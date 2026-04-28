@@ -58,7 +58,7 @@ export default function ApplicationList({
     dispatch(setSelectedApplication(app));
     router.push(`/user/account/applications`);
   };
-
+  
   const StatusIcons: Record<string, React.ReactNode> = {
     APPROVED: (
       <svg
