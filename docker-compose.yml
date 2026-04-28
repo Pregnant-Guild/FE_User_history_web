@@ -1,15 +1,15 @@
 services:
-  history-admin:
+  history-user-master:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: history-admin
+    container_name: history-user-master
     restart: unless-stopped
     ports:
-      - "3011:3000"
+      - "3014:3000"
     networks:
-      - history-admin-network
+      - history-user-master-network
 
 networks:
-  history-admin-network:
+  history-user-master-network:
     driver: bridge

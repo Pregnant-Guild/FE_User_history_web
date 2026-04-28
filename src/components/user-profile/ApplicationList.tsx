@@ -56,7 +56,7 @@ export default function ApplicationList({
 
   const handleViewDetail = (app: any) => {
     dispatch(setSelectedApplication(app));
-    router.push(`/account/applications`);
+    router.push(`/user/account/applications`);
   };
 
   const StatusIcons: Record<string, React.ReactNode> = {

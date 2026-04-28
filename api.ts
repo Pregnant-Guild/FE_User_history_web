@@ -7,7 +7,8 @@ export const API = {
     MEDIA: `${API_URL_ROOT}/users/current/media`,
     Update: `${API_URL_ROOT}/users/current`,
     CHANGE_PASSWORD: `${API_URL_ROOT}/users/current/password`,
-    APPLICATION: `${API_URL_ROOT}/users/current/application`
+    APPLICATION: `${API_URL_ROOT}/users/current/application`,
+    CURRENT_PROJECT: `${API_URL_ROOT}/users/current/project`
   },
   Media:{
     GET_MEDIA: `${API_URL_ROOT}/media`,
@@ -41,5 +42,20 @@ export const API = {
     CREATE_CV: `${API_URL_ROOT}/historian/application`,
     APPLICATION: `${API_URL_ROOT}/historian/application`,
     DELETE_CV: (Id: number | string) => `${API_URL_ROOT}/historian/application/${Id}`,
-  }
+  },
+  Project: {
+    GET_CURRENT_PROJECT: `${API_URL_ROOT}/users/current/project`,
+    CREATE: `${API_URL_ROOT}/projects`,
+    GET_ALL: `${API_URL_ROOT}/projects`,
+    GET_DETAIL: (id: number | string) => `${API_URL_ROOT}/projects/${id}`,
+    UPDATE: (id: number | string) => `${API_URL_ROOT}/projects/${id}`,
+    DELETE: (id: number | string) => `${API_URL_ROOT}/projects/${id}`,
+    ADD_MEMBER: (id: number | string) => `${API_URL_ROOT}/projects/${id}/members`,
+    UPDATE_MEMBER: (id: number | string, userId: number | string) => `${API_URL_ROOT}/projects/${id}/members/${userId}`,
+    REMOVE_MEMBER: (id: number | string, userId: number | string) => `${API_URL_ROOT}/projects/${id}/members/${userId}`,
+    CHANGE_OWNER: (id: number | string) => `${API_URL_ROOT}/projects/${id}/change-owner`,
+    CREATE_COMMIT: (id: number | string) => `${API_URL_ROOT}/projects/${id}/commits`,
+    GET_COMMITS: (id: number | string) => `${API_URL_ROOT}/projects/${id}/commits`,
+    RESTORE_COMMIT: (id: number | string) => `${API_URL_ROOT}/projects/${id}/commits/restore`,
+  },
 }

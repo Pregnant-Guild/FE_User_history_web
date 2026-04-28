@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { ApplicationDto } from "@/interface/historian";
+import { Application } from "@/interface/historian";
 
 export type AppSortColumn =
   | "created_at"
@@ -19,9 +19,9 @@ export type AppSortColumn =
   | "updated_at";
 
 interface ApplicationTableProps {
-  data: ApplicationDto[];
+  data: Application[];
   onSort: (column: AppSortColumn) => void;
-  onViewDetail: (app: ApplicationDto) => void;
+  onViewDetail: (app: Application) => void;
   sortBy?: AppSortColumn;
   sortOrder?: "asc" | "desc";
 }

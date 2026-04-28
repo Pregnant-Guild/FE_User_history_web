@@ -1,7 +1,13 @@
 import api from "@/config/config";
 import { API } from "../../api";
-import { payloadPresignedMedia } from "@/interface/media";
 import axios from "axios";
+import { PresignedUrlResponse } from "@/interface/media";
+
+export interface payloadPresignedMedia {
+  fileName?: string;
+  content_type?: string;
+  size?: number;
+}
 
 export const apiGetCurrentUserMedia = async (
   payload: payloadPresignedMedia,
@@ -41,16 +47,9 @@ export const getFileType = (mime: string): FileType => {
   return "other";
 };
 
-type PreSignedResponse = {
-  token_id: string;
-  upload_url: string;
-  storage_key: string;
-  signed_headers: Record<string, string>;
-};
-
 export const uploadFileToS3 = async (
   file: File,
-  presigned: PreSignedResponse,
+  presigned: PresignedUrlResponse,
 ) => {
   const res = await axios.put(presigned.upload_url, file, {
     headers: {
@@ -70,7 +69,7 @@ export const confirmUpload = async (token_id: string) => {
 };
 
 export const uploadMedia = async (file: File) => {
-  const { data: presigned } = await api.get<PreSignedResponse>(
+  const { data: presigned } = await api.get<PresignedUrlResponse>(
     "/media/presigned",
     {
       params: {
@@ -90,7 +89,7 @@ export const uploadMedia = async (file: File) => {
 };
 
 export const getPresignedUrl = async (file: File) => {
-  const { data: presigned } = await api.get<PreSignedResponse>(
+  const { data: presigned } = await api.get<PresignedUrlResponse>(
     "/media/presigned",
     {
       params: {

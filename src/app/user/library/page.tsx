@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import ApplicationLibrary from "@/components/user-profile/ApplicationList";
-import { MediaDto } from "@/interface/media";
+import { MediaDto } from "@/interface/media"; // Assuming this file will be created
 import { apiGetCurrentUserApplications, apiGetCurrentUserMedia } from "@/service/userService";
 import MediaLibrary from "@/components/user-profile/Media";
+import { Application } from "@/interface/historian";
 
 export default function LibraryPage() {
   const [mediaData, setMediaData] = useState<MediaDto | null>(null);
-  const [applications, setApplications] = useState<any[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function LibraryPage() {
         <div className="space-y-12">
           {(mediaData?.data?.length ?? 0) > 0 && (
             <section>
-              <MediaLibrary data={mediaData ?? {}} />
+              <MediaLibrary data={mediaData!} />
             </section>
           )}
 

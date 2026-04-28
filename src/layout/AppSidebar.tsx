@@ -39,6 +39,11 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/",
   },
   {
+    icon: <BoxCubeIcon />,
+    name: "Dự Án",
+    path: "/user/projects",
+  },
+  {
     icon: <FileIcon />,
     name: "Thư Viện",
     path: "/user/library",

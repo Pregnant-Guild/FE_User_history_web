@@ -16,6 +16,7 @@ import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
 import Image from "next/image";
 import { URL_MEDIA } from "../../../../../api";
+import { MediaItem } from "@/components/tables/MediaTable";
 
 export default function ApplicationDetailPage() {
   const application = useSelector(
@@ -39,7 +40,7 @@ export default function ApplicationDetailPage() {
 
   const config = statusConfig[application.status] || statusConfig.PENDING;
 
-  const isImageFile = (file: any) => {
+  const isImageFile = (file: MediaItem) => {
     const isImageMime = file.mime_type?.startsWith("image/");
     const isImageExt = /\.(jpg|jpeg|png|webp|gif)$/i.test(file.storage_key);
     return isImageMime || isImageExt;
@@ -47,13 +48,13 @@ export default function ApplicationDetailPage() {
 
   const imageMediaOnly = (application.media || []).filter(isImageFile);
 
-  const imageSlides = imageMediaOnly.map((item: any) => ({
+  const imageSlides = imageMediaOnly.map((item: MediaItem) => ({
     src: `${URL_MEDIA}${item.storage_key}`,
     title: item.original_name,
     description: `Dung lượng: ${(item.size / 1024).toFixed(2)} KB`,
   }));
 
-  const handleMediaClick = (item: any) => {
+  const handleMediaClick = (item: MediaItem) => {
     const fileUrl = `${URL_MEDIA}${item.storage_key}`;
     if (isImageFile(item)) {
       const photoIndex = imageMediaOnly.findIndex(
@@ -167,7 +168,7 @@ export default function ApplicationDetailPage() {
               Tài liệu đính kèm ({application.media.length})
             </label>
             <div className="flex flex-row gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {application.media.map((item: any) => {
+              {application.media.map((item: MediaItem) => {
                 const isImg = isImageFile(item);
                 return (
                   <div

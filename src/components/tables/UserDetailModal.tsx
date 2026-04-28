@@ -80,7 +80,7 @@ export default function UserDetailModal({
             ) : (
               <>
                 {(mediaData?.data?.length ?? 0) > 0 ? (
-                  <MediaCard data={mediaData ?? {}} />
+                  <MediaCard data={mediaData!} />
                 ) : (
                   <div className="p-5 border border-dashed border-gray-200 rounded-2xl text-center text-gray-400 text-sm">
                     Người dùng này chưa có dữ liệu media.

@@ -17,6 +17,7 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import { createHistorianCV } from "@/service/historianService";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
+import { PresignedUrlResponse } from "@/interface/media";
 
 type PendingFile = {
   id: string;
@@ -26,7 +27,7 @@ type PendingFile = {
   size: number;
   type: "image" | "document";
   extension: string;
-  presigned?: any;
+  presigned?: PresignedUrlResponse;
 };
 
 export default function RoleUpgrade() {
@@ -131,6 +132,9 @@ export default function RoleUpgrade() {
       setIsSubmitting(true);
 
       const uploadPromises = pendingFiles.map(async (item) => {
+        if (!item.presigned) {
+          throw new Error(`Không thể lấy URL tải lên cho tệp: ${item.name}`);
+        }
         await uploadFileToS3(item.file, item.presigned);
         const confirmRes = await confirmUpload(item.presigned.token_id);
         return confirmRes?.data?.id || confirmRes?.id;
