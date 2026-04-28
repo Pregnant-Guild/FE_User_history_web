@@ -1,0 +1,15 @@
+services:
+  history-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: history-admin
+    restart: unless-stopped
+    ports:
+      - "3011:3000"
+    networks:
+      - history-admin-network
+
+networks:
+  history-admin-network:
+    driver: bridge
