@@ -111,10 +111,10 @@ export default function SignInForm() {
           <div>
             <div className="grid grid-cols-1 gap-3 sm:gap-5">
               <button
-                onClick={() => {
-                  const redirectUrl = HOME_URL;
-                  window.location.href = `${API.Auth.GOOGLE_LOGIN}?redirect=${redirectUrl}`;
-                }}
+                    onClick={() => {
+                    const redirectUrl = HOME_URL;
+                    window.location.href = `${API.Auth.GOOGLE_LOGIN}?redirect=${redirectUrl}`;
+                  }}
                 className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10"
               >
                 <svg

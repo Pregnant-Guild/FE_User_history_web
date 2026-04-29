@@ -1,49 +1,8 @@
+
 import api from "@/config/config";
 import { API } from "../../api";
-import { Project } from "@/interface/project";
-import { CommonResponse, CursorPaginatedResponse } from "@/interface/common";
-
-// ==========================================
-// TYPES & INTERFACES (Cơ bản theo logic chuẩn)
-// ==========================================
-
-export interface CreateProjectPayload {
-  title: string;
-  description?: string;
-  project_status?: "PRIVATE" | "PUBLIC" | "ARCHIVE";
-}
-
-export interface UpdateProjectPayload {
-  title?: string;
-  description?: string;
-  project_status?: "PRIVATE" | "PUBLIC" | "ARCHIVE";
-}
-
-export interface AddMemberPayload {
-  user_id: string;
-  role: "EDITOR" | "VIEWER";
-}
-
-export interface UpdateMemberRolePayload {
-  role: "EDITOR" | "VIEWER";
-}
-
-export interface ChangeOwnerPayload {
-  new_owner_id: string;
-}
-
-export interface CreateCommitPayload {
-  edit_summary: string;
-  snapshot_json: number[]; 
-}
-
-export interface RestoreCommitPayload {
-  commit_id: string;
-}
-
-// ==========================================
-// 1. NHÓM: QUẢN LÝ DỰ ÁN (PROJECTS)
-// ==========================================
+import { Project, GetProjectsParams, UpdateProjectPayload, CreateProjectPayload, AddMemberPayload, UpdateMemberRolePayload, ChangeOwnerPayload, CreateCommitPayload, RestoreCommitPayload } from "@/interface/project";
+import { CommonResponse, CursorPaginatedResponse, PaginatedResponse } from "@/interface/common";
 
 export const apiCreateProject = async (payload: CreateProjectPayload): Promise<CommonResponse<Project>> => {
   const response = await api.post(API.Project.CREATE, payload);
@@ -62,6 +21,11 @@ export const apiUpdateProject = async (id: string, payload: UpdateProjectPayload
 
 export const apiDeleteProject = async (id: string): Promise<CommonResponse> => {
   const response = await api.delete(API.Project.DELETE(id));
+  return response?.data;
+};
+
+export const getProjects = async (params: GetProjectsParams): Promise<PaginatedResponse<Project>> => {
+  const response = await api.get(API.Project.GET_ALL, { params });
   return response?.data;
 };
 

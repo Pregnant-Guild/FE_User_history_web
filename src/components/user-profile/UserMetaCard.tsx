@@ -159,6 +159,9 @@ export default function UserMetaCard({ data }: { data: UserMetaCardProps }) {
                 </>
               )}
             </div>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              ID: {data.data?.id}
+            </span>
           </div>
         </div>
       </div>

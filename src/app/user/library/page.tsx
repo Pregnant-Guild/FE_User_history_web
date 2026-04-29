@@ -6,6 +6,7 @@ import { MediaDto } from "@/interface/media"; // Assuming this file will be crea
 import { apiGetCurrentUserApplications, apiGetCurrentUserMedia } from "@/service/userService";
 import MediaLibrary from "@/components/user-profile/Media";
 import { Application } from "@/interface/historian";
+import Loading from "@/app/loading";
 
 export default function LibraryPage() {
   const [mediaData, setMediaData] = useState<MediaDto | null>(null);
@@ -31,13 +32,7 @@ export default function LibraryPage() {
     fetchLibraryContent();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-      </div>
-    );
-  }
+  if (loading) return <Loading />;
 
   const hasNoData = (!mediaData?.data || mediaData.data.length === 0) && applications.length === 0;
 
