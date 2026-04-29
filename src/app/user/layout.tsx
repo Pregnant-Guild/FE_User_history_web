@@ -8,7 +8,6 @@ import { apiGetCurrentUser } from "@/service/auth";
 import { setUserData } from "@/store/features/userSlice";
 import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { usePathname } from "next/navigation";
 
 export default function AdminLayout({
   children,
@@ -17,8 +16,6 @@ export default function AdminLayout({
 }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const dispatch = useDispatch()
-  const pathname = usePathname();
-  const isHomePage = pathname === "/";
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -34,19 +31,17 @@ export default function AdminLayout({
 
 
   // Dynamic class for main content margin based on sidebar state
-  const mainContentMargin = isHomePage
+  const mainContentMargin = isMobileOpen
     ? "ml-0"
-    : isMobileOpen
-      ? "ml-0"
-      : isExpanded || isHovered
-        ? "lg:ml-[290px]"
-        : "lg:ml-[90px]";
+    : isExpanded || isHovered
+      ? "lg:ml-[290px]"
+      : "lg:ml-[0px]";
 
   return (
     <div className="min-h-screen xl:flex">
       {/* Sidebar and Backdrop */}
-      {!isHomePage && <AppSidebar />}
-      {!isHomePage && <Backdrop />}
+      <AppSidebar />
+      <Backdrop />
       {/* Main Content Area */}
       <div
         className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
