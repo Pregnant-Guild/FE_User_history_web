@@ -217,7 +217,15 @@ export default function ProjectsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center mt-4 md:mt-0 w-[120px] justify-end shrink-0">
+                        <div className="flex items-center mt-4 md:mt-0 gap-10 w-[240px] justify-end shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/editor/${project.id}`)}
+                          >
+                            Editor
+                          </Button>
+
                           <div className="flex -space-x-2 overflow-hidden">
                             {project.members && project.members.length > 0 ? (
                               <>

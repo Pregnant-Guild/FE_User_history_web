@@ -58,4 +58,10 @@ export const API = {
     GET_COMMITS: (id: number | string) => `${API_URL_ROOT}/projects/${id}/commits`,
     RESTORE_COMMIT: (id: number | string) => `${API_URL_ROOT}/projects/${id}/commits/restore`,
   },
+  Submission: {
+    SEARCH: `${API_URL_ROOT}/submissions`,
+    GET_BY_ID: (id: number | string) => `${API_URL_ROOT}/submissions/${id}`,
+    UPDATE_STATUS: (id: number | string) => `${API_URL_ROOT}/submissions/${id}/status`,
+    DELETE: (id: number | string) => `${API_URL_ROOT}/submissions/${id}`,
+  },
 }

@@ -3,6 +3,7 @@ export interface Project {
   title: string;
   description: string;
   project_status: "PRIVATE" | "PUBLIC" | "ARCHIVE";
+  latest_commit_id?: string | null;
   created_at: string;
   updated_at: string;
   is_deleted?: boolean;

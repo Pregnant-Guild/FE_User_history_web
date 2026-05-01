@@ -10,6 +10,7 @@ import Swal from "sweetalert2";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { apiAddProjectMember, apiChangeProjectOwner, apiDeleteProject, apiGetProjectDetail, apiRemoveProjectMember, apiUpdateProject, apiUpdateProjectMemberRole } from "@/service/projectService";
 import Loading from "@/app/loading";
+import Button from "@/components/ui/button/Button";
 
 type TabType = "overview" | "members" | "settings";
 
@@ -256,7 +257,7 @@ export default function ProjectDetailsPage() {
             </span>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
             {[
               {
                 id: "overview",
@@ -305,6 +306,11 @@ export default function ProjectDetailsPage() {
                 )}
               </button>
             ))}
+
+            <div className="flex-1" />
+            <Button size="sm" variant="outline" onClick={() => router.push(`/editor/${id}`)}>
+              Mo editor
+            </Button>
           </div>
         </div>
       </div>
