@@ -311,6 +311,9 @@ export default function ProjectDetailsPage() {
             <Button size="sm" variant="outline" onClick={() => router.push(`/editor/${id}`)}>
               Mo editor
             </Button>
+            <Button size="sm" variant="outline" onClick={() => router.push(`/editor/${id}?only=wiki`)}>
+              Editor only wiki
+            </Button>
           </div>
         </div>
       </div>

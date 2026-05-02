@@ -4,6 +4,7 @@ export const BACKGROUND_LAYER_OPTIONS = [
     { id: "land", label: "Land" },
     { id: "bg-countries-fill", label: "Countries" },
     { id: "bg-country-borders-line", label: "Country Borders" },
+    { id: "country-labels", label: "Country Labels" },
     { id: "regions-line", label: "Regions" },
     { id: "lakes-fill", label: "Lakes" },
     { id: "rivers-line", label: "Rivers" },

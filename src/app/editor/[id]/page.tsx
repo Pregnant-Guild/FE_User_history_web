@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Map from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/BackgroundLayersPanel";
 import TimelineBar from "@/uhm/components/TimelineBar";
 import SelectedGeometryPanel from "@/uhm/components/SelectedGeometryPanel";
+import WikiSidebarPanel from "@/uhm/components/WikiSidebarPanel";
+import ProjectEntityRefsPanel from "@/uhm/components/ProjectEntityRefsPanel";
+import EntityWikiBindingsPanel from "@/uhm/components/EntityWikiBindingsPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
@@ -63,8 +66,11 @@ const DEFAULT_EDITOR_USER_ID = "local-editor";
 export default function Page() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const projectId = String(params.id || "");
     const openedProjectIdRef = useRef<string | null>(null);
+    const autoOpenWiki = searchParams.get("only") === "wiki";
+    const wikiOnly = autoOpenWiki;
 
     const {
         mode,
@@ -99,6 +105,8 @@ export default function Page() {
         setLastSectionSnapshot,
         persistedEntities,
         setPersistedEntities,
+        projectEntityRefs,
+        setProjectEntityRefs,
         pendingEntityCreates,
         setPendingEntityCreates,
         createdEntities,
@@ -137,6 +145,10 @@ export default function Page() {
         setBackgroundVisibility,
         isBackgroundVisibilityReady,
         setIsBackgroundVisibilityReady,
+        wikis,
+        setWikis,
+        entityWikiLinks,
+        setEntityWikiLinks,
     } = useEditorSessionState({
         emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
         defaultEditorUserId: DEFAULT_EDITOR_USER_ID,
@@ -154,6 +166,20 @@ export default function Page() {
         () => mergeEntitiesWithPending(persistedEntities, pendingEntityCreates),
         [persistedEntities, pendingEntityCreates]
     );
+
+    const projectEntityChoices = useMemo(() => {
+        const ids = new Set<string>();
+        for (const ref of projectEntityRefs) ids.add(String(ref.id));
+        for (const feature of editor.draft.features) {
+            for (const id of normalizeFeatureEntityIds(feature)) ids.add(id);
+        }
+        const rows = Array.from(ids).map((id) => {
+            const found = entities.find((e) => e.id === id) || null;
+            return { id, name: found?.name || id };
+        });
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+        return rows;
+    }, [editor.draft.features, entities, projectEntityRefs]);
     const selectedFeature =
         selectedFeatureId === null
             ? null
@@ -186,6 +212,17 @@ export default function Page() {
         return rows;
     }, [editor.changes, entities]);
 
+    const wikiDirty = useMemo(() => {
+        const prev = lastSectionSnapshot?.wikis || [];
+        try {
+            return JSON.stringify(prev) !== JSON.stringify(wikis);
+        } catch {
+            return true;
+        }
+    }, [lastSectionSnapshot?.wikis, wikis]);
+
+    const pendingSaveCount = editor.changeCount + pendingEntityCreates.length + (wikiDirty ? 1 : 0);
+
     const sectionCommands = useSectionCommands({
         editor,
         editorUserId,
@@ -194,8 +231,11 @@ export default function Page() {
         sectionState,
         selectedSectionId,
         newSectionTitle,
-        pendingSaveCount: editor.changeCount + pendingEntityCreates.length,
+        pendingSaveCount,
         pendingEntityCreates,
+        projectEntityRefs,
+        wikis,
+        entityWikiLinks,
         lastSectionSnapshot,
         commitTitle,
         commitNote,
@@ -206,7 +246,10 @@ export default function Page() {
         setInitialData,
         setSectionCommits,
         setPendingEntityCreates,
+        setProjectEntityRefs,
         setCreatedEntities,
+        setWikis,
+        setEntityWikiLinks,
         setEntityFormStatus,
         setSelectedFeatureId,
         setEntityStatus,
@@ -659,7 +702,6 @@ export default function Page() {
         }
     };
 
-    const pendingSaveCount = editor.changeCount + pendingEntityCreates.length;
     const headCommit = sectionState?.head_commit_id
         ? sectionCommits.find((commit) => commit.id === sectionState.head_commit_id) || null
         : null;
@@ -705,29 +747,34 @@ export default function Page() {
                 createdGeometries={createdGeometries}
             />
 
-            <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
-                {isBackgroundVisibilityReady ? (
-                    <Map
-                        mode={mode}
-                        draft={editor.draft}
-                        selectedFeatureId={selectedFeatureId}
-                        onSelectFeatureId={setSelectedFeatureId}
-                        onCreateFeature={handleCreateFeature}
-                        onDeleteFeature={editor.deleteFeature}
-                        onUpdateFeature={editor.updateFeature}
-                        backgroundVisibility={backgroundVisibility}
+            {!wikiOnly ? (
+                <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
+                    {isBackgroundVisibilityReady ? (
+                        <Map
+                            mode={mode}
+                            draft={editor.draft}
+                            selectedFeatureId={selectedFeatureId}
+                            onSelectFeatureId={setSelectedFeatureId}
+                            onCreateFeature={handleCreateFeature}
+                            onDeleteFeature={editor.deleteFeature}
+                            onUpdateFeature={editor.updateFeature}
+                            backgroundVisibility={backgroundVisibility}
+                        />
+                    ) : (
+                        <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
+                    )}
+                    <TimelineBar
+                        year={timelineDraftYear}
+                        onYearChange={handleTimelineYearChange}
+                        isLoading={isTimelineLoading}
+                        disabled={timelineDisabled}
+                        statusText={timelineStatusText}
                     />
-                ) : (
-                    <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
-                )}
-                <TimelineBar
-                    year={timelineDraftYear}
-                    onYearChange={handleTimelineYearChange}
-                    isLoading={isTimelineLoading}
-                    disabled={timelineDisabled}
-                    statusText={timelineStatusText}
-                />
-            </div>
+                </div>
+            ) : (
+                // Wiki-only mode: avoid mounting Map/Timeline (WebGL + geometry fetching) to reduce lag.
+                <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220" }} />
+            )}
 
             <BackgroundLayersPanel
                 visibility={backgroundVisibility}
@@ -735,40 +782,52 @@ export default function Page() {
                 onShowAll={handleShowAllBackgroundLayers}
                 onHideAll={handleHideAllBackgroundLayers}
                 topContent={
-                    <SelectedGeometryPanel
-                        selectedFeature={selectedFeature}
-                        selectedFeatureEntitySummary={
-                            selectedFeature
-                                ? formatEntityNamesForDisplay(selectedFeature, entities)
-                                : "Chưa gắn"
-                        }
-                        selectedFeatureBindingSummary={
-                            selectedFeature
-                                ? formatBindingIdsForDisplay(selectedFeature)
-                                : "Không có"
-                        }
-                        entities={entities}
-                        selectedGeometryEntityIds={selectedGeometryEntityIds}
-                        onEntityIdsChange={handleEntityIdsChange}
-                        entitySearchQuery={entitySearchQuery}
-                        onEntitySearchQueryChange={setEntitySearchQuery}
-                        entitySearchResults={entitySearchResults}
-                        selectedSearchEntityId={selectedSearchEntityId}
-                        onSelectSearchEntityId={setSelectedSearchEntityId}
-                        onAddSelectedSearchEntity={handleAddSelectedSearchEntity}
-                        isEntitySearchLoading={isEntitySearchLoading}
-                        entityForm={entityForm}
-                        onEntityFormChange={handleEntityFormChange}
-                        entityTypeOptions={ENTITY_TYPE_OPTIONS}
-                        geometryMetaForm={geometryMetaForm}
-                        onGeometryMetaFormChange={handleGeometryMetaFormChange}
-                        isEntitySubmitting={isEntitySubmitting}
-                        onCreateEntityOnly={handleCreateEntityOnly}
-                        onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
-                        onApplyEntitiesForSelectedGeometry={featureCommands.applyEntitiesToSelectedGeometry}
-                        changeCount={editor.changeCount}
-                        entityFormStatus={entityFormStatus}
-                    />
+                    <div style={{ display: "grid", gap: "12px" }}>
+                        <WikiSidebarPanel
+                            projectId={projectId}
+                            wikis={wikis}
+                            setWikis={setWikis}
+                            autoOpen={autoOpenWiki}
+                        />
+                        <ProjectEntityRefsPanel entityRefs={projectEntityRefs} setEntityRefs={setProjectEntityRefs} />
+                        <EntityWikiBindingsPanel entities={projectEntityChoices} wikis={wikis} links={entityWikiLinks} setLinks={setEntityWikiLinks} />
+                        {!wikiOnly ? (
+                            <SelectedGeometryPanel
+                                selectedFeature={selectedFeature}
+                                selectedFeatureEntitySummary={
+                                    selectedFeature
+                                        ? formatEntityNamesForDisplay(selectedFeature, entities)
+                                        : "Chưa gắn"
+                                }
+                                selectedFeatureBindingSummary={
+                                    selectedFeature
+                                        ? formatBindingIdsForDisplay(selectedFeature)
+                                        : "Không có"
+                                }
+                                entities={entities}
+                                selectedGeometryEntityIds={selectedGeometryEntityIds}
+                                onEntityIdsChange={handleEntityIdsChange}
+                                entitySearchQuery={entitySearchQuery}
+                                onEntitySearchQueryChange={setEntitySearchQuery}
+                                entitySearchResults={entitySearchResults}
+                                selectedSearchEntityId={selectedSearchEntityId}
+                                onSelectSearchEntityId={setSelectedSearchEntityId}
+                                onAddSelectedSearchEntity={handleAddSelectedSearchEntity}
+                                isEntitySearchLoading={isEntitySearchLoading}
+                                entityForm={entityForm}
+                                onEntityFormChange={handleEntityFormChange}
+                                entityTypeOptions={ENTITY_TYPE_OPTIONS}
+                                geometryMetaForm={geometryMetaForm}
+                                onGeometryMetaFormChange={handleGeometryMetaFormChange}
+                                isEntitySubmitting={isEntitySubmitting}
+                                onCreateEntityOnly={handleCreateEntityOnly}
+                                onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
+                                onApplyEntitiesForSelectedGeometry={featureCommands.applyEntitiesToSelectedGeometry}
+                                changeCount={editor.changeCount}
+                                entityFormStatus={entityFormStatus}
+                            />
+                        ) : null}
+                    </div>
                 }
             />
         </div>

@@ -35,11 +35,13 @@ export type FeatureCollection = {
     features: Feature[];
 };
 
-export type GeometrySnapshotOperation = "create" | "update" | "delete" | "reference" | "replace";
+export type GeometrySnapshotOperation = "create" | "update" | "delete" | "reference";
 
 export type GeometrySnapshot = {
     id: string;
-    operation: GeometrySnapshotOperation;
+    source?: "inline" | "ref";
+    ref?: { id: string };
+    operation?: GeometrySnapshotOperation;
     type?: string | null;
     draw_geometry?: Geometry;
     geometry?: Geometry;
@@ -59,7 +61,8 @@ export type GeometrySnapshot = {
 
 export type LinkScopeSnapshot = {
     geometry_id: string;
-    operation: "replace" | "reference";
+    // Link deltas should be represented as "reference" operations (no replace in the current flow).
+    operation: "reference";
     entity_ids: string[];
     base_links_hash?: string;
 };

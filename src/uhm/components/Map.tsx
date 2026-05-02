@@ -260,22 +260,24 @@ export default function Map({
         const container = containerRef.current;
         if (!container) return;
 
-        const map = new maplibregl.Map({
-            container,
-            attributionControl: false,
-            minZoom: MAP_MIN_ZOOM,
-            maxZoom: MAP_MAX_ZOOM,
-            style: {
-                version: 8,
-                sources: {
-                    base: {
-                        type: "vector",
-                        tiles: [getVectorTileTemplateUrl()],
-                        minzoom: 0,
-                        maxzoom: 6,
+            const map = new maplibregl.Map({
+                container,
+                attributionControl: false,
+                minZoom: MAP_MIN_ZOOM,
+                maxZoom: MAP_MAX_ZOOM,
+                style: {
+                    version: 8,
+                    // Needed for symbol/text layers (country labels).
+                    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+                    sources: {
+                        base: {
+                            type: "vector",
+                            tiles: [getVectorTileTemplateUrl()],
+                            minzoom: 0,
+                            maxzoom: 6,
+                        },
                     },
-                },
-                layers: [
+                    layers: [
                     {
                         id: "background",
                         type: "background",
@@ -321,29 +323,101 @@ export default function Map({
                             "fill-opacity": 0.38,
                         },
                     },
-                    {
-                        id: "bg-country-borders-line",
-                        type: "line",
-                        source: "base",
-                        "source-layer": "country_borders",
-                        paint: {
-                            "line-color": "#cbd5e1",
-                            "line-width": [
-                                "interpolate",
-                                ["linear"],
-                                ["zoom"],
-                                0, 0.2,
-                                4, 0.5,
-                                6, 1.1,
-                            ],
-                            "line-opacity": 0.85,
+                        {
+                            id: "bg-country-borders-line",
+                            type: "line",
+                            source: "base",
+                            "source-layer": "country_borders",
+                            paint: {
+                                "line-color": "#cbd5e1",
+                                "line-width": [
+                                    "interpolate",
+                                    ["linear"],
+                                    ["zoom"],
+                                    0, 0.2,
+                                    4, 0.5,
+                                    6, 1.1,
+                                ],
+                                "line-opacity": 0.85,
+                            },
                         },
-                    },
-                    {
-                        id: "regions-line",
-                        type: "line",
-                        source: "base",
-                        "source-layer": "regions",
+                        {
+                            id: "country-labels",
+                            type: "symbol",
+                            source: "base",
+                            // New tiles build uses NaturalEarth label points layer name.
+                            // If your tile pipeline exposes a different name, adjust here.
+                            "source-layer": "ne_10m_admin_0_label_points",
+                            minzoom: 0,
+                            layout: {
+                                "text-field": [
+                                    "coalesce",
+                                    ["get", "sr_subunit"],
+                                    ["get", "NAME_EN"],
+                                    ["get", "NAME"],
+                                    ["get", "ADMIN"],
+                                    ["get", "name"],
+                                    "",
+                                ],
+                                "text-size": [
+                                    "interpolate",
+                                    ["linear"],
+                                    ["zoom"],
+                                    0, 10,
+                                    3, 11,
+                                    6, 14,
+                                ],
+                                "text-max-width": 10,
+                                "text-allow-overlap": false,
+                                "symbol-placement": "point",
+                            },
+                            paint: {
+                                "text-color": "#e2e8f0",
+                                "text-halo-color": "#0b1220",
+                                "text-halo-width": 1.2,
+                                "text-halo-blur": 0.5,
+                            },
+                        },
+                        // Fallback for tile pipelines that expose country labels under a generic "labels" layer.
+                        // Hidden/shown together with "country-labels" toggle.
+                        {
+                            id: "country-labels-alt",
+                            type: "symbol",
+                            source: "base",
+                            "source-layer": "labels",
+                            minzoom: 0,
+                            layout: {
+                                "text-field": [
+                                    "coalesce",
+                                    ["get", "name"],
+                                    ["get", "title"],
+                                    ["get", "NAME"],
+                                    "",
+                                ],
+                                "text-size": [
+                                    "interpolate",
+                                    ["linear"],
+                                    ["zoom"],
+                                    0, 10,
+                                    3, 11,
+                                    6, 14,
+                                ],
+                                "text-max-width": 10,
+                                "text-allow-overlap": false,
+                                "symbol-placement": "point",
+                            },
+                            paint: {
+                                "text-color": "#e2e8f0",
+                                "text-halo-color": "#0b1220",
+                                "text-halo-width": 1.2,
+                                "text-halo-blur": 0.5,
+                            },
+                        },
+                        {
+                            id: "regions-line",
+                            type: "line",
+                            source: "base",
+                            "source-layer": "regions",
                         paint: {
                             "line-color": "#475569",
                             "line-width": [
@@ -1110,6 +1184,15 @@ function applyBackgroundLayerVisibility(
             layer.id,
             "visibility",
             visibility[layer.id] ? "visible" : "none"
+        );
+    }
+
+    // Keep fallback country label layer in sync with the primary toggle.
+    if (map.getLayer("country-labels-alt")) {
+        map.setLayoutProperty(
+            "country-labels-alt",
+            "visibility",
+            visibility["country-labels"] ? "visible" : "none"
         );
     }
 }

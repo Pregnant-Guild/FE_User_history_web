@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Entity } from "@/uhm/types/entities";
+import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { FeatureId } from "@/uhm/types/geo";
 import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/entityTypeOptions";
 import type {
@@ -12,6 +13,8 @@ import type {
 export function useEntitySessionState() {
     // Entities đã persisted từ backend (dùng cho search/binding).
     const [persistedEntities, setPersistedEntities] = useState<Entity[]>([]);
+    // Entities được "pin" vào project dưới dạng reference (không cần chọn geometry).
+    const [projectEntityRefs, setProjectEntityRefs] = useState<EntitySnapshot[]>([]);
     // Entities tạo mới trong phiên nhưng chưa commit lên backend.
     const [pendingEntityCreates, setPendingEntityCreates] = useState<PendingEntityCreate[]>([]);
     // Tóm tắt entities đã tạo (để hiển thị nhanh ở sidebar).
@@ -50,6 +53,8 @@ export function useEntitySessionState() {
     return {
         persistedEntities,
         setPersistedEntities,
+        projectEntityRefs,
+        setProjectEntityRefs,
         pendingEntityCreates,
         setPendingEntityCreates,
         createdEntities,

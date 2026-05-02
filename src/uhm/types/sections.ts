@@ -1,5 +1,13 @@
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { FeatureCollection, GeometrySnapshot, LinkScopeSnapshot } from "@/uhm/types/geo";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
+
+export type EntityWikiLinkSnapshot = {
+    entity_id: string;
+    wiki_id: string;
+    operation?: "reference" | "delete";
+    is_deleted?: number;
+};
 
 // API mới (BackEndGo) dùng Projects/Commits/Submissions.
 // Giữ tên type "Section" để tránh thay đổi lan rộng trong FE hiện tại.
@@ -62,6 +70,8 @@ export type EditorSnapshot = {
     entities?: EntitySnapshot[];
     geometries?: GeometrySnapshot[];
     link_scopes?: LinkScopeSnapshot[];
+    wikis?: WikiSnapshot[];
+    entity_wikis?: EntityWikiLinkSnapshot[];
 };
 
 export type EditorLoadResponse = {

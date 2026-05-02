@@ -4,6 +4,7 @@ import { useBackgroundSessionState } from "@/uhm/lib/editor/session/useBackgroun
 import { useEntitySessionState } from "@/uhm/lib/editor/session/useEntitySessionState";
 import { useSectionSessionState } from "@/uhm/lib/editor/session/useSectionSessionState";
 import { useTimelineState } from "@/uhm/lib/editor/session/useTimelineState";
+import { useWikiSessionState } from "@/uhm/lib/editor/session/useWikiSessionState";
 import type { EditorMode, TimelineRange } from "@/uhm/lib/editor/session/sessionTypes";
 
 export type {
@@ -37,6 +38,7 @@ export function useEditorSessionState(options: Options) {
         fallbackTimelineRange: options.fallbackTimelineRange,
     });
     const background = useBackgroundSessionState();
+    const wiki = useWikiSessionState();
 
     return {
         mode,
@@ -47,5 +49,6 @@ export function useEditorSessionState(options: Options) {
         ...entity,
         ...timeline,
         ...background,
+        ...wiki,
     };
 }

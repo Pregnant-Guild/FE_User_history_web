@@ -14,7 +14,9 @@ import { buildEditorSnapshot, normalizeEditorSnapshot } from "@/uhm/lib/editor/s
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { CreatedEntitySummary, PendingEntityCreate } from "@/uhm/lib/editor/session/sessionTypes";
 import type { Feature, FeatureCollection, FeatureId } from "@/uhm/types/geo";
-import type { EditorSnapshot, Section, SectionCommit, SectionState } from "@/uhm/types/sections";
+import type { EditorSnapshot, Section, SectionCommit, SectionState, EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntitySnapshot } from "@/uhm/types/entities";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
 
 type EditorDraftApi = {
     draft: FeatureCollection;
@@ -33,6 +35,9 @@ type Options = {
     newSectionTitle: string;
     pendingSaveCount: number;
     pendingEntityCreates: PendingEntityCreate[];
+    projectEntityRefs: EntitySnapshot[];
+    wikis: WikiSnapshot[];
+    entityWikiLinks: EntityWikiLinkSnapshot[];
     lastSectionSnapshot: EditorSnapshot | null;
     commitTitle: string;
     commitNote: string;
@@ -43,7 +48,10 @@ type Options = {
     setInitialData: Dispatch<SetStateAction<FeatureCollection>>;
     setSectionCommits: Dispatch<SetStateAction<SectionCommit[]>>;
     setPendingEntityCreates: Dispatch<SetStateAction<PendingEntityCreate[]>>;
+    setProjectEntityRefs: Dispatch<SetStateAction<EntitySnapshot[]>>;
     setCreatedEntities: Dispatch<SetStateAction<CreatedEntitySummary[]>>;
+    setWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
+    setEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
     setSelectedFeatureId: Dispatch<SetStateAction<FeatureId | null>>;
     setEntityFormStatus: Dispatch<SetStateAction<string | null>>;
     setEntityStatus: Dispatch<SetStateAction<string | null>>;
@@ -71,6 +79,9 @@ export function useSectionCommands(options: Options) {
         options.setSectionCommits(commits);
         options.setPendingEntityCreates([]);
         options.setCreatedEntities([]);
+        options.setProjectEntityRefs((snapshot?.entities || []).filter((e) => e?.operation === "reference"));
+        options.setWikis(snapshot?.wikis || []);
+        options.setEntityWikiLinks(snapshot?.entity_wikis || []);
         options.setSelectedFeatureId(null);
         options.setEntityFormStatus(null);
     }, [options]);
@@ -90,6 +101,9 @@ export function useSectionCommands(options: Options) {
                 draft: options.editor.draft,
                 changes: geometryChanges,
                 pendingEntities: options.pendingEntityCreates,
+                projectEntityRefs: options.projectEntityRefs,
+                wikis: options.wikis,
+                entityWikiLinks: options.entityWikiLinks,
                 previousSnapshot: options.lastSectionSnapshot,
                 hasPersistedFeature: options.editor.hasPersistedFeature,
             });
@@ -233,6 +247,7 @@ export function useSectionCommands(options: Options) {
             if (snapshot?.editor_feature_collection) {
                 options.setInitialData(snapshot.editor_feature_collection);
             }
+            options.setWikis(snapshot?.wikis || []);
             options.setSectionCommits(await fetchSectionCommits(options.activeSection.id));
             options.setEntityFormStatus("Đã restore commit.");
         } catch (err) {

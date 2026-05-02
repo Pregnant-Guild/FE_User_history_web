@@ -8,6 +8,7 @@ export const API_BASE_URL =
 export const API_ENDPOINTS = {
     geometries: `${API_BASE_URL}/geometries`,
     entities: `${API_BASE_URL}/entities`,
+    wikis: `${API_BASE_URL}/wikis`,
     // New API uses projects + commits + submissions (JWT-protected).
     authSignin: `${API_BASE_URL}/auth/signin`,
     authRefresh: `${API_BASE_URL}/auth/refresh`,

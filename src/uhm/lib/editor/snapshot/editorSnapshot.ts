@@ -4,6 +4,8 @@ import type { PendingEntityCreate } from "@/uhm/lib/editor/session/sessionTypes"
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometrySnapshot, LinkScopeSnapshot } from "@/uhm/types/geo";
 import type { EditorSnapshot, Section } from "@/uhm/types/sections";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 
 export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -26,6 +28,9 @@ export function buildEditorSnapshot(options: {
     draft: FeatureCollection;
     changes: Change[];
     pendingEntities: PendingEntityCreate[];
+    projectEntityRefs: EntitySnapshot[];
+    wikis: WikiSnapshot[];
+    entityWikiLinks: EntityWikiLinkSnapshot[];
     previousSnapshot: EditorSnapshot | null;
     hasPersistedFeature: (id: Feature["properties"]["id"]) => boolean;
 }): EditorSnapshot {
@@ -55,13 +60,10 @@ export function buildEditorSnapshot(options: {
 
     const pendingEntityIds = new Set(options.pendingEntities.map((entity) => entity.id));
     const entityRows = new globalThis.Map<string, EntitySnapshot>();
-    for (const item of options.previousSnapshot?.entities || []) {
-        const id = typeof item.id === "string" || typeof item.id === "number" ? String(item.id) : "";
-        if (id) entityRows.set(id, { ...item });
-    }
     for (const entity of options.pendingEntities) {
         entityRows.set(entity.id, {
             id: entity.id,
+            source: "inline",
             operation: "create",
             name: entity.name,
             slug: entity.slug,
@@ -72,11 +74,40 @@ export function buildEditorSnapshot(options: {
         });
     }
 
+    for (const ref of options.projectEntityRefs || []) {
+        const id = typeof ref?.id === "string" || typeof ref?.id === "number" ? String(ref.id) : "";
+        if (!id || entityRows.has(id)) continue;
+        const cloned = JSON.parse(JSON.stringify(ref)) as EntitySnapshot;
+        entityRows.set(id, {
+            ...cloned,
+            id,
+            source: cloned.source || "ref",
+            ref: cloned.ref || { id },
+            operation: "reference",
+            is_deleted: cloned.is_deleted ?? 0,
+        });
+    }
+
+    // Entities referenced by wiki links should be present as "reference" too.
+    for (const link of options.entityWikiLinks || []) {
+        const id = typeof link?.entity_id === "string" ? link.entity_id : "";
+        if (!id || entityRows.has(id)) continue;
+        entityRows.set(id, {
+            id,
+            source: "ref",
+            ref: { id },
+            operation: "reference",
+            is_deleted: 0,
+        });
+    }
+
     for (const feature of options.draft.features) {
         for (const entityId of normalizeFeatureEntityIds(feature)) {
             if (entityRows.has(entityId)) continue;
             entityRows.set(entityId, {
                 id: entityId,
+                source: "ref",
+                ref: { id: entityId },
                 operation: "reference",
                 name: feature.properties.entity_names?.[0] || feature.properties.entity_name || entityId,
                 slug: null,
@@ -95,17 +126,19 @@ export function buildEditorSnapshot(options: {
         const changedFromPreviousSnapshot = previousFeature
             ? JSON.stringify(previousFeature) !== JSON.stringify(feature)
             : false;
-        const operation: GeometrySnapshot["operation"] = previousOperation === "create"
-            ? "create"
-            : !previousFeature && (options.previousSnapshot || !options.hasPersistedFeature(feature.properties.id))
+        const operation: GeometrySnapshot["operation"] =
+            previousOperation === "create"
                 ? "create"
-                : changedIds.has(id) || changedFromPreviousSnapshot
-                    ? "update"
-                    : "reference";
+                : !previousFeature && (options.previousSnapshot || !options.hasPersistedFeature(feature.properties.id))
+                    ? "create"
+                    : changedIds.has(id) || changedFromPreviousSnapshot
+                        ? "update"
+                        : undefined;
         const bbox = getFeatureBBox(feature);
         return {
             id,
             operation,
+            source: "inline",
             type: feature.properties.type || getDefaultTypeIdForFeature(feature),
             draw_geometry: feature.geometry,
             binding: normalizeFeatureBindingIds(feature),
@@ -134,10 +167,62 @@ export function buildEditorSnapshot(options: {
     const linkScopes: LinkScopeSnapshot[] = options.draft.features
         .map((feature) => ({
             geometry_id: String(feature.properties.id),
-            operation: "replace" as const,
+            operation: "reference" as const,
             entity_ids: normalizeFeatureEntityIds(feature),
         }))
         .filter((scope) => scope.entity_ids.length > 0);
+
+    const previousWikis = new globalThis.Map<string, WikiSnapshot>();
+    for (const item of options.previousSnapshot?.wikis || []) {
+        if (!item || typeof item !== "object") continue;
+        const id = typeof (item as any).id === "string" ? String((item as any).id) : "";
+        if (id) previousWikis.set(id, item as WikiSnapshot);
+    }
+
+    // Wikis in snapshot_json are treated as current state (not a delta-table like geometries[]).
+    // Operation semantics:
+    // - create/update/delete: this commit changes the wiki itself
+    // - reference: this wiki is a ref used for linking (entity<->wiki), not a modification
+    const wikis: WikiSnapshot[] = (options.wikis || [])
+        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+        .map((w) => {
+            const prev = previousWikis.get(w.id) || null;
+            const cloned = JSON.parse(JSON.stringify(w)) as WikiSnapshot;
+
+            cloned.source = cloned.source || "inline";
+
+            // Ref wiki: always mark as reference (used for linking, not changed here).
+            if (cloned.source === "ref") {
+                cloned.ref = cloned.ref || { id: cloned.id };
+                cloned.operation = "reference";
+                return cloned;
+            }
+
+            // Inline wiki: if explicitly marked create/update/delete by UI, keep it.
+            if (cloned.operation === "create" || cloned.operation === "update" || cloned.operation === "delete") {
+                return cloned;
+            }
+
+            // Inline wiki with no explicit operation: mark update only if changed; otherwise omit operation.
+            if (!prev) {
+                // New wiki that somehow has no op set: treat as create.
+                cloned.operation = "create";
+                return cloned;
+            }
+
+            const changed = (() => {
+                try {
+                    const prevComparable = { title: (prev as any).title, doc: (prev as any).doc };
+                    const nextComparable = { title: (cloned as any).title, doc: (cloned as any).doc };
+                    return JSON.stringify(prevComparable) !== JSON.stringify(nextComparable);
+                } catch {
+                    return true;
+                }
+            })();
+
+            cloned.operation = changed ? "update" : undefined;
+            return cloned;
+        });
 
     return {
         schema_version: 1,
@@ -153,6 +238,8 @@ export function buildEditorSnapshot(options: {
         }),
         geometries,
         link_scopes: linkScopes,
+        wikis,
+        entity_wikis: JSON.parse(JSON.stringify(options.entityWikiLinks || [])) as EntityWikiLinkSnapshot[],
     };
 }
 

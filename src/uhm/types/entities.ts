@@ -15,11 +15,19 @@ export type Entity = {
     geometry_count?: number;
 };
 
-export type EntitySnapshotOperation = "create" | "update" | "delete" | "reference" | "replace";
+export type EntitySnapshotOperation = "create" | "update" | "delete" | "reference";
 
 export type EntitySnapshot = {
     id: string;
-    operation: EntitySnapshotOperation;
+    // Where this entity's data comes from.
+    // - inline: data is embedded in snapshot_json
+    // - ref: data should be fetched externally by ref.id (DB/global)
+    source?: "inline" | "ref";
+    ref?: { id: string };
+    // Delta semantics for this commit:
+    // - create/update/delete: this commit modifies the entity record
+    // - reference: this entity is referenced/linked (e.g., geometry<->entity, entity<->wiki) but not modified
+    operation?: EntitySnapshotOperation;
     name?: string;
     slug?: string | null;
     description?: string | null;
