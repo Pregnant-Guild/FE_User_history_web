@@ -285,15 +285,15 @@ export default function Map({
                             "background-color": "#0b1220",
                         },
                     },
-                    {
-                        id: "graticules-line",
-                        type: "line",
-                        source: "base",
-                        "source-layer": "graticules",
-                        paint: {
-                            "line-color": "#334155",
-                            "line-width": [
-                                "interpolate",
+	                    {
+	                        id: "graticules-line",
+	                        type: "line",
+	                        source: "base",
+	                        "source-layer": "ne_10m_graticules_10",
+	                        paint: {
+	                            "line-color": "#334155",
+	                            "line-width": [
+	                                "interpolate",
                                 ["linear"],
                                 ["zoom"],
                                 0, 0.3,
@@ -303,34 +303,34 @@ export default function Map({
                             "line-opacity": 0.55,
                         },
                     },
-                    {
-                        id: "land",
-                        type: "fill",
-                        source: "base",
-                        "source-layer": "land",
-                        paint: {
-                            "fill-color": "#1e293b",
-                            "fill-opacity": 0.25,
-                        },
-                    },
-                    {
-                        id: "bg-countries-fill",
-                        type: "fill",
-                        source: "base",
-                        "source-layer": "countries",
-                        paint: {
-                            "fill-color": COUNTRY_FILL_COLOR_EXPRESSION,
-                            "fill-opacity": 0.38,
-                        },
-                    },
+	                    {
+	                        id: "land",
+	                        type: "fill",
+	                        source: "base",
+	                        "source-layer": "ne_10m_land",
+	                        paint: {
+	                            "fill-color": "#1e293b",
+	                            "fill-opacity": 0.25,
+	                        },
+	                    },
+	                    {
+	                        id: "bg-countries-fill",
+	                        type: "fill",
+	                        source: "base",
+	                        "source-layer": "ne_10m_admin_0_countries",
+	                        paint: {
+	                            "fill-color": COUNTRY_FILL_COLOR_EXPRESSION,
+	                            "fill-opacity": 0.38,
+	                        },
+	                    },
                         {
-                            id: "bg-country-borders-line",
-                            type: "line",
-                            source: "base",
-                            "source-layer": "country_borders",
-                            paint: {
-                                "line-color": "#cbd5e1",
-                                "line-width": [
+	                            id: "bg-country-borders-line",
+	                            type: "line",
+	                            source: "base",
+	                            "source-layer": "ne_10m_admin_0_boundary_lines_land",
+	                            paint: {
+	                                "line-color": "#cbd5e1",
+	                                "line-width": [
                                     "interpolate",
                                     ["linear"],
                                     ["zoom"],
@@ -341,87 +341,55 @@ export default function Map({
                                 "line-opacity": 0.85,
                             },
                         },
-                        {
-                            id: "country-labels",
-                            type: "symbol",
-                            source: "base",
-                            // New tiles build uses NaturalEarth label points layer name.
-                            // If your tile pipeline exposes a different name, adjust here.
-                            "source-layer": "ne_10m_admin_0_label_points",
-                            minzoom: 0,
-                            layout: {
-                                "text-field": [
-                                    "coalesce",
-                                    ["get", "sr_subunit"],
-                                    ["get", "NAME_EN"],
-                                    ["get", "NAME"],
-                                    ["get", "ADMIN"],
-                                    ["get", "name"],
-                                    "",
-                                ],
+	                        {
+	                            id: "country-labels",
+	                            type: "symbol",
+	                            source: "base",
+	                            // A dedicated label-point layer (1 point per country) to avoid per-tile duplicates.
+	                            "source-layer": "country_labels",
+	                            minzoom: 0,
+	                            layout: {
+	                                "text-field": [
+	                                    "coalesce",
+	                                    ["get", "NAME_EN"],
+	                                    ["get", "NAME"],
+	                                    ["get", "ADMIN"],
+	                                    ["get", "name"],
+	                                    "",
+	                                ],
                                 "text-size": [
                                     "interpolate",
                                     ["linear"],
                                     ["zoom"],
-                                    0, 10,
-                                    3, 11,
-                                    6, 14,
+                                    0, 15,
+                                    1, 16,
+                                    2, 17,
+                                    4, 19,
+                                    6, 23,
                                 ],
-                                "text-max-width": 10,
-                                "text-allow-overlap": false,
-                                "symbol-placement": "point",
-                            },
-                            paint: {
-                                "text-color": "#e2e8f0",
-                                "text-halo-color": "#0b1220",
-                                "text-halo-width": 1.2,
-                                "text-halo-blur": 0.5,
-                            },
-                        },
-                        // Fallback for tile pipelines that expose country labels under a generic "labels" layer.
-                        // Hidden/shown together with "country-labels" toggle.
-                        {
-                            id: "country-labels-alt",
-                            type: "symbol",
-                            source: "base",
-                            "source-layer": "labels",
-                            minzoom: 0,
-                            layout: {
-                                "text-field": [
-                                    "coalesce",
-                                    ["get", "name"],
-                                    ["get", "title"],
-                                    ["get", "NAME"],
-                                    "",
-                                ],
-                                "text-size": [
-                                    "interpolate",
-                                    ["linear"],
-                                    ["zoom"],
-                                    0, 10,
-                                    3, 11,
-                                    6, 14,
-                                ],
-                                "text-max-width": 10,
-                                "text-allow-overlap": false,
-                                "symbol-placement": "point",
-                            },
-                            paint: {
-                                "text-color": "#e2e8f0",
-                                "text-halo-color": "#0b1220",
-                                "text-halo-width": 1.2,
-                                "text-halo-blur": 0.5,
-                            },
-                        },
-                        {
-                            id: "regions-line",
-                            type: "line",
-                            source: "base",
-                            "source-layer": "regions",
-                        paint: {
-                            "line-color": "#475569",
-                            "line-width": [
-                                "interpolate",
+                                "text-padding": 0,
+	                                "text-max-width": 10,
+	                                // Prefer showing labels earlier (even if it means some collisions).
+	                                "text-allow-overlap": true,
+	                                "text-ignore-placement": true,
+	                                "symbol-placement": "point",
+	                            },
+	                            paint: {
+	                                "text-color": "#e2e8f0",
+	                                "text-halo-color": "#0b1220",
+	                                "text-halo-width": 1.2,
+	                                "text-halo-blur": 0.5,
+	                            },
+	                        },
+	                    {
+	                            id: "regions-line",
+	                            type: "line",
+	                            source: "base",
+	                            "source-layer": "ne_10m_geography_regions_polys",
+	                        paint: {
+	                            "line-color": "#475569",
+	                            "line-width": [
+	                                "interpolate",
                                 ["linear"],
                                 ["zoom"],
                                 0, 0.2,
@@ -431,25 +399,25 @@ export default function Map({
                             "line-opacity": 0.6,
                         },
                     },
-                    {
-                        id: "lakes-fill",
-                        type: "fill",
-                        source: "base",
-                        "source-layer": "lakes",
-                        paint: {
-                            "fill-color": "#1d4ed8",
-                            "fill-opacity": 0.45,
-                        },
-                    },
-                    {
-                        id: "rivers-line",
-                        type: "line",
-                        source: "base",
-                        "source-layer": "rivers",
-                        paint: {
-                            "line-color": "#38bdf8",
-                            "line-width": [
-                                "interpolate",
+	                    {
+	                        id: "lakes-fill",
+	                        type: "fill",
+	                        source: "base",
+	                        "source-layer": "ne_10m_lakes",
+	                        paint: {
+	                            "fill-color": "#1d4ed8",
+	                            "fill-opacity": 0.45,
+	                        },
+	                    },
+	                    {
+	                        id: "rivers-line",
+	                        type: "line",
+	                        source: "base",
+	                        "source-layer": "ne_10m_rivers_lake_centerlines",
+	                        paint: {
+	                            "line-color": "#38bdf8",
+	                            "line-width": [
+	                                "interpolate",
                                 ["linear"],
                                 ["zoom"],
                                 0, 0.25,
@@ -459,14 +427,14 @@ export default function Map({
                             "line-opacity": 0.85,
                         },
                     },
-                    {
-                        id: "geolines-line",
-                        type: "line",
-                        source: "base",
-                        "source-layer": "geolines",
-                        paint: {
-                            "line-color": "#94a3b8",
-                            "line-width": 1.2,
+	                    {
+	                        id: "geolines-line",
+	                        type: "line",
+	                        source: "base",
+	                        "source-layer": "ne_10m_geographic_lines",
+	                        paint: {
+	                            "line-color": "#94a3b8",
+	                            "line-width": 1.2,
                             "line-opacity": 0.8,
                         },
                     },
@@ -1184,15 +1152,6 @@ function applyBackgroundLayerVisibility(
             layer.id,
             "visibility",
             visibility[layer.id] ? "visible" : "none"
-        );
-    }
-
-    // Keep fallback country label layer in sync with the primary toggle.
-    if (map.getLayer("country-labels-alt")) {
-        map.setLayoutProperty(
-            "country-labels-alt",
-            "visibility",
-            visibility["country-labels"] ? "visible" : "none"
         );
     }
 }

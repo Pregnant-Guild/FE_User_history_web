@@ -10,11 +10,10 @@ import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const snapshot = raw as EditorSnapshot;
-    if (
-        snapshot.editor_feature_collection &&
-        snapshot.editor_feature_collection.type === "FeatureCollection" &&
-        Array.isArray(snapshot.editor_feature_collection.features)
-    ) {
+    // Accept legacy snapshots (v1) and new ones (v2+). We only require that a FeatureCollection,
+    // if present, is structurally valid. Everything else is treated as optional.
+    const fc = (snapshot as any).editor_feature_collection as FeatureCollection | undefined;
+    if (fc && fc.type === "FeatureCollection" && Array.isArray(fc.features)) {
         return snapshot;
     }
     return {
@@ -225,11 +224,7 @@ export function buildEditorSnapshot(options: {
         });
 
     return {
-        schema_version: 1,
-        section: {
-            id: options.section.id,
-            title: options.section.title,
-        },
+        schema_version: 2,
         editor_feature_collection: JSON.parse(JSON.stringify(options.draft)) as FeatureCollection,
         entities: Array.from(entityRows.values()).map((entity) => {
             const id = String(entity.id || "");

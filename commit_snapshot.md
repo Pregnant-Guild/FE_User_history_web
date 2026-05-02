@@ -9,16 +9,13 @@ Nguồn tham chiếu trong code:
 - Type snapshot: `FrontEndAdmin/src/uhm/types/sections.ts` (`EditorSnapshot`)
 - Build snapshot khi commit: `FrontEndAdmin/src/uhm/lib/editor/snapshot/editorSnapshot.ts` (`buildEditorSnapshot`)
 
-## 1) Schema tổng quan (v1)
+## 1) Schema tổng quan (v2)
 
-Hiện tại snapshot được ghi với `schema_version: 1`.
+Hiện tại snapshot mới được ghi với `schema_version: 2` và **đã bỏ hẳn `section`** (vì flow BEGo đã có `commits.project_id`).
 
 ```ts
-export type CommitSnapshotV1 = {
-  schema_version: 1;
-
-  // Project/section đang được edit (FE vẫn giữ tên "section" cho compatibility)
-  section: { id: string; title: string };
+export type CommitSnapshotV2 = {
+  schema_version: 2;
 
   // GeoJSON draft để render map + làm nguồn dựng geometries/link_scopes
   editor_feature_collection?: FeatureCollection;
@@ -67,9 +64,8 @@ Ngoài ra snapshot có `entity_wikis[]` để nối entity <-> wiki.
 
 ```mermaid
 classDiagram
-  class CommitSnapshotV1 {
+class CommitSnapshotV2 {
     +number schema_version
-    +SectionRef section
     +FeatureCollection editor_feature_collection?
     +EntitySnapshot[] entities?
     +GeometrySnapshot[] geometries?
@@ -78,10 +74,6 @@ classDiagram
     +EntityWikiLinkSnapshot[] entity_wikis?
   }
 
-  class SectionRef {
-    +string id
-    +string title
-  }
 
   class FeatureCollection {
     +string type  // "FeatureCollection"
@@ -174,25 +166,23 @@ classDiagram
     +string id
   }
 
-  CommitSnapshotV1 --> SectionRef
-  CommitSnapshotV1 --> FeatureCollection
+  CommitSnapshotV2 --> FeatureCollection
   FeatureCollection --> Feature
   Feature --> FeatureProperties
-  CommitSnapshotV1 --> EntitySnapshot
-  CommitSnapshotV1 --> GeometrySnapshot
-  CommitSnapshotV1 --> LinkScopeSnapshot
-  CommitSnapshotV1 --> WikiSnapshot
-  CommitSnapshotV1 --> EntityWikiLinkSnapshot
+  CommitSnapshotV2 --> EntitySnapshot
+  CommitSnapshotV2 --> GeometrySnapshot
+  CommitSnapshotV2 --> LinkScopeSnapshot
+  CommitSnapshotV2 --> WikiSnapshot
+  CommitSnapshotV2 --> EntityWikiLinkSnapshot
 ```
 
 ## 4) Ý nghĩa từng phần
 
-### 4.1 `section`
+### 4.1 (Bỏ) `section`
 
-Chỉ là “ref” tối thiểu để biết commit này thuộc project nào:
+Từ `schema_version: 2`, snapshot **không còn** field `section`.
 
-- `section.id` = `project_id`
-- `section.title` = title tại thời điểm commit (phục vụ UI)
+Nguồn chuẩn để biết commit thuộc project nào là `commits.project_id` (record/endpoint context), không phải snapshot.
 
 ### 4.2 `editor_feature_collection`
 
@@ -305,8 +295,7 @@ Ví dụ dưới đây thể hiện:
 
 ```json
 {
-  "schema_version": 1,
-  "section": { "id": "019d...project", "title": "Project A" },
+  "schema_version": 2,
   "editor_feature_collection": {
     "type": "FeatureCollection",
     "features": [

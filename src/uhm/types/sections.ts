@@ -60,8 +60,10 @@ export type SectionSubmission = {
     content?: string | null;
 };
 
-export type EditorSnapshot = {
-    schema_version: number;
+export type EditorSnapshotV1 = {
+    schema_version: 1;
+    // Legacy: before BEGo flow moved fully to project/commit records, FE stored a minimal "section" ref
+    // inside snapshot_json. New snapshots omit this entirely.
     section: {
         id: string;
         title: string;
@@ -73,6 +75,18 @@ export type EditorSnapshot = {
     wikis?: WikiSnapshot[];
     entity_wikis?: EntityWikiLinkSnapshot[];
 };
+
+export type EditorSnapshotV2 = {
+    schema_version: 2;
+    editor_feature_collection?: FeatureCollection;
+    entities?: EntitySnapshot[];
+    geometries?: GeometrySnapshot[];
+    link_scopes?: LinkScopeSnapshot[];
+    wikis?: WikiSnapshot[];
+    entity_wikis?: EntityWikiLinkSnapshot[];
+};
+
+export type EditorSnapshot = EditorSnapshotV1 | EditorSnapshotV2;
 
 export type EditorLoadResponse = {
     section: Section;
