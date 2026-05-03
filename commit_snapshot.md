@@ -24,7 +24,7 @@ export type CommitSnapshot = {
   wikis?: WikiSnapshot[];
 
   geometry_entity?: GeometryEntitySnapshot[]; // geometry ↔ entity (many-to-many)
-  entity_wikis?: EntityWikiLinkSnapshot[];    // entity ↔ wiki
+  entity_wiki?: EntityWikiLinkSnapshot[];     // entity ↔ wiki
 };
 ```
 
@@ -54,7 +54,7 @@ FE hiện tại luôn ghi `source` cho `entities[]`, `geometries[]`, `wikis[]`.
 
 `geometry_entity[]` không có `operation` (join table state).
 
-`entity_wikis[]` dùng `operation:"reference"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
+`entity_wiki[]` dùng `operation:"reference"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
 
 ## 3) Ý Nghĩa Từng Phần
 
@@ -87,7 +87,7 @@ FE build `entities[]` từ:
 3. Entities xuất hiện trong `geometry_entity[]`:
 `source:"ref"`, `operation:"reference"`.
 
-4. Entities xuất hiện trong `entity_wikis[]`:
+4. Entities xuất hiện trong `entity_wiki[]`:
 `source:"ref"`, `operation:"reference"`.
 
 ### 3.3 `geometries[]`
@@ -130,7 +130,7 @@ Danh sách wiki của project tại thời điểm commit:
 - Wiki không đổi: thường không có `operation`.
 - Wiki add từ search (wiki đã có trong DB): `source:"ref"`, `operation:"reference"`, `doc` có thể là `null`.
 
-### 3.6 `entity_wikis[]` (join table Entity ↔ Wiki)
+### 3.6 `entity_wiki[]` (join table Entity ↔ Wiki)
 
 ```ts
 export type EntityWikiLinkSnapshot = {
@@ -201,7 +201,7 @@ Toggle link trong UI:
       "doc": null
     }
   ],
-  "entity_wikis": [
+  "entity_wiki": [
     { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "reference" }
   ]
 }

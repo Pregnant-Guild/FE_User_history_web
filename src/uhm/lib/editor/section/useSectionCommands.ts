@@ -81,7 +81,7 @@ export function useSectionCommands(options: Options) {
         options.setCreatedEntities([]);
         const geoEntityIds = new Set((snapshot?.geometry_entity || []).map((row) => row.entity_id));
         const linkedByWikiIds = new Set(
-            (snapshot?.entity_wikis || [])
+            (snapshot?.entity_wiki || [])
                 .filter((l) => l?.operation !== "delete")
                 .map((l) => l.entity_id)
         );
@@ -94,7 +94,7 @@ export function useSectionCommands(options: Options) {
             && e.operation !== "delete"
         ));
         options.setWikis(snapshot?.wikis || []);
-        options.setEntityWikiLinks(snapshot?.entity_wikis || []);
+        options.setEntityWikiLinks(snapshot?.entity_wiki || []);
         options.setSelectedFeatureId(null);
         options.setEntityFormStatus(null);
     }, [options]);

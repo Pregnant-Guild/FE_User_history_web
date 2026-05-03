@@ -133,7 +133,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 })
             : undefined;
 
-    const entityWikisRaw = snapshot.entity_wikis;
+    const entityWikisRaw = snapshot.entity_wiki ?? snapshot.entity_wikis;
     const entityWikis: EntityWikiLinkSnapshot[] | undefined = Array.isArray(entityWikisRaw)
         ? entityWikisRaw
             .filter(isRecord)
@@ -186,7 +186,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         geometries,
         wikis,
         geometry_entity: geometryEntity || migratedGeometryEntity,
-        entity_wikis: entityWikis,
+        entity_wiki: entityWikis,
     };
 }
 
@@ -406,7 +406,7 @@ export function buildEditorSnapshot(options: {
         geometries,
         geometry_entity: geometryEntity,
         wikis,
-        entity_wikis: entityWikis,
+        entity_wiki: entityWikis,
     };
 }
 

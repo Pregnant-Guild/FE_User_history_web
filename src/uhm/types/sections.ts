@@ -72,7 +72,7 @@ export type EditorSnapshot = {
     // Join table geometry ↔ entity (many-to-many).
     geometry_entity?: GeometryEntitySnapshot[];
     wikis?: WikiSnapshot[];
-    entity_wikis?: EntityWikiLinkSnapshot[];
+    entity_wiki?: EntityWikiLinkSnapshot[];
 };
 
 export type EditorLoadResponse = {
