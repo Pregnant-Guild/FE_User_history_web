@@ -2,6 +2,7 @@ import type { Entity } from "@/uhm/types/entities";
 import type { Feature, FeatureProperties } from "@/uhm/types/geo";
 import type { PendingEntityCreate } from "@/uhm/lib/editor/session/sessionTypes";
 import { normalizeFeatureEntityIds } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import { newId } from "@/uhm/lib/id";
 
 export function mergeEntitiesWithPending(
     persistedEntities: Entity[],
@@ -65,10 +66,7 @@ export function formatEntityNamesForDisplay(feature: Feature, entities: Entity[]
 }
 
 export function buildClientEntityId(): string {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-        return crypto.randomUUID();
-    }
-    return `entity-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+    return newId();
 }
 
 export function buildFeatureEntityPatch(
@@ -106,4 +104,3 @@ function resolveGeometryTypeFromEntityIds(
     const primaryEntity = entities.find((entity) => entity.id === primaryEntityId) || null;
     return primaryEntity?.type_id || null;
 }
-

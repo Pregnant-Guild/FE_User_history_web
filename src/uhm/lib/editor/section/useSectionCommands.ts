@@ -79,7 +79,20 @@ export function useSectionCommands(options: Options) {
         options.setSectionCommits(commits);
         options.setPendingEntityCreates([]);
         options.setCreatedEntities([]);
-        options.setProjectEntityRefs((snapshot?.entities || []).filter((e) => e?.operation === "reference"));
+        const geoEntityIds = new Set((snapshot?.geometry_entity || []).map((row) => row.entity_id));
+        const linkedByWikiIds = new Set(
+            (snapshot?.entity_wikis || [])
+                .filter((l) => l?.operation !== "delete")
+                .map((l) => l.entity_id)
+        );
+        options.setProjectEntityRefs((snapshot?.entities || []).filter((e) =>
+            e?.source === "ref"
+            && !geoEntityIds.has(e.id)
+            && !linkedByWikiIds.has(e.id)
+            && e.operation !== "create"
+            && e.operation !== "update"
+            && e.operation !== "delete"
+        ));
         options.setWikis(snapshot?.wikis || []);
         options.setEntityWikiLinks(snapshot?.entity_wikis || []);
         options.setSelectedFeatureId(null);

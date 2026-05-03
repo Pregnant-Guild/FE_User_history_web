@@ -1,12 +1,11 @@
 import type { EntitySnapshot } from "@/uhm/types/entities";
-import type { FeatureCollection, GeometrySnapshot, LinkScopeSnapshot } from "@/uhm/types/geo";
+import type { FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 
 export type EntityWikiLinkSnapshot = {
     entity_id: string;
     wiki_id: string;
     operation?: "reference" | "delete";
-    is_deleted?: number;
 };
 
 // API mới (BackEndGo) dùng Projects/Commits/Submissions.
@@ -60,33 +59,21 @@ export type SectionSubmission = {
     content?: string | null;
 };
 
-export type EditorSnapshotV1 = {
-    schema_version: 1;
+export type EditorSnapshot = {
     // Legacy: before BEGo flow moved fully to project/commit records, FE stored a minimal "section" ref
     // inside snapshot_json. New snapshots omit this entirely.
-    section: {
+    section?: {
         id: string;
         title: string;
     };
     editor_feature_collection?: FeatureCollection;
     entities?: EntitySnapshot[];
     geometries?: GeometrySnapshot[];
-    link_scopes?: LinkScopeSnapshot[];
+    // Join table geometry ↔ entity (many-to-many).
+    geometry_entity?: GeometryEntitySnapshot[];
     wikis?: WikiSnapshot[];
     entity_wikis?: EntityWikiLinkSnapshot[];
 };
-
-export type EditorSnapshotV2 = {
-    schema_version: 2;
-    editor_feature_collection?: FeatureCollection;
-    entities?: EntitySnapshot[];
-    geometries?: GeometrySnapshot[];
-    link_scopes?: LinkScopeSnapshot[];
-    wikis?: WikiSnapshot[];
-    entity_wikis?: EntityWikiLinkSnapshot[];
-};
-
-export type EditorSnapshot = EditorSnapshotV1 | EditorSnapshotV2;
 
 export type EditorLoadResponse = {
     section: Section;

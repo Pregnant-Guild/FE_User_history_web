@@ -1,301 +1,154 @@
-# Commit Snapshot (`commits.snapshot_json`) - Cấu Trúc Hiện Tại
+# Commit Snapshot (`commits.snapshot_json`) - Chuẩn Hiện Tại (FrontEndAdmin)
 
-Tài liệu này mô tả **commit snapshot** đang được lưu trong `BackEndGo.commits.snapshot_json` (JSONB) và được `FrontEndAdmin` tạo ra khi bấm **Commit** trong `/editor`.
-
-Mục tiêu: nhìn vào đây là hiểu commit snapshot gồm những phần nào, ý nghĩa ra sao, và `source`/`operation` có vai trò gì.
+Tài liệu này mô tả **commit snapshot** được `FrontEndAdmin` tạo ra khi bấm **Commit** trong `/editor`, và được lưu vào `BackEndGo.commits.snapshot_json` (JSONB).
 
 Nguồn tham chiếu trong code:
 
 - Type snapshot: `FrontEndAdmin/src/uhm/types/sections.ts` (`EditorSnapshot`)
-- Build snapshot khi commit: `FrontEndAdmin/src/uhm/lib/editor/snapshot/editorSnapshot.ts` (`buildEditorSnapshot`)
+- Build snapshot: `FrontEndAdmin/src/uhm/lib/editor/snapshot/editorSnapshot.ts` (`buildEditorSnapshot`)
 
-## 1) Schema tổng quan (v2)
+## 1) Tổng Quan Schema
 
-Hiện tại snapshot mới được ghi với `schema_version: 2` và **đã bỏ hẳn `section`** (vì flow BEGo đã có `commits.project_id`).
+Snapshot hiện tại:
+
+- Không có `schema_version`.
+- Không lưu `section` (project/section được xác định bằng context record `commits.project_id`).
+- Không dùng `ref:{id}` nữa: **`id` là canonical**, `source:"ref"` nghĩa là tham chiếu theo `id`.
 
 ```ts
-export type CommitSnapshotV2 = {
-  schema_version: 2;
-
-  // GeoJSON draft để render map + làm nguồn dựng geometries/link_scopes
+export type CommitSnapshot = {
   editor_feature_collection?: FeatureCollection;
 
-  // Operation-based rows
   entities?: EntitySnapshot[];
   geometries?: GeometrySnapshot[];
-  link_scopes?: LinkScopeSnapshot[];
-
-  // Wiki list (tiptap JSON hoặc reference)
   wikis?: WikiSnapshot[];
 
-  // Join table inside snapshot: links between entities and wikis (project-level)
-  entity_wikis?: EntityWikiLinkSnapshot[];
+  geometry_entity?: GeometryEntitySnapshot[]; // geometry ↔ entity (many-to-many)
+  entity_wikis?: EntityWikiLinkSnapshot[];    // entity ↔ wiki
 };
 ```
 
-## 2) `operation` có những giá trị nào?
+## 2) Quy Ước `source` và `operation`
 
-Trong commit snapshot hiện tại có 4 nơi dùng `operation`:
+### 2.1 `source` (bắt buộc)
 
-1. `entities[].operation`:
+`source` bắt buộc là một trong:
 
-- `create` | `update` | `delete` | `reference`
+- `inline`: dữ liệu được embed trong snapshot_json.
+- `ref`: dữ liệu là tham chiếu (theo `id`), cần fetch bên ngoài nếu muốn đầy đủ.
 
-2. `geometries[].operation`:
+FE hiện tại luôn ghi `source` cho `entities[]`, `geometries[]`, `wikis[]`.
 
-- `create` | `update` | `delete` | `reference`
+### 2.2 `operation` (tùy chọn)
 
-3. `link_scopes[].operation`:
+`operation` là tùy chọn. Khi **không có** `operation` thì hiểu là:
 
-- `reference`
+- row được đưa vào snapshot như **project context** (hoặc không đổi trong commit này),
+- commit này không sửa record, và cũng không cần đánh dấu là `"reference"` để làm “đầu mối nối”.
 
-4. `wikis[].operation`:
+`operation` có thể xuất hiện ở:
 
-- `create` | `update` | `delete` | `reference`
+- `entities[].operation`: `create` | `update` | `delete` | `reference`
+- `geometries[].operation`: `create` | `update` | `delete` | `reference`
+- `wikis[].operation`: `create` | `update` | `delete` | `reference`
 
-Ghi chú về semantics:
+`geometry_entity[]` không có `operation` (join table state).
 
-- `create/update/delete`: bản ghi bị thay đổi trong commit này
-- `reference`: bản ghi được đưa vào snapshot để làm đầu mối **nối (link)** (vd: geometry↔entity, entity↔wiki), không phải “không đổi”
+`entity_wikis[]` dùng `operation:"reference"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
 
-Ngoài ra snapshot có `entity_wikis[]` để nối entity <-> wiki.
+## 3) Ý Nghĩa Từng Phần
 
-## 3) Sơ đồ trực quan (Mermaid)
-
-```mermaid
-classDiagram
-class CommitSnapshotV2 {
-    +number schema_version
-    +FeatureCollection editor_feature_collection?
-    +EntitySnapshot[] entities?
-    +GeometrySnapshot[] geometries?
-    +LinkScopeSnapshot[] link_scopes?
-    +WikiSnapshot[] wikis?
-    +EntityWikiLinkSnapshot[] entity_wikis?
-  }
-
-
-  class FeatureCollection {
-    +string type  // "FeatureCollection"
-    +Feature[] features
-  }
-
-  class Feature {
-    +string type // "Feature"
-    +FeatureProperties properties
-    +Geometry geometry
-  }
-
-  class FeatureProperties {
-    +string|number id
-    +string type?
-    +number time_start?
-    +number time_end?
-    +string[] binding?
-    +string entity_id?
-    +string[] entity_ids?
-    +string entity_name?
-    +string[] entity_names?
-    +string entity_type_id?
-  }
-
-  class EntitySnapshot {
-    +string id
-    +string source? // inline|ref
-    +Ref ref?
-    +string operation?  // create|update|delete|reference
-    +string name?
-    +string slug?
-    +string description?
-    +string type_id?
-    +number status?
-    +number is_deleted?
-    +string base_updated_at?
-    +string base_hash?
-  }
-
-  class GeometrySnapshot {
-    +string id
-    +string source? // inline|ref
-    +Ref ref?
-    +string operation? // create|update|delete|reference
-    +string type?
-    +Geometry draw_geometry?
-    +string[] binding?
-    +number time_start?
-    +number time_end?
-    +BBox bbox?
-    +number is_deleted?
-    +string base_updated_at?
-    +string base_hash?
-  }
-
-  class BBox {
-    +number min_lng
-    +number min_lat
-    +number max_lng
-    +number max_lat
-  }
-
-  class LinkScopeSnapshot {
-    +string geometry_id
-    +string operation // reference
-    +string[] entity_ids
-    +string base_links_hash?
-  }
-
-  class WikiSnapshot {
-    +string id
-    +string source? // inline|ref
-    +Ref ref?
-    +string operation? // create|update|delete|reference
-    +string title
-    +any doc
-    +string updated_at?
-    +number is_deleted?
-  }
-
-  class EntityWikiLinkSnapshot {
-    +string entity_id
-    +string wiki_id
-    +string operation? // reference|delete
-    +number is_deleted?
-  }
-
-  class Ref {
-    +string id
-  }
-
-  CommitSnapshotV2 --> FeatureCollection
-  FeatureCollection --> Feature
-  Feature --> FeatureProperties
-  CommitSnapshotV2 --> EntitySnapshot
-  CommitSnapshotV2 --> GeometrySnapshot
-  CommitSnapshotV2 --> LinkScopeSnapshot
-  CommitSnapshotV2 --> WikiSnapshot
-  CommitSnapshotV2 --> EntityWikiLinkSnapshot
-```
-
-## 4) Ý nghĩa từng phần
-
-### 4.1 (Bỏ) `section`
-
-Từ `schema_version: 2`, snapshot **không còn** field `section`.
-
-Nguồn chuẩn để biết commit thuộc project nào là `commits.project_id` (record/endpoint context), không phải snapshot.
-
-### 4.2 `editor_feature_collection`
+### 3.1 `editor_feature_collection`
 
 GeoJSON `FeatureCollection` là nguồn để:
 
-- render map trong editor
-- build `geometries[]` + `link_scopes[]` khi commit
+- render map trong editor,
+- làm cơ sở build `geometries[]` và join table `geometry_entity[]`.
 
-Trong thực tế, nó là “bản đồ draft state” của commit.
+Lưu ý quan trọng:
 
-### 4.3 `entities[]`
+- Snapshot persist **không lưu** các field entity denormalize trên `feature.properties`:
+  `entity_id/entity_ids/entity_name/entity_names/entity_type_id`.
+- Quan hệ geometry ↔ entity nằm ở `geometry_entity[]`.
+- Khi load commit vào editor, FE có thể rehydrate `entity_ids/entity_id` lên features từ `geometry_entity[]` để UI hoạt động, nhưng đó không phải dữ liệu persist.
 
-`entities[]` là tập các entity rows kèm `source`/`operation`. Trong `buildEditorSnapshot` hiện tại, nó được dựng từ:
+### 3.2 `entities[]`
 
-1. `pending entities` tạo trong editor:
-   - `source: "inline"`, `operation: "create"`
-2. `projectEntityRefs` (entity được user “pin” vào project từ thanh search):
-   - `source: "ref"`, `ref: {id}`, `operation: "reference"`
-3. Các entity IDs đang được gắn vào geometries trong `editor_feature_collection` (nếu chưa có trong list):
-   - `source: "ref"`, `ref: {id}`, `operation: "reference"`
-4. Các entity IDs xuất hiện trong `entity_wikis[]`:
-   - `source: "ref"`, `ref: {id}`, `operation: "reference"`
+`entities[]` là danh sách entity liên quan tới project/commit. Mỗi row có `source` và có thể có/không có `operation`.
 
-=> Nghĩa là: `entities[]` trong commit snapshot hiện tại hoạt động như một “danh sách entity liên quan tới project”, không nhất thiết phải gắn vào một geometry cụ thể.
+FE build `entities[]` từ:
 
-### 4.4 `geometries[]`
+1. Pending entities tạo mới trong editor:
+`source:"inline"`, `operation:"create"`.
 
-Mỗi `Feature` trong `editor_feature_collection.features[]` sẽ sinh ra một `GeometrySnapshot` row:
+2. Entity được user “pin” vào project từ search (không gắn geometry, không link wiki):
+`source:"ref"`, không có `operation`.
 
-- `id`: `String(feature.properties.id)`
-- `draw_geometry`: lấy từ `feature.geometry`
-- `type`: `feature.properties.type || getDefaultTypeIdForFeature(feature)`
-- `binding`: normalize từ `feature.properties.binding`
-- `time_start/time_end`
-- `bbox`: tính từ geometry
-- `is_deleted: 0`
+3. Entities xuất hiện trong `geometry_entity[]`:
+`source:"ref"`, `operation:"reference"`.
 
-`operation` được suy ra dựa vào `changes` + so sánh với snapshot trước:
+4. Entities xuất hiện trong `entity_wikis[]`:
+`source:"ref"`, `operation:"reference"`.
+
+### 3.3 `geometries[]`
+
+Mỗi `Feature` trong `editor_feature_collection.features[]` sinh 1 `GeometrySnapshot` row:
+
+- `id = String(feature.properties.id)`
+- `source:"inline"`
+- `draw_geometry = feature.geometry`
+- kèm `type`, `binding`, `time_start/time_end`, `bbox` (nếu tính được)
+
+`operation` cho geometry:
 
 - `create`: feature mới
 - `update`: feature thay đổi
 - (không có `operation`): feature không đổi (không delta trong commit)
-- `delete`: feature bị xoá khỏi draft (FE sẽ thêm 1 row `{ id, operation:"delete", is_deleted:1 }`)
 
-### 4.5 `link_scopes[]`
+Nếu feature bị xoá khỏi draft, FE thêm 1 delete row:
 
-FE build link scopes từ GeoJSON features:
-
-- `geometry_id = String(feature.properties.id)`
-- `operation = "reference"`
-- `entity_ids` lấy từ `feature.properties.entity_ids` hoặc `entity_id`
-
-Chỉ add scope nếu `entity_ids.length > 0`.
-
-### 4.6 `wikis[]`
-
-`wikis[]` là danh sách wiki của project tại thời điểm commit.
-
-Type hiện tại:
-
-```ts
-export type WikiSnapshot = {
-  id: string;
-  source?: "inline" | "ref";
-  ref?: { id: string };
-  operation?: "create" | "update" | "delete" | "reference";
-  title: string;
-  doc: unknown; // tiptap JSON doc (inline) hoặc null (reference)
-  updated_at?: string;
-  is_deleted?: number;
-};
+```json
+{ "id": "g_1", "source": "ref", "operation": "delete" }
 ```
 
-Quy ước FE đang dùng:
+Lưu ý: geometry `operation:"delete"` **không xuất hiện trên map**, vì map render theo `editor_feature_collection.features[]`.
 
-- Wiki tạo mới trong editor: `operation: "create"`, `doc` là tiptap JSON.
-- Wiki sửa: `operation: "update"`, `doc` là tiptap JSON.
-- Wiki không đổi so với snapshot trước: thường **không có** `operation` (không delta).
-- Wiki add từ thanh search (wiki đã tồn tại trong DB): `source:"ref"`, `ref:{id}`, `operation:"reference"`, **`doc` có thể là `null`**.
+### 3.4 `geometry_entity[]` (join table Geometry ↔ Entity)
 
-Ghi chú quan trọng:
+Join table many-to-many giữa geometry và entity. Mỗi cặp geometry↔entity là một row:
 
-- Hiện tại FE **chưa generate “delete rows” cho wikis** (khác với geometries). Khi bạn remove một wiki khỏi list thì snapshot mới sẽ đơn giản là không còn wiki đó nữa.
+```ts
+{ geometry_id: string; entity_id: string }
+```
 
-### 4.7 `entity_wikis[]` (bảng nối Entity ↔ Wiki)
+### 3.5 `wikis[]`
 
-`entity_wikis[]` là bảng nối trong snapshot để thể hiện “wiki nào thuộc entity nào” ở mức project/commit.
+Danh sách wiki của project tại thời điểm commit:
+
+- Wiki tạo mới: `source:"inline"`, `operation:"create"`, `doc` là tiptap JSON.
+- Wiki sửa: `source:"inline"`, `operation:"update"`, `doc` là tiptap JSON.
+- Wiki không đổi: thường không có `operation`.
+- Wiki add từ search (wiki đã có trong DB): `source:"ref"`, `operation:"reference"`, `doc` có thể là `null`.
+
+### 3.6 `entity_wikis[]` (join table Entity ↔ Wiki)
 
 ```ts
 export type EntityWikiLinkSnapshot = {
   entity_id: string;
   wiki_id: string;
   operation?: "reference" | "delete";
-  is_deleted?: number;
 };
 ```
 
-FE hiện dùng panel “Entity ↔ Wiki” để toggle link:
+Toggle link trong UI:
 
-- Tick checkbox => `{ operation:"reference", is_deleted:0 }`
-- Untick checkbox => `{ operation:"delete", is_deleted:1 }`
+- Tick checkbox: `{ operation: "reference" }`
+- Untick checkbox: `{ operation: "delete" }`
 
-## 5) Ví dụ JSON (rút gọn)
-
-Ví dụ dưới đây thể hiện:
-
-- 1 geometry gắn entity `e_1`
-- 1 entity ref “pin” vào project (`e_2`) dù chưa gắn geometry
-- 1 wiki inline và 1 wiki reference (search từ DB)
+## 4) Ví Dụ JSON (rút gọn)
 
 ```json
 {
-  "schema_version": 2,
   "editor_feature_collection": {
     "type": "FeatureCollection",
     "features": [
@@ -306,31 +159,32 @@ Ví dụ dưới đây thể hiện:
           "type": "city",
           "time_start": 1200,
           "time_end": 1300,
-          "entity_ids": ["e_1"],
-          "entity_names": ["Ha Noi"]
+          "binding": []
         },
         "geometry": { "type": "Point", "coordinates": [105.8, 21.0] }
       }
     ]
   },
   "entities": [
-    { "id": "e_2", "operation": "reference", "name": "Pinned Entity", "is_deleted": 0 },
-    { "id": "e_1", "operation": "reference", "name": "Ha Noi", "type_id": "city", "status": 1, "is_deleted": 0 }
+    { "id": "e_2", "source": "ref", "name": "Pinned Entity" },
+    { "id": "e_1", "source": "ref", "operation": "reference", "name": "Ha Noi", "type_id": "city", "status": 1 }
   ],
   "geometries": [
     {
       "id": "g_1",
+      "source": "inline",
       "operation": "update",
       "type": "city",
       "draw_geometry": { "type": "Point", "coordinates": [105.8, 21.0] },
       "binding": [],
       "time_start": 1200,
       "time_end": 1300,
-      "bbox": { "min_lng": 105.8, "min_lat": 21.0, "max_lng": 105.8, "max_lat": 21.0 },
-      "is_deleted": 0
+      "bbox": { "min_lng": 105.8, "min_lat": 21.0, "max_lng": 105.8, "max_lat": 21.0 }
     }
   ],
-  "link_scopes": [{ "geometry_id": "g_1", "operation": "reference", "entity_ids": ["e_1"] }],
+  "geometry_entity": [
+    { "geometry_id": "g_1", "entity_id": "e_1" }
+  ],
   "wikis": [
     {
       "id": "w_inline_1",
@@ -342,26 +196,13 @@ Ví dụ dưới đây thể hiện:
     {
       "id": "019d...wiki_from_db",
       "source": "ref",
-      "ref": { "id": "019d...wiki_from_db" },
       "operation": "reference",
       "title": "Existing Wiki (DB)",
       "doc": null
     }
   ],
   "entity_wikis": [
-    { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "reference", "is_deleted": 0 }
+    { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "reference" }
   ]
 }
 ```
-
-## 6) Các điểm cần chốt khi muốn đi xa hơn với “ref”
-
-Để `source:"ref"` thực sự “lấy từ bên ngoài snapshot”, cần thống nhất:
-
-1. Wiki DB format:
-- BackEndGo `wikis.content` hiện là `TEXT`, trong khi editor wiki dùng TipTap JSON (`doc`).
-- Nếu muốn `ref` load content khi cần, phải chốt format lưu trữ (JSON string / HTML / Markdown).
-
-2. Semantics `operation:"reference"`:
-- `reference` được dùng theo nghĩa “đầu mối để nối (link)” và thường đi kèm `source:"ref"` (ref tới DB/global).
-- Các bản ghi inline không thay đổi nên **không có `operation`** (không delta).

@@ -21,9 +21,8 @@ export type EntitySnapshot = {
     id: string;
     // Where this entity's data comes from.
     // - inline: data is embedded in snapshot_json
-    // - ref: data should be fetched externally by ref.id (DB/global)
-    source?: "inline" | "ref";
-    ref?: { id: string };
+    // - ref: data should be fetched externally by id (DB/global)
+    source: "inline" | "ref";
     // Delta semantics for this commit:
     // - create/update/delete: this commit modifies the entity record
     // - reference: this entity is referenced/linked (e.g., geometry<->entity, entity<->wiki) but not modified
@@ -33,7 +32,6 @@ export type EntitySnapshot = {
     description?: string | null;
     type_id?: string | null;
     status?: number | null;
-    is_deleted?: number;
     base_updated_at?: string;
     base_hash?: string;
 };

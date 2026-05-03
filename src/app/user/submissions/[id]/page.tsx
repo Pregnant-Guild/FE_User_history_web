@@ -13,6 +13,7 @@ import Map from "@/uhm/components/Map";
 import { DEFAULT_BACKGROUND_LAYER_VISIBILITY } from "@/uhm/lib/backgroundLayers";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/geo/constants";
 import { fetchSectionCommits } from "@/uhm/api/sections";
+import { normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { EditorSnapshot, SectionCommit } from "@/uhm/types/sections";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 
@@ -89,7 +90,7 @@ export default function SubmissionDetailPage() {
         setCommits(commitRows || []);
 
         const commit = (commitRows || []).find((c) => c.id === row.commit_id) || null;
-        const snap = (commit?.snapshot_json || null) as EditorSnapshot | null;
+        const snap = normalizeEditorSnapshot(commit?.snapshot_json || null);
         setSnapshot(snap);
         setSnapshotEntities((snap?.entities || []) as EntitySnapshot[]);
       } catch (err) {
@@ -197,9 +198,7 @@ export default function SubmissionDetailPage() {
               {isLoadingExtras ? (
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">Dang tai snapshot/commits...</div>
               ) : snapshot ? (
-                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  Snapshot schema_version: {snapshot.schema_version}
-                </div>
+                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">Da tai snapshot.</div>
               ) : (
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   Khong tim thay snapshot cho commit nay.

@@ -41,7 +41,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     const set = new Set<string>();
     for (const l of links || []) {
       if (!l || l.entity_id !== activeEntityId) continue;
-      if (l.is_deleted) continue;
+      if (l.operation === "delete") continue;
       set.add(l.wiki_id);
     }
     return set;
@@ -57,11 +57,10 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
       const idx = next.findIndex((l) => l.entity_id === activeEntityId && l.wiki_id === id);
       if (idx >= 0) {
         const existing = next[idx];
-        const currentlyOn = !existing.is_deleted;
+        const currentlyOn = existing.operation !== "delete";
         next[idx] = {
           ...existing,
           operation: currentlyOn ? "delete" : "reference",
-          is_deleted: currentlyOn ? 1 : 0,
         };
         return next;
       }
@@ -69,7 +68,6 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
         entity_id: activeEntityId,
         wiki_id: id,
         operation: "reference",
-        is_deleted: 0,
       });
       return next;
     });
@@ -125,7 +123,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
             <div style={{ display: "grid", gap: "6px" }}>
               {wikiChoices.slice(0, 12).map((w) => {
                 const checked = activeLinks.has(w.id);
-                const isRefWiki = (wikis.find((x) => x.id === w.id)?.source || "inline") === "ref";
+                const isRefWiki = wikis.find((x) => x.id === w.id)?.source === "ref";
                 return (
                   <label
                     key={w.id}

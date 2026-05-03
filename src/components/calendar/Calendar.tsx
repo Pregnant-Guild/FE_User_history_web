@@ -12,6 +12,7 @@ import {
 } from "@fullcalendar/core";
 import { useModal } from "@/hooks/useModal";
 import { Modal } from "@/components/ui/modal";
+import { newId } from "@/uhm/lib/id";
 
 interface CalendarEvent extends EventInput {
   extendedProps: {
@@ -99,7 +100,7 @@ const Calendar: React.FC = () => {
     } else {
       // Add new event
       const newEvent: CalendarEvent = {
-        id: Date.now().toString(),
+        id: newId(),
         title: eventTitle,
         start: eventStartDate,
         end: eventEndDate,

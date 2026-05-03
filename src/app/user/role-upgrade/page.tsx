@@ -16,6 +16,7 @@ import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
 import { createHistorianCV } from "@/service/historianService";
 import { toast } from "sonner";
+import { newId } from "@/uhm/lib/id";
 import Swal from "sweetalert2";
 import { PresignedUrlResponse } from "@/interface/media";
 
@@ -94,7 +95,7 @@ export default function RoleUpgrade() {
         const presigned = await getPresignedUrl(file);
 
         return {
-          id: Math.random().toString(36).substring(7),
+          id: newId(),
           file: file,
           previewUrl: isImage ? URL.createObjectURL(file) : "",
           name: file.name,

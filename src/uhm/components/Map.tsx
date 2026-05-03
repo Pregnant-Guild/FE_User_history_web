@@ -36,6 +36,7 @@ import {
     POLYGON_OPACITY_BY_TYPE,
     POLYGON_STROKE_BY_TYPE,
 } from "@/uhm/lib/map/style";
+import { newId } from "@/uhm/lib/id";
 
 type MapProps = {
     mode: EditorMode;
@@ -1662,11 +1663,7 @@ function roundZoom(value: number): number {
 }
 
 function buildClientFeatureId(): string {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-        return crypto.randomUUID();
-    }
-    // Fallback đảm bảo tránh collision khi user tạo nhiều feature trong cùng 1ms.
-    return `feature-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+    return newId();
 }
 
 function clampNumber(value: number, min: number, max: number): number {

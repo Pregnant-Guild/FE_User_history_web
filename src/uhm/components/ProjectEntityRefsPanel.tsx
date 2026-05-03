@@ -58,11 +58,8 @@ export default function ProjectEntityRefsPanel({ entityRefs, setEntityRefs }: Pr
       {
         id,
         source: "ref",
-        ref: { id },
-        operation: "reference",
         name: e.name,
         description: e.description ?? null,
-        is_deleted: 0,
       },
       ...prev,
     ]);

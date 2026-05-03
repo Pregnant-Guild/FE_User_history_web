@@ -39,8 +39,7 @@ export type GeometrySnapshotOperation = "create" | "update" | "delete" | "refere
 
 export type GeometrySnapshot = {
     id: string;
-    source?: "inline" | "ref";
-    ref?: { id: string };
+    source: "inline" | "ref";
     operation?: GeometrySnapshotOperation;
     type?: string | null;
     draw_geometry?: Geometry;
@@ -54,16 +53,14 @@ export type GeometrySnapshot = {
         max_lng: number;
         max_lat: number;
     } | null;
-    is_deleted?: number;
     base_updated_at?: string;
     base_hash?: string;
 };
 
-export type LinkScopeSnapshot = {
+// Snapshot join table (geometry ↔ entity).
+export type GeometryEntitySnapshot = {
     geometry_id: string;
-    // Link deltas should be represented as "reference" operations (no replace in the current flow).
-    operation: "reference";
-    entity_ids: string[];
+    entity_id: string;
     base_links_hash?: string;
 };
 

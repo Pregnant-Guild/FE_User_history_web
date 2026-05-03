@@ -12,6 +12,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Label from "@/components/form/Label";
 
 import type { WikiSnapshot } from "@/uhm/types/wiki";
+import { newId } from "@/uhm/lib/id";
 
 type Props = {
   projectId: string;
@@ -19,14 +20,6 @@ type Props = {
   setWikis: React.Dispatch<React.SetStateAction<WikiSnapshot[]>>;
   autoOpen?: boolean;
 };
-
-function newId() {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `wiki_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
-}
 
 function clampTitle(title: string) {
   const t = title.trim();
@@ -135,7 +128,6 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
       {
         id,
         source: "ref",
-        ref: { id },
         operation: "reference",
         title,
         doc: null,
@@ -188,16 +180,16 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
     const payload = editor.getJSON();
     const nextTitle = clampTitle(wikiTitle);
     setWikis((prev) =>
-      prev.map((w) =>
-        w.id !== activeId
-          ? w
-          : {
-              ...w,
-              source: w.source || "inline",
-              operation: w.operation === "create" ? "create" : "update",
-              title: nextTitle,
-              doc: payload,
-              updated_at: new Date().toISOString(),
+          prev.map((w) =>
+            w.id !== activeId
+              ? w
+              : {
+                  ...w,
+                  source: w.source,
+                  operation: w.operation === "create" ? "create" : "update",
+                  title: nextTitle,
+                  doc: payload,
+                  updated_at: new Date().toISOString(),
             }
       )
     );
