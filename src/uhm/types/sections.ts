@@ -8,19 +8,18 @@ export type EntityWikiLinkSnapshot = {
     operation?: "reference" | "delete";
 };
 
-// API mới (BackEndGo) dùng Projects/Commits/Submissions.
-// Giữ tên type "Section" để tránh thay đổi lan rộng trong FE hiện tại.
-export type SectionStatus = string;
-export type SectionSubmissionStatus = "PENDING" | "APPROVED" | "REJECTED" | string;
+// BackEndGo uses Projects/Commits/Submissions. "Section" is legacy naming in FE.
+export type ProjectStatus = string;
+export type ProjectSubmissionStatus = "PENDING" | "APPROVED" | "REJECTED" | string;
 
-export type SectionState = {
+export type ProjectState = {
     // Derived state from ProjectResponse (not persisted as-is in API mới).
-    status: SectionStatus;
+    status: ProjectStatus;
     head_commit_id: string | null;
     locked_by?: string | null;
 };
 
-export type Section = {
+export type Project = {
     id: string;
     title: string;
     description: string | null;
@@ -36,7 +35,7 @@ export type Section = {
     };
 };
 
-export type SectionCommit = {
+export type ProjectCommit = {
     id: string;
     project_id: string;
     snapshot_json: EditorSnapshot;
@@ -46,13 +45,13 @@ export type SectionCommit = {
     created_at?: string;
 };
 
-export type SectionSubmission = {
+export type ProjectSubmission = {
     id: string;
     project_id: string;
     commit_id: string;
     user_id: string;
     created_at?: string;
-    status: SectionSubmissionStatus;
+    status: ProjectSubmissionStatus;
     reviewed_by?: string | null;
     reviewed_at?: string | null;
     review_note?: string | null;
@@ -75,10 +74,13 @@ export type EditorSnapshot = {
     entity_wiki?: EntityWikiLinkSnapshot[];
 };
 
+// Alias for clearer naming at API boundary: commits.snapshot_json is this shape.
+export type CommitSnapshot = EditorSnapshot;
+
 export type EditorLoadResponse = {
-    section: Section;
-    state: SectionState;
-    commit: SectionCommit | null;
+    section: Project;
+    state: ProjectState;
+    commit: ProjectCommit | null;
     snapshot: EditorSnapshot | null;
 };
 
@@ -96,3 +98,11 @@ export type CreateCommitInput = {
 export type RestoreCommitInput = {
     commit_id: string;
 };
+
+// Legacy aliases (to reduce churn in existing FE code). Prefer Project* names above.
+export type SectionStatus = ProjectStatus;
+export type SectionSubmissionStatus = ProjectSubmissionStatus;
+export type SectionState = ProjectState;
+export type Section = Project;
+export type SectionCommit = ProjectCommit;
+export type SectionSubmission = ProjectSubmission;

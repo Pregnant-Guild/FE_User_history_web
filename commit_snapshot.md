@@ -12,7 +12,7 @@ Nguồn tham chiếu trong code:
 Snapshot hiện tại:
 
 - Không có `schema_version`.
-- Không lưu `section` (project/section được xác định bằng context record `commits.project_id`).
+- Không lưu `section` (entity trong DB là `projects`; project được xác định bằng context record `commits.project_id`).
 - Không dùng `ref:{id}` nữa: **`id` là canonical**, `source:"ref"` nghĩa là tham chiếu theo `id`.
 
 ```ts
@@ -25,6 +25,130 @@ export type CommitSnapshot = {
 
   geometry_entity?: GeometryEntitySnapshot[]; // geometry ↔ entity (many-to-many)
   entity_wiki?: EntityWikiLinkSnapshot[];     // entity ↔ wiki
+};
+```
+
+## 1.1 Type đầy đủ (TypeScript)
+
+Đây là bản type "đúng để BEGo implement chuyển đổi snapshot → DB". FE có thể gửi thêm field legacy (xem mục 6), nhưng BE nên normalize theo các type dưới đây.
+
+```ts
+// ---- GeoJSON ----
+
+export type Geometry =
+  | { type: "Point"; coordinates: [number, number] }
+  | { type: "MultiPoint"; coordinates: [number, number][] }
+  | { type: "LineString"; coordinates: [number, number][] }
+  | { type: "MultiLineString"; coordinates: [number, number][][] }
+  | { type: "Polygon"; coordinates: [number, number][][] }
+  | { type: "MultiPolygon"; coordinates: [number, number][][][] };
+
+export type FeatureId = string | number; // FE hiện dùng UUIDv7 string
+
+export type FeatureProperties = {
+  id: FeatureId;
+  type?: string | null;
+  geometry_preset?: string | null;
+  time_start?: number | null;
+  time_end?: number | null;
+  binding?: string[]; // entity ids used as "binding filter"
+
+  // Legacy UI fields. FE persist snapshot hiện tại KHONG gửi các field này,
+  // nhưng BE nên ignore nếu gặp trong snapshot cũ:
+  entity_id?: string | null;
+  entity_ids?: string[];
+  entity_name?: string | null;
+  entity_names?: string[];
+  entity_type_id?: string | null;
+};
+
+export type Feature = {
+  type: "Feature";
+  properties: FeatureProperties;
+  geometry: Geometry;
+};
+
+export type FeatureCollection = {
+  type: "FeatureCollection";
+  features: Feature[];
+};
+
+// ---- Snapshot rows ----
+
+export type SnapshotSource = "inline" | "ref";
+
+export type EntitySnapshotOperation = "create" | "update" | "delete" | "reference";
+export type GeometrySnapshotOperation = "create" | "update" | "delete" | "reference";
+export type WikiSnapshotOperation = "create" | "update" | "delete" | "reference";
+
+export type EntitySnapshot = {
+  id: string; // UUIDv7 string (canonical)
+  source: SnapshotSource;
+  operation?: EntitySnapshotOperation;
+  name?: string;
+  slug?: string | null;
+  description?: string | null;
+  type_id?: string | null;
+  status?: number | null;
+  base_updated_at?: string;
+  base_hash?: string;
+};
+
+export type GeometrySnapshot = {
+  id: string; // UUIDv7 string (canonical)
+  source: SnapshotSource;
+  operation?: GeometrySnapshotOperation;
+
+  // Present when source:"inline" (draft features)
+  type?: string | null;
+  draw_geometry?: Geometry;
+  binding?: string[];
+  time_start?: number | null;
+  time_end?: number | null;
+  bbox?: {
+    min_lng: number;
+    min_lat: number;
+    max_lng: number;
+    max_lat: number;
+  } | null;
+
+  base_updated_at?: string;
+  base_hash?: string;
+};
+
+export type WikiSnapshot = {
+  id: string; // UUIDv7 string (canonical)
+  source: SnapshotSource;
+  operation?: WikiSnapshotOperation;
+  title: string;
+  doc: unknown; // tiptap JSON (inline) hoặc null (ref)
+  updated_at?: string;
+};
+
+// ---- Join tables ----
+
+export type GeometryEntitySnapshot = {
+  geometry_id: string;
+  entity_id: string;
+  base_links_hash?: string;
+};
+
+export type EntityWikiLinkSnapshot = {
+  entity_id: string;
+  wiki_id: string;
+  // If missing, BE should treat as "reference" (active link) for backwards-compat.
+  operation?: "reference" | "delete";
+};
+
+// ---- Root ----
+
+export type CommitSnapshot = {
+  editor_feature_collection?: FeatureCollection;
+  entities?: EntitySnapshot[];
+  geometries?: GeometrySnapshot[];
+  wikis?: WikiSnapshot[];
+  geometry_entity?: GeometryEntitySnapshot[];
+  entity_wiki?: EntityWikiLinkSnapshot[];
 };
 ```
 
@@ -112,6 +236,11 @@ Nếu feature bị xoá khỏi draft, FE thêm 1 delete row:
 ```
 
 Lưu ý: geometry `operation:"delete"` **không xuất hiện trên map**, vì map render theo `editor_feature_collection.features[]`.
+
+Gợi ý cho BE khi apply vào DB:
+
+- Có thể coi `editor_feature_collection` là state hiện tại để render/map.
+- `geometries[]` là "rows + deltas": sẽ có 1 row cho mỗi feature đang tồn tại trong draft (có/không có `operation`), và có thể có thêm các row `operation:"delete"` để xoá geometry khỏi project state.
 
 ### 3.4 `geometry_entity[]` (join table Geometry ↔ Entity)
 
@@ -206,3 +335,21 @@ Toggle link trong UI:
   ]
 }
 ```
+
+## 5) Notes Cho BackEnd (Normalize + Compat)
+
+BE nên normalize trước khi convert snapshot → DB:
+
+- Ignore toàn bộ field entity denormalize trên `feature.properties` (nếu có): `entity_id/entity_ids/entity_name/entity_names/entity_type_id`. Quan hệ geometry↔entity lấy từ `geometry_entity[]`.
+- `entity_wiki[].operation`:
+  - `"reference"`: link active
+  - `"delete"`: link removed trong snapshot
+  - missing: treat as `"reference"` (compat)
+
+## 6) Legacy Compatibility (nếu gặp snapshot cũ)
+
+FE đã từng gửi các field legacy; BE có thể gặp nếu đang xử lý commit cũ:
+
+- `entity_wikis` (plural) thay vì `entity_wiki` (singular): treat như nhau.
+- `ref:{id}` trong `entities/geometries/wikis`: ignore (id canonical).
+- `is_deleted` trong join table entity↔wiki: map sang `operation:"delete"` khi `is_deleted==1`, ngược lại `"reference"`.
