@@ -78,6 +78,7 @@ export default function Page() {
     const [blockedPendingSubmissionId, setBlockedPendingSubmissionId] = useState<string | null>(null);
     const [searchKind, setSearchKind] = useState<UnifiedSearchKind>("entity");
     const [searchQuery, setSearchQuery] = useState("");
+    const [searchQueryDraft, setSearchQueryDraft] = useState("");
     const [wikiSearchResults, setWikiSearchResults] = useState<Wiki[]>([]);
     const [isWikiSearching, setIsWikiSearching] = useState(false);
     const [geoSearchResults, setGeoSearchResults] = useState<EntityGeometriesSearchItem[]>([]);
@@ -181,6 +182,10 @@ export default function Page() {
         () => mergeEntitySearchResults(entityCatalog, snapshotEntitiesAsEntities),
         [entityCatalog, snapshotEntitiesAsEntities]
     );
+    const entitiesRef = useRef(entities);
+    useEffect(() => {
+        entitiesRef.current = entities;
+    }, [entities]);
 
     const snapshotEntitiesVisible = useMemo(() => {
         const byId = new globalThis.Map<string, EntitySnapshot>();
@@ -347,7 +352,9 @@ export default function Page() {
             setEntityStatus(null);
         } catch (err) {
             if (err instanceof ApiError) {
-                if (err.status === 401 || err.status === 400) {
+                // Only bounce to login when the session is truly unauthenticated.
+                // Token refresh is handled centrally; if we still get 401 here, refresh likely failed/expired.
+                if (err.status === 401) {
                     router.replace("/signin");
                     return;
                 }
@@ -401,10 +408,14 @@ export default function Page() {
         async function ensureAuthenticated() {
             try {
                 await fetchCurrentUser();
-            } catch {
+            } catch (err) {
                 if (disposed) return;
-                // Follow the same behavior as the rest of FrontEndUser: unauthenticated -> /signin.
-                router.replace("/signin");
+                if (err instanceof ApiError && err.status === 401) {
+                    // Only redirect when refresh token/session is no longer usable.
+                    router.replace("/signin");
+                    return;
+                }
+                console.error("Ensure authenticated failed", err);
             }
         }
 
@@ -482,7 +493,7 @@ export default function Page() {
         const requestId = ++entitySearchRequestRef.current;
         const timeoutId = window.setTimeout(async () => {
             const keywordLower = keyword.toLowerCase();
-            const localMatches = entities
+            const localMatches = entitiesRef.current
                 .filter((entity) =>
                     entity.name.toLowerCase().includes(keywordLower) ||
                     (entity.description || "").toLowerCase().includes(keywordLower)
@@ -530,7 +541,6 @@ export default function Page() {
     }, [
         searchKind,
         searchQuery,
-        entities,
         setEntityCatalog,
         setEntitySearchResults,
         setIsEntitySearchLoading,
@@ -954,11 +964,6 @@ export default function Page() {
             }));
             setEntityStatus(null);
             setEntityFormStatus("Đã tạo entity mới (local). Commit khi sẵn sàng.");
-
-            if (selectedFeature) {
-                setSearchKind("entity");
-                setSearchQuery(name);
-            }
         } finally {
             setIsEntitySubmitting(false);
         }
@@ -1104,12 +1109,14 @@ export default function Page() {
                             onKindChange={(next) => {
                                 setSearchKind(next);
                                 setSearchQuery("");
+                                setSearchQueryDraft("");
                             }}
                             query={searchQuery}
                             onQueryChange={setSearchQuery}
+                            onLocalQueryChange={setSearchQueryDraft}
                         />
 
-                        {searchKind === "entity" && searchQuery.trim().length > 0 ? (
+                        {searchKind === "entity" && searchQueryDraft.trim().length > 0 ? (
                             <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                     <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Entity Results</div>
@@ -1165,7 +1172,7 @@ export default function Page() {
                             </div>
                         ) : null}
 
-                        {searchKind === "wiki" && searchQuery.trim().length > 0 ? (
+                        {searchKind === "wiki" && searchQueryDraft.trim().length > 0 ? (
                             <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                     <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Wiki Results</div>
@@ -1221,7 +1228,7 @@ export default function Page() {
                             </div>
                         ) : null}
 
-                        {searchKind === "geo" && searchQuery.trim().length > 0 ? (
+                        {searchKind === "geo" && searchQueryDraft.trim().length > 0 ? (
                             <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                     <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Geo Results</div>

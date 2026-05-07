@@ -60,6 +60,12 @@ type EngineBinding = {
     clearSelection?: () => void;
 };
 
+const MAP_PROJECTION_STORAGE_KEY = "uhm:mapProjection";
+
+function applyMapProjection(map: maplibregl.Map, isGlobe: boolean) {
+    map.setProjection({ type: isGlobe ? "globe" : "mercator" });
+}
+
 export default function Map({
     mode,
     draft,
@@ -106,6 +112,15 @@ export default function Map({
     const [zoomLevel, setZoomLevel] = useState(2);
     // Min/max zoom dùng cho slider và clamp thao tác zoom.
     const [zoomBounds, setZoomBounds] = useState({ min: MAP_MIN_ZOOM, max: MAP_MAX_ZOOM });
+    // Projection mode: phang (mercator) vs hinh cau (globe).
+    const [isGlobeProjection, setIsGlobeProjection] = useState(() => {
+        if (typeof window === "undefined") return false;
+        try {
+            return window.localStorage.getItem(MAP_PROJECTION_STORAGE_KEY) === "globe";
+        } catch {
+            return false;
+        }
+    });
 
     // Engine chỉnh sửa polygon (kéo đỉnh/insert đỉnh), chỉ khởi tạo 1 lần.
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
@@ -119,6 +134,18 @@ export default function Map({
     const engineBindingsRef = useRef<Partial<Record<MapProps["mode"], EngineBinding>>>({});
     // Lưu mode trước đó để cancel engine đúng lúc khi switch mode.
     const previousModeRef = useRef<MapProps["mode"]>(mode);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            window.localStorage.setItem(
+                MAP_PROJECTION_STORAGE_KEY,
+                isGlobeProjection ? "globe" : "mercator"
+            );
+        } catch {
+            // ignore
+        }
+    }, [isGlobeProjection]);
 
     useEffect(() => {
         fitToDraftBoundsRef.current = fitToDraftBounds;
@@ -1034,6 +1061,32 @@ export default function Map({
         };
     }, [allowGeometryEditing, applyDraftToMap, tryCenterToUserLocation]);
 
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        const apply = () => {
+            // Map instance có thể đã bị replace/unmount trước khi event fire.
+            if (mapRef.current !== map) return;
+            // setProjection sẽ throw nếu style chưa load xong.
+            if (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded()) return;
+            applyMapProjection(map, isGlobeProjection);
+        };
+
+        // Nếu style đã sẵn sàng thì apply ngay.
+        if (typeof map.isStyleLoaded === "function" && map.isStyleLoaded()) {
+            apply();
+            return;
+        }
+
+        // Chưa load xong: đợi load/style.load.
+        map.once("load", apply);
+        map.once("style.load", apply);
+        return () => {
+            map.off("load", apply);
+            map.off("style.load", apply);
+        };
+    }, [isGlobeProjection]);
+
     const handleZoomByStep = (delta: number) => {
         const map = mapRef.current;
         if (!map) return;
@@ -1122,6 +1175,69 @@ export default function Map({
                         pointerEvents: "auto",
                     }}
                 >
+                    <label
+                        title={
+                            isGlobeProjection
+                                ? "Dang o che do hinh cau (globe)"
+                                : "Dang o che do trai phang (flat)"
+                        }
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "0 6px",
+                            userSelect: "none",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={isGlobeProjection}
+                            onChange={(e) => setIsGlobeProjection(e.target.checked)}
+                            aria-label="Toggle globe projection"
+                            style={{ display: "none" }}
+                        />
+                        <span
+                            aria-hidden="true"
+                            style={{
+                                position: "relative",
+                                width: "42px",
+                                height: "22px",
+                                borderRadius: "999px",
+                                border: "1px solid rgba(148, 163, 184, 0.45)",
+                                background: isGlobeProjection
+                                    ? "rgba(56, 189, 248, 0.30)"
+                                    : "rgba(148, 163, 184, 0.18)",
+                                boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+                                transition: "background 160ms ease",
+                            }}
+                        >
+                            <span
+                                style={{
+                                    position: "absolute",
+                                    top: "2px",
+                                    left: isGlobeProjection ? "22px" : "2px",
+                                    width: "18px",
+                                    height: "18px",
+                                    borderRadius: "999px",
+                                    background: isGlobeProjection ? "#38bdf8" : "#e2e8f0",
+                                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
+                                    transition: "left 160ms ease, background 160ms ease",
+                                }}
+                            />
+                        </span>
+                        <span
+                            style={{
+                                fontSize: "12px",
+                                color: isGlobeProjection ? "#7dd3fc" : "#cbd5e1",
+                                fontWeight: 700,
+                                minWidth: "40px",
+                            }}
+                        >
+                            {isGlobeProjection ? "Globe" : "Flat"}
+                        </span>
+                    </label>
+
                     <button
                         type="button"
                         onClick={() => handleZoomByStep(-0.8)}

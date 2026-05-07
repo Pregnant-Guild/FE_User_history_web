@@ -1,40 +1,42 @@
-# Commit Snapshot (`commits.snapshot_json`) - Chuẩn Hiện Tại (FrontEndAdmin)
+# Commit Snapshot (`commits.snapshot_json`) - Chuẩn Hiện Tại (FrontEndUser / UHM)
 
-Tài liệu này mô tả **commit snapshot** được `FrontEndAdmin` tạo ra khi bấm **Commit** trong `/editor`, và được lưu vào `BackEndGo.commits.snapshot_json` (JSONB).
+Tài liệu này mô tả **snapshot_json** mà `FrontEndUser` (module UHM editor) tạo ra khi bấm **Commit** trong `/editor/[id]`, và gửi lên endpoint `POST /projects/{id}/commits`.
 
-Nguồn tham chiếu trong code:
+Nguồn tham chiếu trong code (FrontEndUser):
 
-- Type snapshot: `FrontEndAdmin/src/uhm/types/sections.ts` (`EditorSnapshot`)
-- Build snapshot: `FrontEndAdmin/src/uhm/lib/editor/snapshot/editorSnapshot.ts` (`buildEditorSnapshot`)
+- Types:
+  - `src/uhm/types/sections.ts` (`EditorSnapshot`, `EntityWikiLinkSnapshot`)
+  - `src/uhm/types/geo.ts` (`FeatureCollection`, `GeometrySnapshot`, `GeometryEntitySnapshot`)
+  - `src/uhm/types/entities.ts` (`EntitySnapshot`)
+  - `src/uhm/types/wiki.ts` (`WikiSnapshot`)
+- Build/normalize snapshot:
+  - `src/uhm/lib/editor/snapshot/editorSnapshot.ts` (`buildEditorSnapshot`, `normalizeEditorSnapshot`)
 
-## 1) Tổng Quan Schema
+## 1) Root Shape
 
-Snapshot hiện tại:
-
-- Không có `schema_version`.
-- Không lưu `section` (entity trong DB là `projects`; project được xác định bằng context record `commits.project_id`).
-- Không dùng `ref:{id}` nữa: **`id` là canonical**, `source:"ref"` nghĩa là tham chiếu theo `id`.
+FE hiện tại không dùng `schema_version`. `snapshot_json` là một object có các phần sau:
 
 ```ts
-export type CommitSnapshot = {
+export type EditorSnapshot = {
   editor_feature_collection?: FeatureCollection;
-
   entities?: EntitySnapshot[];
   geometries?: GeometrySnapshot[];
+  geometry_entity?: GeometryEntitySnapshot[];
   wikis?: WikiSnapshot[];
-
-  geometry_entity?: GeometryEntitySnapshot[]; // geometry ↔ entity (many-to-many)
-  entity_wiki?: EntityWikiLinkSnapshot[];     // entity ↔ wiki
+  entity_wiki?: EntityWikiLinkSnapshot[];
 };
 ```
 
-## 1.1 Type đầy đủ (TypeScript)
+Lưu ý:
 
-Đây là bản type "đúng để BEGo implement chuyển đổi snapshot → DB". FE có thể gửi thêm field legacy (xem mục 6), nhưng BE nên normalize theo các type dưới đây.
+- FE có thể **đọc** cả `entity_wiki` và legacy alias `entity_wikis` khi load snapshot (normalize), nhưng khi commit FE ghi `entity_wiki`.
+- `editor_feature_collection` là nguồn để render editor/map. Các join table (`geometry_entity`, `entity_wiki`) là nguồn quan hệ.
+
+## 2) Types (TypeScript) - Đúng Theo FE Hiện Tại
+
+### 2.1 GeoJSON (editor_feature_collection)
 
 ```ts
-// ---- GeoJSON ----
-
 export type Geometry =
   | { type: "Point"; coordinates: [number, number] }
   | { type: "MultiPoint"; coordinates: [number, number][] }
@@ -43,7 +45,7 @@ export type Geometry =
   | { type: "Polygon"; coordinates: [number, number][][] }
   | { type: "MultiPolygon"; coordinates: [number, number][][][] };
 
-export type FeatureId = string | number; // FE hiện dùng UUIDv7 string
+export type FeatureId = string | number;
 
 export type FeatureProperties = {
   id: FeatureId;
@@ -51,10 +53,9 @@ export type FeatureProperties = {
   geometry_preset?: string | null;
   time_start?: number | null;
   time_end?: number | null;
-  binding?: string[]; // entity ids used as "binding filter"
+  binding?: string[];
 
-  // Legacy UI fields. FE persist snapshot hiện tại KHONG gửi các field này,
-  // nhưng BE nên ignore nếu gặp trong snapshot cũ:
+  // UI-only / legacy fields (FE sẽ strip khi persist snapshot):
   entity_id?: string | null;
   entity_ids?: string[];
   entity_name?: string | null;
@@ -72,9 +73,11 @@ export type FeatureCollection = {
   type: "FeatureCollection";
   features: Feature[];
 };
+```
 
-// ---- Snapshot rows ----
+### 2.2 Snapshot rows
 
+```ts
 export type SnapshotSource = "inline" | "ref";
 
 export type EntitySnapshotOperation = "create" | "update" | "delete" | "reference";
@@ -82,7 +85,7 @@ export type GeometrySnapshotOperation = "create" | "update" | "delete" | "refere
 export type WikiSnapshotOperation = "create" | "update" | "delete" | "reference";
 
 export type EntitySnapshot = {
-  id: string; // UUIDv7 string (canonical)
+  id: string;
   source: SnapshotSource;
   operation?: EntitySnapshotOperation;
   name?: string;
@@ -94,13 +97,12 @@ export type EntitySnapshot = {
 };
 
 export type GeometrySnapshot = {
-  id: string; // UUIDv7 string (canonical)
+  id: string;
   source: SnapshotSource;
   operation?: GeometrySnapshotOperation;
-
-  // Present when source:"inline" (draft features)
   type?: string | null;
   draw_geometry?: Geometry;
+  geometry?: Geometry; // legacy
   binding?: string[];
   time_start?: number | null;
   time_end?: number | null;
@@ -110,22 +112,27 @@ export type GeometrySnapshot = {
     max_lng: number;
     max_lat: number;
   } | null;
-
   base_updated_at?: string;
   base_hash?: string;
 };
 
+// FE stores wiki doc as a string (commonly HTML; in some flows it may be a JSON-stringified editor payload).
+export type WikiDoc = string | null;
+
 export type WikiSnapshot = {
-  id: string; // UUIDv7 string (canonical)
+  id: string;
   source: SnapshotSource;
   operation?: WikiSnapshotOperation;
   title: string;
-  doc: unknown; // tiptap JSON (inline) hoặc null (ref)
+  slug?: string | null;
+  doc: WikiDoc;
   updated_at?: string;
 };
+```
 
-// ---- Join tables ----
+### 2.3 Join tables
 
+```ts
 export type GeometryEntitySnapshot = {
   geometry_id: string;
   entity_id: string;
@@ -135,149 +142,73 @@ export type GeometryEntitySnapshot = {
 export type EntityWikiLinkSnapshot = {
   entity_id: string;
   wiki_id: string;
-  // If missing, BE should treat as "reference" (active link) for backwards-compat.
-  operation?: "reference" | "delete";
-};
-
-// ---- Root ----
-
-export type CommitSnapshot = {
-  editor_feature_collection?: FeatureCollection;
-  entities?: EntitySnapshot[];
-  geometries?: GeometrySnapshot[];
-  wikis?: WikiSnapshot[];
-  geometry_entity?: GeometryEntitySnapshot[];
-  entity_wiki?: EntityWikiLinkSnapshot[];
+  operation?: "reference" | "binding" | "delete";
 };
 ```
 
-## 2) Quy Ước `source` và `operation`
+## 3) Quy Ước FE Khi Build Snapshot (buildEditorSnapshot)
 
-### 2.1 `source` (bắt buộc)
+### 3.1 Feature.properties entity fields bị strip
 
-`source` bắt buộc là một trong:
+Khi persist snapshot, FE chủ động xoá các field denormalize trên feature properties:
+`entity_id`, `entity_ids`, `entity_name`, `entity_names`, `entity_type_id`.
 
-- `inline`: dữ liệu được embed trong snapshot_json.
-- `ref`: dữ liệu là tham chiếu (theo `id`), cần fetch bên ngoài nếu muốn đầy đủ.
+Quan hệ geometry ↔ entity chỉ nằm ở `geometry_entity[]`.
 
-FE hiện tại luôn ghi `source` cho `entities[]`, `geometries[]`, `wikis[]`.
+### 3.2 entities[]
 
-### 2.2 `operation` (tùy chọn)
+FE cố gắng đảm bảo mọi entity có `name` không rỗng (fallback sang `id`) và có `source`.
 
-`operation` là tùy chọn. Khi **không có** `operation` thì hiểu là:
+`operation` được dùng như "delta" trong commit:
 
-- row được đưa vào snapshot như **project context** (hoặc không đổi trong commit này),
-- commit này không sửa record, và cũng không cần đánh dấu là `"reference"` để làm “đầu mối nối”.
+- `"create"|"update"|"delete"`: thay đổi record entity
+- `"reference"`: đưa entity vào context snapshot (pin/link) nhưng commit không sửa record entity
 
-`operation` có thể xuất hiện ở:
+### 3.3 geometries[]
 
-- `entities[].operation`: `create` | `update` | `delete` | `reference`
-- `geometries[].operation`: `create` | `update` | `delete` | `reference`
-- `wikis[].operation`: `create` | `update` | `delete` | `reference`
-
-`geometry_entity[]` không có `operation` (join table state).
-
-`entity_wiki[]` dùng `operation:"binding"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
-
-## 3) Ý Nghĩa Từng Phần
-
-### 3.1 `editor_feature_collection`
-
-GeoJSON `FeatureCollection` là nguồn để:
-
-- render map trong editor,
-- làm cơ sở build `geometries[]` và join table `geometry_entity[]`.
-
-Lưu ý quan trọng:
-
-- Snapshot persist **không lưu** các field entity denormalize trên `feature.properties`:
-  `entity_id/entity_ids/entity_name/entity_names/entity_type_id`.
-- Quan hệ geometry ↔ entity nằm ở `geometry_entity[]`.
-- Khi load commit vào editor, FE có thể rehydrate `entity_ids/entity_id` lên features từ `geometry_entity[]` để UI hoạt động, nhưng đó không phải dữ liệu persist.
-
-### 3.2 `entities[]`
-
-`entities[]` là danh sách entity liên quan tới project/commit. Mỗi row có `source` và có thể có/không có `operation`.
-
-FE build `entities[]` từ:
-
-1. Pending entities tạo mới trong editor:
-`source:"inline"`, `operation:"create"`.
-
-2. Entity được user “pin” vào project từ search (không gắn geometry, không link wiki):
-`source:"ref"`, không có `operation`.
-
-3. Entities xuất hiện trong `geometry_entity[]`:
-`source:"ref"`, `operation:"reference"`.
-
-4. Entities xuất hiện trong `entity_wiki[]`:
-`source:"ref"`, `operation:"reference"`.
-
-### 3.3 `geometries[]`
-
-Mỗi `Feature` trong `editor_feature_collection.features[]` sinh 1 `GeometrySnapshot` row:
+FE sinh 1 `GeometrySnapshot` cho mỗi feature đang tồn tại trong `editor_feature_collection.features[]`:
 
 - `id = String(feature.properties.id)`
 - `source:"inline"`
 - `draw_geometry = feature.geometry`
-- kèm `type`, `binding`, `time_start/time_end`, `bbox` (nếu tính được)
+- `binding`, `time_start`, `time_end`, `bbox` (nếu tính được)
+- `type`: FE hiện gửi **string code** (geo_type smallint) dưới dạng string
+- `operation`:
+  - `"create"` nếu geometry mới
+  - `"update"` nếu geometry thay đổi
+  - `undefined` nếu geometry không đổi
 
-`operation` cho geometry:
-
-- `create`: feature mới
-- `update`: feature thay đổi
-- (không có `operation`): feature không đổi (không delta trong commit)
-
-Nếu feature bị xoá khỏi draft, FE thêm 1 delete row:
+Nếu feature bị xoá khỏi draft, FE thêm 1 row:
 
 ```json
-{ "id": "g_1", "source": "ref", "operation": "delete" }
+{ "id": "…", "source": "ref", "operation": "delete" }
 ```
 
-Lưu ý: geometry `operation:"delete"` **không xuất hiện trên map**, vì map render theo `editor_feature_collection.features[]`.
+### 3.4 geometry_entity[]
 
-Gợi ý cho BE khi apply vào DB:
-
-- Có thể coi `editor_feature_collection` là state hiện tại để render/map.
-- `geometries[]` là "rows + deltas": sẽ có 1 row cho mỗi feature đang tồn tại trong draft (có/không có `operation`), và có thể có thêm các row `operation:"delete"` để xoá geometry khỏi project state.
-
-### 3.4 `geometry_entity[]` (join table Geometry ↔ Entity)
-
-Join table many-to-many giữa geometry và entity. Mỗi cặp geometry↔entity là một row:
+`geometry_entity` là danh sách quan hệ many-to-many geometry ↔ entity. Mỗi row là một cặp:
 
 ```ts
 { geometry_id: string; entity_id: string }
 ```
 
-### 3.5 `wikis[]`
+### 3.5 wikis[]
 
-Danh sách wiki của project tại thời điểm commit:
+- Wiki `source:"ref"` (được add từ search): FE set `operation:"reference"` và `doc:null`.
+- Wiki `source:"inline"` (được tạo/sửa trong editor):
+  - nếu UI set explicit `create|update|delete` thì giữ nguyên
+  - nếu không có operation:
+    - wiki mới: FE coi là `"create"`
+    - wiki cũ không đổi: FE gán `"reference"`
+    - wiki cũ có đổi nội dung: FE gán `"update"`
 
-- Wiki tạo mới: `source:"inline"`, `operation:"create"`, `doc` là HTML string (Quill).
-- Wiki sửa: `source:"inline"`, `operation:"update"`, `doc` là HTML string (Quill).
-- Wiki không đổi: thường không có `operation`.
-- Wiki add từ search (wiki đã có trong DB): `source:"ref"`, `operation:"reference"`, `doc` có thể là `null`.
+### 3.6 entity_wiki[]
 
-### 3.6 `entity_wiki[]` (join table Entity ↔ Wiki)
+Type trong FE cho UI state cho phép `"binding"` và `"delete"`.
 
-```ts
-export type EntityWikiLinkSnapshot = {
-  entity_id: string;
-  wiki_id: string;
-  // New semantics:
-  // - binding: link active
-  // - delete: link removed in this snapshot
-  // Backwards-compat: older snapshots may use "reference" meaning link active.
-  operation?: "binding" | "delete" | "reference";
-};
-```
+Khi build snapshot để commit, FE map link “đang bật” về `"reference"` để tương thích với backend (một số backend chỉ chấp nhận `"reference"|"delete"`).
 
-Toggle link trong UI:
-
-- Toggle ON (bind): `{ operation: "binding" }` (or legacy `"reference"`)
-- Untick checkbox: `{ operation: "delete" }`
-
-## 4) Ví Dụ JSON (rút gọn)
+## 4) Ví Dụ snapshot_json (rút gọn)
 
 ```json
 {
@@ -286,73 +217,32 @@ Toggle link trong UI:
     "features": [
       {
         "type": "Feature",
-        "properties": {
-          "id": "g_1",
-          "type": "city",
-          "time_start": 1200,
-          "time_end": 1300,
-          "binding": []
-        },
-        "geometry": { "type": "Point", "coordinates": [105.8, 21.0] }
+        "properties": { "id": "019e…", "type": "country", "time_start": 1000, "time_end": 1500 },
+        "geometry": { "type": "Polygon", "coordinates": [[[100, 10], [101, 10], [101, 11], [100, 10]]] }
       }
     ]
   },
   "entities": [
-    { "id": "e_2", "source": "ref", "name": "Pinned Entity" },
-    { "id": "e_1", "source": "ref", "operation": "reference", "name": "Ha Noi", "status": 1 }
+    { "id": "019e…", "source": "inline", "operation": "reference", "name": "ent1", "description": null, "status": 1 }
   ],
   "geometries": [
-    {
-      "id": "g_1",
-      "source": "inline",
-      "operation": "update",
-      "type": "city",
-      "draw_geometry": { "type": "Point", "coordinates": [105.8, 21.0] },
-      "binding": [],
-      "time_start": 1200,
-      "time_end": 1300,
-      "bbox": { "min_lng": 105.8, "min_lat": 21.0, "max_lng": 105.8, "max_lat": 21.0 }
-    }
+    { "id": "019e…", "source": "inline", "operation": "update", "type": "9", "draw_geometry": { "type": "Polygon", "coordinates": [] }, "binding": [], "time_start": 1000, "time_end": 1500, "bbox": null }
   ],
   "geometry_entity": [
-    { "geometry_id": "g_1", "entity_id": "e_1" }
+    { "geometry_id": "019e…", "entity_id": "019e…" }
   ],
-	  "wikis": [
-	    {
-	      "id": "w_inline_1",
-	      "source": "inline",
-	      "operation": "create",
-	      "title": "Overview",
-	      "doc": "<p>Overview</p>"
-	    },
-    {
-      "id": "019d...wiki_from_db",
-      "source": "ref",
-      "operation": "reference",
-      "title": "Existing Wiki (DB)",
-      "doc": null
-    }
+  "wikis": [
+    { "id": "019e…", "source": "ref", "operation": "reference", "title": "Existing wiki", "doc": null, "updated_at": "2026-05-08T00:00:00.000Z" }
   ],
-	  "entity_wiki": [
-	    { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "binding" }
-	  ]
-	}
-	```
+  "entity_wiki": [
+    { "entity_id": "019e…", "wiki_id": "019e…", "operation": "reference" }
+  ]
+}
+```
 
-## 5) Notes Cho BackEnd (Normalize + Compat)
+## 5) Compat Notes (khi load snapshot cũ)
 
-BE nên normalize trước khi convert snapshot → DB:
+FE normalize khi load snapshot:
 
-- Ignore toàn bộ field entity denormalize trên `feature.properties` (nếu có): `entity_id/entity_ids/entity_name/entity_names/entity_type_id`. Quan hệ geometry↔entity lấy từ `geometry_entity[]`.
-- `entity_wiki[].operation`:
-  - `"binding"` (or legacy `"reference"`): link active
-  - `"delete"`: link removed trong snapshot
-  - missing: treat as `"binding"` (compat)
-
-## 6) Legacy Compatibility (nếu gặp snapshot cũ)
-
-FE đã từng gửi các field legacy; BE có thể gặp nếu đang xử lý commit cũ:
-
-- `entity_wikis` (plural) thay vì `entity_wiki` (singular): treat như nhau.
-- `ref:{id}` trong `entities/geometries/wikis`: ignore (id canonical).
-- `is_deleted` trong join table entity↔wiki: map sang `operation:"delete"` khi `is_deleted==1`, ngược lại `"binding"` (or legacy `"reference"`).
+- Nếu thấy `entity_wikis` (plural) sẽ đọc như `entity_wiki`.
+- Nếu join link có `operation:"reference"` thì FE coi như link active (UI biểu diễn như “binding”).

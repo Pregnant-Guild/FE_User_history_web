@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uhm.commit_snapshot.contract",
+  "title": "History API Commit Snapshot (snapshot_json) - Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "editor_feature_collection",
+    "entities",
+    "geometries",
+    "geometry_entity",
+    "wikis",
+    "entity_wiki"
+  ],
+  "properties": {
+    "editor_feature_collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "features"],
+      "properties": {
+        "type": { "const": "FeatureCollection" },
+        "features": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/feature" }
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entitySnapshot" }
+    },
+    "geometries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/geometrySnapshot" }
+    },
+    "geometry_entity": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/geometryEntitySnapshot" }
+    },
+    "wikis": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/wikiSnapshot" }
+    },
+    "entity_wiki": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entityWikiLinkSnapshot" }
+    }
+  },
+  "$defs": {
+    "uuidv7": {
+      "type": "string",
+      "description": "UUID v7 string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "geometry", "properties"],
+      "properties": {
+        "type": { "const": "Feature" },
+        "geometry": {
+          "type": "object",
+          "description": "GeoJSON geometry. Backend expects JSON raw payload."
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "description": "Geometry id. FE uses uuidv7 strings but backend accepts 'any' for editor_feature_collection properties.id",
+              "oneOf": [{ "$ref": "#/$defs/uuidv7" }, { "type": "string" }, { "type": "number" }]
+            },
+            "type": { "type": "string" },
+            "geometry_preset": { "type": "string" },
+            "time_start": { "type": "number" },
+            "time_end": { "type": "number" },
+            "binding": { "type": "array", "items": { "type": "string" } },
+            "entity_id": { "type": "string" },
+            "entity_ids": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "entitySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidv7" },
+        "source": { "type": "string", "enum": ["inline", "ref"] },
+        "operation": { "type": "string", "enum": ["create", "update", "delete", "reference"] },
+        "name": { "type": "string" },
+        "slug": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "status": { "type": ["number", "null"], "enum": [0, 1, null] },
+        "time_start": { "type": ["number", "null"] },
+        "time_end": { "type": ["number", "null"] },
+        "base_updated_at": { "type": ["string", "null"] },
+        "base_hash": { "type": ["string", "null"] }
+      }
+    },
+    "geometrySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidv7" },
+        "source": { "type": "string", "enum": ["inline", "ref"] },
+        "operation": { "type": "string", "enum": ["create", "update", "delete", "reference"] },
+        "type": {
+          "type": "string",
+          "description": "Backend expects a string; FE currently sends the geo_type smallint code as a string."
+        },
+        "draw_geometry": {
+          "type": ["object", "null"],
+          "description": "GeoJSON geometry raw payload"
+        },
+        "binding": { "type": "array", "items": { "type": "string" } },
+        "time_start": { "type": ["number", "null"] },
+        "time_end": { "type": ["number", "null"] },
+        "bbox": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["min_lng", "min_lat", "max_lng", "max_lat"],
+          "properties": {
+            "min_lng": { "type": "number" },
+            "min_lat": { "type": "number" },
+            "max_lng": { "type": "number" },
+            "max_lat": { "type": "number" }
+          }
+        },
+        "base_updated_at": { "type": ["string", "null"] },
+        "base_hash": { "type": ["string", "null"] }
+      }
+    },
+    "geometryEntitySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["geometry_id", "entity_id"],
+      "properties": {
+        "geometry_id": { "$ref": "#/$defs/uuidv7" },
+        "entity_id": { "$ref": "#/$defs/uuidv7" },
+        "base_links_hash": { "type": ["string", "null"] }
+      }
+    },
+    "wikiSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidv7" },
+        "source": { "type": "string", "enum": ["inline", "ref"] },
+        "operation": { "type": "string", "enum": ["create", "update", "delete", "reference"] },
+        "title": { "type": "string" },
+        "slug": { "type": ["string", "null"] },
+        "doc": { "type": ["string", "null"] },
+        "updated_at": { "type": ["string", "null"] }
+      }
+    },
+    "entityWikiLinkSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "wiki_id"],
+      "properties": {
+        "entity_id": { "$ref": "#/$defs/uuidv7" },
+        "wiki_id": { "$ref": "#/$defs/uuidv7" },
+        "operation": {
+          "type": "string",
+          "description": "Server swagger.json currently enumerates ['reference','delete'] for this field. Some deployments may also accept 'binding'.",
+          "enum": ["reference", "delete", "binding"]
+        },
+        "is_deleted": { "type": ["number", "null"], "enum": [0, 1, null] }
+      }
+    }
+  }
+}
+

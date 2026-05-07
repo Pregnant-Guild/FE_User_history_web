@@ -1,7 +1,8 @@
 import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/entityTypeOptions";
-import { typeKeyToGeoTypeCode } from "@/uhm/lib/geoTypeMap";
+import { geoTypeCodeToTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/geoTypeMap";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
+import type { EntitySnapshotOperation } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { EditorSnapshot, Section } from "@/uhm/types/sections";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
@@ -11,6 +12,15 @@ type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
     return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeEntitySnapshotOperation(op: unknown): EntitySnapshotOperation {
+    if (typeof op !== "string") return "reference";
+    const v = op.trim();
+    if (v === "create" || v === "update" || v === "delete" || v === "reference") return v;
+    // Defensive: legacy/buggy data sometimes concatenates words (e.g. "reference delete").
+    // Never guess "delete" here; prefer non-destructive behavior.
+    return "reference";
 }
 
 function getStringId(value: unknown): string {
@@ -176,7 +186,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
     // store entity_id/entity_ids/entity_names on features anymore.
     const fcForEditor: FeatureCollection | undefined = (() => {
         if (!fc) return undefined;
-        if (!geometryEntity && !migratedGeometryEntity) return fc;
+        const hasLinks = Boolean(geometryEntity || migratedGeometryEntity);
         const links = geometryEntity || migratedGeometryEntity || [];
         const byGeom = new Map<string, string[]>();
         for (const row of links) {
@@ -184,14 +194,47 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             list.push(row.entity_id);
             byGeom.set(row.geometry_id, list);
         }
+        const entityNameById = new Map<string, string>();
+        for (const row of entities || []) {
+            const id = typeof row?.id === "string" ? row.id : "";
+            if (!id) continue;
+            const name = typeof (row as any)?.name === "string" ? String((row as any).name).trim() : "";
+            if (name) entityNameById.set(id, name);
+        }
+        const geometryById = new Map<string, GeometrySnapshot>();
+        for (const row of geometries || []) {
+            const id = typeof row?.id === "string" ? row.id : "";
+            if (!id) continue;
+            geometryById.set(id, row);
+        }
         const cloned = JSON.parse(JSON.stringify(fc)) as FeatureCollection;
         for (const feature of cloned.features) {
             const gid = String(feature.properties.id);
             const entity_ids = byGeom.get(gid) || [];
-            if (entity_ids.length) {
+            if (entity_ids.length || hasLinks) {
                 const props = feature.properties as unknown as UnknownRecord;
                 props.entity_ids = entity_ids;
-                props.entity_id = entity_ids[0];
+                props.entity_id = entity_ids[0] || null;
+
+                // Generate denormalized names for UI/map usage.
+                const primaryId = entity_ids[0] || null;
+                const primaryName = primaryId ? (entityNameById.get(primaryId) || "") : "";
+                const names = entity_ids.map((id) => entityNameById.get(id) || "").filter((n) => n.length > 0);
+                props.entity_name = primaryName || null;
+                props.entity_names = names;
+            }
+
+            // Generate geometry metadata onto feature properties (optional in persisted snapshot).
+            const geo = geometryById.get(gid) || null;
+            if (geo) {
+                const p = feature.properties as unknown as UnknownRecord;
+                // type (semantic key) is derived from geometries[].type (numeric code in string form).
+                const typeCode = typeof geo.type === "string" && geo.type.trim().length ? Number(geo.type) : NaN;
+                const typeKey = geoTypeCodeToTypeKey(Number.isFinite(typeCode) ? typeCode : null);
+                if (typeKey) p.type = typeKey;
+                if (Array.isArray(geo.binding) && geo.binding.length) p.binding = geo.binding;
+                if (typeof geo.time_start === "number") p.time_start = geo.time_start;
+                if (typeof geo.time_end === "number") p.time_end = geo.time_end;
             }
         }
         return cloned;
@@ -273,12 +316,13 @@ export function buildEditorSnapshot(options: {
                 ? cloned.name.trim()
                 : id;
         const source: "inline" | "ref" = cloned.source === "inline" ? "inline" : "ref";
+        const operation = sanitizeEntitySnapshotOperation((cloned as any).operation);
         entityRows.set(id, {
             ...cloned,
             id,
             source,
             name,
-            operation: cloned.operation ?? "reference",
+            operation,
         });
     }
 
@@ -370,6 +414,11 @@ export function buildEditorSnapshot(options: {
     const draftForSnapshot = JSON.parse(JSON.stringify(options.draft)) as FeatureCollection;
     for (const feature of draftForSnapshot.features) {
         const p = feature.properties as unknown as UnknownRecord;
+        // Do not send generate-only fields on the API payload. These are re-generated on load.
+        delete p.type;
+        delete p.time_start;
+        delete p.time_end;
+        delete p.binding;
         delete p.entity_id;
         delete p.entity_ids;
         delete p.entity_name;
@@ -414,7 +463,8 @@ export function buildEditorSnapshot(options: {
                 return cloned;
             }
 
-            // Inline wiki with no explicit operation: mark update only if changed; otherwise omit operation.
+            // Inline wiki with no explicit operation:
+            // Keep a valid operation value, because backend validation may require it (oneof).
             if (!prev) {
                 // New wiki that somehow has no op set: treat as create.
                 cloned.operation = "create";
@@ -431,7 +481,7 @@ export function buildEditorSnapshot(options: {
                 }
             })();
 
-            cloned.operation = changed ? "update" : undefined;
+            cloned.operation = changed ? "update" : "reference";
             return cloned;
         });
 
@@ -440,16 +490,34 @@ export function buildEditorSnapshot(options: {
         .map((l) => ({
             entity_id: l.entity_id,
             wiki_id: l.wiki_id,
-            operation: l.operation === "delete" ? "delete" : "binding",
+            // Backend API expects "reference" to indicate an active link (not "binding").
+            operation: l.operation === "delete" ? "delete" : "reference",
         }));
     const entityWikis = dedupeAndSortEntityWiki(entityWikisRaw);
 
     return {
         editor_feature_collection: draftForSnapshot,
-        entities: Array.from(entityRows.values()).sort((a, b) => String(a.id).localeCompare(String(b.id))),
+        entities: Array.from(entityRows.values())
+            .map((e) => ({
+                id: e.id,
+                source: e.source,
+                operation: e.operation,
+                name: typeof e.name === "string" ? e.name : undefined,
+                description: typeof (e as any).description === "string" ? (e as any).description : (e as any).description ?? null,
+            }))
+            .sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometries: geometries.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometry_entity: geometryEntity,
-        wikis: wikis.slice().sort((a, b) => a.id.localeCompare(b.id)),
+        wikis: wikis
+            .map((w) => ({
+                id: w.id,
+                source: w.source,
+                operation: w.operation,
+                title: w.title,
+                slug: (w as any).slug ?? null,
+                doc: (w as any).doc ?? null,
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id)),
         entity_wiki: entityWikis,
     };
 }
@@ -481,7 +549,13 @@ function dedupeAndSortEntityWiki(rows: EntityWikiLinkSnapshot[]): EntityWikiLink
         const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
         const wiki_id = typeof row.wiki_id === "string" ? row.wiki_id : "";
         if (!entity_id || !wiki_id) continue;
-        const operation = row.operation === "delete" ? "delete" : "binding";
+        const opRaw = row.operation;
+        const operation: EntityWikiLinkSnapshot["operation"] =
+            opRaw === "delete"
+                ? "delete"
+                : opRaw === "binding" || opRaw === "reference"
+                    ? opRaw
+                    : "reference";
         const key = `${entity_id}::${wiki_id}`;
         if (seen.has(key)) continue;
         seen.add(key);

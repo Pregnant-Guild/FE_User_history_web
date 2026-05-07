@@ -1,5 +1,6 @@
 import { API_ENDPOINTS } from "@/uhm/api/config";
 import { jsonRequestInit, requestJson } from "@/uhm/api/http";
+import { clearStoredTokens, setStoredTokens } from "@/auth/tokenStore";
 
 export type AuthTokens = {
     access_token: string;
@@ -18,14 +19,15 @@ export async function signIn(email: string, password: string): Promise<AuthToken
     const res = await requestJson<AuthTokens>(
         API_ENDPOINTS.authSignin,
         jsonRequestInit("POST", { email, password }),
-        // Sign-in sets httpOnly cookies in BackEndGo.
         { skipAuth: true }
     );
+    if (res?.access_token && res?.refresh_token) setStoredTokens(res);
     return res;
 }
 
 export async function logout(): Promise<void> {
     await requestJson(API_ENDPOINTS.authLogout, { method: "POST" });
+    clearStoredTokens();
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {

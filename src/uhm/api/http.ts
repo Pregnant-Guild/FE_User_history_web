@@ -1,5 +1,6 @@
 import type { ApiEnvelope } from "@/uhm/types/api";
 import { API_ENDPOINTS } from "@/uhm/api/config";
+import { getAccessToken, getRefreshToken, setStoredTokens, type StoredTokens, extractTokensFromResponsePayload } from "@/auth/tokenStore";
 
 export class ApiError extends Error {
     status: number;
@@ -15,12 +16,12 @@ export class ApiError extends Error {
     }
 }
 
-// BackEndGo auth flow: cookie-based (httpOnly access_token/refresh_token).
-// We intentionally do not store bearer tokens in localStorage in this FE.
+// History API auth flow supports Bearer JWT and (in some deployments) cookie-based sessions.
 
 type RequestJsonOptions = {
     skipAuth?: boolean;
     skipRefresh?: boolean;
+    authToken?: string | null; // Override bearer token (used for refresh).
 };
 
 export async function requestJson<T>(
@@ -142,25 +143,76 @@ function stringifyPayload(payload: unknown): string {
 function withAuthHeaders(init: RequestInit | undefined, options?: RequestJsonOptions): RequestInit | undefined {
     const baseInit: RequestInit = {
         ...init,
-        // Always include cookies (BackEndGo sets httpOnly access_token/refresh_token cookies).
         credentials: init?.credentials ?? "include",
     };
 
-    // Cookie-based auth only.
-    // Keep the function so call sites don't change, but never inject Authorization headers.
+    const headers = new Headers(baseInit.headers || undefined);
+
+    const override = options?.authToken;
+    if (override) {
+        headers.set("Authorization", `Bearer ${override}`);
+        return { ...baseInit, headers };
+    }
+
     if (options?.skipAuth) return baseInit;
-    return baseInit;
+
+    const access = getAccessToken();
+    if (access) headers.set("Authorization", `Bearer ${access}`);
+    return { ...baseInit, headers };
 }
 
+let refreshInFlight: Promise<boolean> | null = null;
+
 async function tryRefreshTokens(): Promise<boolean> {
+    // Single-flight refresh for concurrent 401s.
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = (async () => {
     try {
-        await requestJson(
-            API_ENDPOINTS.authRefresh,
-            { method: "POST" },
-            { skipAuth: true, skipRefresh: true }
-        );
-        return true;
+        const refreshToken = getRefreshToken();
+
+        // Try header-based refresh first (per swagger), but fall back to cookie-based refresh if needed.
+        let payload: unknown;
+        try {
+            payload = await requestJsonInternal<unknown>(
+                API_ENDPOINTS.authRefresh,
+                { method: "POST" },
+                refreshToken
+                    ? { skipRefresh: true, authToken: refreshToken }
+                    : { skipRefresh: true, skipAuth: true }
+            );
+        } catch (err) {
+            if (refreshToken && err instanceof ApiError && err.status === 401) {
+                payload = await requestJsonInternal<unknown>(
+                    API_ENDPOINTS.authRefresh,
+                    { method: "POST" },
+                    { skipRefresh: true, skipAuth: true }
+                );
+            } else {
+                throw err;
+            }
+        }
+
+        const next = extractTokensFromResponsePayload(payload) as StoredTokens | null;
+        if (next) {
+            setStoredTokens(next);
+            return true;
+        }
+
+        // Fallback: if server returns only access_token, keep existing refresh token (if any).
+        const maybeAccess = (payload as any)?.access_token ?? (payload as any)?.data?.access_token;
+        if (typeof maybeAccess === "string" && maybeAccess.trim()) {
+            if (refreshToken) setStoredTokens({ access_token: maybeAccess, refresh_token: refreshToken });
+            return true;
+        }
+
+        return false;
     } catch {
         return false;
+    }
+    })();
+    try {
+        return await refreshInFlight;
+    } finally {
+        refreshInFlight = null;
     }
 }

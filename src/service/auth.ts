@@ -1,5 +1,6 @@
 import api from "@/config/config";
 import { API } from "../../api";
+import { clearStoredTokens, extractTokensFromResponsePayload, setStoredTokens } from "@/auth/tokenStore";
 
 export const apiCreateOTP = async (email: string) => {
   const token_type = 2;
@@ -23,11 +24,14 @@ export const apiSignUp = async (payload: any) => {
 
 export const apiLogout = async () => {
   const response = await api.post(API.Auth.LOGOUT);
+  clearStoredTokens();
   return response.data;
 };
 
 export const apiSignIn = async (payload: any) => {
   const response = await api.post(API.Auth.SIGNIN, payload);
+  const tokens = extractTokensFromResponsePayload(response?.data);
+  if (tokens) setStoredTokens(tokens);
   return response.data;
 };
 

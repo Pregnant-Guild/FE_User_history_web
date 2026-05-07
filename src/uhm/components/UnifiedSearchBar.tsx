@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 export type UnifiedSearchKind = "entity" | "wiki" | "geo";
 
@@ -10,9 +10,53 @@ type Props = {
     query: string;
     onQueryChange: (query: string) => void;
     disabledGeo?: boolean;
+    debounceMs?: number;
+    onLocalQueryChange?: (query: string) => void;
 };
 
-export default function UnifiedSearchBar({ kind, onKindChange, query, onQueryChange, disabledGeo }: Props) {
+export default function UnifiedSearchBar({
+    kind,
+    onKindChange,
+    query,
+    onQueryChange,
+    disabledGeo,
+    debounceMs = 300,
+    onLocalQueryChange,
+}: Props) {
+    // Local input state to avoid propagating query changes (and triggering API) on every keystroke.
+    const [localQuery, setLocalQuery] = useState(query);
+    const debounceTimerRef = useRef<number | null>(null);
+
+    // Keep local input in sync when parent updates `query` externally (e.g. reset, preset, navigation).
+    useEffect(() => {
+        setLocalQuery(query);
+    }, [query]);
+
+    useEffect(() => {
+        onLocalQueryChange?.(localQuery);
+    }, [localQuery, onLocalQueryChange]);
+
+    // Debounce propagation upwards.
+    useEffect(() => {
+        if (localQuery === query) return;
+
+        if (debounceTimerRef.current != null) window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = window.setTimeout(() => {
+            onQueryChange(localQuery);
+        }, debounceMs);
+
+        return () => {
+            if (debounceTimerRef.current != null) window.clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        };
+    }, [localQuery, query, onQueryChange, debounceMs]);
+
+    const commitNow = () => {
+        if (debounceTimerRef.current != null) window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+        if (localQuery !== query) onQueryChange(localQuery);
+    };
+
     const selectStyle: CSSProperties = {
         width: 110,
         border: "1px solid #1f2937",
@@ -74,8 +118,12 @@ export default function UnifiedSearchBar({ kind, onKindChange, query, onQueryCha
                     </option>
                 </select>
                 <input
-                    value={query}
-                    onChange={(e) => onQueryChange(e.target.value)}
+                    value={localQuery}
+                    onChange={(e) => setLocalQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") commitNow();
+                    }}
+                    onBlur={() => commitNow()}
                     placeholder={kind === "entity" ? "Nhập tên entity…" : kind === "wiki" ? "Nhập title wiki…" : "Nhập tên entity…"}
                     style={inputStyle}
                     aria-label="Search query"

@@ -6,9 +6,9 @@ export type EntityWikiLinkSnapshot = {
     entity_id: string;
     wiki_id: string;
     // Relationship semantics (entity ↔ wiki).
-    // - binding: the link exists (assigned)
+    // - reference/binding: the link exists (assigned)
     // - delete: the link is removed
-    operation?: "binding" | "delete";
+    operation?: "reference" | "binding" | "delete";
 };
 
 // BackEndGo uses Projects/Commits/Submissions. "Section" is legacy naming in FE.
