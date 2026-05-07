@@ -22,6 +22,7 @@ function wikiTitle(w: WikiSnapshot): string {
 
 export default function EntityWikiBindingsPanel({ entities, wikis, links, setLinks }: Props) {
   const [activeEntityId, setActiveEntityId] = useState<string>("");
+  const [activeWikiId, setActiveWikiId] = useState<string>("");
 
   const wikiChoices: WikiChoice[] = useMemo(
     () =>
@@ -60,18 +61,21 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
         const currentlyOn = existing.operation !== "delete";
         next[idx] = {
           ...existing,
-          operation: currentlyOn ? "delete" : "reference",
+          operation: currentlyOn ? "delete" : "binding",
         };
         return next;
       }
       next.push({
         entity_id: activeEntityId,
         wiki_id: id,
-        operation: "reference",
+        operation: "binding",
       });
       return next;
     });
   };
+
+  const activeWikiLinked = activeEntityId && activeWikiId ? activeLinks.has(activeWikiId) : false;
+  const activeWikiChoice = activeWikiId ? wikiChoices.find((w) => w.id === activeWikiId) || null : null;
 
   return (
     <div
@@ -115,48 +119,132 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
 
         <div>
           <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>Wikis</div>
-          {!wikiChoices.length ? (
-            <div style={{ fontSize: "12px", color: "#94a3b8" }}>No wiki in project yet.</div>
-          ) : !activeEntityId ? (
-            <div style={{ fontSize: "12px", color: "#94a3b8" }}>Pick an entity to bind wikis.</div>
-          ) : (
-            <div style={{ display: "grid", gap: "6px" }}>
-              {wikiChoices.slice(0, 12).map((w) => {
-                const checked = activeLinks.has(w.id);
-                const isRefWiki = wikis.find((x) => x.id === w.id)?.source === "ref";
-                return (
-                  <label
-                    key={w.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "8px",
-                      borderRadius: "6px",
-                      border: "1px solid #1f2937",
-                      cursor: "pointer",
-                      background: checked ? "#111827" : "transparent",
-                    }}
-                    title={w.id}
-                  >
-                    <input type="checkbox" checked={checked} onChange={() => toggle(w.id)} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: "#e5e7eb", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {w.title}
-                        {isRefWiki ? " (ref)" : ""}
-                      </div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {w.id}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })}
-              {wikiChoices.length > 12 ? (
-                <div style={{ fontSize: "12px", color: "#94a3b8" }}>+{wikiChoices.length - 12} more…</div>
-              ) : null}
-            </div>
-          )}
+          <div style={{ display: "grid", gap: "8px" }}>
+            <select
+              value={activeWikiId}
+              onChange={(e) => setActiveWikiId(e.target.value)}
+              disabled={wikiChoices.length === 0}
+              style={{
+                width: "100%",
+                border: "1px solid #1f2937",
+                background: "#0b1220",
+                color: "#e5e7eb",
+                borderRadius: "6px",
+                padding: "8px 10px",
+                fontSize: "12px",
+                outline: "none",
+                opacity: wikiChoices.length === 0 ? 0.7 : 1,
+                cursor: wikiChoices.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              <option value="">
+                {wikiChoices.length === 0 ? "No wikis available" : "Select wiki…"}
+              </option>
+              {wikiChoices.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.title}
+                </option>
+              ))}
+            </select>
+
+            {wikiChoices.length === 0 ? (
+              <div style={{ fontSize: "12px", color: "#94a3b8" }}>No wiki in project yet.</div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={!activeEntityId || !activeWikiId}
+                  onClick={() => toggle(activeWikiId)}
+                  style={{
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "8px 10px",
+                    cursor: !activeEntityId || !activeWikiId ? "not-allowed" : "pointer",
+                    background: activeWikiLinked ? "#334155" : "#16a34a",
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: 12,
+                    opacity: !activeEntityId || !activeWikiId ? 0.65 : 1,
+                  }}
+                >
+                  {activeWikiLinked ? "Unlink wiki" : "Link wiki"}
+                </button>
+
+                {activeWikiChoice ? (
+                  <div style={{ fontSize: 12, color: "#94a3b8", overflowWrap: "anywhere" }}>
+                    {activeWikiChoice.id}
+                  </div>
+                ) : null}
+
+                {!activeEntityId ? (
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>Pick an entity to see/link wikis.</div>
+                ) : activeLinks.size ? (
+                  <div style={{ display: "grid", gap: "6px" }}>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>Linked wikis ({activeLinks.size})</div>
+                    {Array.from(activeLinks).slice(0, 8).map((id) => {
+                      const w = wikiChoices.find((x) => x.id === id) || null;
+                      return (
+                        <div
+                          key={id}
+                          style={{
+                            padding: "8px",
+                            borderRadius: "6px",
+                            border: "1px solid #1f2937",
+                            background: "#111827",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 8,
+                          }}
+                          title={id}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                color: "#e5e7eb",
+                                fontSize: 12,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {w?.title || "Untitled wiki"}
+                            </div>
+                            <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {id}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggle(id)}
+                            style={{
+                              border: "none",
+                              background: "#0b1220",
+                              color: "#fecaca",
+                              cursor: "pointer",
+                              borderRadius: 6,
+                              padding: "6px 8px",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              flex: "0 0 auto",
+                            }}
+                          >
+                            Unlink
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {activeLinks.size > 8 ? (
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>+{activeLinks.size - 8} more…</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>No wiki linked yet.</div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

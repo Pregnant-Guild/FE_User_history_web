@@ -11,6 +11,7 @@ export type GeometryMetadataPatch = {
 };
 
 export function buildGeometryMetadataPatch(form: GeometryMetaFormState): GeometryMetadataPatch {
+    const typeKey = form.type_key.trim();
     const timeStart = parseOptionalYearInput(form.time_start, "time_start");
     const timeEnd = parseOptionalYearInput(form.time_end, "time_end");
     if (timeStart !== null && timeEnd !== null && timeStart > timeEnd) {
@@ -20,11 +21,13 @@ export function buildGeometryMetadataPatch(form: GeometryMetaFormState): Geometr
     const bindingIds = parseBindingInput(form.binding);
     return {
         patch: {
+            type: typeKey.length ? typeKey : undefined,
             time_start: timeStart,
             time_end: timeEnd,
             binding: bindingIds,
         },
         formState: {
+            type_key: typeKey,
             time_start: timeStart != null ? String(timeStart) : "",
             time_end: timeEnd != null ? String(timeEnd) : "",
             binding: bindingIds.join(", "),
@@ -47,4 +50,3 @@ function parseOptionalYearInput(raw: string, fieldName: string): number | null {
     }
     return Math.trunc(parsed);
 }
-

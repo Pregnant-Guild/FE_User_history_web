@@ -25,12 +25,12 @@ export type EntitySnapshot = {
     source: "inline" | "ref";
     // Delta semantics for this commit:
     // - create/update/delete: this commit modifies the entity record
-    // - reference: this entity is referenced/linked (e.g., geometry<->entity, entity<->wiki) but not modified
+    // - reference: this entity is kept as-is (no modification in this commit). Relationship assignments live in
+    //   join tables (geometry_entity / entity_wiki), not here.
     operation?: EntitySnapshotOperation;
     name?: string;
     slug?: string | null;
     description?: string | null;
-    type_id?: string | null;
     status?: number | null;
     base_updated_at?: string;
     base_hash?: string;

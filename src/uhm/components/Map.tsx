@@ -111,6 +111,8 @@ export default function Map({
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
     // Đánh dấu đã fitBounds cho fitBoundsKey hiện tại (tránh fit lặp).
     const fitBoundsAppliedRef = useRef(false);
+    // Auto center theo vị trí người dùng chỉ nên chạy 1 lần / mount.
+    const geolocationCenteredRef = useRef(false);
     // Danh sách cleanup fns để dọn listeners/engines khi unmount map.
     const mapCleanupFnsRef = useRef<Array<() => void>>([]);
     // Các engine bindings theo mode để gọi cancel/cleanup khi đổi mode.
@@ -255,6 +257,34 @@ export default function Map({
         if (fitToDraftBoundsRef.current && !fitBoundsAppliedRef.current) {
             fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, visibleDraft);
         }
+    }, []);
+
+    const tryCenterToUserLocation = useCallback(() => {
+        if (geolocationCenteredRef.current) return;
+        // Nếu đang "fit to draft bounds" thì không nên override center.
+        if (fitToDraftBoundsRef.current) return;
+        if (typeof window === "undefined") return;
+        if (!("geolocation" in navigator)) return;
+
+        const map = mapRef.current;
+        if (!map) return;
+
+        geolocationCenteredRef.current = true;
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                if (mapRef.current !== map) return;
+                const { longitude, latitude } = pos.coords;
+                if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
+
+                const currentZoom = map.getZoom();
+                const nextZoom = Number.isFinite(currentZoom) ? Math.max(currentZoom, 5) : 5;
+                map.easeTo({ center: [longitude, latitude], zoom: nextZoom, duration: 900 });
+            },
+            () => {
+                // Người dùng từ chối / lỗi định vị: im lặng.
+            },
+            { enableHighAccuracy: false, timeout: 4000, maximumAge: 60_000 }
+        );
     }, []);
 
     useEffect(() => {
@@ -841,7 +871,7 @@ export default function Map({
                         type: "Feature",
                         properties: {
                             id,
-                            type: null,
+                            type: "country",
                             geometry_preset: "polygon",
                             entity_id: null,
                             entity_ids: [],
@@ -880,7 +910,7 @@ export default function Map({
                         type: "Feature",
                         properties: {
                             id,
-                            type: null,
+                            type: "city",
                             geometry_preset: "point",
                             entity_id: null,
                             entity_ids: [],
@@ -946,7 +976,7 @@ export default function Map({
                         type: "Feature",
                         properties: {
                             id,
-                            type: null,
+                            type: "war",
                             geometry_preset: "circle-area",
                             entity_id: null,
                             entity_ids: [],
@@ -979,6 +1009,8 @@ export default function Map({
 
             // after everything mounted, push current draft to sources
             applyDraftToMap(draftRef.current);
+            // Khi vao web, thu auto center theo vi tri user (neu co quyen).
+            tryCenterToUserLocation();
 
             if (allowGeometryEditing) {
                 editingEngineRef.current?.bindEditEvents(map);
@@ -1000,7 +1032,7 @@ export default function Map({
             }
             map.remove();
         };
-    }, [allowGeometryEditing, applyDraftToMap]);
+    }, [allowGeometryEditing, applyDraftToMap, tryCenterToUserLocation]);
 
     const handleZoomByStep = (delta: number) => {
         const map = mapRef.current;

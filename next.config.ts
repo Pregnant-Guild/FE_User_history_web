@@ -1,4 +1,12 @@
 import type { NextConfig } from "next";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+// Turbopack uses its "root" directory for module resolution. In a repo that
+// contains multiple projects (without a package.json at the repo root),
+// Turbopack can accidentally pick the repo root and then fail to resolve
+// dependencies like `tailwindcss`. Force Turbopack root to this app directory.
+const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -28,6 +36,7 @@ const nextConfig: NextConfig = {
   },
 
   turbopack: {
+    root: turbopackRoot,
     rules: {
       '*.svg': {
         loaders: ['@svgr/webpack'],

@@ -1,6 +1,6 @@
 import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/entityTypeOptions";
+import { typeKeyToGeoTypeCode } from "@/uhm/lib/geoTypeMap";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
-import type { PendingEntityCreate } from "@/uhm/lib/editor/session/sessionTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { EditorSnapshot, Section } from "@/uhm/types/sections";
@@ -42,17 +42,21 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             .filter(isRecord)
             .map((e) => {
                 const id = getStringId(e.id);
-                const op = typeof e.operation === "string" ? e.operation : undefined;
+                const opRaw = typeof e.operation === "string" ? e.operation : undefined;
+                const operation: EntitySnapshot["operation"] =
+                    opRaw === "delete" ? "delete" : "reference";
                 const existingSource = e.source === "inline" || e.source === "ref" ? e.source : undefined;
                 const refId = getRefId(e.ref);
-                const source: "inline" | "ref" = existingSource || (refId || op === "reference" ? "ref" : "inline");
+                const source: "inline" | "ref" =
+                    existingSource || (refId || opRaw === "reference" ? "ref" : "inline");
                 const rest: UnknownRecord = { ...e };
                 delete rest.ref;
 
                 return {
-                    ...(rest as unknown as Omit<EntitySnapshot, "id" | "source">),
+                    ...(rest as unknown as Omit<EntitySnapshot, "id" | "source" | "operation">),
                     id,
                     source,
+                    operation,
                 };
             })
         : undefined;
@@ -63,6 +67,9 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             .filter(isRecord)
             .map((g) => {
                 const id = getStringId(g.id);
+                const opRaw = typeof g.operation === "string" ? g.operation : undefined;
+                const operation: GeometrySnapshot["operation"] =
+                    opRaw === "delete" ? "delete" : "reference";
                 const existingSource = g.source === "inline" || g.source === "ref" ? g.source : undefined;
                 const refId = getRefId(g.ref);
                 const hasInlineGeometry = "draw_geometry" in g || "geometry" in g;
@@ -71,9 +78,10 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 delete rest.ref;
 
                 return {
-                    ...(rest as unknown as Omit<GeometrySnapshot, "id" | "source">),
+                    ...(rest as unknown as Omit<GeometrySnapshot, "id" | "source" | "operation">),
                     id,
                     source,
+                    operation,
                 };
             })
         : undefined;
@@ -84,17 +92,21 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             .filter(isRecord)
             .map((w) => {
                 const id = typeof w.id === "string" ? w.id : "";
-                const op = typeof w.operation === "string" ? w.operation : undefined;
+                const opRaw = typeof w.operation === "string" ? w.operation : undefined;
+                const operation: WikiSnapshot["operation"] =
+                    opRaw === "delete" ? "delete" : "reference";
                 const existingSource = w.source === "inline" || w.source === "ref" ? w.source : undefined;
                 const refId = getRefId(w.ref);
-                const source: "inline" | "ref" = existingSource || (refId || op === "reference" ? "ref" : "inline");
+                const source: "inline" | "ref" =
+                    existingSource || (refId || opRaw === "reference" ? "ref" : "inline");
                 const rest: UnknownRecord = { ...w };
                 delete rest.ref;
 
                 return {
-                    ...(rest as unknown as Omit<WikiSnapshot, "id" | "source">),
+                    ...(rest as unknown as Omit<WikiSnapshot, "id" | "source" | "operation">),
                     id,
                     source,
+                    operation,
                 };
             })
         : undefined;
@@ -147,8 +159,14 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                         : typeof r.is_deleted === "boolean"
                             ? r.is_deleted
                             : false;
-                const operation: "reference" | "delete" =
-                    opRaw === "delete" ? "delete" : opRaw === "reference" ? "reference" : isDeleted ? "delete" : "reference";
+                const operation: "binding" | "delete" =
+                    opRaw === "delete"
+                        ? "delete"
+                        : opRaw === "binding" || opRaw === "reference"
+                            ? "binding"
+                            : isDeleted
+                                ? "delete"
+                                : "binding";
                 return { entity_id, wiki_id, operation };
             })
             .filter((r) => r.entity_id.length > 0 && r.wiki_id.length > 0)
@@ -194,10 +212,9 @@ export function buildEditorSnapshot(options: {
     section: Section;
     draft: FeatureCollection;
     changes: Change[];
-    pendingEntities: PendingEntityCreate[];
-    projectEntityRefs: EntitySnapshot[];
-    wikis: WikiSnapshot[];
-    entityWikiLinks: EntityWikiLinkSnapshot[];
+    snapshotEntities: EntitySnapshot[];
+    snapshotWikis: WikiSnapshot[];
+    snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
     previousSnapshot: EditorSnapshot | null;
     hasPersistedFeature: (id: Feature["properties"]["id"]) => boolean;
 }): EditorSnapshot {
@@ -225,40 +242,58 @@ export function buildEditorSnapshot(options: {
         if (id && operation) previousGeometryOps.set(id, operation);
     }
 
-    const pendingEntityIds = new Set(options.pendingEntities.map((entity) => entity.id));
     const entityRows = new globalThis.Map<string, EntitySnapshot>();
-    for (const entity of options.pendingEntities) {
-        entityRows.set(entity.id, {
-            id: entity.id,
+
+    // Persist inline entity records across commits even when they're not currently bound.
+    // Without this, "create entity" can disappear on the next commit unless the entity is referenced
+    // by geometry_entity/entity_wiki or pinned via projectEntityRefs.
+    for (const prev of options.previousSnapshot?.entities || []) {
+        if (!prev) continue;
+        const id = typeof prev.id === "string" || typeof prev.id === "number" ? String(prev.id) : "";
+        if (!id || entityRows.has(id)) continue;
+        if (prev.operation === "delete") continue;
+        if (prev.source !== "inline") continue;
+        // Carry forward as current-state inline entity; operation is a per-commit delta signal.
+        const cloned = JSON.parse(JSON.stringify(prev)) as EntitySnapshot;
+        const { operation: _op, ...rest } = cloned;
+        entityRows.set(id, {
+            ...rest,
+            id,
             source: "inline",
-            operation: "create",
-            name: entity.name,
-            slug: entity.slug,
-            description: null,
-            type_id: entity.type_id,
-            status: entity.status,
+            operation: "reference",
         });
     }
-
-    for (const ref of options.projectEntityRefs || []) {
-        const id = typeof ref?.id === "string" || typeof ref?.id === "number" ? String(ref.id) : "";
-        if (!id || entityRows.has(id)) continue;
-        const cloned = JSON.parse(JSON.stringify(ref)) as EntitySnapshot;
+    for (const row of options.snapshotEntities || []) {
+        if (!row) continue;
+        const id = typeof row.id === "string" || typeof row.id === "number" ? String(row.id) : "";
+        if (!id) continue;
+        const cloned = JSON.parse(JSON.stringify(row)) as EntitySnapshot;
+        const name =
+            typeof cloned?.name === "string" && cloned.name.trim().length
+                ? cloned.name.trim()
+                : id;
+        const source: "inline" | "ref" = cloned.source === "inline" ? "inline" : "ref";
         entityRows.set(id, {
             ...cloned,
             id,
-            source: "ref",
+            source,
+            name,
+            operation: cloned.operation ?? "reference",
         });
     }
 
     // Entities referenced by wiki links should be present as "reference" too.
-    for (const link of options.entityWikiLinks || []) {
+    for (const link of options.snapshotEntityWikiLinks || []) {
         const id = typeof link?.entity_id === "string" ? link.entity_id : "";
         if (!id || entityRows.has(id)) continue;
         entityRows.set(id, {
             id,
             source: "ref",
             operation: "reference",
+            name: id,
+            slug: null,
+            description: null,
+            status: 1,
         });
     }
 
@@ -272,7 +307,6 @@ export function buildEditorSnapshot(options: {
                 name: entityId,
                 slug: null,
                 description: null,
-                type_id: feature.properties.type || DEFAULT_ENTITY_TYPE_ID,
                 status: 1,
             });
         }
@@ -294,11 +328,14 @@ export function buildEditorSnapshot(options: {
                         ? "update"
                         : undefined;
         const bbox = getFeatureBBox(feature);
+        const typeKey = feature.properties.type || getDefaultTypeIdForFeature(feature);
+        const typeCode = typeKeyToGeoTypeCode(typeKey);
         return {
             id,
             operation,
             source: "inline",
-            type: feature.properties.type || getDefaultTypeIdForFeature(feature),
+            // BE currently expects geometries[].type as a string. We send the geo_type SMALLINT code as a string.
+            type: String(typeCode ?? 0),
             draw_geometry: feature.geometry,
             binding: normalizeFeatureBindingIds(feature),
             time_start: feature.properties.time_start ?? null,
@@ -322,11 +359,12 @@ export function buildEditorSnapshot(options: {
         });
     }
 
-    const geometryEntity: GeometryEntitySnapshot[] = options.draft.features.flatMap((feature) => {
+    const geometryEntityRaw: GeometryEntitySnapshot[] = options.draft.features.flatMap((feature) => {
         const geometry_id = String(feature.properties.id);
         const entityIds = normalizeFeatureEntityIds(feature);
         return entityIds.map((entity_id) => ({ geometry_id, entity_id }));
     });
+    const geometryEntity = dedupeAndSortGeometryEntity(geometryEntityRaw);
 
     // Persist snapshot without denormalized entity fields on features (many-to-many lives in geometry_entity[]).
     const draftForSnapshot = JSON.parse(JSON.stringify(options.draft)) as FeatureCollection;
@@ -350,8 +388,17 @@ export function buildEditorSnapshot(options: {
     // Operation semantics:
     // - create/update/delete: this commit changes the wiki itself
     // - reference: this wiki is a ref used for linking (entity<->wiki), not a modification
-    const wikis: WikiSnapshot[] = (options.wikis || [])
-        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+    const wikis: WikiSnapshot[] = (options.snapshotWikis || [])
+        .filter((w) => {
+            if (!w || typeof w.id !== "string" || w.id.trim().length === 0) return false;
+            if (w.source === "ref") return true;
+            // Keep explicit operations (e.g. delete) even if content is empty.
+            if (w.operation === "create" || w.operation === "update" || w.operation === "delete") return true;
+            // Inline wiki with no content: don't persist it (treat as not written).
+            const title = typeof w.title === "string" ? w.title.trim() : "";
+            const doc = typeof w.doc === "string" ? w.doc.trim() : "";
+            return title.length > 0 || (w.doc !== null && doc.length > 0);
+        })
         .map((w) => {
             const prev = previousWikis.get(w.id) || null;
             const cloned = JSON.parse(JSON.stringify(w)) as WikiSnapshot;
@@ -388,26 +435,64 @@ export function buildEditorSnapshot(options: {
             return cloned;
         });
 
-    const entityWikis: EntityWikiLinkSnapshot[] = (options.entityWikiLinks || [])
+    const entityWikisRaw: EntityWikiLinkSnapshot[] = (options.snapshotEntityWikiLinks || [])
         .filter((l) => l && typeof l.entity_id === "string" && typeof l.wiki_id === "string")
         .map((l) => ({
             entity_id: l.entity_id,
             wiki_id: l.wiki_id,
-            operation: l.operation === "delete" ? "delete" : "reference",
+            operation: l.operation === "delete" ? "delete" : "binding",
         }));
+    const entityWikis = dedupeAndSortEntityWiki(entityWikisRaw);
 
     return {
         editor_feature_collection: draftForSnapshot,
-        entities: Array.from(entityRows.values()).map((entity) => {
-            const id = String(entity.id || "");
-            if (pendingEntityIds.has(id)) return entity;
-            return entity;
-        }),
-        geometries,
+        entities: Array.from(entityRows.values()).sort((a, b) => String(a.id).localeCompare(String(b.id))),
+        geometries: geometries.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometry_entity: geometryEntity,
-        wikis,
+        wikis: wikis.slice().sort((a, b) => a.id.localeCompare(b.id)),
         entity_wiki: entityWikis,
     };
+}
+
+function dedupeAndSortGeometryEntity(rows: GeometryEntitySnapshot[]): GeometryEntitySnapshot[] {
+    const seen = new Set<string>();
+    const deduped: GeometryEntitySnapshot[] = [];
+    for (const row of rows) {
+        const geometry_id = typeof row.geometry_id === "string" ? row.geometry_id : "";
+        const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
+        if (!geometry_id || !entity_id) continue;
+        const key = `${geometry_id}::${entity_id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push({ ...row, geometry_id, entity_id });
+    }
+    deduped.sort((a, b) => {
+        const g = a.geometry_id.localeCompare(b.geometry_id);
+        if (g !== 0) return g;
+        return a.entity_id.localeCompare(b.entity_id);
+    });
+    return deduped;
+}
+
+function dedupeAndSortEntityWiki(rows: EntityWikiLinkSnapshot[]): EntityWikiLinkSnapshot[] {
+    const seen = new Set<string>();
+    const deduped: EntityWikiLinkSnapshot[] = [];
+    for (const row of rows) {
+        const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
+        const wiki_id = typeof row.wiki_id === "string" ? row.wiki_id : "";
+        if (!entity_id || !wiki_id) continue;
+        const operation = row.operation === "delete" ? "delete" : "binding";
+        const key = `${entity_id}::${wiki_id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push({ entity_id, wiki_id, operation });
+    }
+    deduped.sort((a, b) => {
+        const e = a.entity_id.localeCompare(b.entity_id);
+        if (e !== 0) return e;
+        return a.wiki_id.localeCompare(b.wiki_id);
+    });
+    return deduped;
 }
 
 export function getDefaultTypeIdForFeature(feature: Feature): string {

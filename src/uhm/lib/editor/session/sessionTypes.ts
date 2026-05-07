@@ -16,11 +16,11 @@ export type TimelineRange = {
 
 export type EntityFormState = {
     name: string;
-    slug: string;
-    type_id: string;
+    description: string;
 };
 
 export type GeometryMetaFormState = {
+    type_key: string;
     time_start: string;
     time_end: string;
     binding: string;
@@ -29,16 +29,13 @@ export type GeometryMetaFormState = {
 export type PendingEntityCreate = {
     id: string;
     name: string;
-    slug: string | null;
-    type_id: string;
+    description: string | null;
     status: number;
 };
 
 export type CreatedEntitySummary = {
     id: string;
     name: string;
-    type_id?: string | null;
 };
 
 export type GeometryPreset = EntityGeometryPreset;
-

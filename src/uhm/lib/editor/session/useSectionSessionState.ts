@@ -51,8 +51,8 @@ export function useSectionSessionState(options: Options) {
     const [sectionState, setSectionState] = useState<SectionState | null>(null);
     // Danh sách commits của section đang mở.
     const [sectionCommits, setSectionCommits] = useState<SectionCommit[]>([]);
-    // Snapshot gần nhất đã load (để build snapshot diff/metadata).
-    const [lastSectionSnapshot, setLastSectionSnapshot] = useState<EditorSnapshot | null>(null);
+    // Baseline snapshot currently loaded for this editor session.
+    const [baselineSnapshot, setBaselineSnapshot] = useState<EditorSnapshot | null>(null);
 
     return {
         isSaving,
@@ -79,7 +79,7 @@ export function useSectionSessionState(options: Options) {
         setSectionState,
         sectionCommits,
         setSectionCommits,
-        lastSectionSnapshot,
-        setLastSectionSnapshot,
+        baselineSnapshot,
+        setBaselineSnapshot,
     };
 }

@@ -15,7 +15,10 @@ export interface Project {
     avatar_url: string;
   };
   commits?: any[];
+  // Legacy (old BE): submission_ids
   submission_ids?: any[];
+  // New BE: lightweight submissions list on project response
+  submissions?: Array<{ id: string; status: string }>;
   members?: ProjectMember[];
 }
 export interface ProjectsResponse<T = Project> {

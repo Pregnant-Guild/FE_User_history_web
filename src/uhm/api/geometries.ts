@@ -2,8 +2,30 @@ import { API_ENDPOINTS } from "@/uhm/api/config";
 import { requestJson } from "@/uhm/api/http";
 import type { GeometriesBBoxQuery } from "@/uhm/types/api";
 import type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
+import { geoTypeCodeToTypeKey } from "@/uhm/lib/geoTypeMap";
 
 export type { GeometriesBBoxQuery } from "@/uhm/types/api";
+
+export type EntityGeometrySearchGeo = {
+    id: string;
+    geo_type: number;
+    draw_geometry: unknown;
+    binding?: unknown;
+    time_start?: number | null;
+    time_end?: number | null;
+};
+
+export type EntityGeometriesSearchItem = {
+    entity_id: string;
+    name: string;
+    description: string;
+    geometries: EntityGeometrySearchGeo[];
+};
+
+export type SearchGeometriesByEntityNameResponse = {
+    items: EntityGeometriesSearchItem[];
+    next_cursor?: string;
+};
 
 function buildBBoxQueryString(params: GeometriesBBoxQuery): string {
     const query = new URLSearchParams({
@@ -32,9 +54,25 @@ export async function fetchGeometriesByBBox(params: GeometriesBBoxQuery): Promis
     return geometriesToFeatureCollection(rows);
 }
 
+export async function searchGeometriesByEntityName(
+    name: string,
+    options?: { cursor?: string; limit?: number }
+): Promise<SearchGeometriesByEntityNameResponse> {
+    const keyword = name.trim();
+    if (!keyword.length) return { items: [] };
+
+    const params = new URLSearchParams({ name: keyword });
+    if (options?.cursor) params.set("cursor", options.cursor);
+    if (options?.limit && Number.isFinite(options.limit)) {
+        params.set("limit", String(Math.trunc(options.limit)));
+    }
+
+    return requestJson<SearchGeometriesByEntityNameResponse>(`${API_ENDPOINTS.geometries}/entity?${params.toString()}`);
+}
+
 type GeometryRow = {
     id: string;
-    geo_type: string;
+    geo_type: number;
     draw_geometry: unknown;
     binding?: unknown;
     time_start?: number;
@@ -55,10 +93,11 @@ function geometriesToFeatureCollection(rows: GeometryRow[]): FeatureCollection {
         if (!geometry) continue;
 
         const binding = normalizeBinding(row.binding);
+        const typeKey = geoTypeCodeToTypeKey(row.geo_type) || null;
 
         const properties: FeatureProperties = {
             id: row.id,
-            type: row.geo_type || null,
+            type: typeKey,
             time_start: row.time_start ?? null,
             time_end: row.time_end ?? null,
             binding: binding.length ? binding : undefined,
@@ -76,10 +115,10 @@ function geometriesToFeatureCollection(rows: GeometryRow[]): FeatureCollection {
 
 function normalizeGeometry(value: unknown): Geometry | null {
     if (!value || typeof value !== "object") return null;
-    const g = value as any;
+    const g = value as Record<string, unknown>;
     if (typeof g.type !== "string") return null;
     if (!("coordinates" in g)) return null;
-    return g as Geometry;
+    return value as Geometry;
 }
 
 function normalizeBinding(value: unknown): string[] {

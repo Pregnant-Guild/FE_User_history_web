@@ -13,6 +13,7 @@ type Props = {
     onShowAll: () => void;
     onHideAll: () => void;
     topContent?: ReactNode;
+    width?: number;
 };
 
 export default function BackgroundLayersPanel({
@@ -21,11 +22,12 @@ export default function BackgroundLayersPanel({
     onShowAll,
     onHideAll,
     topContent,
+    width = 240,
 }: Props) {
     return (
         <aside
             style={{
-                width: "240px",
+                width,
                 background: "#111827",
                 color: "#e5e7eb",
                 borderLeft: "1px solid #1f2937",
@@ -38,57 +40,34 @@ export default function BackgroundLayersPanel({
 
             <h3 style={{ margin: 0, marginBottom: "10px" }}>Map Layers</h3>
 
-            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                <button
-                    onClick={onShowAll}
-                    style={{
-                        flex: 1,
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "6px 8px",
-                        cursor: "pointer",
-                        background: "#374151",
-                        color: "#f9fafb",
-                    }}
-                >
-                    Bật hết
-                </button>
-                <button
-                    onClick={onHideAll}
-                    style={{
-                        flex: 1,
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "6px 8px",
-                        cursor: "pointer",
-                        background: "#1f2937",
-                        color: "#f9fafb",
-                    }}
-                >
-                    Tắt hết
-                </button>
-            </div>
-
-            <div style={{ display: "grid", gap: "8px" }}>
-                {BACKGROUND_LAYER_OPTIONS.map((layer) => (
-                    <label
-                        key={layer.id}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            cursor: "pointer",
-                        }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={visibility[layer.id]}
-                            onChange={() => onToggleLayer(layer.id)}
-                        />
-                        <span>{layer.label}</span>
-                    </label>
-                ))}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 12px" }}>
+                {BACKGROUND_LAYER_OPTIONS.map((layer) => {
+                    const on = Boolean(visibility[layer.id]);
+                    return (
+                        <button
+                            key={layer.id}
+                            type="button"
+                            onClick={() => onToggleLayer(layer.id)}
+                            style={{
+                                border: "none",
+                                background: "transparent",
+                                padding: 0,
+                                margin: 0,
+                                cursor: "pointer",
+                                color: on ? "#22c55e" : "#e5e7eb",
+                                textDecorationLine: on ? "none" : "line-through",
+                                textDecorationThickness: on ? undefined : "2px",
+                                textDecorationColor: on ? undefined : "rgba(148, 163, 184, 0.7)",
+                                fontSize: 13,
+                                fontWeight: 750,
+                                whiteSpace: "nowrap",
+                            }}
+                            title={on ? "On" : "Off"}
+                        >
+                            {layer.label}
+                        </button>
+                    );
+                })}
             </div>
         </aside>
     );

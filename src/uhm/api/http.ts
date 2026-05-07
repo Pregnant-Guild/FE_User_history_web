@@ -45,7 +45,19 @@ async function requestJsonInternal<T>(
     options?: RequestJsonOptions
 ): Promise<T> {
     const nextInit = withAuthHeaders(init, options);
-    const res = await fetch(input, nextInit);
+    let res: Response;
+    try {
+        res = await fetch(input, nextInit);
+    } catch (err) {
+        // Browser "TypeError: Failed to fetch" typically means:
+        // - CORS blocked (common when using 127.0.0.1 instead of localhost in dev),
+        // - DNS/TLS/network error,
+        // - request blocked by the browser.
+        const origin = typeof window !== "undefined" ? window.location.origin : "<server>";
+        const url = typeof input === "string" ? input : String(input);
+        const details = { origin, url, apiBase: API_ENDPOINTS.projects.split("/projects")[0] };
+        throw new ApiError("Network error (failed to fetch)", 0, stringifyPayload(details));
+    }
 
     // One-shot refresh + retry for protected endpoints.
     if (

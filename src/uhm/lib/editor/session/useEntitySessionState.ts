@@ -2,23 +2,16 @@ import { useState } from "react";
 import type { Entity } from "@/uhm/types/entities";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { FeatureId } from "@/uhm/types/geo";
-import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/entityTypeOptions";
 import type {
-    CreatedEntitySummary,
     EntityFormState,
     GeometryMetaFormState,
-    PendingEntityCreate,
 } from "@/uhm/lib/editor/session/sessionTypes";
 
 export function useEntitySessionState() {
-    // Entities đã persisted từ backend (dùng cho search/binding).
-    const [persistedEntities, setPersistedEntities] = useState<Entity[]>([]);
-    // Entities được "pin" vào project dưới dạng reference (không cần chọn geometry).
-    const [projectEntityRefs, setProjectEntityRefs] = useState<EntitySnapshot[]>([]);
-    // Entities tạo mới trong phiên nhưng chưa commit lên backend.
-    const [pendingEntityCreates, setPendingEntityCreates] = useState<PendingEntityCreate[]>([]);
-    // Tóm tắt entities đã tạo (để hiển thị nhanh ở sidebar).
-    const [createdEntities, setCreatedEntities] = useState<CreatedEntitySummary[]>([]);
+    // Entity catalog loaded from backend (global list, used for search/lookup).
+    const [entityCatalog, setEntityCatalog] = useState<Entity[]>([]);
+    // Snapshot entity store for the current editor session (single source of truth for snapshot.entities).
+    const [snapshotEntities, setSnapshotEntities] = useState<EntitySnapshot[]>([]);
     // Thông báo trạng thái/lỗi liên quan entity/session.
     const [entityStatus, setEntityStatus] = useState<string | null>(null);
     // Feature đang được chọn để thao tác bind entities/metadata.
@@ -26,13 +19,13 @@ export function useEntitySessionState() {
     // Form tạo entity mới (độc lập).
     const [entityForm, setEntityForm] = useState<EntityFormState>({
         name: "",
-        slug: "",
-        type_id: DEFAULT_ENTITY_TYPE_ID,
+        description: "",
     });
     // Danh sách entity IDs đang chọn để bind vào geometry hiện tại.
     const [selectedGeometryEntityIds, setSelectedGeometryEntityIds] = useState<string[]>([]);
     // Form metadata geometry (time range + binding ids).
     const [geometryMetaForm, setGeometryMetaForm] = useState<GeometryMetaFormState>({
+        type_key: "",
         time_start: "",
         time_end: "",
         binding: "",
@@ -51,14 +44,10 @@ export function useEntitySessionState() {
     const [isEntitySearchLoading, setIsEntitySearchLoading] = useState(false);
 
     return {
-        persistedEntities,
-        setPersistedEntities,
-        projectEntityRefs,
-        setProjectEntityRefs,
-        pendingEntityCreates,
-        setPendingEntityCreates,
-        createdEntities,
-        setCreatedEntities,
+        entityCatalog,
+        setEntityCatalog,
+        snapshotEntities,
+        setSnapshotEntities,
         entityStatus,
         setEntityStatus,
         selectedFeatureId,

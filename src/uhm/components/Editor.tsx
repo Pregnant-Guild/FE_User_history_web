@@ -1,6 +1,7 @@
 "use client";
 
-import { UndoAction } from "@/uhm/lib/useEditorState";
+import type { ReactNode } from "react";
+import type { UndoAction } from "@/uhm/lib/useEditorState";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
 type Props = {
@@ -34,7 +35,6 @@ type Props = {
     createdEntities: Array<{
         id: string;
         name: string;
-        type_id?: string | null;
     }>;
     createdGeometries: Array<{
         id: string | number;
@@ -42,46 +42,44 @@ type Props = {
         semanticType?: string | null;
         entityNames: string[];
     }>;
+    width?: number;
 };
 
 export default function Editor({
-                                   mode,
-                                   setMode,
-                                   entityStatus,
-                                   onUndo,
-                                   onCommit,
-                                   onSubmit,
-                                   onRestoreCommit,
-                                   isSaving,
-                                   isSubmitting,
-                                   sectionTitle,
-                                   sectionStatus,
-                                   commitTitle,
-                                   commitNote,
-                                   onCommitTitleChange,
-                                   onCommitNoteChange,
-                                   commitCount,
-                                   hasHeadCommit,
-                                   headCommitId,
-                                   latestCommitLabel,
-                                   commits,
-                                   changesCount,
-                               undoStack,
-                               createdEntities,
-                               createdGeometries,
-                           }: Props) {
-    const formatCommitTitle = (commit: Props["commits"][number]) =>
-        commit.edit_summary?.trim() || `Commit ${commit.id.slice(0, 8)}`;
-
+    mode,
+    setMode,
+    entityStatus,
+    onUndo,
+    onCommit,
+    onSubmit,
+    onRestoreCommit,
+    isSaving,
+    isSubmitting,
+    sectionTitle,
+    sectionStatus,
+    commitTitle,
+    commitNote,
+    onCommitTitleChange,
+    onCommitNoteChange,
+    commitCount,
+    hasHeadCommit,
+    headCommitId,
+    latestCommitLabel,
+    commits,
+    changesCount,
+    undoStack,
+    createdEntities,
+    createdGeometries,
+    width = 280,
+}: Props) {
     const toggleMode = (newMode: EditorMode) => {
         if (mode === newMode) {
-            setMode("idle"); // bấm lại → tắt
+            setMode("idle");
         } else {
-            setMode(newMode); // chuyển mode
+            setMode(newMode);
         }
     };
 
-    // Lấy tối đa 8 tác vụ mới nhất, bỏ trùng nhãn (cùng loại/cùng id)
     const recentUndoLabels = (() => {
         const seen = new Set<string>();
         const labels: string[] = [];
@@ -94,385 +92,416 @@ export default function Editor({
         return labels.reverse();
     })();
 
-    const getButtonStyle = (btnMode: EditorMode) => ({
-        width: "100%",
-        padding: "8px",
-        marginBottom: "6px",
-        border: "none",
-        cursor: "pointer",
-        background: mode === btnMode ? "#4caf50" : "#222",
-        color: "white",
-        borderRadius: "4px",
-    });
+    const formatCommitTitle = (commit: Props["commits"][number]) =>
+        commit.edit_summary?.trim() || `Commit ${commit.id.slice(0, 8)}`;
+
+    const modeButtonStyle = (btnMode: EditorMode) =>
+        ({
+            padding: "8px 10px",
+            borderRadius: 6,
+            border: "1px solid #334155",
+            background: mode === btnMode ? "#16a34a" : "#111827",
+            color: "white",
+            cursor: "pointer",
+            fontWeight: 800,
+            fontSize: 12,
+            minHeight: 34,
+            boxSizing: "border-box",
+        }) as const;
+
+    const primaryButtonStyle =
+        ({
+            width: "100%",
+            padding: "8px 10px",
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            fontWeight: 850,
+            fontSize: 12,
+        }) as const;
 
     return (
         <div
             style={{
-                width: "220px",
+                width,
                 height: "100vh",
                 overflowY: "auto",
-                background: "#111",
+                background: "#0b1220",
                 color: "white",
-                padding: "12px",
-                borderRight: "1px solid #333",
+                padding: "12px 12px 20px",
+                borderRight: "1px solid #1f2937",
             }}
         >
-            <h3 style={{ marginBottom: "10px" }}>Editor</h3>
+            <div style={{ position: "sticky", top: 0, zIndex: 5, background: "#0b1220", paddingBottom: 10 }}>
+                <div style={{ fontWeight: 950, fontSize: 14, marginBottom: 10 }}>Editor</div>
 
-            <div
-                style={{
-                    marginBottom: "12px",
-                    padding: "10px",
-                    background: "#0b1220",
-                    borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                    fontSize: "12px",
-                    color: "#cbd5e1",
-                }}
-            >
-                <div style={{ color: "white", fontWeight: 600 }}>{sectionTitle}</div>
-                <div style={{ marginTop: "4px" }}>Status: {sectionStatus}</div>
-                <div>Commits: {commitCount}</div>
-                <div>{latestCommitLabel || "Chưa có commit"}</div>
+                <Panel title="Project" defaultOpen>
+                    <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.4 }}>
+                        <div style={{ color: "white", fontWeight: 850, overflowWrap: "anywhere" }}>{sectionTitle}</div>
+                        <div style={{ marginTop: 6 }}>
+                            Status: <span style={{ color: "#e2e8f0" }}>{sectionStatus}</span>
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                            Commits: <span style={{ color: "#e2e8f0" }}>{commitCount}</span>
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                            {latestCommitLabel ? (
+                                <span style={{ color: "#e2e8f0" }}>{latestCommitLabel}</span>
+                            ) : (
+                                <span style={{ color: "#94a3b8" }}>Chưa có head commit</span>
+                            )}
+                        </div>
+                    </div>
+                </Panel>
+
+                <Panel title="Tools" defaultOpen>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <button style={modeButtonStyle("select")} onClick={() => toggleMode("select")} title="Select">
+                            Select
+                        </button>
+                        <button style={modeButtonStyle("draw")} onClick={() => toggleMode("draw")} title="Draw polygon">
+                            Draw
+                        </button>
+                        <button style={modeButtonStyle("add-point")} onClick={() => setMode("add-point")} title="Add point">
+                            Point
+                        </button>
+                        <button style={modeButtonStyle("add-line")} onClick={() => setMode("add-line")} title="Add line">
+                            Line
+                        </button>
+                        <button style={modeButtonStyle("add-path")} onClick={() => setMode("add-path")} title="Add path">
+                            Path
+                        </button>
+                        <button style={modeButtonStyle("add-circle")} onClick={() => setMode("add-circle")} title="Add circle">
+                            Circle
+                        </button>
+                    </div>
+
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#94a3b8" }}>
+                        Mode: <span style={{ color: "white", fontWeight: 850 }}>{mode}</span>
+                    </div>
+                    <ModeHint mode={mode} />
+
+                    <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <button
+                            style={{
+                                ...modeButtonStyle("idle"),
+                                background: "#111827",
+                            }}
+                            onClick={() => setMode("idle")}
+                            title="Tắt tool hiện tại"
+                        >
+                            Idle
+                        </button>
+                        <button
+                            style={{
+                                ...modeButtonStyle("idle"),
+                                background: "#334155",
+                            }}
+                            onClick={onUndo}
+                            title="Undo thao tác gần nhất"
+                        >
+                            Undo
+                        </button>
+                    </div>
+                </Panel>
+
+                {entityStatus ? (
+                    <div
+                        style={{
+                            marginTop: 10,
+                            padding: "10px",
+                            background: "#111827",
+                            borderRadius: 8,
+                            border: "1px solid #7f1d1d",
+                            color: "#fecaca",
+                            fontSize: 12,
+                            overflowWrap: "anywhere",
+                        }}
+                    >
+                        {entityStatus}
+                    </div>
+                ) : null}
             </div>
 
-            <div
-                style={{
-                    marginBottom: "12px",
-                    padding: "10px",
-                    background: "#0b1220",
-                    borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                    fontSize: "12px",
-                    color: "#cbd5e1",
-                }}
-            >
-                <div style={{ marginBottom: "8px", fontWeight: 600, color: "white" }}>Project</div>
-            </div>
-
-            <button
-                style={getButtonStyle("draw")}
-                onClick={() => toggleMode("draw")}
-            >
-                Draw
-            </button>
-
-            <button
-                style={getButtonStyle("select")}
-                onClick={() => toggleMode("select")}
-            >
-                Select
-            </button>
-
-            <button
-                style={getButtonStyle("idle")}
-                onClick={() => setMode("idle")}
-            >
-                Idle
-            </button>
-
-            <button
-                style={getButtonStyle("add-point")}
-                onClick={() => setMode("add-point")}
-            >
-                Add point
-            </button>
-
-            <button
-                style={getButtonStyle("add-line")}
-                onClick={() => setMode("add-line")}
-            >
-                Add line
-            </button>
-
-            <button
-                style={getButtonStyle("add-path")}
-                onClick={() => setMode("add-path")}
-            >
-                Add path
-            </button>
-
-            <button
-                style={getButtonStyle("add-circle")}
-                onClick={() => setMode("add-circle")}
-            >
-                Add circle
-            </button>
-
-            <div style={{ marginTop: "12px", fontSize: "14px" }}>
-                Mode: <b>{mode}</b>
-            </div>
-            {mode === "add-line" ? (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#93c5fd" }}>
-                    Click để thêm điểm, Enter để hoàn tất, Esc để hủy.
-                </div>
-            ) : null}
-            {mode === "add-path" ? (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#93c5fd" }}>
-                    Click để thêm điểm, Enter để hoàn tất, Esc để hủy.
-                </div>
-            ) : null}
-            {mode === "add-circle" ? (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#93c5fd" }}>
-                    Giữ chuột trái kéo để mở bán kính, thả chuột để hoàn tất.
-                </div>
-            ) : null}
-
-            {entityStatus ? (
-                <div
-                    style={{
-                        marginTop: "12px",
-                        padding: "10px",
-                        background: "#0b1220",
-                        borderRadius: "6px",
-                        border: "1px solid #1f2937",
-                        color: "#fca5a5",
-                        fontSize: "12px",
-                    }}
-                >
-                    {entityStatus}
-                </div>
-            ) : null}
-
-            <div style={{ marginTop: "12px" }}>
+            <Panel title="Commit" defaultOpen>
+                <input
+                    value={commitTitle}
+                    onChange={(event) => onCommitTitleChange(event.target.value)}
+                    placeholder="Commit title"
+                    disabled={isSaving || isSubmitting}
+                    style={textInputStyle}
+                />
+                <textarea
+                    value={commitNote}
+                    onChange={(event) => onCommitNoteChange(event.target.value)}
+                    placeholder="Commit note"
+                    disabled={isSaving || isSubmitting}
+                    rows={3}
+                    style={textAreaStyle}
+                />
                 <button
                     style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "none",
-                        cursor: "pointer",
-                        background: "#334155",
-                        color: "white",
-                    }}
-                    onClick={onUndo}
-                >
-                    Undo
-                </button>
-            </div>
-            <input
-                value={commitTitle}
-                onChange={(event) => onCommitTitleChange(event.target.value)}
-                placeholder="Commit title"
-                disabled={isSaving || isSubmitting}
-                style={{
-                    width: "100%",
-                    marginTop: "8px",
-                    padding: "7px",
-                    borderRadius: "4px",
-                    border: "1px solid #334155",
-                    background: "#111827",
-                    color: "white",
-                    boxSizing: "border-box",
-                }}
-            />
-            <textarea
-                value={commitNote}
-                onChange={(event) => onCommitNoteChange(event.target.value)}
-                placeholder="Commit note"
-                disabled={isSaving || isSubmitting}
-                rows={3}
-                style={{
-                    width: "100%",
-                    marginTop: "8px",
-                    padding: "7px",
-                    borderRadius: "4px",
-                    border: "1px solid #334155",
-                    background: "#111827",
-                    color: "white",
-                    boxSizing: "border-box",
-                    resize: "vertical",
-                    fontFamily: "inherit",
-                }}
-            />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 68px", gap: "8px", marginTop: "8px" }}>
-                <button
-                    style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "none",
-                        cursor: isSaving || isSubmitting ? "not-allowed" : "pointer",
-                        background: isSaving || isSubmitting ? "#555" : "#0f766e",
-                        color: "white",
+                        ...primaryButtonStyle,
+                        marginTop: 8,
+                        background: isSaving || isSubmitting || changesCount <= 0 ? "#475569" : "#0f766e",
+                        cursor: isSaving || isSubmitting || changesCount <= 0 ? "not-allowed" : "pointer",
+                        opacity: changesCount <= 0 ? 0.75 : 1,
                     }}
                     onClick={onCommit}
-                    disabled={isSaving || isSubmitting}
+                    disabled={isSaving || isSubmitting || changesCount <= 0}
+                    title={changesCount <= 0 ? "Khong co thay doi de commit" : undefined}
                 >
                     Commit ({changesCount})
                 </button>
-                <div />
-            </div>
-            <button
-                style={{
-                    width: "100%",
-                    marginTop: "8px",
-                    padding: "8px",
-                    borderRadius: "4px",
-                    border: "none",
-                    cursor: isSubmitting || !hasHeadCommit ? "not-allowed" : "pointer",
-                    background: isSubmitting || !hasHeadCommit ? "#555" : "#16a34a",
-                    color: "white",
-                    opacity: !hasHeadCommit ? 0.6 : 1,
-                }}
-                onClick={onSubmit}
-                disabled={isSubmitting || !hasHeadCommit}
-            >
-                Submit
-            </button>
+                <button
+                    style={{
+                        ...primaryButtonStyle,
+                        marginTop: 8,
+                        background: isSubmitting || !hasHeadCommit ? "#475569" : "#16a34a",
+                        cursor: isSubmitting || !hasHeadCommit ? "not-allowed" : "pointer",
+                        opacity: !hasHeadCommit ? 0.6 : 1,
+                    }}
+                    onClick={onSubmit}
+                    disabled={isSubmitting || !hasHeadCommit}
+                >
+                    Submit
+                </button>
+            </Panel>
 
-            <div
-                style={{
-                    marginTop: "16px",
-                    padding: "10px",
-                    background: "#0b1220",
-                    borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                }}
-            >
-                <div style={{ marginBottom: "8px", fontWeight: 600, fontSize: "14px" }}>
-                    Commit history
-                </div>
+            <Panel title="Commit History" badge={String(commits.length)} defaultOpen={false}>
                 {commits.length === 0 ? (
-                    <div style={{ color: "#64748b", fontSize: "12px" }}>
-                        Chưa có commit
-                    </div>
+                    <div style={{ color: "#64748b", fontSize: 12 }}>Chưa có commit</div>
                 ) : (
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "12px" }}>
-                        {commits.slice(0, 8).map((commit) => (
-                            <li
-                                key={commit.id}
-                                style={{
-                                    padding: "6px 0",
-                                    borderBottom: "1px solid #1f2937",
-                                    color: "#e2e8f0",
-                                }}
-                            >
-                                <div
-                                    title={formatCommitTitle(commit)}
+                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 12 }}>
+                        {commits.slice(0, 8).map((commit) => {
+                            const isHead = Boolean(headCommitId && commit.id === headCommitId);
+                            return (
+                                <li
+                                    key={commit.id}
                                     style={{
-                                        fontWeight: 600,
-                                        color: "#f8fafc",
-                                        overflowWrap: "anywhere",
+                                        padding: "8px 0",
+                                        borderBottom: "1px solid #1f2937",
+                                        color: "#e2e8f0",
+                                        display: "flex",
+                                        flexDirection: "row"
                                     }}
                                 >
-                                    {formatCommitTitle(commit)}
-                                </div>
-                                <div style={{ marginTop: "2px", color: "#94a3b8" }}>
-                                    {commit.created_at ? new Date(commit.created_at).toLocaleString() : ""}
-                                </div>
-                                <button
-                                    style={{
-                                        marginTop: "4px",
-                                        padding: "4px 6px",
-                                        borderRadius: "4px",
-                                        border: "none",
-                                        background: "#334155",
-                                        color: "white",
-                                        cursor: isSaving || isSubmitting ? "not-allowed" : "pointer",
-                                    }}
-                                    onClick={() => onRestoreCommit(commit.id)}
-                                    disabled={isSaving || isSubmitting}
-                                >
-                                    Restore
-                                </button>
-                            </li>
-                        ))}
+                                    <div style={{flex:1}}>
+                                        <div
+                                            title={formatCommitTitle(commit)}
+                                            style={{
+                                                fontWeight: 750,
+                                                color: "#f8fafc",
+                                                overflowWrap: "anywhere",
+                                            }}
+                                        >
+                                            {formatCommitTitle(commit)}
+                                        </div>
+                                        <div style={{ marginTop: 3, color: "#94a3b8" }}>
+                                            {commit.created_at ? new Date(commit.created_at).toLocaleString() : ""}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        style={{
+                                            marginTop: 6,
+                                            padding: "6px 8px",
+                                            borderRadius: 6,
+                                            border: "1px solid #334155",
+                                            background: isHead ? "#0b1220" : "#334155",
+                                            color: "white",
+                                            cursor: isSaving || isSubmitting || isHead ? "not-allowed" : "pointer",
+                                            opacity: isHead ? 0.65 : 1,
+                                            fontWeight: 800,
+                                            fontSize: 12,
+                                        }}
+                                        onClick={() => onRestoreCommit(commit.id)}
+                                        disabled={isSaving || isSubmitting || isHead}
+                                        title={isHead ? "Đang là head commit" : "Restore snapshot từ commit này (FE-only)"}
+                                    >
+                                        Restore
+                                    </button>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
-            </div>
+            </Panel>
 
-            <div
-                style={{
-                    marginTop: "16px",
-                    padding: "10px",
-                    background: "#0b1220",
-                    borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                }}
-            >
-                <div style={{ marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
-                    Tác vụ có thể undo ({recentUndoLabels.length})
-                </div>
+            <Panel title="Undo List" badge={String(recentUndoLabels.length)} defaultOpen={false}>
                 {recentUndoLabels.length === 0 ? (
-                    <div style={{ color: "#94a3b8", fontSize: "13px" }}>Chưa có thao tác</div>
+                    <div style={{ color: "#94a3b8", fontSize: 13 }}>Chưa có thao tác</div>
                 ) : (
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "13px", color: "#e2e8f0" }}>
+                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13, color: "#e2e8f0" }}>
                         {recentUndoLabels.map((label, idx) => (
-                            <li key={`${label}-${idx}`} style={{ padding: "4px 0", borderBottom: "1px solid #1f2937" }}>
+                            <li key={`${label}-${idx}`} style={{ padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
                                 {label}
                             </li>
                         ))}
                     </ul>
                 )}
-            </div>
+            </Panel>
 
-            <div
-                style={{
-                    marginTop: "16px",
-                    padding: "10px",
-                    background: "#0b1220",
-                    borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                }}
-            >
-                <div style={{ marginBottom: "8px", fontWeight: 600, fontSize: "14px" }}>
-                    Mới tạo trong phiên
-                </div>
-
-                <div style={{ fontSize: "13px", color: "#cbd5e1", marginBottom: "6px" }}>
+            <Panel title="This Session" defaultOpen={false}>
+                <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>
                     Entities ({createdEntities.length})
                 </div>
                 {createdEntities.length === 0 ? (
-                    <div style={{ color: "#64748b", fontSize: "12px", marginBottom: "10px" }}>
-                        Chưa tạo entity mới
-                    </div>
+                    <div style={{ color: "#64748b", fontSize: 12, marginBottom: 10 }}>Chưa tạo entity mới</div>
                 ) : (
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "12px", marginBottom: "10px" }}>
+                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 12, marginBottom: 10 }}>
                         {createdEntities.map((entity) => (
                             <li
                                 key={entity.id}
-                                style={{
-                                    padding: "4px 0",
-                                    borderBottom: "1px solid #1f2937",
-                                    color: "#e2e8f0",
-                                }}
+                                style={{ padding: "6px 0", borderBottom: "1px solid #1f2937", color: "#e2e8f0" }}
                                 title={entity.id}
                             >
-                                {entity.name} ({entity.type_id || "country"})
+                                {entity.name}
                             </li>
                         ))}
                     </ul>
                 )}
 
-                <div style={{ fontSize: "13px", color: "#cbd5e1", marginBottom: "6px" }}>
+                <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>
                     Geometries mới chưa commit ({createdGeometries.length})
                 </div>
                 {createdGeometries.length === 0 ? (
-                    <div style={{ color: "#64748b", fontSize: "12px" }}>
-                        Chưa có geometry mới chờ commit
-                    </div>
+                    <div style={{ color: "#64748b", fontSize: 12 }}>Chưa có geometry mới chờ commit</div>
                 ) : (
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "12px" }}>
+                    <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 12 }}>
                         {createdGeometries.map((geometry) => (
                             <li
                                 key={String(geometry.id)}
-                                style={{
-                                    padding: "4px 0",
-                                    borderBottom: "1px solid #1f2937",
-                                    color: "#e2e8f0",
-                                }}
+                                style={{ padding: "6px 0", borderBottom: "1px solid #1f2937", color: "#e2e8f0" }}
                             >
-                                #{geometry.id} [{geometry.geometryType}] {geometry.semanticType ? `- ${geometry.semanticType}` : ""}
+                                #{geometry.id} [{geometry.geometryType}]{" "}
+                                {geometry.semanticType ? `- ${geometry.semanticType}` : ""}
                                 {geometry.entityNames.length ? ` | ${geometry.entityNames.join(", ")}` : ""}
                             </li>
                         ))}
                     </ul>
                 )}
-            </div>
-
+            </Panel>
         </div>
     );
+}
+
+const textInputStyle = {
+    width: "100%",
+    marginTop: 0,
+    padding: "8px 10px",
+    borderRadius: 6,
+    border: "1px solid #334155",
+    background: "#0b1220",
+    color: "white",
+    boxSizing: "border-box",
+    fontSize: 13,
+    outline: "none",
+} as const;
+
+const textAreaStyle = {
+    ...textInputStyle,
+    marginTop: 8,
+    resize: "vertical",
+    fontFamily: "inherit",
+} as const;
+
+function Panel({
+    title,
+    badge,
+    defaultOpen,
+    children,
+}: {
+    title: string;
+    badge?: string | null;
+    defaultOpen?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <details
+            open={Boolean(defaultOpen)}
+            style={{
+                marginTop: 10,
+                padding: 10,
+                background: "#111827",
+                borderRadius: 8,
+                border: "1px solid #1f2937",
+            }}
+        >
+            <summary
+                style={{
+                    cursor: "pointer",
+                    listStyle: "none",
+                    fontWeight: 900,
+                    fontSize: 13,
+                    color: "white",
+                    userSelect: "none",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                }}
+            >
+                <span>{title}</span>
+                {badge ? (
+                    <span
+                        style={{
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            border: "1px solid #334155",
+                            background: "#0b1220",
+                            color: "#cbd5e1",
+                            fontSize: 12,
+                            fontWeight: 850,
+                            flex: "0 0 auto",
+                        }}
+                    >
+                        {badge}
+                    </span>
+                ) : null}
+            </summary>
+            <div style={{ marginTop: 10 }}>{children}</div>
+        </details>
+    );
+}
+
+function ModeHint({ mode }: { mode: EditorMode }) {
+    if (mode === "add-line" || mode === "add-path") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Click để thêm điểm, Enter để hoàn tất, Esc để hủy.
+            </div>
+        );
+    }
+    if (mode === "add-circle") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Giữ chuột trái kéo để mở bán kính, thả chuột để hoàn tất.
+            </div>
+        );
+    }
+    if (mode === "add-point") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Chọn 1 điểm trên bản đồ để đặt địa điểm.
+            </div>
+        )
+    }
+    if (mode === "select") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Chọn 1 hình, đường, điểm trên bản đồ để xem chi tiết.
+            </div>
+        )
+    }
+    if (mode === "draw") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Chọn các điểm trên bản đồ để vẽ hình, ENTER để kết thúc, ESC để hủy.
+            </div>
+        )
+    }
+    return null;
 }
 
 function formatUndoLabel(action: UndoAction) {

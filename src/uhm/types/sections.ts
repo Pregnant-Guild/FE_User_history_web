@@ -5,12 +5,21 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 export type EntityWikiLinkSnapshot = {
     entity_id: string;
     wiki_id: string;
-    operation?: "reference" | "delete";
+    // Relationship semantics (entity ↔ wiki).
+    // - binding: the link exists (assigned)
+    // - delete: the link is removed
+    operation?: "binding" | "delete";
 };
 
 // BackEndGo uses Projects/Commits/Submissions. "Section" is legacy naming in FE.
 export type ProjectStatus = string;
 export type ProjectSubmissionStatus = "PENDING" | "APPROVED" | "REJECTED" | string;
+
+// BackEndGo (new): project response includes submissions as a lightweight list.
+export type SubmissionSimpleResponse = {
+    id: string;
+    status: ProjectSubmissionStatus;
+};
 
 export type ProjectState = {
     // Derived state from ProjectResponse (not persisted as-is in API mới).
@@ -25,7 +34,10 @@ export type Project = {
     description: string | null;
     project_status?: string;
     latest_commit_id?: string | null;
+    // Legacy (old BE): submission_ids?: string[]
+    // New BE: submissions?: [{id,status}]
     submission_ids?: string[];
+    submissions?: SubmissionSimpleResponse[];
     locked_by?: string | null;
     user_id?: string;
     created_at?: string;

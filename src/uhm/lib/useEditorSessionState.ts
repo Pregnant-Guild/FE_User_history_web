@@ -8,11 +8,9 @@ import { useWikiSessionState } from "@/uhm/lib/editor/session/useWikiSessionStat
 import type { EditorMode, TimelineRange } from "@/uhm/lib/editor/session/sessionTypes";
 
 export type {
-    CreatedEntitySummary,
     EditorMode,
     EntityFormState,
     GeometryMetaFormState,
-    PendingEntityCreate,
     TimelineRange,
 } from "@/uhm/lib/editor/session/sessionTypes";
 

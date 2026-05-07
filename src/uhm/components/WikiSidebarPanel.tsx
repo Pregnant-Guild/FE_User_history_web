@@ -1,24 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import TiptapLink from "@tiptap/extension-link";
-import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css";
 
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
-import Badge from "@/components/ui/badge/Badge";
 import Label from "@/components/form/Label";
 
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { newId } from "@/uhm/lib/id";
+import type ReactQuill from "react-quill-new";
+
+type ReactQuillProps = ComponentProps<typeof ReactQuill>;
+
+const ReactQuillEditor = dynamic<ReactQuillProps>(() => import("react-quill-new"), {
+  ssr: false,
+  loading: () => <div className="h-[480px] w-full animate-pulse bg-gray-100 rounded-lg" />,
+});
 
 type Props = {
   projectId: string;
   wikis: WikiSnapshot[];
   setWikis: React.Dispatch<React.SetStateAction<WikiSnapshot[]>>;
   autoOpen?: boolean;
+  requestedActiveId?: string | null;
 };
 
 function clampTitle(title: string) {
@@ -26,35 +32,15 @@ function clampTitle(title: string) {
   return t.length ? t.slice(0, 120) : "Untitled wiki";
 }
 
-export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen }: Props) {
+export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen, requestedActiveId }: Props) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeWiki = useMemo(() => wikis.find((w) => w.id === activeId) || null, [activeId, wikis]);
 
   const [wikiTitle, setWikiTitle] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Wiki[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchRequestRef = useState(() => ({ id: 0 }))[0];
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      TiptapLink.configure({
-        openOnClick: false,
-        autolink: true,
-        linkOnPaste: true,
-      }),
-    ],
-    content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
-    editorProps: {
-      attributes: {
-        class: "tiptap-editor focus:outline-none min-h-[320px] px-4 py-3",
-      },
-    },
-  });
+  const [wikiDocHtml, setWikiDocHtml] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
 
   useEffect(() => {
     if (!autoOpen) return;
@@ -62,17 +48,20 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
     setOpen(true);
   }, [autoOpen]);
 
+  useEffect(() => {
+    if (!requestedActiveId) return;
+    if (wikis.some((w) => w.id === requestedActiveId)) {
+      setActiveId(requestedActiveId);
+    }
+  }, [requestedActiveId, wikis]);
+
   // keep editor content in sync when switching wiki
   useEffect(() => {
-    if (!editor) return;
     if (!open) return;
 
-    const doc = (activeWiki?.doc || null) as JSONContent | null;
-    editor.commands.setContent(
-      (doc && typeof doc === "object" ? doc : { type: "doc", content: [{ type: "paragraph" }] }) as any
-    );
     setWikiTitle(activeWiki?.title || "");
-  }, [activeWiki?.doc, activeWiki?.title, editor, open]);
+    setWikiDocHtml(normalizeWikiDocForQuill(activeWiki?.doc || null));
+  }, [activeWiki?.doc, activeWiki?.title, open]);
 
   const ensureActive = () => {
     if (activeId && wikis.some((w) => w.id === activeId)) return;
@@ -84,60 +73,6 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wikis.length]);
 
-  useEffect(() => {
-    const keyword = searchQuery.trim();
-    if (!keyword.length) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    let disposed = false;
-    const requestId = ++searchRequestRef.id;
-    const t = window.setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const rows = await searchWikisByTitle(keyword, { limit: 12 });
-        if (disposed || requestId !== searchRequestRef.id) return;
-        setSearchResults(rows);
-      } catch (err) {
-        if (disposed || requestId !== searchRequestRef.id) return;
-        console.error("Search wikis failed", err);
-        setSearchResults([]);
-      } finally {
-        if (disposed || requestId !== searchRequestRef.id) return;
-        setIsSearching(false);
-      }
-    }, 250);
-
-    return () => {
-      disposed = true;
-      window.clearTimeout(t);
-    };
-  }, [searchQuery, searchRequestRef]);
-
-  const addWikiRef = (wiki: Wiki) => {
-    const id = String(wiki.id || "").trim();
-    if (!id) return;
-    if (wikis.some((w) => w.id === id)) {
-      setActiveId(id);
-      return;
-    }
-    const title = (wiki.title || "").trim() || "Untitled wiki";
-    setWikis((prev) => [
-      {
-        id,
-        source: "ref",
-        operation: "reference",
-        title,
-        doc: null,
-        updated_at: wiki.updated_at,
-      },
-      ...prev,
-    ]);
-    setActiveId(id);
-  };
-
   const openEditor = () => {
     if (!wikis.length) {
       const id = newId();
@@ -146,7 +81,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
         source: "inline",
         operation: "create",
         title: "Untitled wiki",
-        doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
+        doc: "",
         updated_at: new Date().toISOString(),
       };
       setWikis((prev) => [seed, ...prev]);
@@ -155,17 +90,18 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
     setOpen(true);
   };
 
-  const createWiki = () => {
+  const createWikiAndOpen = (title?: string) => {
     const id = newId();
-    const next: WikiSnapshot = {
+    const seedTitle = clampTitle(title || "Untitled wiki");
+    const seed: WikiSnapshot = {
       id,
       source: "inline",
       operation: "create",
-      title: "Untitled wiki",
-      doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
+      title: seedTitle,
+      doc: "",
       updated_at: new Date().toISOString(),
     };
-    setWikis((prev) => [next, ...prev]);
+    setWikis((prev) => [seed, ...prev]);
     setActiveId(id);
     setOpen(true);
   };
@@ -176,8 +112,8 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
   };
 
   const saveWiki = () => {
-    if (!editor || !activeId) return;
-    const payload = editor.getJSON();
+    if (!activeId) return;
+    const payload = wikiDocHtml;
     const nextTitle = clampTitle(wikiTitle);
     setWikis((prev) =>
           prev.map((w) =>
@@ -196,19 +132,6 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
     setOpen(false);
   };
 
-  const setLink = () => {
-    if (!editor) return;
-    const prev = editor.getAttributes("link")?.href as string | undefined;
-    const href = window.prompt("Link URL", prev || "https://");
-    if (href == null) return;
-    const next = href.trim();
-    if (!next.length) {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
-    }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: next }).run();
-  };
-
   return (
     <div
       style={{
@@ -218,192 +141,13 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
         border: "1px solid #1f2937",
       }}
     >
-      <style jsx global>{`
-        .tiptap-editor p {
-          margin: 0.5rem 0;
-          line-height: 1.65;
-          font-size: 0.95rem;
-        }
-        .tiptap-editor h1 {
-          margin: 1rem 0 0.5rem;
-          font-size: 1.5rem;
-          font-weight: 800;
-          line-height: 1.25;
-        }
-        .tiptap-editor h2 {
-          margin: 0.9rem 0 0.4rem;
-          font-size: 1.25rem;
-          font-weight: 700;
-          line-height: 1.3;
-        }
-        .tiptap-editor h3 {
-          margin: 0.8rem 0 0.35rem;
-          font-size: 1.1rem;
-          font-weight: 700;
-          line-height: 1.35;
-        }
-        .tiptap-editor ul,
-        .tiptap-editor ol {
-          margin: 0.6rem 0;
-          padding-left: 1.25rem;
-        }
-        .tiptap-editor li {
-          margin: 0.2rem 0;
-        }
-        .tiptap-editor blockquote {
-          margin: 0.75rem 0;
-          padding-left: 0.75rem;
-          border-left: 4px solid rgba(148, 163, 184, 0.55);
-          color: rgba(100, 116, 139, 1);
-        }
-        .dark .tiptap-editor blockquote {
-          border-left-color: rgba(71, 85, 105, 1);
-          color: rgba(148, 163, 184, 1);
-        }
-        .tiptap-editor code {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-            "Liberation Mono", "Courier New", monospace;
-          font-size: 0.85em;
-          padding: 0.1rem 0.25rem;
-          border-radius: 0.35rem;
-          background: rgba(148, 163, 184, 0.15);
-        }
-        .tiptap-editor pre {
-          margin: 0.8rem 0;
-          padding: 0.9rem 1rem;
-          border-radius: 0.75rem;
-          border: 1px solid rgba(226, 232, 240, 1);
-          background: rgba(248, 250, 252, 1);
-          overflow: auto;
-        }
-        .dark .tiptap-editor pre {
-          border-color: rgba(30, 41, 59, 1);
-          background: rgba(13, 17, 23, 1);
-        }
-        .tiptap-editor pre code {
-          background: transparent;
-          padding: 0;
-        }
-        .tiptap-editor a {
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-      `}</style>
-
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontWeight: 700, fontSize: "14px" }}>Wiki</div>
-        <Badge size="sm" variant="light" color="info">
-          {wikis.length}
-        </Badge>
-      </div>
-
-      <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-        <button
-          type="button"
-          onClick={openEditor}
-          style={{
-            flex: 1,
-            border: "none",
-            borderRadius: "6px",
-            padding: "8px",
-            cursor: "pointer",
-            background: "#2563eb",
-            color: "white",
-            fontWeight: 700,
-          }}
-        >
-          Open wiki editor
-        </button>
-        <button
-          type="button"
-          onClick={createWiki}
-          title="New wiki"
-          style={{
-            width: "42px",
-            border: "none",
-            borderRadius: "6px",
-            padding: "8px",
-            cursor: "pointer",
-            background: "#1f2937",
-            color: "white",
-            fontWeight: 900,
-          }}
-        >
-          +
-        </button>
-      </div>
-
-      <div style={{ marginTop: "10px" }}>
-        <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>Add existing wiki</div>
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by title…"
-          style={{
-            width: "100%",
-            border: "1px solid #1f2937",
-            background: "#0b1220",
-            color: "#e5e7eb",
-            borderRadius: "6px",
-            padding: "8px 10px",
-            fontSize: "12px",
-            outline: "none",
-          }}
-        />
-        {isSearching ? (
-          <div style={{ marginTop: "6px", fontSize: "12px", color: "#94a3b8" }}>Searching…</div>
-        ) : null}
-        {!isSearching && searchQuery.trim().length > 0 ? (
-          <div style={{ marginTop: "6px", display: "grid", gap: "6px" }}>
-            {searchResults.slice(0, 8).map((w) => (
-              <div
-                key={w.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px",
-                  borderRadius: "6px",
-                  border: "1px solid #1f2937",
-                  background: "transparent",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#e5e7eb", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {(w.title || "").trim() || "Untitled wiki"}
-                  </div>
-                  <div style={{ color: "#94a3b8", fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {w.id}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addWikiRef(w)}
-                  style={{
-                    border: "none",
-                    background: "#111827",
-                    color: "#93c5fd",
-                    cursor: "pointer",
-                    borderRadius: "6px",
-                    padding: "6px 8px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    flex: "0 0 auto",
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-            ))}
-            {!searchResults.length ? (
-              <div style={{ fontSize: "12px", color: "#94a3b8" }}>No results.</div>
-            ) : null}
-          </div>
-        ) : null}
+        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{wikis.length}</div>
       </div>
 
       {wikis.length ? (
-        <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+        <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
           {wikis.slice(0, 8).map((w) => (
             <div
               key={w.id}
@@ -414,7 +158,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
                 padding: "8px",
                 borderRadius: "6px",
                 border: "1px solid #1f2937",
-                background: w.id === activeId ? "#111827" : "transparent",
+                background: "transparent",
               }}
             >
               <button
@@ -467,6 +211,83 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
         </div>
       )}
 
+      <div
+        style={{
+          marginTop: "10px",
+          display: "grid",
+          gap: "8px",
+          border: "1px solid #1e3a8a",
+          borderRadius: "8px",
+          padding: "8px",
+          background: "#0f172a",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ color: "#bfdbfe", fontWeight: 700, fontSize: "12px" }}>
+            Tạo wiki mới
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen((v) => !v)}
+            title={isCreateOpen ? "Dong" : "Mo"}
+            aria-label={isCreateOpen ? "Dong tao wiki" : "Mo tao wiki"}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              border: "1px solid #334155",
+              background: "#0b1220",
+              color: "#e2e8f0",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "0 0 auto",
+            }}
+          >
+            {isCreateOpen ? <CloseIcon /> : <PlusIcon />}
+          </button>
+        </div>
+
+        {isCreateOpen ? (
+          <>
+            <input
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              placeholder="Tieu de wiki"
+              style={{
+                width: "100%",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                background: "#111827",
+                color: "#f8fafc",
+                padding: "6px 8px",
+                fontSize: "13px",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                createWikiAndOpen(createTitle);
+                setCreateTitle("");
+                setIsCreateOpen(false);
+              }}
+              style={{
+                border: "none",
+                borderRadius: "6px",
+                padding: "7px 8px",
+                cursor: "pointer",
+                background: "#2563eb",
+                color: "#ffffff",
+                fontWeight: 600,
+              }}
+            >
+              Tạo wiki mới
+            </button>
+          </>
+        ) : null}
+      </div>
+
       <Modal
         isOpen={open}
         onClose={() => setOpen(false)}
@@ -484,7 +305,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
               <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" className="bg-brand-500 hover:bg-brand-600 text-white" onClick={saveWiki} disabled={!editor || !activeId}>
+              <Button size="sm" className="bg-brand-500 hover:bg-brand-600 text-white" onClick={saveWiki} disabled={!activeId}>
                 Save
               </Button>
             </div>
@@ -510,7 +331,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{w.id}</div>
                   </button>
                 ))}
-                <Button size="sm" variant="outline" onClick={createWiki}>
+                <Button size="sm" variant="outline" onClick={openEditor}>
                   + New wiki
                 </Button>
               </div>
@@ -529,41 +350,16 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleBold().run()} disabled={!editor}>
-                    B
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleItalic().run()} disabled={!editor}>
-                    I
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} disabled={!editor}>
-                    H1
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} disabled={!editor}>
-                    H2
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} disabled={!editor}>
-                    H3
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleBulletList().run()} disabled={!editor}>
-                    Bullets
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleOrderedList().run()} disabled={!editor}>
-                    Numbers
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleBlockquote().run()} disabled={!editor}>
-                    Quote
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} disabled={!editor}>
-                    Code
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={setLink} disabled={!editor}>
-                    Link
-                  </Button>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117]">
-                  {editor ? <EditorContent editor={editor} /> : <div className="p-4 text-sm text-gray-500">Loading editor...</div>}
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117] overflow-hidden">
+                  <ReactQuillEditor
+                    theme="snow"
+                    value={wikiDocHtml}
+                    onChange={(content: string) => setWikiDocHtml(content)}
+                    modules={QUILL_MODULES}
+                    className="min-h-[320px]"
+                    placeholder="Nhap noi dung wiki..."
+                    readOnly={!activeId}
+                  />
                 </div>
               </div>
             </div>
@@ -576,4 +372,81 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen 
       </Modal>
     </div>
   );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const QUILL_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["blockquote", "code-block"],
+    ["link", "image"],
+    ["clean"],
+  ],
+};
+
+function normalizeWikiDocForQuill(doc: string | null): string {
+  const raw = (doc || "").trim();
+  if (!raw.length) return "";
+
+  // New format (Quill): HTML string.
+  if (raw[0] === "<") return raw;
+
+  // Legacy format (Tiptap): JSON string.
+  if (raw[0] === "{") {
+    try {
+      const json: unknown = JSON.parse(raw);
+      const text = tiptapJsonToPlainText(json).trim();
+      if (!text.length) return "";
+      return `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Unknown plaintext: treat as plain text.
+  return `<p>${escapeHtml(raw).replace(/\n/g, "<br/>")}</p>`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function tiptapJsonToPlainText(node: unknown): string {
+  if (node == null) return "";
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(tiptapJsonToPlainText).join("");
+
+  if (isRecord(node)) {
+    if (node.type === "text" && typeof node.text === "string") return node.text;
+    if (node.type === "hardBreak") return "\n";
+    if ("content" in node) return tiptapJsonToPlainText(node.content);
+  }
+
+  return "";
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
 }

@@ -1,0 +1,33 @@
+[
+  { "type_key": "defense_line", "geo_type_code": 1 },
+  { "type_key": "attack_route", "geo_type_code": 2 },
+  { "type_key": "retreat_route", "geo_type_code": 3 },
+  { "type_key": "invasion_route", "geo_type_code": 4 },
+  { "type_key": "migration_route", "geo_type_code": 5 },
+  { "type_key": "refugee_route", "geo_type_code": 6 },
+  { "type_key": "trade_route", "geo_type_code": 7 },
+  { "type_key": "shipping_route", "geo_type_code": 8 },
+
+  { "type_key": "country", "geo_type_code": 9 },
+  { "type_key": "state", "geo_type_code": 10 },
+  { "type_key": "empire", "geo_type_code": 11 },
+  { "type_key": "kingdom", "geo_type_code": 12 },
+
+  { "type_key": "war", "geo_type_code": 13 },
+  { "type_key": "battle", "geo_type_code": 14 },
+  { "type_key": "civilization", "geo_type_code": 15 },
+  { "type_key": "rebellion_zone", "geo_type_code": 16 },
+
+  { "type_key": "person_deathplace", "geo_type_code": 17 },
+  { "type_key": "person_birthplace", "geo_type_code": 18 },
+  { "type_key": "person_activity", "geo_type_code": 19 },
+  { "type_key": "temple", "geo_type_code": 20 },
+  { "type_key": "capital", "geo_type_code": 21 },
+  { "type_key": "city", "geo_type_code": 22 },
+  { "type_key": "fortress", "geo_type_code": 23 },
+  { "type_key": "castle", "geo_type_code": 24 },
+  { "type_key": "ruin", "geo_type_code": 25 },
+  { "type_key": "port", "geo_type_code": 26 },
+  { "type_key": "bridge", "geo_type_code": 27 }
+]
+

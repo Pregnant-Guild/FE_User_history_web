@@ -7,12 +7,10 @@ import {
     fetchSectionCommits,
     fetchSections,
     openSectionEditor,
-    restoreSectionCommit,
     submitSection,
 } from "@/uhm/api/sections";
 import { buildEditorSnapshot, normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
-import type { CreatedEntitySummary, PendingEntityCreate } from "@/uhm/lib/editor/session/sessionTypes";
 import type { Feature, FeatureCollection, FeatureId } from "@/uhm/types/geo";
 import type { EditorSnapshot, Section, SectionCommit, SectionState, EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 import type { EntitySnapshot } from "@/uhm/types/entities";
@@ -34,24 +32,21 @@ type Options = {
     selectedSectionId: string;
     newSectionTitle: string;
     pendingSaveCount: number;
-    pendingEntityCreates: PendingEntityCreate[];
-    projectEntityRefs: EntitySnapshot[];
-    wikis: WikiSnapshot[];
-    entityWikiLinks: EntityWikiLinkSnapshot[];
-    lastSectionSnapshot: EditorSnapshot | null;
+    snapshotEntities: EntitySnapshot[];
+    snapshotWikis: WikiSnapshot[];
+    snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
+    baselineSnapshot: EditorSnapshot | null;
     commitTitle: string;
     commitNote: string;
     setActiveSection: Dispatch<SetStateAction<Section | null>>;
     setSelectedSectionId: Dispatch<SetStateAction<string>>;
     setSectionState: Dispatch<SetStateAction<SectionState | null>>;
-    setLastSectionSnapshot: Dispatch<SetStateAction<EditorSnapshot | null>>;
+    setBaselineSnapshot: Dispatch<SetStateAction<EditorSnapshot | null>>;
     setInitialData: Dispatch<SetStateAction<FeatureCollection>>;
     setSectionCommits: Dispatch<SetStateAction<SectionCommit[]>>;
-    setPendingEntityCreates: Dispatch<SetStateAction<PendingEntityCreate[]>>;
-    setProjectEntityRefs: Dispatch<SetStateAction<EntitySnapshot[]>>;
-    setCreatedEntities: Dispatch<SetStateAction<CreatedEntitySummary[]>>;
-    setWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
-    setEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
+    setSnapshotEntities: Dispatch<SetStateAction<EntitySnapshot[]>>;
+    setSnapshotWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
+    setSnapshotEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
     setSelectedFeatureId: Dispatch<SetStateAction<FeatureId | null>>;
     setEntityFormStatus: Dispatch<SetStateAction<string | null>>;
     setEntityStatus: Dispatch<SetStateAction<string | null>>;
@@ -68,33 +63,21 @@ export function useSectionCommands(options: Options) {
     const openSectionForEditing = useCallback(async (sectionId: string) => {
         const editorPayload = await openSectionEditor(sectionId);
         const snapshot = normalizeEditorSnapshot(editorPayload.snapshot);
+        // When starting a fresh editor session from a commit snapshot, treat all rows as baseline state:
+        // operations should not carry over as deltas into the next commit.
+        const sessionSnapshot = snapshot ? toEditorSessionSnapshot(snapshot) : null;
         const commits = await fetchSectionCommits(sectionId);
-        const nextInitialData = snapshot?.editor_feature_collection || options.emptyFeatureCollection;
+        const nextInitialData = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
 
         options.setActiveSection(editorPayload.section);
         options.setSelectedSectionId(editorPayload.section.id);
         options.setSectionState(editorPayload.state);
-        options.setLastSectionSnapshot(snapshot);
+        options.setBaselineSnapshot(sessionSnapshot);
         options.setInitialData(nextInitialData);
         options.setSectionCommits(commits);
-        options.setPendingEntityCreates([]);
-        options.setCreatedEntities([]);
-        const geoEntityIds = new Set((snapshot?.geometry_entity || []).map((row) => row.entity_id));
-        const linkedByWikiIds = new Set(
-            (snapshot?.entity_wiki || [])
-                .filter((l) => l?.operation !== "delete")
-                .map((l) => l.entity_id)
-        );
-        options.setProjectEntityRefs((snapshot?.entities || []).filter((e) =>
-            e?.source === "ref"
-            && !geoEntityIds.has(e.id)
-            && !linkedByWikiIds.has(e.id)
-            && e.operation !== "create"
-            && e.operation !== "update"
-            && e.operation !== "delete"
-        ));
-        options.setWikis(snapshot?.wikis || []);
-        options.setEntityWikiLinks(snapshot?.entity_wiki || []);
+        options.setSnapshotEntities(sessionSnapshot?.entities || []);
+        options.setSnapshotWikis(sessionSnapshot?.wikis || []);
+        options.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
         options.setSelectedFeatureId(null);
         options.setEntityFormStatus(null);
     }, [options]);
@@ -102,6 +85,10 @@ export function useSectionCommands(options: Options) {
     const commitSection = useCallback(async () => {
         if (!options.activeSection || !options.sectionState) {
             options.setEntityStatus("Chưa mở được section editor.");
+            return;
+        }
+        if (options.pendingSaveCount <= 0) {
+            options.setEntityStatus("Không có thay đổi để Commit.");
             return;
         }
 
@@ -113,26 +100,46 @@ export function useSectionCommands(options: Options) {
                 section: options.activeSection,
                 draft: options.editor.draft,
                 changes: geometryChanges,
-                pendingEntities: options.pendingEntityCreates,
-                projectEntityRefs: options.projectEntityRefs,
-                wikis: options.wikis,
-                entityWikiLinks: options.entityWikiLinks,
-                previousSnapshot: options.lastSectionSnapshot,
+                snapshotEntities: options.snapshotEntities,
+                snapshotWikis: options.snapshotWikis,
+                snapshotEntityWikiLinks: options.snapshotEntityWikiLinks,
+                previousSnapshot: options.baselineSnapshot,
                 hasPersistedFeature: options.editor.hasPersistedFeature,
             });
+            const editSummary = options.commitTitle.trim()
+                || options.commitNote.trim()
+                || `Edit ${new Date().toLocaleString()}`;
+
+            // Guardrail: commit payload can get large and some deployments reject/close connections for big bodies.
+            // When that happens, browsers often surface it as "TypeError: Failed to fetch".
+            try {
+                const payloadText = JSON.stringify({ snapshot_json: snapshot, edit_summary: editSummary });
+                const bytes = typeof Blob !== "undefined" ? new Blob([payloadText]).size : payloadText.length;
+                const limitBytes = 3_500_000; // ~3.5MB (conservative vs common default body limits)
+                if (bytes > limitBytes) {
+                    options.setEntityStatus(
+                        `Commit payload quá lớn (~${(bytes / (1024 * 1024)).toFixed(2)}MB). ` +
+                        `Hãy giảm bớt nội dung snapshot/changes hoặc chạy BE local với body limit lớn hơn.`
+                    );
+                    return;
+                }
+            } catch {
+                // If stringify fails, let API call throw a more actionable error downstream.
+            }
+
             const result = await createSectionCommit(options.activeSection.id, {
                 snapshot,
-                edit_summary: options.commitTitle.trim()
-                    || options.commitNote.trim()
-                    || `Edit ${new Date().toLocaleString()}`,
+                edit_summary: editSummary,
             });
 
+            const sessionSnapshot = toEditorSessionSnapshot(snapshot);
             options.setSectionState(result.state);
-            options.setLastSectionSnapshot(snapshot);
+            options.setBaselineSnapshot(sessionSnapshot);
+            options.setSnapshotEntities(sessionSnapshot.entities || []);
+            options.setSnapshotWikis(sessionSnapshot.wikis || []);
+            options.setSnapshotEntityWikiLinks(sessionSnapshot.entity_wiki || []);
             options.setInitialData(options.editor.draft);
             options.editor.clearChanges();
-            options.setPendingEntityCreates([]);
-            options.setCreatedEntities([]);
             options.setCommitTitle("");
             options.setCommitNote("");
             options.setSectionCommits(await fetchSectionCommits(options.activeSection.id));
@@ -250,19 +257,30 @@ export function useSectionCommands(options: Options) {
         options.setIsSaving(true);
         options.setEntityStatus(null);
         try {
-            const result = await restoreSectionCommit(options.activeSection.id, {
-                commit_id: commitId,
-            });
-            const editorPayload = await openSectionEditor(options.activeSection.id);
-            const snapshot = normalizeEditorSnapshot(editorPayload.snapshot);
-            options.setSectionState(result.state);
-            options.setLastSectionSnapshot(snapshot);
-            if (snapshot?.editor_feature_collection) {
-                options.setInitialData(snapshot.editor_feature_collection);
+            // FE-only restore: load snapshot from selected commit and apply to editor state.
+            // Do NOT move project's head commit on backend.
+            const commits = await fetchSectionCommits(options.activeSection.id);
+            const target = commits.find((c: SectionCommit) => c.id === commitId) || null;
+            if (!target) {
+                options.setEntityStatus("Không tìm thấy commit để restore.");
+                return;
             }
-            options.setWikis(snapshot?.wikis || []);
-            options.setSectionCommits(await fetchSectionCommits(options.activeSection.id));
-            options.setEntityFormStatus("Đã restore commit.");
+
+            const snapshot = normalizeEditorSnapshot(target.snapshot_json);
+            const sessionSnapshot = snapshot ? toEditorSessionSnapshot(snapshot) : null;
+            const nextInitialData = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
+
+            options.setBaselineSnapshot(sessionSnapshot);
+            options.setInitialData(nextInitialData);
+            options.setSnapshotEntities(sessionSnapshot?.entities || []);
+            options.setSnapshotWikis(sessionSnapshot?.wikis || []);
+            options.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
+            options.setSelectedFeatureId(null);
+            options.setEntityFormStatus(null);
+
+            // Refresh commits list for UI, but keep sectionState/head as-is.
+            options.setSectionCommits(commits);
+            options.setEntityFormStatus("Đã load snapshot từ commit (không đổi head trên BE).");
         } catch (err) {
             if (err instanceof ApiError) {
                 options.setEntityStatus(`Restore thất bại: ${err.body}`);
@@ -282,4 +300,64 @@ export function useSectionCommands(options: Options) {
         submitCurrentSection,
         restoreCommit,
     };
+}
+
+function toEditorSessionSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
+    return {
+        ...snapshot,
+        entities: toEditorSessionEntities(snapshot.entities),
+        wikis: toEditorSessionWikis(snapshot.wikis),
+        entity_wiki: toEditorSessionEntityWikiLinks(snapshot.entity_wiki),
+    };
+}
+
+function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnapshot[] {
+    const rows = Array.isArray(input) ? input : [];
+    return rows
+        .filter((e) => e && (typeof e.id === "string" || typeof e.id === "number"))
+        .map((e) => {
+            const { operation: _op, ...rest } = e;
+            const id = String(e.id);
+            const source: EntitySnapshot["source"] = e.source === "inline" ? "inline" : "ref";
+            return {
+                ...(rest as Omit<EntitySnapshot, "id" | "source" | "operation">),
+                id,
+                source,
+                operation: "reference",
+            };
+        });
+}
+
+function toEditorSessionWikis(input: EditorSnapshot["wikis"]): WikiSnapshot[] {
+    const rows = Array.isArray(input) ? input : [];
+    return rows
+        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+        .map((w) => {
+            const { operation: _op, ...rest } = w;
+            const source: WikiSnapshot["source"] = w.source === "inline" ? "inline" : "ref";
+            return {
+                ...(rest as Omit<WikiSnapshot, "source" | "operation">),
+                source,
+                operation: "reference",
+            };
+        });
+}
+
+function toEditorSessionEntityWikiLinks(input: EditorSnapshot["entity_wiki"]): EntityWikiLinkSnapshot[] {
+    const rows = Array.isArray(input) ? input : [];
+    const deduped = new globalThis.Map<string, EntityWikiLinkSnapshot>();
+    for (const row of rows) {
+        if (!row || typeof row.entity_id !== "string" || typeof row.wiki_id !== "string") continue;
+        if (row.operation === "delete") continue;
+        const entity_id = row.entity_id.trim();
+        const wiki_id = row.wiki_id.trim();
+        if (!entity_id || !wiki_id) continue;
+        const key = `${entity_id}::${wiki_id}`;
+        deduped.set(key, { entity_id, wiki_id, operation: "binding" });
+    }
+    return Array.from(deduped.values()).sort((a, b) => {
+        const e = a.entity_id.localeCompare(b.entity_id);
+        if (e !== 0) return e;
+        return a.wiki_id.localeCompare(b.wiki_id);
+    });
 }

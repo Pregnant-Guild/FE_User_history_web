@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Map from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
@@ -13,12 +13,16 @@ import EntityWikiBindingsPanel from "@/uhm/components/EntityWikiBindingsPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
-import { fetchGeometriesByBBox } from "@/uhm/api/geometries";
 import { SectionCommit } from "@/uhm/api/sections";
+import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
+import type { EntitySnapshot } from "@/uhm/types/entities";
 import {
     Feature,
+    Geometry,
     useEditorState,
 } from "@/uhm/lib/useEditorState";
+import { geoTypeCodeToTypeKey } from "@/uhm/lib/geoTypeMap";
 import {
     BackgroundLayerId,
     BackgroundLayerVisibility,
@@ -26,14 +30,11 @@ import {
     HIDDEN_BACKGROUND_LAYER_VISIBILITY,
 } from "@/uhm/lib/backgroundLayers";
 import {
-    DEFAULT_ENTITY_TYPE_ID,
     ENTITY_TYPE_OPTIONS,
-    EntityTypeGroupId,
-    findEntityTypeOption,
 } from "@/uhm/lib/entityTypeOptions";
 import {
     EntityFormState,
-    PendingEntityCreate,
+    GeometryMetaFormState,
     useEditorSessionState,
 } from "@/uhm/lib/useEditorSessionState";
 import {
@@ -45,9 +46,9 @@ import {
 import {
     buildClientEntityId,
     formatEntityNamesForDisplay,
-    mergeEntitiesWithPending,
     mergeEntitySearchResults,
 } from "@/uhm/lib/editor/entity/entityBinding";
+import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
 import {
     formatBindingIdsForDisplay,
 } from "@/uhm/lib/editor/geometry/geometryMetadata";
@@ -56,9 +57,12 @@ import {
     persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
 import { useSectionCommands } from "@/uhm/lib/editor/section/useSectionCommands";
-import { EMPTY_FEATURE_COLLECTION, WORLD_BBOX } from "@/uhm/lib/geo/constants";
-import { FIXED_TIMELINE_RANGE, clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/timeline";
+import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/geo/constants";
+import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/timeline";
 import { useFeatureCommands } from "./featureCommands";
+import { deleteSubmission } from "@/uhm/api/sections";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
+import UnifiedSearchBar, { type UnifiedSearchKind } from "@/uhm/components/UnifiedSearchBar";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
@@ -71,6 +75,19 @@ export default function Page() {
     const openedProjectIdRef = useRef<string | null>(null);
     const autoOpenWiki = searchParams.get("only") === "wiki";
     const wikiOnly = autoOpenWiki;
+    const [blockedPendingSubmissionId, setBlockedPendingSubmissionId] = useState<string | null>(null);
+    const [searchKind, setSearchKind] = useState<UnifiedSearchKind>("entity");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [wikiSearchResults, setWikiSearchResults] = useState<Wiki[]>([]);
+    const [isWikiSearching, setIsWikiSearching] = useState(false);
+    const [geoSearchResults, setGeoSearchResults] = useState<EntityGeometriesSearchItem[]>([]);
+    const [isGeoSearching, setIsGeoSearching] = useState(false);
+    const [requestedActiveWikiId, setRequestedActiveWikiId] = useState<string | null>(null);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(280);
+    const [rightPanelWidth, setRightPanelWidth] = useState(420);
+    const [timelineFilterEnabled, setTimelineFilterEnabled] = useState(true);
+    const entityFormStatusTimeoutRef = useRef<number | null>(null);
+    const lastSelectedFeatureIdRef = useRef<string | null>(null);
 
     const {
         mode,
@@ -83,7 +100,6 @@ export default function Page() {
         setIsSubmitting,
         isOpeningSection,
         setIsOpeningSection,
-        availableSections,
         setAvailableSections,
         selectedSectionId,
         setSelectedSectionId,
@@ -94,23 +110,18 @@ export default function Page() {
         commitNote,
         setCommitNote,
         editorUserIdInput,
-        setEditorUserIdInput,
         activeSection,
         setActiveSection,
         sectionState,
         setSectionState,
         sectionCommits,
         setSectionCommits,
-        lastSectionSnapshot,
-        setLastSectionSnapshot,
-        persistedEntities,
-        setPersistedEntities,
-        projectEntityRefs,
-        setProjectEntityRefs,
-        pendingEntityCreates,
-        setPendingEntityCreates,
-        createdEntities,
-        setCreatedEntities,
+        baselineSnapshot,
+        setBaselineSnapshot,
+        entityCatalog,
+        setEntityCatalog,
+        snapshotEntities,
+        setSnapshotEntities,
         entityStatus,
         setEntityStatus,
         selectedFeatureId,
@@ -125,67 +136,103 @@ export default function Page() {
         setIsEntitySubmitting,
         entityFormStatus,
         setEntityFormStatus,
-        entitySearchQuery,
-        setEntitySearchQuery,
         entitySearchResults,
         setEntitySearchResults,
-        selectedSearchEntityId,
-        setSelectedSearchEntityId,
         isEntitySearchLoading,
         setIsEntitySearchLoading,
-        timelineYear,
-        setTimelineYear,
         timelineDraftYear,
         setTimelineDraftYear,
-        isTimelineLoading,
-        setIsTimelineLoading,
-        timelineStatus,
-        setTimelineStatus,
         backgroundVisibility,
         setBackgroundVisibility,
         isBackgroundVisibilityReady,
         setIsBackgroundVisibilityReady,
-        wikis,
-        setWikis,
-        entityWikiLinks,
-        setEntityWikiLinks,
+        snapshotWikis,
+        setSnapshotWikis,
+        snapshotEntityWikiLinks,
+        setSnapshotEntityWikiLinks,
     } = useEditorSessionState({
         emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
         defaultEditorUserId: DEFAULT_EDITOR_USER_ID,
         fallbackTimelineRange: FIXED_TIMELINE_RANGE,
         currentYear: CURRENT_YEAR,
     });
-    // Counter để bỏ qua response cũ khi user đổi timeline/section liên tục.
-    const timelineFetchRequestRef = useRef(0);
     // Counter để bỏ qua response cũ khi user gõ search entity liên tục.
     const entitySearchRequestRef = useRef(0);
+    const wikiSearchRequestRef = useRef(0);
+    const geoSearchRequestRef = useRef(0);
 
     const editor = useEditorState(initialData);
     const editorUserId = normalizeEditorUserId(editorUserIdInput);
+    const snapshotEntitiesAsEntities = useMemo(() => {
+        const rows = snapshotEntities || [];
+        return rows
+            .filter((e) => e && e.operation !== "delete")
+            .map((e) => ({
+                id: String(e.id || ""),
+                name: String(e.name || "").trim() || String(e.id || ""),
+                description: e.description ?? null,
+                status: typeof e.status === "number" ? e.status : 1,
+                geometry_count: 0,
+            }))
+            .filter((e) => e.id.length > 0 && e.name.length > 0);
+    }, [snapshotEntities]);
+
     const entities = useMemo(
-        () => mergeEntitiesWithPending(persistedEntities, pendingEntityCreates),
-        [persistedEntities, pendingEntityCreates]
+        () => mergeEntitySearchResults(entityCatalog, snapshotEntitiesAsEntities),
+        [entityCatalog, snapshotEntitiesAsEntities]
     );
+
+    const snapshotEntitiesVisible = useMemo(() => {
+        const byId = new globalThis.Map<string, EntitySnapshot>();
+        for (const ref of snapshotEntities || []) {
+            const id = String(ref?.id || "").trim();
+            if (!id || byId.has(id)) continue;
+            if (ref.operation === "delete") continue;
+            byId.set(id, ref);
+        }
+        return Array.from(byId.values());
+    }, [snapshotEntities]);
+
+    // Timeline filter: only affects persisted snapshot features.
+    // New features created in the current session remain visible regardless of time range.
+    const timelineVisibleDraft = useMemo(() => {
+        if (!timelineFilterEnabled) return editor.draft;
+        const year = clampYearToFixedRange(Math.trunc(timelineDraftYear));
+        return {
+            ...editor.draft,
+            features: editor.draft.features.filter((feature) => {
+                if (!editor.hasPersistedFeature(feature.properties.id)) return true;
+                return isFeatureVisibleAtYear(feature, year);
+            }),
+        };
+    }, [editor, timelineDraftYear, timelineFilterEnabled]);
 
     const projectEntityChoices = useMemo(() => {
         const ids = new Set<string>();
-        for (const ref of projectEntityRefs) ids.add(String(ref.id));
-        for (const feature of editor.draft.features) {
-            for (const id of normalizeFeatureEntityIds(feature)) ids.add(id);
-        }
+        for (const ref of snapshotEntitiesVisible) ids.add(String(ref.id));
         const rows = Array.from(ids).map((id) => {
             const found = entities.find((e) => e.id === id) || null;
             return { id, name: found?.name || id };
         });
         rows.sort((a, b) => a.name.localeCompare(b.name));
         return rows;
-    }, [editor.draft.features, entities, projectEntityRefs]);
+    }, [entities, snapshotEntitiesVisible]);
     const selectedFeature =
         selectedFeatureId === null
             ? null
             : editor.draft.features.find((feature) =>
                 String(feature.properties.id) === String(selectedFeatureId)
             ) || null;
+
+    const createdEntities = useMemo(() => {
+        return (snapshotEntities || [])
+            .filter((e) => e && e.source === "inline" && e.operation === "create")
+            .map((e) => ({
+                id: String(e.id || ""),
+                name: String(e.name || "").trim() || String(e.id || ""),
+            }))
+            .filter((e) => e.id.length > 0 && e.name.length > 0);
+    }, [snapshotEntities]);
 
     const createdGeometries = useMemo(() => {
         const rows: Array<{
@@ -213,15 +260,40 @@ export default function Page() {
     }, [editor.changes, entities]);
 
     const wikiDirty = useMemo(() => {
-        const prev = lastSectionSnapshot?.wikis || [];
+        const prev = normalizeWikisForCompare(baselineSnapshot?.wikis);
+        const next = normalizeWikisForCompare(snapshotWikis);
         try {
-            return JSON.stringify(prev) !== JSON.stringify(wikis);
+            return JSON.stringify(prev) !== JSON.stringify(next);
         } catch {
             return true;
         }
-    }, [lastSectionSnapshot?.wikis, wikis]);
+    }, [baselineSnapshot?.wikis, snapshotWikis]);
 
-    const pendingSaveCount = editor.changeCount + pendingEntityCreates.length + (wikiDirty ? 1 : 0);
+    const entitiesDirty = useMemo(() => {
+        const prev = normalizeEntitiesForCompare(baselineSnapshot?.entities);
+        const next = normalizeEntitiesForCompare(snapshotEntities);
+        try {
+            return JSON.stringify(prev) !== JSON.stringify(next);
+        } catch {
+            return true;
+        }
+    }, [baselineSnapshot?.entities, snapshotEntities]);
+
+    const entityWikiDirty = useMemo(() => {
+        const prev = normalizeEntityWikiLinksForCompare(baselineSnapshot?.entity_wiki);
+        const next = normalizeEntityWikiLinksForCompare(snapshotEntityWikiLinks);
+        try {
+            return JSON.stringify(prev) !== JSON.stringify(next);
+        } catch {
+            return true;
+        }
+    }, [snapshotEntityWikiLinks, baselineSnapshot?.entity_wiki]);
+
+    const pendingSaveCount =
+        editor.changeCount
+        + (wikiDirty ? 1 : 0)
+        + (entitiesDirty ? 1 : 0)
+        + (entityWikiDirty ? 1 : 0);
 
     const sectionCommands = useSectionCommands({
         editor,
@@ -232,24 +304,21 @@ export default function Page() {
         selectedSectionId,
         newSectionTitle,
         pendingSaveCount,
-        pendingEntityCreates,
-        projectEntityRefs,
-        wikis,
-        entityWikiLinks,
-        lastSectionSnapshot,
+        snapshotEntities,
+        snapshotWikis,
+        snapshotEntityWikiLinks,
+        baselineSnapshot,
         commitTitle,
         commitNote,
         setActiveSection,
         setSelectedSectionId,
         setSectionState,
-        setLastSectionSnapshot,
+        setBaselineSnapshot,
         setInitialData,
         setSectionCommits,
-        setPendingEntityCreates,
-        setProjectEntityRefs,
-        setCreatedEntities,
-        setWikis,
-        setEntityWikiLinks,
+        setSnapshotEntities,
+        setSnapshotWikis,
+        setSnapshotEntityWikiLinks,
         setEntityFormStatus,
         setSelectedFeatureId,
         setEntityStatus,
@@ -273,6 +342,7 @@ export default function Page() {
         try {
             setIsOpeningSection(true);
             setEntityStatus(null);
+            setBlockedPendingSubmissionId(null);
             await openSectionForEditing(projectId);
             setEntityStatus(null);
         } catch (err) {
@@ -280,6 +350,19 @@ export default function Page() {
                 if (err.status === 401 || err.status === 400) {
                     router.replace("/signin");
                     return;
+                }
+                // Pending submission blocks editor in BE. We parse the pending id to offer delete/unlock.
+                if (err.status === 409) {
+                    try {
+                        const payload = JSON.parse(err.body || "{}");
+                        if (payload?.pending_submission_id) {
+                            setBlockedPendingSubmissionId(String(payload.pending_submission_id));
+                            setEntityStatus("Project đang có submission PENDING. Hãy xoa submission đó để unlock editor.");
+                            return;
+                        }
+                    } catch {
+                        // fallthrough
+                    }
                 }
                 setEntityStatus(`Mở project thất bại: ${err.body || err.message}`);
             } else {
@@ -291,15 +374,36 @@ export default function Page() {
         }
     }, [openSectionForEditing, projectId, router, setEntityStatus, setIsOpeningSection]);
 
+    const unlockByDeletingPendingSubmission = useCallback(async () => {
+        if (!blockedPendingSubmissionId) return;
+        const confirmed = window.confirm("Xoa submission PENDING de unlock editor? Hanh dong nay khong the hoan tac.");
+        if (!confirmed) return;
+        try {
+            setIsOpeningSection(true);
+            setEntityStatus(null);
+            await deleteSubmission(blockedPendingSubmissionId);
+            setBlockedPendingSubmissionId(null);
+            await openProject();
+        } catch (err) {
+            if (err instanceof ApiError) {
+                setEntityStatus(`Khong the xoa submission: ${err.body || err.message}`);
+            } else {
+                setEntityStatus("Khong the xoa submission.");
+            }
+        } finally {
+            setIsOpeningSection(false);
+        }
+    }, [blockedPendingSubmissionId, openProject, setEntityStatus, setIsOpeningSection]);
+
     useEffect(() => {
         let disposed = false;
 
         async function ensureAuthenticated() {
             try {
                 await fetchCurrentUser();
-            } catch (err) {
+            } catch {
                 if (disposed) return;
-                // Follow the same behavior as the rest of FrontEndAdmin: unauthenticated -> /signin.
+                // Follow the same behavior as the rest of FrontEndUser: unauthenticated -> /signin.
                 router.replace("/signin");
             }
         }
@@ -322,7 +426,7 @@ export default function Page() {
                 // allow retry if openProject threw outside its try/catch (should be rare)
                 openedProjectIdRef.current = null;
             });
-    }, [openProject]);
+    }, [openProject, projectId]);
 
     useEffect(() => {
         let disposed = false;
@@ -332,7 +436,19 @@ export default function Page() {
                 const rows = await fetchEntities();
                 if (disposed) return;
 
-                setPersistedEntities(rows);
+                setEntityCatalog((prev) => {
+                    const byId = new globalThis.Map<string, Entity>();
+                    for (const row of prev || []) {
+                        if (!row?.id) continue;
+                        byId.set(String(row.id), row);
+                    }
+                    for (const row of rows || []) {
+                        if (!row?.id) continue;
+                        // Prefer the freshest backend payload on conflicts.
+                        byId.set(String(row.id), row);
+                    }
+                    return Array.from(byId.values());
+                });
                 setEntityStatus(null);
             } catch (err) {
                 if (disposed) return;
@@ -346,20 +462,18 @@ export default function Page() {
         return () => {
             disposed = true;
         };
-    }, [setEntityStatus, setPersistedEntities]);
+    }, [setEntityCatalog, setEntityStatus]);
 
     useEffect(() => {
-        if (!selectedFeature) {
+        if (searchKind !== "entity") {
             setEntitySearchResults([]);
-            setSelectedSearchEntityId(null);
             setIsEntitySearchLoading(false);
             return;
         }
 
-        const keyword = entitySearchQuery.trim();
+        const keyword = searchQuery.trim();
         if (!keyword.length) {
             setEntitySearchResults([]);
-            setSelectedSearchEntityId(null);
             setIsEntitySearchLoading(false);
             return;
         }
@@ -367,50 +481,41 @@ export default function Page() {
         let disposed = false;
         const requestId = ++entitySearchRequestRef.current;
         const timeoutId = window.setTimeout(async () => {
+            const keywordLower = keyword.toLowerCase();
+            const localMatches = entities
+                .filter((entity) =>
+                    entity.name.toLowerCase().includes(keywordLower) ||
+                    (entity.description || "").toLowerCase().includes(keywordLower)
+                )
+                .map<Entity>((entity) => ({
+                    ...entity,
+                    geometry_count: typeof entity.geometry_count === "number" ? entity.geometry_count : 0,
+                }));
+
             setIsEntitySearchLoading(true);
             try {
                 const rows = await searchEntitiesByName(keyword, { limit: 30 });
                 if (disposed || requestId !== entitySearchRequestRef.current) return;
+                // Centralize: merge search results into the shared entity catalog so UI stays consistent.
+                setEntityCatalog((prev) => {
+                    const byId = new globalThis.Map<string, Entity>();
+                    for (const row of prev || []) {
+                        if (!row?.id) continue;
+                        byId.set(String(row.id), row);
+                    }
+                    for (const row of rows || []) {
+                        if (!row?.id) continue;
+                        byId.set(String(row.id), row);
+                    }
+                    return Array.from(byId.values());
+                });
 
-                const pendingMatches = pendingEntityCreates
-                    .filter((entity) =>
-                        entity.name.toLowerCase().includes(keyword.toLowerCase()) ||
-                        (entity.slug || "").toLowerCase().includes(keyword.toLowerCase())
-                    )
-                    .map<Entity>((entity) => ({
-                        id: entity.id,
-                        name: entity.name,
-                        slug: entity.slug,
-                        type_id: entity.type_id,
-                        status: entity.status,
-                        geometry_count: 0,
-                    }));
-
-                const mergedRows = mergeEntitySearchResults(rows, pendingMatches);
+                const mergedRows = mergeEntitySearchResults(rows, localMatches);
                 setEntitySearchResults(mergedRows);
-                setSelectedSearchEntityId((prev) =>
-                    prev && mergedRows.some((entity) => entity.id === prev)
-                        ? prev
-                        : mergedRows[0]?.id || null
-                );
             } catch (err) {
                 if (disposed || requestId !== entitySearchRequestRef.current) return;
                 console.error("Search entity by name failed", err);
-                const pendingMatches = pendingEntityCreates
-                    .filter((entity) =>
-                        entity.name.toLowerCase().includes(keyword.toLowerCase()) ||
-                        (entity.slug || "").toLowerCase().includes(keyword.toLowerCase())
-                    )
-                    .map<Entity>((entity) => ({
-                        id: entity.id,
-                        name: entity.name,
-                        slug: entity.slug,
-                        type_id: entity.type_id,
-                        status: entity.status,
-                        geometry_count: 0,
-                    }));
-                setEntitySearchResults(pendingMatches);
-                setSelectedSearchEntityId(pendingMatches[0]?.id || null);
+                setEntitySearchResults(localMatches);
             } finally {
                 if (!disposed && requestId === entitySearchRequestRef.current) {
                     setIsEntitySearchLoading(false);
@@ -423,42 +528,124 @@ export default function Page() {
             window.clearTimeout(timeoutId);
         };
     }, [
-        entitySearchQuery,
-        selectedFeature,
-        pendingEntityCreates,
+        searchKind,
+        searchQuery,
+        entities,
+        setEntityCatalog,
         setEntitySearchResults,
         setIsEntitySearchLoading,
-        setSelectedSearchEntityId,
     ]);
 
     useEffect(() => {
+        if (searchKind !== "wiki") {
+            setWikiSearchResults([]);
+            setIsWikiSearching(false);
+            return;
+        }
+
+        const keyword = searchQuery.trim();
+        if (!keyword.length) {
+            setWikiSearchResults([]);
+            setIsWikiSearching(false);
+            return;
+        }
+
+        let disposed = false;
+        const requestId = ++wikiSearchRequestRef.current;
+        const timeoutId = window.setTimeout(async () => {
+            setIsWikiSearching(true);
+            try {
+                const rows = await searchWikisByTitle(keyword, { limit: 12 });
+                if (disposed || requestId !== wikiSearchRequestRef.current) return;
+                setWikiSearchResults(rows);
+            } catch (err) {
+                if (disposed || requestId !== wikiSearchRequestRef.current) return;
+                console.error("Search wikis failed", err);
+                setWikiSearchResults([]);
+            } finally {
+                if (!disposed && requestId === wikiSearchRequestRef.current) {
+                    setIsWikiSearching(false);
+                }
+            }
+        }, 250);
+
+        return () => {
+            disposed = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [searchKind, searchQuery]);
+
+    useEffect(() => {
+        if (searchKind !== "geo") {
+            setGeoSearchResults([]);
+            setIsGeoSearching(false);
+            return;
+        }
+
+        const keyword = searchQuery.trim();
+        if (!keyword.length) {
+            setGeoSearchResults([]);
+            setIsGeoSearching(false);
+            return;
+        }
+
+        let disposed = false;
+        const requestId = ++geoSearchRequestRef.current;
+        const timeoutId = window.setTimeout(async () => {
+            setIsGeoSearching(true);
+            try {
+                const res = await searchGeometriesByEntityName(keyword, { limit: 24 });
+                if (disposed || requestId !== geoSearchRequestRef.current) return;
+                setGeoSearchResults(res.items || []);
+            } catch (err) {
+                if (disposed || requestId !== geoSearchRequestRef.current) return;
+                console.error("Search geometries by entity name failed", err);
+                setGeoSearchResults([]);
+            } finally {
+                if (!disposed && requestId === geoSearchRequestRef.current) {
+                    setIsGeoSearching(false);
+                }
+            }
+        }, 260);
+
+        return () => {
+            disposed = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [geoSearchRequestRef, searchKind, searchQuery]);
+
+    useEffect(() => {
         if (selectedFeatureId === null) return;
-        const stillExists = editor.draft.features.some((feature) =>
+        const stillExists = timelineVisibleDraft.features.some((feature) =>
             String(feature.properties.id) === String(selectedFeatureId)
         );
         if (!stillExists) {
             setSelectedFeatureId(null);
         }
-    }, [editor.draft, selectedFeatureId, setSelectedFeatureId]);
+    }, [timelineVisibleDraft, selectedFeatureId, setSelectedFeatureId]);
 
     useEffect(() => {
         if (!selectedFeature) {
             setSelectedGeometryEntityIds([]);
             setGeometryMetaForm({
+                type_key: "",
                 time_start: "",
                 time_end: "",
                 binding: "",
             });
-            setEntitySearchQuery("");
-            setEntitySearchResults([]);
-            setSelectedSearchEntityId(null);
             setEntityFormStatus(null);
+            lastSelectedFeatureIdRef.current = null;
             return;
         }
 
         const featureEntityIds = normalizeFeatureEntityIds(selectedFeature);
+        const nextTypeKey = typeof selectedFeature.properties.type === "string" && selectedFeature.properties.type.trim().length
+            ? selectedFeature.properties.type
+            : getDefaultTypeIdForFeature(selectedFeature);
+        const currentId = String(selectedFeature.properties.id);
         setSelectedGeometryEntityIds(featureEntityIds);
         setGeometryMetaForm({
+            type_key: nextTypeKey,
             time_start: selectedFeature.properties.time_start != null
                 ? String(selectedFeature.properties.time_start)
                 : "",
@@ -467,106 +654,37 @@ export default function Page() {
                 : "",
             binding: normalizeFeatureBindingIds(selectedFeature).join(", "),
         });
-        setEntitySearchQuery("");
-        setEntitySearchResults([]);
-        setSelectedSearchEntityId(null);
-        setEntityFormStatus(null);
+        // Only clear status when switching to a different geometry, not when patching metadata/bindings
+        // on the same selected geometry (otherwise messages will blink).
+        if (lastSelectedFeatureIdRef.current !== currentId) {
+            setEntityFormStatus(null);
+        }
+        lastSelectedFeatureIdRef.current = currentId;
     }, [
         selectedFeature,
         setEntityFormStatus,
-        setEntitySearchQuery,
-        setEntitySearchResults,
         setGeometryMetaForm,
         setSelectedGeometryEntityIds,
-        setSelectedSearchEntityId,
     ]);
 
-    useEffect(() => {
-        if (!selectedFeature) return;
-
-        const allowedGroupIds = getAllowedEntityTypeGroupIdsForFeature(selectedFeature);
-        const fallbackOption = ENTITY_TYPE_OPTIONS.find((option) =>
-            allowedGroupIds.includes(option.groupId)
-        );
-        if (!fallbackOption) return;
-
-        setEntityForm((prev) => {
-            const currentOption = findEntityTypeOption(prev.type_id);
-            const isCurrentAllowed = currentOption
-                ? allowedGroupIds.includes(currentOption.groupId)
-                : false;
-            if (isCurrentAllowed || prev.type_id === fallbackOption.value) {
-                return prev;
-            }
-            return {
-                ...prev,
-                type_id: fallbackOption.value,
-            };
-        });
-    }, [selectedFeature, setEntityForm]);
-
-    useEffect(() => {
-        const timeoutId = window.setTimeout(() => {
-            if (timelineDraftYear !== timelineYear) {
-                setTimelineYear(timelineDraftYear);
-            }
-        }, TIMELINE_DEBOUNCE_MS);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [timelineDraftYear, timelineYear, setTimelineYear]);
+    const flashEntityFormStatus = useCallback((msg: string | null, timeoutMs = 3000) => {
+        if (entityFormStatusTimeoutRef.current) {
+            window.clearTimeout(entityFormStatusTimeoutRef.current);
+            entityFormStatusTimeoutRef.current = null;
+        }
+        setEntityFormStatus(msg);
+        if (msg && timeoutMs > 0) {
+            entityFormStatusTimeoutRef.current = window.setTimeout(() => {
+                setEntityFormStatus(null);
+                entityFormStatusTimeoutRef.current = null;
+            }, timeoutMs);
+        }
+    }, [setEntityFormStatus]);
 
     useEffect(() => {
         setBackgroundVisibility(loadBackgroundLayerVisibilityFromStorage());
         setIsBackgroundVisibilityReady(true);
     }, [setBackgroundVisibility, setIsBackgroundVisibilityReady]);
-
-    useEffect(() => {
-        if (activeSection) return;
-
-        let disposed = false;
-        const requestId = ++timelineFetchRequestRef.current;
-
-        async function loadGlobalByTimeline() {
-            setIsTimelineLoading(true);
-            setTimelineStatus(null);
-
-            try {
-                const data = await fetchGeometriesByBBox({
-                    ...WORLD_BBOX,
-                    time: timelineYear,
-                });
-
-                if (disposed || requestId !== timelineFetchRequestRef.current) return;
-                setInitialData(data);
-            } catch (err) {
-                if (err instanceof ApiError) {
-                    console.error("Load global timeline data failed", err.body);
-                } else {
-                    console.error("Load global timeline data failed", err);
-                }
-
-                if (!disposed && requestId === timelineFetchRequestRef.current) {
-                    setTimelineStatus("Không tải được geometry global tại mốc thời gian đã chọn.");
-                }
-            } finally {
-                if (!disposed && requestId === timelineFetchRequestRef.current) {
-                    setIsTimelineLoading(false);
-                }
-            }
-        }
-
-        loadGlobalByTimeline();
-
-        return () => {
-            disposed = true;
-        };
-    }, [
-        timelineYear,
-        activeSection,
-        setInitialData,
-        setIsTimelineLoading,
-        setTimelineStatus,
-    ]);
 
     const updateBackgroundVisibility = (
         updater: (prev: BackgroundLayerVisibility) => BackgroundLayerVisibility
@@ -601,7 +719,7 @@ export default function Page() {
         setEntityForm((prev) => ({ ...prev, [key]: value }));
     };
 
-    const handleGeometryMetaFormChange = (key: "time_start" | "time_end" | "binding", value: string) => {
+    const handleGeometryMetaFormChange = (key: keyof GeometryMetaFormState, value: string) => {
         setGeometryMetaForm((prev) => ({ ...prev, [key]: value }));
     };
 
@@ -609,18 +727,161 @@ export default function Page() {
         setSelectedGeometryEntityIds(uniqueEntityIds(values));
     };
 
-    const handleAddSelectedSearchEntity = () => {
-        const entityId = selectedSearchEntityId ? selectedSearchEntityId.trim() : "";
-        if (!entityId.length) {
-            setEntityFormStatus("Hãy chọn một entity từ kết quả search trước.");
+    const handleAddEntityRefToProject = useCallback((entity: Entity) => {
+        const id = String(entity.id || "").trim();
+        if (!id) return;
+        setSnapshotEntities((prev) => {
+            if (prev.some((e) => String(e.id) === id)) return prev;
+            return [
+                {
+                    id,
+                    source: "ref",
+                    operation: "reference",
+                    name: entity.name,
+                    description: entity.description ?? null,
+                },
+                ...prev,
+            ];
+        });
+        // Keep entity catalog centralized as a single in-memory list.
+        setEntityCatalog((prev) => {
+            const byId = new globalThis.Map<string, Entity>();
+            for (const row of prev || []) {
+                if (!row?.id) continue;
+                byId.set(String(row.id), row);
+            }
+            byId.set(id, entity);
+            return Array.from(byId.values());
+        });
+    }, [setEntityCatalog, setSnapshotEntities]);
+
+    const handleToggleBindEntityForSelectedGeometry = useCallback((entityId: string, nextChecked: boolean) => {
+        if (!selectedFeature) {
+            flashEntityFormStatus("Chưa chọn geometry để bind entity.");
+            return;
+        }
+        const id = String(entityId || "").trim();
+        if (!id) return;
+        const nextEntityIds = (() => {
+            const prev = selectedGeometryEntityIds;
+            const has = prev.includes(id);
+            if (nextChecked) {
+                if (has) return prev;
+                return uniqueEntityIds([...prev, id]);
+            }
+            if (!has) return prev;
+            return prev.filter((x) => x !== id);
+        })();
+
+        setIsEntitySubmitting(true);
+        flashEntityFormStatus(null, 0);
+        try {
+            editor.patchFeatureProperties(
+                selectedFeature.properties.id,
+                buildFeatureEntityPatch(selectedFeature, nextEntityIds, entities)
+            );
+            setSelectedGeometryEntityIds(nextEntityIds);
+            flashEntityFormStatus(
+                nextChecked
+                    ? "Đã bind entity vào geometry. Commit khi sẵn sàng."
+                    : "Đã unbind entity khỏi geometry. Commit khi sẵn sàng.",
+                3000
+            );
+        } finally {
+            setIsEntitySubmitting(false);
+        }
+    }, [
+        editor,
+        entities,
+        flashEntityFormStatus,
+        selectedFeature,
+        selectedGeometryEntityIds,
+        setIsEntitySubmitting,
+        setSelectedGeometryEntityIds,
+    ]);
+
+    const handleAddWikiRefToProject = useCallback((wiki: Wiki) => {
+        const id = String(wiki.id || "").trim();
+        if (!id) return;
+        const title = (wiki.title || "").trim() || "Untitled wiki";
+        setSnapshotWikis((prev) => {
+            if (prev.some((w) => w.id === id)) return prev;
+            return [
+                {
+                    id,
+                    source: "ref",
+                    operation: "reference",
+                    title,
+                    doc: null,
+                    updated_at: wiki.updated_at,
+                },
+                ...prev,
+            ];
+        });
+        setRequestedActiveWikiId(id);
+    }, [setSnapshotWikis]);
+
+    const handleImportGeoFromSearch = useCallback((
+        entityItem: EntityGeometriesSearchItem,
+        geo: EntityGeometrySearchGeo
+    ) => {
+        const geoId = String(geo?.id || "").trim();
+        if (!geoId) return;
+
+        // Ensure the geometry stays selectable even if it doesn't match the current timeline year.
+        setTimelineFilterEnabled(false);
+
+        // Keep entity store consistent: importing a geo implies the entity should exist in snapshot + catalog.
+        handleAddEntityRefToProject({
+            id: entityItem.entity_id,
+            name: (entityItem.name || "").trim() || entityItem.entity_id,
+            description: (entityItem.description || "").trim() || null,
+            status: 1,
+            geometry_count: 0,
+        });
+
+        const existing = editor.draft.features.find((f) => String(f.properties.id) === geoId) || null;
+        if (existing) {
+            setSelectedFeatureId(existing.properties.id);
+            flashEntityFormStatus("Đã chọn geometry từ kết quả search.", 3000);
             return;
         }
 
-        const next = uniqueEntityIds([...selectedGeometryEntityIds, entityId]);
-        setSelectedGeometryEntityIds(next);
-        setSelectedSearchEntityId(null);
-        setEntityFormStatus(null);
-    };
+        const geometry = normalizeGeoSearchGeometry(geo.draw_geometry);
+        if (!geometry) {
+            flashEntityFormStatus("Không import được: draw_geometry không hợp lệ.", 3000);
+            return;
+        }
+
+        const bindingIds = normalizeGeoSearchBindingIds(geo.binding);
+        const typeKey = geoTypeCodeToTypeKey(Number(geo.geo_type)) || null;
+
+        const feature: Feature = {
+            type: "Feature",
+            properties: {
+                id: geoId,
+                type: typeKey,
+                time_start: typeof geo.time_start === "number" ? geo.time_start : null,
+                time_end: typeof geo.time_end === "number" ? geo.time_end : null,
+                binding: bindingIds.length ? bindingIds : undefined,
+                entity_id: entityItem.entity_id,
+                entity_ids: [entityItem.entity_id],
+                entity_name: (entityItem.name || "").trim() || entityItem.entity_id,
+                entity_names: [(entityItem.name || "").trim() || entityItem.entity_id],
+            },
+            geometry,
+        };
+
+        editor.createFeature(feature);
+        setSelectedFeatureId(feature.properties.id);
+        flashEntityFormStatus("Đã import geometry từ search GEO. Commit khi sẵn sàng.", 3000);
+    }, [
+        editor,
+        flashEntityFormStatus,
+        handleAddEntityRefToProject,
+        setSelectedFeatureId,
+        setTimelineFilterEnabled,
+    ]);
 
     const featureCommands = useFeatureCommands({
         editor,
@@ -641,61 +902,62 @@ export default function Page() {
             return;
         }
 
-        const slug = entityForm.slug.trim() || null;
-        const typeId = entityForm.type_id || DEFAULT_ENTITY_TYPE_ID;
+        const description = entityForm.description.trim() || null;
         const normalizedName = name.toLowerCase();
         const duplicatedName = entities.some((entity) => entity.name.trim().toLowerCase() === normalizedName);
         if (duplicatedName) {
             setEntityFormStatus("Tên entity đã tồn tại.");
             return;
         }
-        if (slug) {
-            const normalizedSlug = slug.toLowerCase();
-            const duplicatedSlug = entities.some((entity) =>
-                (entity.slug || "").trim().toLowerCase() === normalizedSlug
-            );
-            if (duplicatedSlug) {
-                setEntityFormStatus("Slug entity đã tồn tại.");
-                return;
-            }
-        }
 
         const entityId = buildClientEntityId();
-        const pendingCreate: PendingEntityCreate = {
+        const createdEntity: Entity = {
             id: entityId,
             name,
-            slug,
-            type_id: typeId,
+            description,
             status: 1,
+            geometry_count: 0,
         };
 
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            setPendingEntityCreates((prev) => [pendingCreate, ...prev]);
-            setCreatedEntities((prev) => {
-                if (prev.some((item) => item.id === pendingCreate.id)) return prev;
+            setSnapshotEntities((prev) => {
+                if (prev.some((e) => String(e.id) === entityId)) return prev;
                 return [
                     {
-                        id: pendingCreate.id,
-                        name: pendingCreate.name,
-                        type_id: pendingCreate.type_id || null,
+                        id: entityId,
+                        source: "inline",
+                        operation: "create",
+                        name,
+                        slug: null,
+                        description,
+                        status: 1,
                     },
                     ...prev,
                 ];
+            });
+            setEntityCatalog((prev) => {
+                const byId = new globalThis.Map<string, Entity>();
+                for (const row of prev || []) {
+                    if (!row?.id) continue;
+                    byId.set(String(row.id), row);
+                }
+                byId.set(entityId, createdEntity);
+                return Array.from(byId.values());
             });
 
             setEntityForm((prev) => ({
                 ...prev,
                 name: "",
-                slug: "",
+                description: "",
             }));
             setEntityStatus(null);
-            setEntityFormStatus("Đã thêm entity mới vào danh sách chờ Commit.");
+            setEntityFormStatus("Đã tạo entity mới (local). Commit khi sẵn sàng.");
 
             if (selectedFeature) {
-                setEntitySearchQuery(pendingCreate.name);
-                setSelectedSearchEntityId(pendingCreate.id);
+                setSearchKind("entity");
+                setSearchQuery(name);
             }
         } finally {
             setIsEntitySubmitting(false);
@@ -705,13 +967,6 @@ export default function Page() {
     const headCommit = sectionState?.head_commit_id
         ? sectionCommits.find((commit) => commit.id === sectionState.head_commit_id) || null
         : null;
-    const timelineDisabled = isSaving || pendingSaveCount > 0;
-    const timelineStatusText =
-        pendingSaveCount > 0
-            ? "Commit hoặc Undo hết thay đổi trước khi đổi mốc thời gian."
-            : isSaving
-                ? "Đang lưu thay đổi..."
-                : timelineStatus;
 
     const handleCreateFeature = (feature: Feature) => {
         editor.createFeature(feature);
@@ -745,14 +1000,64 @@ export default function Page() {
                 undoStack={editor.undoStack}
                 createdEntities={createdEntities}
                 createdGeometries={createdGeometries}
+                width={leftPanelWidth}
             />
 
-            {!wikiOnly ? (
+            <ResizeHandle
+                title="Resize left panel"
+                onDrag={(deltaX) => {
+                    setLeftPanelWidth((prev) => clampNumber(prev + deltaX, 220, 520));
+                }}
+            />
+
+            {blockedPendingSubmissionId ? (
+                <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220", color: "white", padding: "24px" }}>
+                    <div style={{ maxWidth: 720 }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Editor dang bi khoa</h2>
+                        <div style={{ marginTop: 10, fontSize: 13, color: "#cbd5e1" }}>
+                            Project nay dang co submission o trang thai <b>PENDING</b> (id:{" "}
+                            <code style={{ color: "white" }}>{blockedPendingSubmissionId}</code>). Theo BE moi, khi
+                            submission dang pending thi khong duoc tao submission/commit moi va khong duoc vao editor.
+                        </div>
+                        <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
+                            <button
+                                onClick={unlockByDeletingPendingSubmission}
+                                disabled={isOpeningSection}
+                                style={{
+                                    padding: "10px 12px",
+                                    borderRadius: 6,
+                                    border: "1px solid #334155",
+                                    background: isOpeningSection ? "#334155" : "#ef4444",
+                                    color: "white",
+                                    cursor: isOpeningSection ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                Xoa submission pending de unlock
+                            </button>
+                            <button
+                                onClick={() => router.push("/user/projects")}
+                                style={{
+                                    padding: "10px 12px",
+                                    borderRadius: 6,
+                                    border: "1px solid #334155",
+                                    background: "#111827",
+                                    color: "white",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Quay lai danh sach projects
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {!wikiOnly && !blockedPendingSubmissionId ? (
                 <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
                     {isBackgroundVisibilityReady ? (
                         <Map
                             mode={mode}
-                            draft={editor.draft}
+                            draft={timelineVisibleDraft}
                             selectedFeatureId={selectedFeatureId}
                             onSelectFeatureId={setSelectedFeatureId}
                             onCreateFeature={handleCreateFeature}
@@ -766,32 +1071,287 @@ export default function Page() {
                     <TimelineBar
                         year={timelineDraftYear}
                         onYearChange={handleTimelineYearChange}
-                        isLoading={isTimelineLoading}
-                        disabled={timelineDisabled}
-                        statusText={timelineStatusText}
+                        isLoading={false}
+                        disabled={false}
+                        statusText={null}
+                        filterEnabled={timelineFilterEnabled}
+                        onFilterEnabledChange={setTimelineFilterEnabled}
                     />
                 </div>
-            ) : (
+            ) : blockedPendingSubmissionId ? null : (
                 // Wiki-only mode: avoid mounting Map/Timeline (WebGL + geometry fetching) to reduce lag.
                 <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220" }} />
             )}
+
+            <ResizeHandle
+                title="Resize right panel"
+                onDrag={(deltaX) => {
+                    // dragging handle (between map and right panel): moving right increases right panel width
+                    setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
+                }}
+            />
 
             <BackgroundLayersPanel
                 visibility={backgroundVisibility}
                 onToggleLayer={handleToggleBackgroundLayer}
                 onShowAll={handleShowAllBackgroundLayers}
                 onHideAll={handleHideAllBackgroundLayers}
+                width={rightPanelWidth}
                 topContent={
                     <div style={{ display: "grid", gap: "12px" }}>
+                        <UnifiedSearchBar
+                            kind={searchKind}
+                            onKindChange={(next) => {
+                                setSearchKind(next);
+                                setSearchQuery("");
+                            }}
+                            query={searchQuery}
+                            onQueryChange={setSearchQuery}
+                        />
+
+                        {searchKind === "entity" && searchQuery.trim().length > 0 ? (
+                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Entity Results</div>
+                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                        {isEntitySearchLoading ? "Searching…" : `${entitySearchResults.length} results`}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                                    {entitySearchResults.slice(0, 8).map((e) => (
+                                        <div
+                                            key={e.id}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                padding: 8,
+                                                borderRadius: 6,
+                                                border: "1px solid #1f2937",
+                                                background: "transparent",
+                                            }}
+                                        >
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    {e.name}
+                                                </div>
+                                                <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    {e.id}
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddEntityRefToProject(e)}
+                                                style={{
+                                                    border: "none",
+                                                    background: "#111827",
+                                                    color: "#93c5fd",
+                                                    cursor: "pointer",
+                                                    borderRadius: 6,
+                                                    padding: "6px 8px",
+                                                    fontSize: 12,
+                                                    fontWeight: 700,
+                                                }}
+                                                title="Add entity ref to project snapshot"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {!isEntitySearchLoading && entitySearchResults.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {searchKind === "wiki" && searchQuery.trim().length > 0 ? (
+                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Wiki Results</div>
+                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                        {isWikiSearching ? "Searching…" : `${wikiSearchResults.length} results`}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                                    {wikiSearchResults.slice(0, 8).map((w) => (
+                                        <div
+                                            key={w.id}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                padding: 8,
+                                                borderRadius: 6,
+                                                border: "1px solid #1f2937",
+                                                background: "transparent",
+                                            }}
+                                        >
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    {(w.title || "").trim() || "Untitled wiki"}
+                                                </div>
+                                                <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    {w.id}
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddWikiRefToProject(w)}
+                                                style={{
+                                                    border: "none",
+                                                    background: "#111827",
+                                                    color: "#93c5fd",
+                                                    cursor: "pointer",
+                                                    borderRadius: 6,
+                                                    padding: "6px 8px",
+                                                    fontSize: 12,
+                                                    fontWeight: 700,
+                                                }}
+                                                title="Add wiki ref to project snapshot"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {!isWikiSearching && wikiSearchResults.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {searchKind === "geo" && searchQuery.trim().length > 0 ? (
+                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Geo Results</div>
+                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                        {isGeoSearching ? "Searching…" : `${geoSearchResults.length} entities`}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+                                    {geoSearchResults.slice(0, 6).map((item) => (
+                                        <div
+                                            key={item.entity_id}
+                                            style={{
+                                                padding: 8,
+                                                borderRadius: 6,
+                                                border: "1px solid #1f2937",
+                                                background: "transparent",
+                                                display: "grid",
+                                                gap: 6,
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ color: "#e5e7eb", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                        {item.name?.trim() || item.entity_id}
+                                                    </div>
+                                                    <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                        {item.entity_id}
+                                                    </div>
+                                                </div>
+                                                <div style={{ fontSize: 12, color: "#94a3b8", flex: "0 0 auto" }}>
+                                                    {Array.isArray(item.geometries) ? item.geometries.length : 0} geos
+                                                </div>
+                                            </div>
+                                            {item.description?.trim() ? (
+                                                <div style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 1.35 }}>
+                                                    {item.description.trim()}
+                                                </div>
+                                            ) : null}
+                                            {Array.isArray(item.geometries) && item.geometries.length ? (
+                                                <div style={{ display: "grid", gap: 6 }}>
+                                                    {item.geometries.slice(0, 4).map((geo) => (
+                                                        <div
+                                                            key={geo.id}
+                                                            style={{
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "space-between",
+                                                                gap: 8,
+                                                                padding: 8,
+                                                                borderRadius: 6,
+                                                                border: "1px solid #243244",
+                                                                background: "#0f172a",
+                                                            }}
+                                                        >
+                                                            <div style={{ minWidth: 0 }}>
+                                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                    #{geo.id}
+                                                                </div>
+                                                                <div style={{ color: "#94a3b8", fontSize: 11 }}>
+                                                                    type: {String(geo.geo_type)}{" "}
+                                                                    {geo.time_start != null || geo.time_end != null
+                                                                        ? `| time: ${geo.time_start ?? "?"} → ${geo.time_end ?? "?"}`
+                                                                        : ""}
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleImportGeoFromSearch(item, geo)}
+                                                                style={{
+                                                                    border: "none",
+                                                                    background: "#111827",
+                                                                    color: "#93c5fd",
+                                                                    cursor: "pointer",
+                                                                    borderRadius: 6,
+                                                                    padding: "6px 8px",
+                                                                    fontSize: 12,
+                                                                    fontWeight: 700,
+                                                                    flex: "0 0 auto",
+                                                                }}
+                                                                title="Import geometry into current editor draft"
+                                                            >
+                                                                Import
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {item.geometries.length > 4 ? (
+                                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                            +{item.geometries.length - 4} more…
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                    No geometry linked.
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {!isGeoSearching && geoSearchResults.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+
                         <WikiSidebarPanel
                             projectId={projectId}
-                            wikis={wikis}
-                            setWikis={setWikis}
+                            wikis={snapshotWikis}
+                            setWikis={setSnapshotWikis}
                             autoOpen={autoOpenWiki}
+                            requestedActiveId={requestedActiveWikiId}
                         />
-                        <ProjectEntityRefsPanel entityRefs={projectEntityRefs} setEntityRefs={setProjectEntityRefs} />
-                        <EntityWikiBindingsPanel entities={projectEntityChoices} wikis={wikis} links={entityWikiLinks} setLinks={setEntityWikiLinks} />
-                        {!wikiOnly ? (
+                        <ProjectEntityRefsPanel
+                            entityRefs={snapshotEntitiesVisible}
+                            entityForm={entityForm}
+                            onEntityFormChange={handleEntityFormChange}
+                            isEntitySubmitting={isEntitySubmitting}
+                            onCreateEntityOnly={handleCreateEntityOnly}
+                            entityFormStatus={entityFormStatus}
+                            hasSelectedGeometry={Boolean(selectedFeature)}
+                            selectedGeometryEntityIds={selectedGeometryEntityIds}
+                            onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
+                        />
+                        <EntityWikiBindingsPanel
+                            entities={projectEntityChoices}
+                            wikis={snapshotWikis}
+                            links={snapshotEntityWikiLinks}
+                            setLinks={setSnapshotEntityWikiLinks}
+                        />
+                        {!wikiOnly && selectedFeature ? (
                             <SelectedGeometryPanel
                                 selectedFeature={selectedFeature}
                                 selectedFeatureEntitySummary={
@@ -807,24 +1367,12 @@ export default function Page() {
                                 entities={entities}
                                 selectedGeometryEntityIds={selectedGeometryEntityIds}
                                 onEntityIdsChange={handleEntityIdsChange}
-                                entitySearchQuery={entitySearchQuery}
-                                onEntitySearchQueryChange={setEntitySearchQuery}
-                                entitySearchResults={entitySearchResults}
-                                selectedSearchEntityId={selectedSearchEntityId}
-                                onSelectSearchEntityId={setSelectedSearchEntityId}
-                                onAddSelectedSearchEntity={handleAddSelectedSearchEntity}
-                                isEntitySearchLoading={isEntitySearchLoading}
-                                entityForm={entityForm}
-                                onEntityFormChange={handleEntityFormChange}
                                 entityTypeOptions={ENTITY_TYPE_OPTIONS}
                                 geometryMetaForm={geometryMetaForm}
                                 onGeometryMetaFormChange={handleGeometryMetaFormChange}
                                 isEntitySubmitting={isEntitySubmitting}
-                                onCreateEntityOnly={handleCreateEntityOnly}
                                 onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
-                                onApplyEntitiesForSelectedGeometry={featureCommands.applyEntitiesToSelectedGeometry}
                                 changeCount={editor.changeCount}
-                                entityFormStatus={entityFormStatus}
                             />
                         ) : null}
                     </div>
@@ -832,6 +1380,59 @@ export default function Page() {
             />
         </div>
     );
+}
+
+function ResizeHandle({
+    onDrag,
+    title,
+}: {
+    onDrag: (deltaX: number) => void;
+    title: string;
+}) {
+    const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+        // Only horizontal resize
+        event.preventDefault();
+        const startX = event.clientX;
+        let lastX = startX;
+
+        const onMove = (e: PointerEvent) => {
+            const dx = e.clientX - lastX;
+            if (dx !== 0) {
+                onDrag(dx);
+                lastX = e.clientX;
+            }
+        };
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+    };
+
+    return (
+        <div
+            role="separator"
+            aria-orientation="vertical"
+            title={title}
+            onPointerDown={handlePointerDown}
+            style={{
+                width: 6,
+                cursor: "col-resize",
+                background: "rgba(148, 163, 184, 0.08)",
+                borderLeft: "1px solid rgba(148, 163, 184, 0.18)",
+                borderRight: "1px solid rgba(148, 163, 184, 0.18)",
+                flex: "0 0 auto",
+            }}
+        />
+    );
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
 }
 
 function normalizeEditorUserId(value: string): string {
@@ -843,11 +1444,83 @@ function formatCommitTitle(commit: SectionCommit): string {
     return commit.edit_summary?.trim() || `Commit ${commit.id.slice(0, 8)}`;
 }
 
-function getAllowedEntityTypeGroupIdsForFeature(feature: Feature): EntityTypeGroupId[] {
-    const defaultTypeId = getDefaultTypeIdForFeature(feature);
-    const defaultTypeOption = findEntityTypeOption(defaultTypeId);
-    if (defaultTypeOption) {
-        return [defaultTypeOption.groupId];
+function isFeatureVisibleAtYear(feature: Feature, year: number): boolean {
+    const start = feature.properties.time_start;
+    const end = feature.properties.time_end;
+    if (typeof start === "number" && Number.isFinite(start) && year < start) return false;
+    if (typeof end === "number" && Number.isFinite(end) && year > end) return false;
+    return true;
+}
+
+function normalizeWikisForCompare(input: WikiSnapshot[] | null | undefined) {
+    const list = Array.isArray(input) ? input : [];
+    const normalized = list
+        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+        .filter((w) => {
+            if (w.source === "ref") return true;
+            if (w.operation === "create" || w.operation === "update" || w.operation === "delete") return true;
+            const title = typeof w.title === "string" ? w.title.trim() : "";
+            const doc = typeof w.doc === "string" ? w.doc.trim() : "";
+            return title.length > 0 || (w.doc !== null && doc.length > 0);
+        })
+        .map((w) => ({
+            id: w.id,
+            source: w.source,
+            title: typeof w.title === "string" ? w.title.trim() : "",
+            slug: typeof w.slug === "string" ? w.slug : null,
+            doc: w.doc === null ? null : typeof w.doc === "string" ? w.doc.trim() : null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    return normalized;
+}
+
+function normalizeEntitiesForCompare(input: EntitySnapshot[] | null | undefined) {
+    const list = Array.isArray(input) ? input : [];
+    const normalized = list
+        .filter((e) => e && (typeof e.id === "string" || typeof e.id === "number"))
+        .map((e) => ({
+            id: String(e.id),
+            source: e.source,
+            name: typeof e.name === "string" ? e.name.trim() : "",
+            slug: typeof e.slug === "string" ? e.slug : null,
+            description: e.description == null ? null : String(e.description),
+            status: typeof e.status === "number" ? e.status : null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    return normalized;
+}
+
+function normalizeEntityWikiLinksForCompare(input: Array<{ entity_id: string; wiki_id: string; operation?: string }> | null | undefined) {
+    const list = Array.isArray(input) ? input : [];
+    const normalized = list
+        .filter((l) => l && typeof l.entity_id === "string" && typeof l.wiki_id === "string")
+        .map((l) => ({
+            entity_id: l.entity_id,
+            wiki_id: l.wiki_id,
+            operation: l.operation === "delete" ? "delete" : "binding",
+        }))
+        .sort((a, b) => (a.entity_id + a.wiki_id).localeCompare(b.entity_id + b.wiki_id));
+    return normalized;
+}
+
+function normalizeGeoSearchGeometry(value: unknown): Geometry | null {
+    if (!value || typeof value !== "object") return null;
+    const g = value as Record<string, unknown>;
+    if (typeof g.type !== "string") return null;
+    if (!("coordinates" in g)) return null;
+    return value as Geometry;
+}
+
+function normalizeGeoSearchBindingIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+    for (const rawId of value) {
+        if (typeof rawId !== "string" && typeof rawId !== "number") continue;
+        const id = String(rawId).trim();
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        deduped.push(id);
     }
-    return ["polygon"];
+    return deduped;
 }

@@ -3,7 +3,7 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 
 export function useWikiSessionState() {
-  const [wikis, setWikis] = useState<WikiSnapshot[]>([]);
-  const [entityWikiLinks, setEntityWikiLinks] = useState<EntityWikiLinkSnapshot[]>([]);
-  return { wikis, setWikis, entityWikiLinks, setEntityWikiLinks };
+  const [snapshotWikis, setSnapshotWikis] = useState<WikiSnapshot[]>([]);
+  const [snapshotEntityWikiLinks, setSnapshotEntityWikiLinks] = useState<EntityWikiLinkSnapshot[]>([]);
+  return { snapshotWikis, setSnapshotWikis, snapshotEntityWikiLinks, setSnapshotEntityWikiLinks };
 }

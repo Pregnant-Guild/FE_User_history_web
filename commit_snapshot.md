@@ -88,7 +88,6 @@ export type EntitySnapshot = {
   name?: string;
   slug?: string | null;
   description?: string | null;
-  type_id?: string | null;
   status?: number | null;
   base_updated_at?: string;
   base_hash?: string;
@@ -178,7 +177,7 @@ FE hiện tại luôn ghi `source` cho `entities[]`, `geometries[]`, `wikis[]`.
 
 `geometry_entity[]` không có `operation` (join table state).
 
-`entity_wiki[]` dùng `operation:"reference"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
+`entity_wiki[]` dùng `operation:"binding"|"delete"` để biểu diễn link/unlink **trong snapshot** (không phải delete trong DB).
 
 ## 3) Ý Nghĩa Từng Phần
 
@@ -254,8 +253,8 @@ Join table many-to-many giữa geometry và entity. Mỗi cặp geometry↔entit
 
 Danh sách wiki của project tại thời điểm commit:
 
-- Wiki tạo mới: `source:"inline"`, `operation:"create"`, `doc` là tiptap JSON.
-- Wiki sửa: `source:"inline"`, `operation:"update"`, `doc` là tiptap JSON.
+- Wiki tạo mới: `source:"inline"`, `operation:"create"`, `doc` là HTML string (Quill).
+- Wiki sửa: `source:"inline"`, `operation:"update"`, `doc` là HTML string (Quill).
 - Wiki không đổi: thường không có `operation`.
 - Wiki add từ search (wiki đã có trong DB): `source:"ref"`, `operation:"reference"`, `doc` có thể là `null`.
 
@@ -265,13 +264,17 @@ Danh sách wiki của project tại thời điểm commit:
 export type EntityWikiLinkSnapshot = {
   entity_id: string;
   wiki_id: string;
-  operation?: "reference" | "delete";
+  // New semantics:
+  // - binding: link active
+  // - delete: link removed in this snapshot
+  // Backwards-compat: older snapshots may use "reference" meaning link active.
+  operation?: "binding" | "delete" | "reference";
 };
 ```
 
 Toggle link trong UI:
 
-- Tick checkbox: `{ operation: "reference" }`
+- Toggle ON (bind): `{ operation: "binding" }` (or legacy `"reference"`)
 - Untick checkbox: `{ operation: "delete" }`
 
 ## 4) Ví Dụ JSON (rút gọn)
@@ -296,7 +299,7 @@ Toggle link trong UI:
   },
   "entities": [
     { "id": "e_2", "source": "ref", "name": "Pinned Entity" },
-    { "id": "e_1", "source": "ref", "operation": "reference", "name": "Ha Noi", "type_id": "city", "status": 1 }
+    { "id": "e_1", "source": "ref", "operation": "reference", "name": "Ha Noi", "status": 1 }
   ],
   "geometries": [
     {
@@ -314,14 +317,14 @@ Toggle link trong UI:
   "geometry_entity": [
     { "geometry_id": "g_1", "entity_id": "e_1" }
   ],
-  "wikis": [
-    {
-      "id": "w_inline_1",
-      "source": "inline",
-      "operation": "create",
-      "title": "Overview",
-      "doc": { "type": "doc", "content": [{ "type": "paragraph" }] }
-    },
+	  "wikis": [
+	    {
+	      "id": "w_inline_1",
+	      "source": "inline",
+	      "operation": "create",
+	      "title": "Overview",
+	      "doc": "<p>Overview</p>"
+	    },
     {
       "id": "019d...wiki_from_db",
       "source": "ref",
@@ -330,11 +333,11 @@ Toggle link trong UI:
       "doc": null
     }
   ],
-  "entity_wiki": [
-    { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "reference" }
-  ]
-}
-```
+	  "entity_wiki": [
+	    { "entity_id": "e_1", "wiki_id": "w_inline_1", "operation": "binding" }
+	  ]
+	}
+	```
 
 ## 5) Notes Cho BackEnd (Normalize + Compat)
 
@@ -342,9 +345,9 @@ BE nên normalize trước khi convert snapshot → DB:
 
 - Ignore toàn bộ field entity denormalize trên `feature.properties` (nếu có): `entity_id/entity_ids/entity_name/entity_names/entity_type_id`. Quan hệ geometry↔entity lấy từ `geometry_entity[]`.
 - `entity_wiki[].operation`:
-  - `"reference"`: link active
+  - `"binding"` (or legacy `"reference"`): link active
   - `"delete"`: link removed trong snapshot
-  - missing: treat as `"reference"` (compat)
+  - missing: treat as `"binding"` (compat)
 
 ## 6) Legacy Compatibility (nếu gặp snapshot cũ)
 
@@ -352,4 +355,4 @@ FE đã từng gửi các field legacy; BE có thể gặp nếu đang xử lý 
 
 - `entity_wikis` (plural) thay vì `entity_wiki` (singular): treat như nhau.
 - `ref:{id}` trong `entities/geometries/wikis`: ignore (id canonical).
-- `is_deleted` trong join table entity↔wiki: map sang `operation:"delete"` khi `is_deleted==1`, ngược lại `"reference"`.
+- `is_deleted` trong join table entity↔wiki: map sang `operation:"delete"` khi `is_deleted==1`, ngược lại `"binding"` (or legacy `"reference"`).

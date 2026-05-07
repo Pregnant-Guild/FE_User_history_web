@@ -39,18 +39,26 @@ export function useFeatureCommands(options: Options) {
         setEntityFormStatus,
     } = options;
 
-    const applyGeometryMetadata = useCallback(async () => {
+    const applyGeometryMetadata = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
         if (!selectedFeature) {
-            setEntityFormStatus("Hãy chọn một geometry trước.");
-            return;
+            const msg = "Hãy chọn một geometry trước.";
+            setEntityFormStatus(msg);
+            return { ok: false, error: msg };
+        }
+
+        if (!geometryMetaForm.time_start.trim() || !geometryMetaForm.time_end.trim()) {
+            const msg = "time_start và time_end là bắt buộc.";
+            setEntityFormStatus(msg);
+            return { ok: false, error: msg };
         }
 
         let metadata;
         try {
             metadata = buildGeometryMetadataPatch(geometryMetaForm);
         } catch (err) {
-            setEntityFormStatus(err instanceof Error ? err.message : "Thời gian không hợp lệ.");
-            return;
+            const msg = err instanceof Error ? err.message : "Thời gian không hợp lệ.";
+            setEntityFormStatus(msg);
+            return { ok: false, error: msg };
         }
 
         setIsEntitySubmitting(true);
@@ -59,6 +67,7 @@ export function useFeatureCommands(options: Options) {
             editor.patchFeatureProperties(selectedFeature.properties.id, metadata.patch);
             setGeometryMetaForm(metadata.formState);
             setEntityFormStatus("Đã cập nhật thuộc tính GEO. Commit khi sẵn sàng.");
+            return { ok: true };
         } finally {
             setIsEntitySubmitting(false);
         }
@@ -111,4 +120,3 @@ export function useFeatureCommands(options: Options) {
         applyEntitiesToSelectedGeometry,
     };
 }
-

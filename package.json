@@ -3,7 +3,7 @@
   "version": "2.2.3",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node ./scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
@@ -31,7 +31,6 @@
     "next": "^16.1.6",
     "react": "^19.2.0",
     "react-apexcharts": "^1.8.0",
-    "react-d3-tree": "^3.6.6",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.2.0",
