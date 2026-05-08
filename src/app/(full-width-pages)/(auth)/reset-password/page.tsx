@@ -42,7 +42,7 @@ export default function ResetPasswordForm() {
 
     try {
       setLoading(true);
-      await apiCreateOTP(email);
+      await apiCreateOTP(email, 1);
       toast.success("Mã OTP đã được gửi đến email của bạn!");
       setStep(2);
     } catch (error) {
@@ -69,7 +69,7 @@ export default function ResetPasswordForm() {
     try {
       setLoading(true);
 
-      const verifyRes = await apiVerifyOTP(email, otp);
+      const verifyRes = await apiVerifyOTP(email, otp, 1);
       const tokenId = verifyRes?.data?.token_id;
       
       if (!tokenId) {
