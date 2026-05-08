@@ -61,6 +61,10 @@ export type GeometrySnapshot = {
 export type GeometryEntitySnapshot = {
     geometry_id: string;
     entity_id: string;
+    // Relationship semantics (geometry ↔ entity).
+    // - reference/binding: the link exists (assigned)
+    // - delete: the link is removed
+    operation?: "reference" | "binding" | "delete";
     base_links_hash?: string;
 };
 

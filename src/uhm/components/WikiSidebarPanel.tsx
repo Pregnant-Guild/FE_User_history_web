@@ -11,6 +11,7 @@ import Label from "@/components/form/Label";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { newId } from "@/uhm/lib/id";
 import type ReactQuill from "react-quill-new";
+import { checkWikiSlugExists } from "@/uhm/api/wikis";
 
 type ReactQuillProps = ComponentProps<typeof ReactQuill>;
 
@@ -35,12 +36,19 @@ function clampTitle(title: string) {
 export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen, requestedActiveId }: Props) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const activeWiki = useMemo(() => wikis.find((w) => w.id === activeId) || null, [activeId, wikis]);
 
   const [wikiTitle, setWikiTitle] = useState("");
+  const [wikiSlug, setWikiSlug] = useState("");
   const [wikiDocHtml, setWikiDocHtml] = useState("");
+  const [wikiSaveError, setWikiSaveError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
+  const [createSlug, setCreateSlug] = useState("");
+  const [createSlugTouched, setCreateSlugTouched] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCheckingCreateSlug, setIsCheckingCreateSlug] = useState(false);
 
   useEffect(() => {
     if (!autoOpen) return;
@@ -60,8 +68,10 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     if (!open) return;
 
     setWikiTitle(activeWiki?.title || "");
+    setWikiSlug(typeof activeWiki?.slug === "string" ? activeWiki.slug : "");
     setWikiDocHtml(normalizeWikiDocForQuill(activeWiki?.doc || null));
-  }, [activeWiki?.doc, activeWiki?.title, open]);
+    setWikiSaveError(null);
+  }, [activeWiki?.doc, activeWiki?.slug, activeWiki?.title, open]);
 
   const ensureActive = () => {
     if (activeId && wikis.some((w) => w.id === activeId)) return;
@@ -81,6 +91,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         source: "inline",
         operation: "create",
         title: "Untitled wiki",
+        slug: null,
         doc: "",
         updated_at: new Date().toISOString(),
       };
@@ -90,7 +101,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     setOpen(true);
   };
 
-  const createWikiAndOpen = (title?: string) => {
+  const createWikiAndOpen = (title?: string, slug?: string | null) => {
     const id = newId();
     const seedTitle = clampTitle(title || "Untitled wiki");
     const seed: WikiSnapshot = {
@@ -98,6 +109,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
       source: "inline",
       operation: "create",
       title: seedTitle,
+      slug: slug ?? null,
       doc: "",
       updated_at: new Date().toISOString(),
     };
@@ -106,15 +118,63 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     setOpen(true);
   };
 
+  const handleCreateWikiFromPanel = async () => {
+    const title = clampTitle(createTitle);
+    const slug = normalizeWikiSlugInput(createSlug);
+    if (!slug) {
+      setCreateError("Slug la bat buoc. Hay thu mot slug khac.");
+      return;
+    }
+
+    setIsCheckingCreateSlug(true);
+    setCreateError(null);
+    try {
+      const exists = await checkWikiSlugExists(slug);
+      if (exists) {
+        setCreateError("Slug da ton tai. Hay thu slug khac.");
+        return;
+      }
+      createWikiAndOpen(title, slug);
+      setCreateTitle("");
+      setCreateSlug("");
+      setCreateSlugTouched(false);
+      setIsCreateOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Khong check duoc slug.";
+      setCreateError(msg);
+    } finally {
+      setIsCheckingCreateSlug(false);
+    }
+  };
+
   const removeWiki = (id: string) => {
     setWikis((prev) => prev.filter((w) => w.id !== id));
     if (activeId === id) setActiveId(null);
   };
 
-  const saveWiki = () => {
+  const saveWiki = async () => {
     if (!activeId) return;
     const payload = wikiDocHtml;
     const nextTitle = clampTitle(wikiTitle);
+    const nextSlug = normalizeWikiSlugInput(wikiSlug);
+
+    const current = wikis.find((w) => w.id === activeId) || null;
+    // Check uniqueness only when creating a brand-new wiki.
+    if (current?.operation === "create" && nextSlug) {
+      try {
+        const exists = await checkWikiSlugExists(nextSlug);
+        if (exists) {
+          setWikiSaveError("Slug da ton tai. Hay thu slug khac.");
+          return;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Khong check duoc slug.";
+        setWikiSaveError(msg);
+        return;
+      }
+    }
+
+    setWikiSaveError(null);
     setWikis((prev) =>
           prev.map((w) =>
             w.id !== activeId
@@ -124,6 +184,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
                   source: w.source,
                   operation: w.operation === "create" ? "create" : "update",
                   title: nextTitle,
+                  slug: nextSlug,
                   doc: payload,
                   updated_at: new Date().toISOString(),
             }
@@ -143,10 +204,33 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontWeight: 700, fontSize: "14px" }}>Wiki</div>
-        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{wikis.length}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{wikis.length}</div>
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Mo panel" : "Thu gon panel"}
+            aria-label={collapsed ? "Mo panel Wiki" : "Thu gon panel Wiki"}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              border: "1px solid #334155",
+              background: "#0b1220",
+              color: "#e2e8f0",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "0 0 auto",
+            }}
+          >
+            {collapsed ? <PlusIcon /> : <MinusIcon />}
+          </button>
+        </div>
       </div>
 
-      {wikis.length ? (
+      {collapsed ? null : wikis.length ? (
         <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
           {wikis.slice(0, 8).map((w) => (
             <div
@@ -211,6 +295,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         </div>
       )}
 
+      {collapsed ? null : (
       <div
         style={{
           marginTop: "10px",
@@ -228,7 +313,17 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           </div>
           <button
             type="button"
-            onClick={() => setIsCreateOpen((v) => !v)}
+            onClick={() =>
+              setIsCreateOpen((v) => {
+                const next = !v;
+                if (next) {
+                  setCreateError(null);
+                  setIsCheckingCreateSlug(false);
+                  setCreateSlugTouched(false);
+                }
+                return next;
+              })
+            }
             title={isCreateOpen ? "Dong" : "Mo"}
             aria-label={isCreateOpen ? "Dong tao wiki" : "Mo tao wiki"}
             style={{
@@ -253,8 +348,35 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           <>
             <input
               value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)}
+              onChange={(e) => {
+                const nextTitle = e.target.value;
+                setCreateTitle(nextTitle);
+                setCreateError(null);
+                if (!createSlugTouched) {
+                  setCreateSlug(slugifyWikiTitle(nextTitle));
+                }
+              }}
               placeholder="Tieu de wiki"
+              disabled={isCheckingCreateSlug}
+              style={{
+                width: "100%",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                background: "#111827",
+                color: "#f8fafc",
+                padding: "6px 8px",
+                fontSize: "13px",
+              }}
+            />
+            <input
+              value={createSlug}
+              onChange={(e) => {
+                setCreateSlugTouched(true);
+                setCreateSlug(e.target.value);
+                setCreateError(null);
+              }}
+              placeholder="Slug"
+              disabled={isCheckingCreateSlug}
               style={{
                 width: "100%",
                 borderRadius: "6px",
@@ -267,26 +389,30 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
             />
             <button
               type="button"
-              onClick={() => {
-                createWikiAndOpen(createTitle);
-                setCreateTitle("");
-                setIsCreateOpen(false);
-              }}
+              onClick={handleCreateWikiFromPanel}
+              disabled={isCheckingCreateSlug}
               style={{
                 border: "none",
                 borderRadius: "6px",
                 padding: "7px 8px",
-                cursor: "pointer",
+                cursor: isCheckingCreateSlug ? "not-allowed" : "pointer",
                 background: "#2563eb",
                 color: "#ffffff",
                 fontWeight: 600,
+                opacity: isCheckingCreateSlug ? 0.7 : 1,
               }}
             >
               Tạo wiki mới
             </button>
+            {createError ? (
+              <div style={{ color: "#fca5a5", fontSize: 12 }}>
+                {createError}
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
+      )}
 
       <Modal
         isOpen={open}
@@ -349,6 +475,21 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
                     disabled={!activeId}
                   />
                 </div>
+                <div>
+                  <Label>Slug</Label>
+                  <input
+                    value={wikiSlug}
+                    onChange={(e) => setWikiSlug(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:focus:border-brand-800"
+                    placeholder="wiki-slug"
+                    disabled={!activeId}
+                  />
+                </div>
+                {wikiSaveError ? (
+                  <div className="text-xs text-red-600 dark:text-red-300">
+                    {wikiSaveError}
+                  </div>
+                ) : null}
 
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117] overflow-hidden">
                   <ReactQuillEditor
@@ -378,6 +519,14 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 5v14M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -422,6 +571,24 @@ function normalizeWikiDocForQuill(doc: string | null): string {
 
   // Unknown plaintext: treat as plain text.
   return `<p>${escapeHtml(raw).replace(/\n/g, "<br/>")}</p>`;
+}
+
+function normalizeWikiSlugInput(raw: string): string | null {
+  const s = raw.trim();
+  return s.length ? s : null;
+}
+
+function slugifyWikiTitle(raw: string): string {
+  const input = String(raw || "").trim();
+  if (!input.length) return "";
+  return input
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "")
+    .slice(0, 80);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

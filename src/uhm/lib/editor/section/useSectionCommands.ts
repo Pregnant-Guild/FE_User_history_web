@@ -11,7 +11,7 @@ import {
 } from "@/uhm/api/sections";
 import { buildEditorSnapshot, normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
-import type { Feature, FeatureCollection, FeatureId } from "@/uhm/types/geo";
+import type { Feature, FeatureCollection, FeatureId, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { EditorSnapshot, Section, SectionCommit, SectionState, EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
@@ -306,6 +306,8 @@ function toEditorSessionSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
     return {
         ...snapshot,
         entities: toEditorSessionEntities(snapshot.entities),
+        geometries: toEditorSessionGeometries(snapshot.geometries),
+        geometry_entity: toEditorSessionGeometryEntity(snapshot.geometry_entity),
         wikis: toEditorSessionWikis(snapshot.wikis),
         entity_wiki: toEditorSessionEntityWikiLinks(snapshot.entity_wiki),
     };
@@ -315,6 +317,7 @@ function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnaps
     const rows = Array.isArray(input) ? input : [];
     return rows
         .filter((e) => e && (typeof e.id === "string" || typeof e.id === "number"))
+        .filter((e) => (e as any).operation !== "delete")
         .map((e) => {
             const { operation: _op, ...rest } = e;
             const id = String(e.id);
@@ -328,10 +331,52 @@ function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnaps
         });
 }
 
+function toEditorSessionGeometries(input: EditorSnapshot["geometries"]): GeometrySnapshot[] {
+    const rows = Array.isArray(input) ? input : [];
+    return rows
+        .filter((g) => g && (typeof (g as any).id === "string" || typeof (g as any).id === "number"))
+        .filter((g) => (g as any).operation !== "delete")
+        .map((g) => {
+            const { operation: _op, ...rest } = g as any;
+            const id = String((g as any).id);
+            const source: GeometrySnapshot["source"] = (g as any).source === "inline" ? "inline" : "ref";
+            return {
+                ...(rest as Omit<GeometrySnapshot, "id" | "source" | "operation">),
+                id,
+                source,
+                operation: "reference",
+            };
+        });
+}
+
+function toEditorSessionGeometryEntity(input: EditorSnapshot["geometry_entity"]): GeometryEntitySnapshot[] {
+    const rows = Array.isArray(input) ? input : [];
+    const deduped = new globalThis.Map<string, GeometryEntitySnapshot>();
+    for (const row of rows) {
+        if (!row) continue;
+        if ((row as any).operation === "delete") continue;
+        const geometry_id = typeof (row as any).geometry_id === "string" || typeof (row as any).geometry_id === "number"
+            ? String((row as any).geometry_id).trim()
+            : "";
+        const entity_id = typeof (row as any).entity_id === "string" || typeof (row as any).entity_id === "number"
+            ? String((row as any).entity_id).trim()
+            : "";
+        if (!geometry_id || !entity_id) continue;
+        const key = `${geometry_id}::${entity_id}`;
+        deduped.set(key, { geometry_id, entity_id, operation: "reference", base_links_hash: (row as any).base_links_hash });
+    }
+    return Array.from(deduped.values()).sort((a, b) => {
+        const g = a.geometry_id.localeCompare(b.geometry_id);
+        if (g !== 0) return g;
+        return a.entity_id.localeCompare(b.entity_id);
+    });
+}
+
 function toEditorSessionWikis(input: EditorSnapshot["wikis"]): WikiSnapshot[] {
     const rows = Array.isArray(input) ? input : [];
     return rows
         .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
+        .filter((w) => (w as any).operation !== "delete")
         .map((w) => {
             const { operation: _op, ...rest } = w;
             const source: WikiSnapshot["source"] = w.source === "inline" ? "inline" : "ref";
@@ -353,7 +398,7 @@ function toEditorSessionEntityWikiLinks(input: EditorSnapshot["entity_wiki"]): E
         const wiki_id = row.wiki_id.trim();
         if (!entity_id || !wiki_id) continue;
         const key = `${entity_id}::${wiki_id}`;
-        deduped.set(key, { entity_id, wiki_id, operation: "binding" });
+        deduped.set(key, { entity_id, wiki_id, operation: "reference" });
     }
     return Array.from(deduped.values()).sort((a, b) => {
         const e = a.entity_id.localeCompare(b.entity_id);

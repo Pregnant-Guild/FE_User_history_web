@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Entity } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
@@ -23,6 +23,7 @@ function wikiTitle(w: WikiSnapshot): string {
 export default function EntityWikiBindingsPanel({ entities, wikis, links, setLinks }: Props) {
   const [activeEntityId, setActiveEntityId] = useState<string>("");
   const [activeWikiId, setActiveWikiId] = useState<string>("");
+  const [collapsed, setCollapsed] = useState(false);
 
   const wikiChoices: WikiChoice[] = useMemo(
     () =>
@@ -37,6 +38,17 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     cleaned.sort((a, b) => a.name.localeCompare(b.name));
     return cleaned;
   }, [entities]);
+
+  // Don't auto-select entity. The user must explicitly pick one.
+  // Only clear the selection if the currently selected entity is no longer available.
+  useEffect(() => {
+    if (!activeEntityId) return;
+    const stillExists = entityChoices.some((e) => e.id === activeEntityId);
+    if (!stillExists) {
+      setActiveEntityId("");
+      setActiveWikiId("");
+    }
+  }, [activeEntityId, entityChoices]);
 
   const activeLinks = useMemo(() => {
     const set = new Set<string>();
@@ -54,23 +66,16 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     if (!id) return;
 
     setLinks((prev) => {
-      const next = [...prev];
-      const idx = next.findIndex((l) => l.entity_id === activeEntityId && l.wiki_id === id);
-      if (idx >= 0) {
-        const existing = next[idx];
-        const currentlyOn = existing.operation !== "delete";
-        next[idx] = {
-          ...existing,
-          operation: currentlyOn ? "delete" : "binding",
-        };
-        return next;
+      const idx = prev.findIndex((l) => l.entity_id === activeEntityId && l.wiki_id === id);
+      // If link exists (reference/binding), unlink by removing the row entirely.
+      if (idx >= 0 && prev[idx]?.operation !== "delete") {
+        return prev.filter((_, i) => i !== idx);
       }
-      next.push({
-        entity_id: activeEntityId,
-        wiki_id: id,
-        operation: "binding",
-      });
-      return next;
+      // If link doesn't exist, add as a new binding (create for relation).
+      return [
+        ...prev.filter((l) => !(l.entity_id === activeEntityId && l.wiki_id === id)),
+        { entity_id: activeEntityId, wiki_id: id, operation: "binding" },
+      ];
     });
   };
 
@@ -88,10 +93,34 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontWeight: 700, fontSize: "14px" }}>Entity ↔ Wiki</div>
-        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{links.length}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{links.length}</div>
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              border: "1px solid #334155",
+              background: "#0b1220",
+              color: "#e2e8f0",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "0 0 auto",
+            }}
+            title={collapsed ? "Mo panel" : "Thu gon panel"}
+            aria-label={collapsed ? "Mo panel Entity Wiki" : "Thu gon panel Entity Wiki"}
+          >
+            {collapsed ? <PlusIcon /> : <MinusIcon />}
+          </button>
+        </div>
       </div>
 
-      <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+      {collapsed ? null : (
+        <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
         <div>
           <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>Entity</div>
           <select
@@ -247,6 +276,23 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
           </div>
         </div>
       </div>
+      )}
     </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }

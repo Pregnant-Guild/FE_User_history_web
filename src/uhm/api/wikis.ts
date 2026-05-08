@@ -28,3 +28,23 @@ export async function fetchWikiById(id: string): Promise<Wiki> {
   return requestJson<Wiki>(`${API_ENDPOINTS.wikis}/${encodeURIComponent(wikiId)}`);
 }
 
+export async function checkWikiSlugExists(slug: string): Promise<boolean> {
+  const value = String(slug || "").trim();
+  if (!value.length) return false;
+
+  const params = new URLSearchParams({ slug: value });
+  const url = `${API_ENDPOINTS.wikis}/slug/exists?${params.toString()}`;
+  const payload = await requestJson<unknown>(url);
+
+  if (typeof payload === "boolean") return payload;
+  if (payload && typeof payload === "object") {
+    const anyPayload = payload as any;
+    if (typeof anyPayload.exists === "boolean") return anyPayload.exists;
+    if (typeof anyPayload.exists === "number") return anyPayload.exists !== 0;
+    if (typeof anyPayload.is_exists === "boolean") return anyPayload.is_exists;
+    if (typeof anyPayload.is_exists === "number") return anyPayload.is_exists !== 0;
+  }
+
+  // Be conservative: unknown payload shape, treat as "exists" to prevent creating conflicting slugs.
+  return true;
+}

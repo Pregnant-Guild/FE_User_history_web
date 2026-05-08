@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntityFormState } from "@/uhm/lib/editor/session/sessionTypes";
 
@@ -10,6 +10,7 @@ type Props = {
   onEntityFormChange: (key: keyof EntityFormState, value: string) => void;
   isEntitySubmitting: boolean;
   onCreateEntityOnly: () => void;
+  onUpdateEntity?: (entityId: string, payload: { name: string; description: string | null }) => void;
   entityFormStatus: string | null;
   selectedGeometryEntityIds?: string[];
   hasSelectedGeometry?: boolean;
@@ -22,6 +23,7 @@ export default function ProjectEntityRefsPanel({
   onEntityFormChange,
   isEntitySubmitting,
   onCreateEntityOnly,
+  onUpdateEntity,
   entityFormStatus,
   selectedGeometryEntityIds,
   hasSelectedGeometry,
@@ -32,7 +34,30 @@ export default function ProjectEntityRefsPanel({
     Array.isArray(selectedGeometryEntityIds) &&
     typeof onToggleBindEntityForSelectedGeometry === "function";
 
+  const canEditEntity = typeof onUpdateEntity === "function";
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+
+  const activeEntity = useMemo(
+    () => (activeEntityId ? entityRefs.find((e) => String(e.id) === String(activeEntityId)) || null : null),
+    [activeEntityId, entityRefs]
+  );
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+
+  useEffect(() => {
+    if (!activeEntityId) return;
+    if (!entityRefs.some((e) => String(e.id) === String(activeEntityId))) {
+      setActiveEntityId(null);
+    }
+  }, [activeEntityId, entityRefs]);
+
+  useEffect(() => {
+    if (!activeEntity) return;
+    setEditName(typeof activeEntity.name === "string" ? activeEntity.name : "");
+    setEditDescription(activeEntity.description == null ? "" : String(activeEntity.description));
+  }, [activeEntity?.description, activeEntity?.id, activeEntity?.name]);
 
   return (
     <div
@@ -45,10 +70,33 @@ export default function ProjectEntityRefsPanel({
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontWeight: 700, fontSize: "14px" }}>Entities</div>
-        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{entityRefs.length}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{entityRefs.length}</div>
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Mo panel" : "Thu gon panel"}
+            aria-label={collapsed ? "Mo panel Entities" : "Thu gon panel Entities"}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              border: "1px solid #334155",
+              background: "#0b1220",
+              color: "#e2e8f0",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "0 0 auto",
+            }}
+          >
+            {collapsed ? <PlusIcon /> : <MinusIcon />}
+          </button>
+        </div>
       </div>
 
-      {entityRefs.length ? (
+      {collapsed ? null : entityRefs.length ? (
         <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
           {entityRefs.slice(0, 8).map((e) => (
             <div
@@ -56,21 +104,35 @@ export default function ProjectEntityRefsPanel({
               style={{
                 padding: "8px",
                 borderRadius: "6px",
-                border: "1px solid #1f2937",
+                border: activeEntityId === String(e.id) ? "1px solid #2563eb" : "1px solid #1f2937",
                 background: "transparent",
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
               }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <button
+                type="button"
+                onClick={() => setActiveEntityId(String(e.id))}
+                title="Chon de sua"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  textAlign: "left",
+                  border: "none",
+                  background: "transparent",
+                  padding: 0,
+                  cursor: canEditEntity ? "pointer" : "default",
+                }}
+                disabled={!canEditEntity}
+              >
                 <div style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {e.name || e.id}
                 </div>
                 <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {e.id}
                 </div>
-              </div>
+              </button>
               {canBindToggle ? (
                 <button
                   type="button"
@@ -114,6 +176,85 @@ export default function ProjectEntityRefsPanel({
         <div style={{ marginTop: "10px", fontSize: "12px", color: "#94a3b8" }}>No entity ref yet for this project.</div>
       )}
 
+      {collapsed ? null : canEditEntity && activeEntity ? (
+        <div
+          style={{
+            marginTop: "10px",
+            display: "grid",
+            gap: "8px",
+            border: "1px solid #0f766e",
+            borderRadius: "8px",
+            padding: "8px",
+            background: "#0f172a",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ color: "#a7f3d0", fontWeight: 700, fontSize: "12px" }}>
+              Sua entity
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveEntityId(null)}
+              title="Dong"
+              aria-label="Dong sua entity"
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 6,
+                border: "1px solid #334155",
+                background: "#0b1220",
+                color: "#e2e8f0",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "0 0 auto",
+              }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+
+          <div style={{ fontSize: 11, color: "#94a3b8", overflowWrap: "anywhere" }}>
+            {String(activeEntity.id)}
+          </div>
+          <input
+            value={editName}
+            onChange={(event) => setEditName(event.target.value)}
+            placeholder="Ten entity"
+            disabled={isEntitySubmitting}
+            style={entityInputStyle}
+          />
+          <input
+            value={editDescription}
+            onChange={(event) => setEditDescription(event.target.value)}
+            placeholder="Description"
+            disabled={isEntitySubmitting}
+            style={entityInputStyle}
+          />
+
+          <button
+            type="button"
+            onClick={() => onUpdateEntity!(String(activeEntity.id), { name: editName, description: editDescription.trim().length ? editDescription : null })}
+            disabled={isEntitySubmitting}
+            style={{
+              border: "none",
+              borderRadius: "6px",
+              padding: "7px 8px",
+              cursor: isEntitySubmitting ? "not-allowed" : "pointer",
+              background: "#0f766e",
+              color: "#ffffff",
+              opacity: isEntitySubmitting ? 0.7 : 1,
+              fontWeight: 600,
+            }}
+          >
+            Luu entity
+          </button>
+        </div>
+      ) : null}
+
+      {collapsed ? null : (
+      <>
       <div
         style={{
           marginTop: "10px",
@@ -197,6 +338,8 @@ export default function ProjectEntityRefsPanel({
           {entityFormStatus}
         </div>
       ) : null}
+      </>
+      )}
     </div>
   );
 }
@@ -259,6 +402,14 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 5v14M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

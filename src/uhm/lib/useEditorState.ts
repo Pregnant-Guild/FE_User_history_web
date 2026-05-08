@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type {
     Feature,
     FeatureCollection,
@@ -9,15 +9,27 @@ import { buildInitialMap, deepClone, diffDraftToInitial } from "@/uhm/lib/editor
 import { useDraftState } from "@/uhm/lib/editor/draft/useDraftState";
 import { useUndoStack } from "@/uhm/lib/editor/draft/useUndoStack";
 import type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
+import type { EntitySnapshot } from "@/uhm/types/entities";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 
 export type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
 export type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
+
+type SnapshotUndoApi = {
+    snapshotEntitiesRef: { current: EntitySnapshot[] };
+    setSnapshotEntities: Dispatch<SetStateAction<EntitySnapshot[]>>;
+    snapshotWikisRef: { current: WikiSnapshot[] };
+    setSnapshotWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
+    snapshotEntityWikiLinksRef: { current: EntityWikiLinkSnapshot[] };
+    setSnapshotEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
+};
 
 // State trung tâm của editor:
 // - draft: dữ liệu nguồn để render UI
 // - changes: map các thay đổi chờ lưu
 // - undoStack: lịch sử thao tác tối thiểu để hoàn tác
-export function useEditorState(initialData: FeatureCollection) {
+export function useEditorState(initialData: FeatureCollection, snapshotUndo?: SnapshotUndoApi) {
     const { draft, draftRef, commitDraft, resetDraft } = useDraftState(initialData);
 
     // Map baseline (id -> feature) để diff draft hiện tại ra changes.
@@ -72,10 +84,25 @@ export function useEditorState(initialData: FeatureCollection) {
                 commitDraft({ ...draftRef.current, features: nextFeatures });
                 return true;
             }
+            case "snapshot_entities": {
+                if (!snapshotUndo) return false;
+                snapshotUndo.setSnapshotEntities(deepClone(action.prev));
+                return true;
+            }
+            case "snapshot_wikis": {
+                if (!snapshotUndo) return false;
+                snapshotUndo.setSnapshotWikis(deepClone(action.prev));
+                return true;
+            }
+            case "snapshot_entity_wiki": {
+                if (!snapshotUndo) return false;
+                snapshotUndo.setSnapshotEntityWikiLinks(deepClone(action.prev));
+                return true;
+            }
             default:
                 return false;
         }
-    }, [commitDraft, draftRef]);
+    }, [commitDraft, draftRef, snapshotUndo]);
 
     const { undoStack, pushUndo, undo, clearUndo } = useUndoStack({ applyUndoAction });
 
@@ -169,6 +196,71 @@ export function useEditorState(initialData: FeatureCollection) {
         return initialMapRef.current.has(id);
     }
 
+    const setSnapshotEntitiesUndoable = useCallback((
+        next: SetStateAction<EntitySnapshot[]>,
+        label = "Cập nhật entities"
+    ) => {
+        if (!snapshotUndo) return;
+        snapshotUndo.setSnapshotEntities((prev) => {
+            const prevClone = deepClone(prev);
+            const computed = typeof next === "function" ? (next as (p: EntitySnapshot[]) => EntitySnapshot[])(prev) : next;
+            let changed = true;
+            try {
+                changed = JSON.stringify(prev) !== JSON.stringify(computed);
+            } catch {
+                changed = true;
+            }
+            if (changed) {
+                pushUndo({ type: "snapshot_entities", label, prev: prevClone });
+            }
+            return computed;
+        });
+    }, [pushUndo, snapshotUndo]);
+
+    const setSnapshotWikisUndoable = useCallback((
+        next: SetStateAction<WikiSnapshot[]>,
+        label = "Cập nhật wikis"
+    ) => {
+        if (!snapshotUndo) return;
+        snapshotUndo.setSnapshotWikis((prev) => {
+            const prevClone = deepClone(prev);
+            const computed = typeof next === "function" ? (next as (p: WikiSnapshot[]) => WikiSnapshot[])(prev) : next;
+            let changed = true;
+            try {
+                changed = JSON.stringify(prev) !== JSON.stringify(computed);
+            } catch {
+                changed = true;
+            }
+            if (changed) {
+                pushUndo({ type: "snapshot_wikis", label, prev: prevClone });
+            }
+            return computed;
+        });
+    }, [pushUndo, snapshotUndo]);
+
+    const setSnapshotEntityWikiLinksUndoable = useCallback((
+        next: SetStateAction<EntityWikiLinkSnapshot[]>,
+        label = "Cập nhật entity-wiki"
+    ) => {
+        if (!snapshotUndo) return;
+        snapshotUndo.setSnapshotEntityWikiLinks((prev) => {
+            const prevClone = deepClone(prev);
+            const computed = typeof next === "function"
+                ? (next as (p: EntityWikiLinkSnapshot[]) => EntityWikiLinkSnapshot[])(prev)
+                : next;
+            let changed = true;
+            try {
+                changed = JSON.stringify(prev) !== JSON.stringify(computed);
+            } catch {
+                changed = true;
+            }
+            if (changed) {
+                pushUndo({ type: "snapshot_entity_wiki", label, prev: prevClone });
+            }
+            return computed;
+        });
+    }, [pushUndo, snapshotUndo]);
+
     return {
         draft,
         changes,
@@ -182,5 +274,9 @@ export function useEditorState(initialData: FeatureCollection) {
         buildPayload,
         clearChanges,
         hasPersistedFeature,
+        // Snapshot undo helpers (no-op if snapshotUndo not provided)
+        setSnapshotEntities: setSnapshotEntitiesUndoable,
+        setSnapshotWikis: setSnapshotWikisUndoable,
+        setSnapshotEntityWikiLinks: setSnapshotEntityWikiLinksUndoable,
     };
 }

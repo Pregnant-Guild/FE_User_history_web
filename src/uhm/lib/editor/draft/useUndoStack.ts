@@ -75,6 +75,18 @@ function isSameUndo(a: UndoAction | undefined, b: UndoAction) {
                 JSON.stringify(a.prevProperties) === JSON.stringify(next.prevProperties)
             );
         }
+        case "snapshot_entities": {
+            const next = b as Extract<UndoAction, { type: "snapshot_entities" }>;
+            return a.label === next.label && JSON.stringify(a.prev) === JSON.stringify(next.prev);
+        }
+        case "snapshot_wikis": {
+            const next = b as Extract<UndoAction, { type: "snapshot_wikis" }>;
+            return a.label === next.label && JSON.stringify(a.prev) === JSON.stringify(next.prev);
+        }
+        case "snapshot_entity_wiki": {
+            const next = b as Extract<UndoAction, { type: "snapshot_entity_wiki" }>;
+            return a.label === next.label && JSON.stringify(a.prev) === JSON.stringify(next.prev);
+        }
         default:
             return false;
     }

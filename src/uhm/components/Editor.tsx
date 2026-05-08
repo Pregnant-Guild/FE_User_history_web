@@ -514,6 +514,10 @@ function formatUndoLabel(action: UndoAction) {
             return `Chỉnh sửa #${action.id}`;
         case "properties":
             return `Cập nhật thuộc tính #${action.id}`;
+        case "snapshot_entities":
+        case "snapshot_wikis":
+        case "snapshot_entity_wiki":
+            return action.label;
         default:
             return "Tác vụ";
     }

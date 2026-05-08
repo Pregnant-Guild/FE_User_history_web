@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
@@ -12,7 +12,9 @@ import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Badge from "@/components/ui/badge/Badge";
 import { CreateProjectPayload, Project } from "@/interface/project";
-import { apiCreateProject, getCurrentProject } from "@/service/projectService";
+import { apiCreateProject, apiCreateProjectCommit, apiGetProjectCommits, getCurrentProject } from "@/service/projectService";
+import { normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import type { EditorSnapshot } from "@/uhm/types/sections";
 
 export type ProjectSortColumn = "created_at" | "updated_at" | "title";
 
@@ -21,12 +23,16 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExportingProjectId, setIsExportingProjectId] = useState<string | null>(null);
 
   const [sortBy, setSortBy] = useState<ProjectSortColumn>("updated_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const { isOpen, openModal, closeModal } = useModal();
   const [formData, setFormData] = useState<CreateProjectPayload>({ title: "", description: "", project_status: "PRIVATE" });
+  const importJsonInputRef = useRef<HTMLInputElement | null>(null);
+  const [importSnapshot, setImportSnapshot] = useState<EditorSnapshot | null>(null);
+  const [importSnapshotName, setImportSnapshotName] = useState<string | null>(null);
 
   const fetchProjects = async () => {
     try {
@@ -58,16 +64,117 @@ export default function ProjectsPage() {
     }
     try {
       setIsSubmitting(true);
-      await apiCreateProject(formData);
+      const created = await apiCreateProject(formData);
+      const projectId = created?.data?.id;
       toast.success("Tạo dự án mới thành công!");
       closeModal();
       setFormData({ title: "", description: "", project_status: "PRIVATE" });
+      setImportSnapshot(null);
+      setImportSnapshotName(null);
       fetchProjects(); 
+      if (projectId) router.push(`/editor/${projectId}`);
     } catch (error) {
       console.error("Lỗi tạo dự án:", error);
       toast.error("Có lỗi xảy ra khi tạo dự án.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePickImportJson = () => {
+    importJsonInputRef.current?.click();
+  };
+
+  const handleImportJsonFile = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const raw = JSON.parse(text) as unknown;
+      const normalized = normalizeEditorSnapshot(raw);
+      if (!normalized) {
+        toast.error("JSON snapshot không hợp lệ.");
+        return;
+      }
+      setImportSnapshot(normalized);
+      setImportSnapshotName(file.name);
+      toast.success("Đã nạp JSON snapshot. Bấm 'Tạo với JSON' để khởi tạo dự án.");
+    } catch (err) {
+      console.error("Import JSON failed", err);
+      toast.error("Không đọc được file JSON.");
+    }
+  };
+
+  const handleCreateProjectWithJson = async () => {
+    if (!formData.title.trim()) {
+      toast.warning("Vui lòng nhập tên dự án!");
+      return;
+    }
+    if (!importSnapshot) {
+      toast.warning("Chưa chọn JSON snapshot.");
+      handlePickImportJson();
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      const created = await apiCreateProject(formData);
+      const projectId = created?.data?.id;
+      if (!projectId) {
+        toast.error("Tạo dự án thất bại: thiếu project id.");
+        return;
+      }
+      await apiCreateProjectCommit(projectId, {
+        edit_summary: "Init project from JSON",
+        snapshot_json: importSnapshot as any,
+      } as any);
+      toast.success("Tạo dự án (kèm JSON) thành công!");
+      closeModal();
+      setFormData({ title: "", description: "", project_status: "PRIVATE" });
+      setImportSnapshot(null);
+      setImportSnapshotName(null);
+      fetchProjects();
+      router.push(`/editor/${projectId}`);
+    } catch (error) {
+      console.error("Lỗi tạo dự án với JSON:", error);
+      toast.error("Có lỗi xảy ra khi tạo dự án với JSON.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleExportHeadSnapshot = async (project: Project) => {
+    const projectId = String(project.id || "").trim();
+    if (!projectId) return;
+    const headCommitId = project.latest_commit_id ? String(project.latest_commit_id) : "";
+    if (!headCommitId) {
+      toast.warning("Dự án chưa có head commit để export.");
+      return;
+    }
+    setIsExportingProjectId(projectId);
+    try {
+      const res: any = await apiGetProjectCommits(projectId);
+      const rawList = res?.data?.items ?? res?.data ?? res?.items ?? [];
+      const commits = Array.isArray(rawList) ? rawList : [];
+      const head = commits.find((c: any) => String(c?.id || "") === headCommitId) || null;
+      const snapshot = head?.snapshot_json ?? null;
+      if (!snapshot) {
+        toast.error("Không tìm thấy snapshot_json của head commit.");
+        return;
+      }
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `project-${projectId}-head-${headCommitId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Đã export JSON snapshot.");
+    } catch (err) {
+      console.error("Export snapshot failed", err);
+      toast.error("Export thất bại.");
+    } finally {
+      setIsExportingProjectId(null);
     }
   };
 
@@ -131,6 +238,11 @@ export default function ProjectsPage() {
   };
 
   console.log(projects);
+
+  const importLabel = useMemo(() => {
+    if (!importSnapshotName) return "Chưa chọn JSON snapshot";
+    return `JSON: ${importSnapshotName}`;
+  }, [importSnapshotName]);
 
   return (
     <div className="max-w-7xl mx-auto pb-10">
@@ -224,6 +336,15 @@ export default function ProjectsPage() {
                             onClick={() => router.push(`/editor/${project.id}`)}
                           >
                             Editor
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isExportingProjectId === String(project.id)}
+                            onClick={() => handleExportHeadSnapshot(project)}
+                            title="Export head commit snapshot_json"
+                          >
+                            ExportJSON
                           </Button>
                           <Button
                             size="sm"
@@ -334,10 +455,38 @@ export default function ProjectsPage() {
                 placeholder="Mô tả ngắn gọn về dự án..."
               ></textarea>
             </div>
+            <div>
+              <Label>Khởi tạo từ JSON</Label>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" type="button" onClick={handlePickImportJson}>
+                  Chọn JSON
+                </Button>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {importLabel}
+                </div>
+              </div>
+              <input
+                ref={importJsonInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={(e) => handleImportJsonFile(e.target.files?.[0] || null)}
+              />
+            </div>
             <div className="flex items-center justify-end gap-3 mt-4">
               <Button size="sm" variant="outline" type="button" onClick={closeModal}>Hủy</Button>
               <Button size="sm" type="submit" disabled={isSubmitting} className="bg-brand-500 hover:bg-brand-600 text-white">
                 {isSubmitting ? "Đang tạo..." : "Khởi tạo"}
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                disabled={isSubmitting}
+                className="bg-gray-900 hover:bg-gray-800 text-white"
+                onClick={handleCreateProjectWithJson}
+                title="Tạo dự án và tạo commit đầu tiên từ JSON snapshot"
+              >
+                Tạo với JSON
               </Button>
             </div>
           </form>

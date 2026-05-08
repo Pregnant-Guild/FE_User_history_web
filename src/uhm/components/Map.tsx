@@ -1366,21 +1366,33 @@ function filterDraftByBinding(
     selectedFeatureId: string | number | null
 ): FeatureCollection {
     const selectedId = selectedFeatureId !== null ? String(selectedFeatureId) : null;
-    if (selectedId === null) {
-        return {
-            ...fc,
-            features: fc.features.filter((feature) => !normalizeBindingIds(feature.properties.binding).length),
-        };
+    // Semantics:
+    // - A feature's `binding` is a list of "child" geometry ids.
+    // - Child geometries are hidden by default, and only shown when their parent is selected.
+    const childIds = new Set<string>();
+    for (const feature of fc.features) {
+        for (const id of normalizeBindingIds(feature.properties.binding)) {
+            childIds.add(id);
+        }
     }
+
+    if (selectedId === null) {
+        return { ...fc, features: fc.features.filter((f) => !childIds.has(String(f.properties.id))) };
+    }
+
+    const selectedFeature =
+        fc.features.find((feature) => String(feature.properties.id) === selectedId) || null;
+    const selectedChildren = new Set<string>(
+        normalizeBindingIds(selectedFeature?.properties.binding)
+    );
 
     return {
         ...fc,
         features: fc.features.filter((feature) => {
             const featureId = String(feature.properties.id);
             if (featureId === selectedId) return true;
-            const bindingIds = normalizeBindingIds(feature.properties.binding);
-            if (!bindingIds.length) return true;
-            return bindingIds.includes(selectedId);
+            if (selectedChildren.has(featureId)) return true;
+            return !childIds.has(featureId);
         }),
     };
 }

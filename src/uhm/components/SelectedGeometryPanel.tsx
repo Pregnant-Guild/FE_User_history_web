@@ -41,6 +41,7 @@ export default function SelectedGeometryPanel({
     onApplyGeometryMetadata,
     changeCount,
 }: Props) {
+    const [collapsed, setCollapsed] = useState(false);
     const [geoApplyFeedback, setGeoApplyFeedback] = useState<
         | {
               kind: "ok" | "error";
@@ -99,10 +100,34 @@ export default function SelectedGeometryPanel({
                 border: "1px solid #1f2937",
             }}
         >
-            <div style={{ fontWeight: 700, marginBottom: "8px", fontSize: "14px" }}>
-                Entity & Geometry
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: "8px" }}>
+                <div style={{ fontWeight: 700, fontSize: "14px" }}>
+                    Entity & Geometry
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setCollapsed((v) => !v)}
+                    title={collapsed ? "Mo panel" : "Thu gon panel"}
+                    aria-label={collapsed ? "Mo panel Selected Geometry" : "Thu gon panel Selected Geometry"}
+                    style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 6,
+                        border: "1px solid #334155",
+                        background: "#0b1220",
+                        color: "#e2e8f0",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flex: "0 0 auto",
+                    }}
+                >
+                    {collapsed ? <PlusIcon /> : <MinusIcon />}
+                </button>
             </div>
 
+            {collapsed ? null : (
             <div style={{ display: "grid", gap: "8px", fontSize: "13px" }}>
                 <div style={{ color: "#e2e8f0" }}>
                     ID: {String(selectedFeature.properties.id)}
@@ -231,6 +256,13 @@ export default function SelectedGeometryPanel({
                             disabled={isEntitySubmitting}
                             style={entityInputStyle}
                         />
+                        {/*<input*/}
+                        {/*    value={geometryMetaForm.binding}*/}
+                        {/*    onChange={(event) => onGeometryMetaFormChange("binding", event.target.value)}*/}
+                        {/*    placeholder="binding (geometry ids, comma separated)"*/}
+                        {/*    disabled={isEntitySubmitting}*/}
+                        {/*    style={entityInputStyle}*/}
+                        {/*/>*/}
                         <button
                             type="button"
                             onClick={handleApplyGeoMeta}
@@ -258,6 +290,7 @@ export default function SelectedGeometryPanel({
                         </div>
                     ) : null}
             </div>
+            )}
         </div>
     );
 }
@@ -291,6 +324,22 @@ const primaryGeometryButtonStyle: CSSProperties = {
     color: "#ffffff",
     fontWeight: 600,
 };
+
+function PlusIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+function MinusIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 12h14" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+    );
+}
 
 function resolveFeatureGeometryPreset(feature: Feature): EntityGeometryPreset {
     const explicitPreset = normalizeGeometryPreset(feature.properties.geometry_preset);

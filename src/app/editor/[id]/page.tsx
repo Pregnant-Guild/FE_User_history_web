@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Map from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
@@ -10,6 +10,7 @@ import SelectedGeometryPanel from "@/uhm/components/SelectedGeometryPanel";
 import WikiSidebarPanel from "@/uhm/components/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/EntityWikiBindingsPanel";
+import GeometryBindingPanel from "@/uhm/components/GeometryBindingPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
@@ -62,6 +63,7 @@ import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/timeline"
 import { useFeatureCommands } from "./featureCommands";
 import { deleteSubmission } from "@/uhm/api/sections";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
 import UnifiedSearchBar, { type UnifiedSearchKind } from "@/uhm/components/UnifiedSearchBar";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
@@ -87,7 +89,10 @@ export default function Page() {
     const [leftPanelWidth, setLeftPanelWidth] = useState(280);
     const [rightPanelWidth, setRightPanelWidth] = useState(420);
     const [timelineFilterEnabled, setTimelineFilterEnabled] = useState(true);
+    const [geometryBindingFilterEnabled, setGeometryBindingFilterEnabled] = useState(true);
     const entityFormStatusTimeoutRef = useRef<number | null>(null);
+    const geoBindingStatusTimeoutRef = useRef<number | null>(null);
+    const [geoBindingStatus, setGeoBindingStatus] = useState<string | null>(null);
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
 
     const {
@@ -162,7 +167,39 @@ export default function Page() {
     const wikiSearchRequestRef = useRef(0);
     const geoSearchRequestRef = useRef(0);
 
-    const editor = useEditorState(initialData);
+    const snapshotEntitiesRef = useRef(snapshotEntities);
+    const snapshotWikisRef = useRef(snapshotWikis);
+    const snapshotEntityWikiLinksRef = useRef(snapshotEntityWikiLinks);
+    useEffect(() => {
+        snapshotEntitiesRef.current = snapshotEntities;
+    }, [snapshotEntities]);
+    useEffect(() => {
+        snapshotWikisRef.current = snapshotWikis;
+    }, [snapshotWikis]);
+    useEffect(() => {
+        snapshotEntityWikiLinksRef.current = snapshotEntityWikiLinks;
+    }, [snapshotEntityWikiLinks]);
+
+    const editor = useEditorState(initialData, {
+        snapshotEntitiesRef,
+        setSnapshotEntities,
+        snapshotWikisRef,
+        setSnapshotWikis,
+        snapshotEntityWikiLinksRef,
+        setSnapshotEntityWikiLinks,
+    });
+    const setSnapshotWikisUndoable = useCallback(
+        (next: SetStateAction<WikiSnapshot[]>) => {
+            editor.setSnapshotWikis(next, "Cập nhật wiki");
+        },
+        [editor]
+    );
+    const setSnapshotEntityWikiLinksUndoable = useCallback(
+        (next: SetStateAction<EntityWikiLinkSnapshot[]>) => {
+            editor.setSnapshotEntityWikiLinks(next, "Cập nhật entity-wiki");
+        },
+        [editor]
+    );
     const editorUserId = normalizeEditorUserId(editorUserIdInput);
     const snapshotEntitiesAsEntities = useMemo(() => {
         const rows = snapshotEntities || [];
@@ -228,6 +265,24 @@ export default function Page() {
             : editor.draft.features.find((feature) =>
                 String(feature.properties.id) === String(selectedFeatureId)
             ) || null;
+
+    const geometryChoices = useMemo(() => {
+        const rows = (editor.draft.features || [])
+            .filter((f) => f && f.properties && (typeof f.properties.id === "string" || typeof f.properties.id === "number"))
+            .map((f) => {
+                const id = String(f.properties.id);
+                const semantic = String(f.properties.type || getDefaultTypeIdForFeature(f) || "").trim();
+                const label = semantic.length ? `${semantic} (${f.geometry.type})` : f.geometry.type;
+                return { id, label };
+            });
+        rows.sort((a, b) => a.id.localeCompare(b.id));
+        return rows;
+    }, [editor.draft.features]);
+
+    const selectedGeometryBindingIds = useMemo(() => {
+        if (!selectedFeature) return [];
+        return normalizeFeatureBindingIds(selectedFeature);
+    }, [selectedFeature]);
 
     const createdEntities = useMemo(() => {
         return (snapshotEntities || [])
@@ -691,6 +746,20 @@ export default function Page() {
         }
     }, [setEntityFormStatus]);
 
+    const flashGeoBindingStatus = useCallback((msg: string | null, timeoutMs = 3000) => {
+        if (geoBindingStatusTimeoutRef.current) {
+            window.clearTimeout(geoBindingStatusTimeoutRef.current);
+            geoBindingStatusTimeoutRef.current = null;
+        }
+        setGeoBindingStatus(msg);
+        if (msg && timeoutMs > 0) {
+            geoBindingStatusTimeoutRef.current = window.setTimeout(() => {
+                setGeoBindingStatus(null);
+                geoBindingStatusTimeoutRef.current = null;
+            }, timeoutMs);
+        }
+    }, [setGeoBindingStatus]);
+
     useEffect(() => {
         setBackgroundVisibility(loadBackgroundLayerVisibilityFromStorage());
         setIsBackgroundVisibilityReady(true);
@@ -740,7 +809,7 @@ export default function Page() {
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
         const id = String(entity.id || "").trim();
         if (!id) return;
-        setSnapshotEntities((prev) => {
+        editor.setSnapshotEntities((prev) => {
             if (prev.some((e) => String(e.id) === id)) return prev;
             return [
                 {
@@ -752,7 +821,7 @@ export default function Page() {
                 },
                 ...prev,
             ];
-        });
+        }, `Thêm entity ref #${id}`);
         // Keep entity catalog centralized as a single in-memory list.
         setEntityCatalog((prev) => {
             const byId = new globalThis.Map<string, Entity>();
@@ -763,7 +832,38 @@ export default function Page() {
             byId.set(id, entity);
             return Array.from(byId.values());
         });
-    }, [setEntityCatalog, setSnapshotEntities]);
+    }, [editor, setEntityCatalog]);
+
+    const handleUpdateEntityInProject = useCallback((entityId: string, payload: { name: string; description: string | null }) => {
+        const id = String(entityId || "").trim();
+        if (!id) return;
+        const nextName = String(payload?.name || "").trim();
+        if (!nextName.length) {
+            flashEntityFormStatus("Ten entity la bat buoc.");
+            return;
+        }
+        const nextDescription = payload?.description == null ? null : String(payload.description);
+
+        editor.setSnapshotEntities((prev) => prev.map((e) => {
+            if (!e || String(e.id) !== id) return e;
+            const source = e.source === "inline" ? "inline" : "ref";
+            const operation =
+                source === "ref"
+                    ? "reference"
+                    : e.operation === "create"
+                        ? "create"
+                        : "update";
+            return {
+                ...e,
+                id,
+                source,
+                operation,
+                name: nextName,
+                description: nextDescription,
+            };
+        }), `Cap nhat entity #${id}`);
+        flashEntityFormStatus("Da cap nhat entity. Commit khi san sang.", 3000);
+    }, [editor, flashEntityFormStatus]);
 
     const handleToggleBindEntityForSelectedGeometry = useCallback((entityId: string, nextChecked: boolean) => {
         if (!selectedFeature) {
@@ -810,11 +910,53 @@ export default function Page() {
         setSelectedGeometryEntityIds,
     ]);
 
+    const handleToggleBindGeometryForSelectedGeometry = useCallback((geoId: string, nextChecked: boolean) => {
+        if (!selectedFeature) {
+            flashGeoBindingStatus("Chưa chọn geometry để bind.");
+            return;
+        }
+        const id = String(geoId || "").trim();
+        if (!id) return;
+        if (String(selectedFeature.properties.id) === id) return;
+
+        const prevBindingIds = normalizeFeatureBindingIds(selectedFeature);
+        const has = prevBindingIds.includes(id);
+        const nextBindingIds = (() => {
+            if (nextChecked) {
+                if (has) return prevBindingIds;
+                return [...prevBindingIds, id];
+            }
+            if (!has) return prevBindingIds;
+            return prevBindingIds.filter((x) => x !== id);
+        })();
+
+        setIsEntitySubmitting(true);
+        flashGeoBindingStatus(null, 0);
+        try {
+            editor.patchFeatureProperties(selectedFeature.properties.id, { binding: nextBindingIds });
+            setGeometryMetaForm((prev) => ({ ...prev, binding: nextBindingIds.join(", ") }));
+            flashGeoBindingStatus(
+                nextChecked
+                    ? "Đã bind geometry vào binding. Commit khi sẵn sàng."
+                    : "Đã gỡ binding geometry. Commit khi sẵn sàng.",
+                3000
+            );
+        } finally {
+            setIsEntitySubmitting(false);
+        }
+    }, [
+        editor,
+        flashGeoBindingStatus,
+        selectedFeature,
+        setGeometryMetaForm,
+        setIsEntitySubmitting,
+    ]);
+
     const handleAddWikiRefToProject = useCallback((wiki: Wiki) => {
         const id = String(wiki.id || "").trim();
         if (!id) return;
         const title = (wiki.title || "").trim() || "Untitled wiki";
-        setSnapshotWikis((prev) => {
+        editor.setSnapshotWikis((prev) => {
             if (prev.some((w) => w.id === id)) return prev;
             return [
                 {
@@ -827,9 +969,9 @@ export default function Page() {
                 },
                 ...prev,
             ];
-        });
+        }, `Thêm wiki ref #${id}`);
         setRequestedActiveWikiId(id);
-    }, [setSnapshotWikis]);
+    }, [editor, setRequestedActiveWikiId]);
 
     const handleImportGeoFromSearch = useCallback((
         entityItem: EntityGeometriesSearchItem,
@@ -932,7 +1074,7 @@ export default function Page() {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            setSnapshotEntities((prev) => {
+            editor.setSnapshotEntities((prev) => {
                 if (prev.some((e) => String(e.id) === entityId)) return prev;
                 return [
                     {
@@ -946,7 +1088,7 @@ export default function Page() {
                     },
                     ...prev,
                 ];
-            });
+            }, `Tạo entity #${entityId}`);
             setEntityCatalog((prev) => {
                 const byId = new globalThis.Map<string, Entity>();
                 for (const row of prev || []) {
@@ -1069,6 +1211,7 @@ export default function Page() {
                             onDeleteFeature={editor.deleteFeature}
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
+                            respectBindingFilter={geometryBindingFilterEnabled}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -1333,30 +1476,42 @@ export default function Page() {
                                 </div>
                             </div>
                         ) : null}
-
-                        <WikiSidebarPanel
-                            projectId={projectId}
-                            wikis={snapshotWikis}
-                            setWikis={setSnapshotWikis}
-                            autoOpen={autoOpenWiki}
-                            requestedActiveId={requestedActiveWikiId}
+                        <GeometryBindingPanel
+                            geometries={geometryChoices}
+                            selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
+                            selectedGeometryBindingIds={selectedGeometryBindingIds}
+                            onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
+                            statusText={geoBindingStatus}
+                            bindingFilterEnabled={geometryBindingFilterEnabled}
+                            onBindingFilterEnabledChange={setGeometryBindingFilterEnabled}
                         />
+
                         <ProjectEntityRefsPanel
                             entityRefs={snapshotEntitiesVisible}
                             entityForm={entityForm}
                             onEntityFormChange={handleEntityFormChange}
                             isEntitySubmitting={isEntitySubmitting}
                             onCreateEntityOnly={handleCreateEntityOnly}
+                            onUpdateEntity={handleUpdateEntityInProject}
                             entityFormStatus={entityFormStatus}
                             hasSelectedGeometry={Boolean(selectedFeature)}
                             selectedGeometryEntityIds={selectedGeometryEntityIds}
                             onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
                         />
+
+                        <WikiSidebarPanel
+                            projectId={projectId}
+                            wikis={snapshotWikis}
+                            setWikis={setSnapshotWikisUndoable}
+                            autoOpen={autoOpenWiki}
+                            requestedActiveId={requestedActiveWikiId}
+                        />
+
                         <EntityWikiBindingsPanel
                             entities={projectEntityChoices}
                             wikis={snapshotWikis}
                             links={snapshotEntityWikiLinks}
-                            setLinks={setSnapshotEntityWikiLinks}
+                            setLinks={setSnapshotEntityWikiLinksUndoable}
                         />
                         {!wikiOnly && selectedFeature ? (
                             <SelectedGeometryPanel
