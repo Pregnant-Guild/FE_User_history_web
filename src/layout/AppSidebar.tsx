@@ -15,6 +15,7 @@ import {
   PageIcon,
   PieChartIcon,
   PlugInIcon,
+  ShootingStarIcon,
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
@@ -52,6 +53,11 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "Tài Khoản",
     path: "/user/account",
+  },
+  {
+    icon: <ShootingStarIcon />,
+    name: "Về Chúng Tôi",
+    path: "/user/about-us",
   },
 ];
 
