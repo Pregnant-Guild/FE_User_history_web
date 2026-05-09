@@ -19,6 +19,7 @@ import {
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
 import { EMPTY_FEATURE_COLLECTION, WORLD_BBOX } from "@/uhm/lib/geo/constants";
 import { clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/timeline";
+import { GEO_TYPE_KEYS } from "@/uhm/lib/geoTypeMap";
 import type { Feature, FeatureCollection } from "@/uhm/types/geo";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
@@ -28,6 +29,7 @@ export default function Page() {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
   const [timelineYear, setTimelineYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
   const [timelineDraftYear, setTimelineDraftYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
+  const [timeRange, setTimeRange] = useState<number>(0);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [timelineStatus, setTimelineStatus] = useState<string | null>(null);
   const [backgroundVisibility, setBackgroundVisibility] = useState<BackgroundLayerVisibility>(
@@ -36,6 +38,11 @@ export default function Page() {
   const [isBackgroundVisibilityReady, setIsBackgroundVisibilityReady] = useState(false);
   const timelineFetchRequestRef = useRef(0);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
+  const [geometryVisibility, setGeometryVisibility] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const key of GEO_TYPE_KEYS) init[key] = true;
+    return init;
+  });
 
   const selectedFeature: Feature | null = useMemo(() => {
     if (selectedFeatureId === null) return null;
@@ -70,7 +77,7 @@ export default function Page() {
       setIsTimelineLoading(true);
       setTimelineStatus(null);
       try {
-        const next = await fetchGeometriesByBBox({ ...WORLD_BBOX, time: timelineYear });
+        const next = await fetchGeometriesByBBox({ ...WORLD_BBOX, time: timelineYear, timeRange });
         if (disposed || requestId !== timelineFetchRequestRef.current) return;
         setData(next);
         setLastLoadedAt(new Date().toISOString());
@@ -94,7 +101,7 @@ export default function Page() {
     return () => {
       disposed = true;
     };
-  }, [timelineYear]);
+  }, [timelineYear, timeRange]);
 
   const updateBackgroundVisibility = (updater: (prev: BackgroundLayerVisibility) => BackgroundLayerVisibility) => {
     setBackgroundVisibility((prev) => {
@@ -120,6 +127,11 @@ export default function Page() {
     setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
   };
 
+  const handleTimeRangeChange = (nextRange: number) => {
+    const safe = Number.isFinite(nextRange) ? Math.trunc(nextRange) : 0;
+    setTimeRange(Math.max(0, Math.min(30, safe)));
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
@@ -130,6 +142,7 @@ export default function Page() {
             selectedFeatureId={selectedFeatureId}
             onSelectFeatureId={setSelectedFeatureId}
             backgroundVisibility={backgroundVisibility}
+            geometryVisibility={geometryVisibility}
             allowGeometryEditing={false}
             respectBindingFilter={false}
           />
@@ -140,6 +153,8 @@ export default function Page() {
         <TimelineBar
           year={timelineDraftYear}
           onYearChange={handleTimelineYearChange}
+          timeRange={timeRange}
+          onTimeRangeChange={handleTimeRangeChange}
           isLoading={isTimelineLoading}
           disabled={false}
           statusText={timelineStatus}
@@ -151,6 +166,10 @@ export default function Page() {
         onToggleLayer={handleToggleBackgroundLayer}
         onShowAll={handleShowAllBackgroundLayers}
         onHideAll={handleHideAllBackgroundLayers}
+        geometryVisibility={geometryVisibility}
+        onToggleGeometryType={(typeKey) => {
+          setGeometryVisibility((prev) => ({ ...prev, [typeKey]: prev[typeKey] === false }));
+        }}
         topContent={
           <div
             style={{

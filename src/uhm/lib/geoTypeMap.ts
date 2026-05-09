@@ -7,6 +7,14 @@ export type GeoTypeMapRow = {
 
 const MAP_ROWS: GeoTypeMapRow[] = rows as GeoTypeMapRow[];
 
+export const GEO_TYPE_KEYS: string[] = Array.from(
+    new Set(
+        MAP_ROWS
+            .map((row) => (typeof row?.type_key === "string" ? row.type_key.trim().toLowerCase() : ""))
+            .filter((key) => key.length > 0)
+    )
+);
+
 const CODE_BY_KEY = new Map<string, number>();
 const KEY_BY_CODE = new Map<number, string>();
 
@@ -31,4 +39,3 @@ export function geoTypeCodeToTypeKey(code: number | null | undefined): string | 
     if (!Number.isFinite(code)) return null;
     return KEY_BY_CODE.get(Math.trunc(code)) ?? null;
 }
-

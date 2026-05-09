@@ -40,6 +40,10 @@ function buildBBoxQueryString(params: GeometriesBBoxQuery): string {
         query.set("time", String(params.time));
     }
 
+    if (params.timeRange !== undefined) {
+        query.set("time_range", String(params.timeRange));
+    }
+
     if (params.entity_id) {
         query.set("entity_id", params.entity_id);
     }

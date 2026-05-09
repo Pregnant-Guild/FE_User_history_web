@@ -23,7 +23,7 @@ import {
     Geometry,
     useEditorState,
 } from "@/uhm/lib/useEditorState";
-import { geoTypeCodeToTypeKey } from "@/uhm/lib/geoTypeMap";
+import { GEO_TYPE_KEYS, geoTypeCodeToTypeKey } from "@/uhm/lib/geoTypeMap";
 import {
     BackgroundLayerId,
     BackgroundLayerVisibility,
@@ -166,6 +166,12 @@ export default function Page() {
     const entitySearchRequestRef = useRef(0);
     const wikiSearchRequestRef = useRef(0);
     const geoSearchRequestRef = useRef(0);
+
+    const [geometryVisibility, setGeometryVisibility] = useState<Record<string, boolean>>(() => {
+        const init: Record<string, boolean> = {};
+        for (const key of GEO_TYPE_KEYS) init[key] = true;
+        return init;
+    });
 
     const snapshotEntitiesRef = useRef(snapshotEntities);
     const snapshotWikisRef = useRef(snapshotWikis);
@@ -1211,6 +1217,7 @@ export default function Page() {
                             onDeleteFeature={editor.deleteFeature}
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
+                            geometryVisibility={geometryVisibility}
                             respectBindingFilter={geometryBindingFilterEnabled}
                         />
                     ) : (
@@ -1244,6 +1251,10 @@ export default function Page() {
                 onToggleLayer={handleToggleBackgroundLayer}
                 onShowAll={handleShowAllBackgroundLayers}
                 onHideAll={handleHideAllBackgroundLayers}
+                geometryVisibility={geometryVisibility}
+                onToggleGeometryType={(typeKey) => {
+                    setGeometryVisibility((prev) => ({ ...prev, [typeKey]: prev[typeKey] === false }));
+                }}
                 width={rightPanelWidth}
                 topContent={
                     <div style={{ display: "grid", gap: "12px" }}>

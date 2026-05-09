@@ -5,6 +5,8 @@ import { FIXED_TIMELINE_END_YEAR, FIXED_TIMELINE_START_YEAR, clampYearValue } fr
 type Props = {
     year: number;
     onYearChange: (year: number) => void;
+    timeRange?: number;
+    onTimeRangeChange?: (range: number) => void;
     isLoading: boolean;
     disabled: boolean;
     statusText?: string | null;
@@ -15,6 +17,8 @@ type Props = {
 export default function TimelineBar({
     year,
     onYearChange,
+    timeRange,
+    onTimeRangeChange,
     isLoading,
     disabled,
     statusText,
@@ -32,6 +36,12 @@ export default function TimelineBar({
 
     const handleYearChange = (nextYear: number) => {
         onYearChange(clampYearValue(Math.trunc(nextYear), lower, upper));
+    };
+
+    const handleTimeRangeChange = (nextValue: number) => {
+        if (!onTimeRangeChange) return;
+        const safe = Number.isFinite(nextValue) ? Math.trunc(nextValue) : 0;
+        onTimeRangeChange(Math.max(0, Math.min(30, safe)));
     };
 
     return (
@@ -148,6 +158,41 @@ export default function TimelineBar({
                         outline: "none",
                     }}
                 />
+                {typeof timeRange === "number" && onTimeRangeChange ? (
+                    <label
+                        title="time_range (0-30)"
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            color: "#94a3b8",
+                            whiteSpace: "nowrap",
+                            opacity: effectiveDisabled ? 0.6 : 1,
+                        }}
+                    >
+                        <span style={{ fontSize: "12px" }}>Range</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={30}
+                            step={1}
+                            value={Math.max(0, Math.min(30, Math.trunc(timeRange)))}
+                            onChange={(event) => handleTimeRangeChange(Number(event.target.value))}
+                            disabled={effectiveDisabled}
+                            aria-label="Timeline range"
+                            style={{
+                                width: "84px",
+                                border: "1px solid rgba(148, 163, 184, 0.45)",
+                                borderRadius: "6px",
+                                padding: "6px 8px",
+                                background: "rgba(15, 23, 42, 0.7)",
+                                color: "#f8fafc",
+                                fontSize: "13px",
+                                outline: "none",
+                            }}
+                        />
+                    </label>
+                ) : null}
             </div>
         </div>
     );

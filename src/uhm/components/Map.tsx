@@ -42,6 +42,7 @@ type MapProps = {
     mode: EditorMode;
     draft: FeatureCollection;
     backgroundVisibility: BackgroundLayerVisibility;
+    geometryVisibility?: Record<string, boolean>;
     selectedFeatureId: string | number | null;
     onSelectFeatureId: (id: string | number | null) => void;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
@@ -70,6 +71,7 @@ export default function Map({
     mode,
     draft,
     backgroundVisibility,
+    geometryVisibility,
     selectedFeatureId,
     onSelectFeatureId,
     onCreateFeature,
@@ -98,6 +100,8 @@ export default function Map({
     const draftRef = useRef<FeatureCollection>(draft);
     // Mirror của backgroundVisibility để sync visibility khi map đã load.
     const backgroundVisibilityRef = useRef<BackgroundLayerVisibility>(backgroundVisibility);
+    // Mirror of geometry visibility for type filtering.
+    const geometryVisibilityRef = useRef<MapProps["geometryVisibility"]>(geometryVisibility);
     // Mirror của selectedFeatureId để filter/select trên map (không phụ thuộc re-render).
     const selectedFeatureIdRef = useRef<string | number | null>(selectedFeatureId);
     // Mirror của callback onSelectFeatureId.
@@ -224,6 +228,14 @@ export default function Map({
     }, [backgroundVisibility]);
 
     useEffect(() => {
+        geometryVisibilityRef.current = geometryVisibility;
+        // When toggling geometry types, refresh sources immediately (without waiting for parent re-mount).
+        const map = mapRef.current;
+        if (!map) return;
+        applyDraftToMap(draftRef.current);
+    }, [geometryVisibility]);
+
+    useEffect(() => {
         onCreateRef.current = onCreateFeature;
     }, [onCreateFeature]);
 
@@ -264,9 +276,10 @@ export default function Map({
             }
         }
 
-        const visibleDraft = respectBindingFilterRef.current
+        const visibleDraftRaw = respectBindingFilterRef.current
             ? filterDraftByBinding(fc, selectedFeatureIdRef.current)
             : fc;
+        const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
         const { polygons, points } = splitDraftFeatures(visibleDraft);
         const pathArrowShapes = buildPathArrowFeatureCollection(visibleDraft);
 
@@ -1393,6 +1406,22 @@ function filterDraftByBinding(
             if (featureId === selectedId) return true;
             if (selectedChildren.has(featureId)) return true;
             return !childIds.has(featureId);
+        }),
+    };
+}
+
+function filterDraftByGeometryVisibility(
+    fc: FeatureCollection,
+    visibility: Record<string, boolean> | null | undefined
+): FeatureCollection {
+    if (!visibility) return fc;
+
+    return {
+        ...fc,
+        features: fc.features.filter((feature) => {
+            const key = getFeatureSemanticType(feature);
+            if (!key) return true;
+            return visibility[key] !== false;
         }),
     };
 }
