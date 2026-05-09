@@ -3,6 +3,7 @@ import { ApiError, requestJson } from "@/uhm/api/http";
 
 export type Wiki = {
   id: string;
+  project_id?: string;
   title?: string;
   slug?: string | null;
   content?: string;

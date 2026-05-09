@@ -20,6 +20,8 @@ const ReactQuillEditor = dynamic<ReactQuillProps>(() => import("react-quill-new"
   loading: () => <div className="h-[480px] w-full animate-pulse bg-gray-100 rounded-lg" />,
 });
 
+let quillLinkSanitizePatched = false;
+
 type Props = {
   projectId: string;
   wikis: WikiSnapshot[];
@@ -42,6 +44,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
   const [wikiTitle, setWikiTitle] = useState("");
   const [wikiSlug, setWikiSlug] = useState("");
   const [wikiDocHtml, setWikiDocHtml] = useState("");
+  const wikiDocStorageFormat = useMemo(() => detectWikiDocStorageFormat(wikiDocHtml), [wikiDocHtml]);
   const [wikiSaveError, setWikiSaveError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
@@ -66,12 +69,45 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
   const [isGlobalWikiSearching, setIsGlobalWikiSearching] = useState(false);
   const [globalWikiSearchError, setGlobalWikiSearchError] = useState<string | null>(null);
   const globalWikiSearchRequestRef = useRef(0);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!autoOpen) return;
     // open once on mount
     setOpen(true);
   }, [autoOpen]);
+
+  // Allow Quill to keep wiki links where href is a slug (no scheme).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (quillLinkSanitizePatched) return;
+    quillLinkSanitizePatched = true;
+
+    (async () => {
+      try {
+        const mod: any = await import("react-quill-new");
+        const Quill = mod?.Quill;
+        if (!Quill) return;
+        const Link = Quill.import?.("formats/link");
+        if (!Link) return;
+
+        const anyLink = Link as any;
+        if (anyLink.__uhmAllowSlugHref) return;
+        const original = anyLink.sanitize;
+        anyLink.sanitize = (url: unknown) => {
+          const value = String(url ?? "").trim();
+          const lower = value.toLowerCase();
+          if (lower.startsWith("javascript:")) return "";
+          // Keep slug/relative/external as-is; rendering layer will rewrite slug links for navigation.
+          return value;
+        };
+        anyLink.__uhmAllowSlugHref = true;
+        anyLink.__uhmOriginalSanitize = original;
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!requestedActiveId) return;
@@ -209,6 +245,77 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     );
     setOpen(false);
   };
+
+  const exportCurrentWikiDoc = useCallback(() => {
+    if (!activeId) return;
+
+    const fmt = detectWikiDocStorageFormat(wikiDocHtml);
+    const label = fmt === "json" ? "json" : fmt === "text" ? "txt" : "html";
+    const mime =
+      fmt === "json"
+        ? "application/json;charset=utf-8"
+        : fmt === "text"
+          ? "text/plain;charset=utf-8"
+          : "text/html;charset=utf-8";
+
+    const base =
+      normalizeWikiSlugInput(wikiSlug) ||
+      slugifyWikiTitle(wikiTitle) ||
+      String(activeId).slice(0, 8);
+    const filename = `${base}.${label}`;
+
+    downloadTextFile(filename, wikiDocHtml || "", mime);
+  }, [activeId, wikiDocHtml, wikiSlug, wikiTitle]);
+
+  const openImportPicker = useCallback(() => {
+    if (!activeId) return;
+    importFileInputRef.current?.click();
+  }, [activeId]);
+
+  const handleImportFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0] || null;
+      // Allow selecting the same file again.
+      e.target.value = "";
+      if (!file) return;
+      if (!activeId) return;
+
+      try {
+        // Only accept HTML import to match the current Quill storage format.
+        const name = (file.name || "").toLowerCase();
+        const isHtml =
+          name.endsWith(".html") ||
+          name.endsWith(".htm") ||
+          String(file.type || "").toLowerCase().includes("text/html");
+        if (!isHtml) {
+          setWikiSaveError("Chi ho tro import file HTML (.html/.htm).");
+          return;
+        }
+
+        const text = await file.text();
+        const raw = String(text || "").trim();
+        if (!raw.length) {
+          setWikiDocHtml("");
+          setWikiSaveError(null);
+          return;
+        }
+        if (raw[0] !== "<") {
+          setWikiSaveError("Noi dung file khong phai HTML hop le.");
+          return;
+        }
+
+        // Quill drops <a> tags that do not have a valid href.
+        // Preserve the intent by inserting a placeholder href.
+        const normalized = ensureAnchorsHaveHref(raw);
+        setWikiDocHtml(normalized);
+        setWikiSaveError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Khong import duoc file.";
+        setWikiSaveError(msg);
+      }
+    },
+    [activeId]
+  );
 
   const closeWikiLinkModal = useCallback(() => {
     setIsWikiLinkOpen(false);
@@ -635,13 +742,38 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         // Defensive: even if Modal defaults change, keep wiki popup free of the "X" close button.
         className="max-w-[1100px] m-4 [&>button]:hidden"
       >
-        <div className="p-6 bg-white rounded-3xl dark:bg-gray-900">
+        <div className="p-6 bg-white rounded-3xl dark:bg-gray-900 max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col">
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".html,.htm,text/html"
+            onChange={handleImportFile}
+            style={{ display: "none" }}
+          />
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="text-xs text-gray-500 dark:text-gray-400">Project</div>
               <div className="text-sm font-mono break-all text-gray-700 dark:text-gray-200">{projectId}</div>
             </div>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openImportPicker}
+                disabled={!activeId}
+                title="Import HTML"
+              >
+                Import
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportCurrentWikiDoc}
+                disabled={!activeId}
+                title={`Export ${wikiDocStorageFormat.toUpperCase()}`}
+              >
+                Export {wikiDocStorageFormat.toUpperCase()}
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
@@ -651,7 +783,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="mt-5 grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0 overflow-auto">
             <div className="lg:col-span-1">
               <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Wikis</div>
               <div className="flex flex-col gap-2">
@@ -711,7 +843,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
                     value={wikiDocHtml}
                     onChange={(content: string) => setWikiDocHtml(content)}
                     modules={quillModules}
-                    className="min-h-[320px]"
+                    className="min-h-[320px] uhm-wiki-quill"
                     placeholder="Nhap noi dung wiki..."
                     readOnly={!activeId}
                   />
@@ -719,12 +851,19 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
               </div>
             </div>
           </div>
-
-          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Stored in snapshot_json on commit. This page does not write to DB yet.
-          </div>
         </div>
       </Modal>
+
+      <style jsx global>{`
+        /* Quill editor content is inheriting a light-on-dark color in some themes.
+           Force paragraph/text to be readable on the wiki editor's (light) background. */
+        .uhm-wiki-quill .ql-editor {
+          color: #000 !important;
+        }
+        .uhm-wiki-quill .ql-editor p {
+          color: #000 !important;
+        }
+      `}</style>
 
       <Modal
         isOpen={isWikiLinkOpen}
@@ -921,4 +1060,52 @@ function escapeHtml(input: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+type WikiDocStorageFormat = "html" | "json" | "text";
+
+function detectWikiDocStorageFormat(doc: string): WikiDocStorageFormat {
+  const raw = String(doc || "").trim();
+  if (!raw.length) return "html";
+  const first = raw[0];
+  if (first === "<") return "html";
+  if (first === "{" || first === "[") return "json";
+  return "text";
+}
+
+function downloadTextFile(filename: string, contents: string, mime: string): void {
+  if (typeof window === "undefined") return;
+  const safeName = String(filename || "export.txt").replace(/[\\/]+/g, "_");
+  const blob = new Blob([contents], { type: mime || "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = safeName;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function ensureAnchorsHaveHref(html: string): string {
+  const raw = String(html || "").trim();
+  if (!raw.length) return "";
+  if (typeof window === "undefined") return raw;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(raw, "text/html");
+    const anchors = Array.from(doc.querySelectorAll("a"));
+    for (const a of anchors) {
+      const href = a.getAttribute("href");
+      if (href == null || String(href).trim() === "") {
+        // Placeholder: the viewer will render this as "missing" (red) and will not rewrite it.
+        a.setAttribute("href", "__missing__");
+      }
+    }
+    return doc.body.innerHTML;
+  } catch {
+    return raw;
+  }
 }
