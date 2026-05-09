@@ -342,7 +342,7 @@ export default function ProjectsPage() {
                             variant="outline"
                             disabled={isExportingProjectId === String(project.id)}
                             onClick={() => handleExportHeadSnapshot(project)}
-                            title="Export head commit snapshot_json"
+                            // title="Export head commit snapshot_json"
                           >
                             ExportJSON
                           </Button>
@@ -484,7 +484,7 @@ export default function ProjectsPage() {
                 disabled={isSubmitting}
                 className="bg-gray-900 hover:bg-gray-800 text-white"
                 onClick={handleCreateProjectWithJson}
-                title="Tạo dự án và tạo commit đầu tiên từ JSON snapshot"
+                // title="Tạo dự án và tạo commit đầu tiên từ JSON snapshot"
               >
                 Tạo với JSON
               </Button>

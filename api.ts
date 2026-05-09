@@ -64,4 +64,7 @@ export const API = {
     UPDATE_STATUS: (id: number | string) => `${API_URL_ROOT}/submissions/${id}/status`,
     DELETE: (id: number | string) => `${API_URL_ROOT}/submissions/${id}`,
   },
+  Chatbot:{
+    CHAT: `${API_URL_ROOT}/chatbot/chat`,
+  }
 }

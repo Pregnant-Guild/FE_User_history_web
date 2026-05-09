@@ -8,6 +8,7 @@ import { apiGetCurrentUser } from "@/service/auth";
 import { setUserData } from "@/store/features/userSlice";
 import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
+import ChatbotWidget from "@/components/ui/chat/ChatbotWidget";
 
 export default function AdminLayout({
   children,
@@ -51,6 +52,7 @@ export default function AdminLayout({
         {/* Page Content */}
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
       </div>
+      <ChatbotWidget />
     </div>
   );
 }
