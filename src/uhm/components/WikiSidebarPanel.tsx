@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
 
@@ -11,7 +11,7 @@ import Label from "@/components/form/Label";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { newId } from "@/uhm/lib/id";
 import type ReactQuill from "react-quill-new";
-import { checkWikiSlugExists } from "@/uhm/api/wikis";
+import { checkWikiSlugExists, fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 
 type ReactQuillProps = ComponentProps<typeof ReactQuill>;
 
@@ -49,6 +49,23 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
   const [createSlugTouched, setCreateSlugTouched] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCheckingCreateSlug, setIsCheckingCreateSlug] = useState(false);
+
+  // Quill: custom link UI (link-to-wiki by slug).
+  const wikiLinkIntentRef = useRef<{
+    quill: any;
+    range: { index: number; length: number } | null;
+    activeWikiId: string | null;
+    existingHref: string | null;
+  } | null>(null);
+  const wikiLinkHandlerRef = useRef<(quill: any) => void>(() => {});
+  const [isWikiLinkOpen, setIsWikiLinkOpen] = useState(false);
+  const [wikiLinkQuery, setWikiLinkQuery] = useState("");
+  const [wikiLinkError, setWikiLinkError] = useState<string | null>(null);
+  const [wikiLinkSearchMode, setWikiLinkSearchMode] = useState<"title" | "slug">("title");
+  const [globalWikiResults, setGlobalWikiResults] = useState<Wiki[]>([]);
+  const [isGlobalWikiSearching, setIsGlobalWikiSearching] = useState(false);
+  const [globalWikiSearchError, setGlobalWikiSearchError] = useState<string | null>(null);
+  const globalWikiSearchRequestRef = useRef(0);
 
   useEffect(() => {
     if (!autoOpen) return;
@@ -192,6 +209,203 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     );
     setOpen(false);
   };
+
+  const closeWikiLinkModal = useCallback(() => {
+    setIsWikiLinkOpen(false);
+    setWikiLinkQuery("");
+    setWikiLinkError(null);
+    setGlobalWikiResults([]);
+    setIsGlobalWikiSearching(false);
+    setGlobalWikiSearchError(null);
+    wikiLinkIntentRef.current = null;
+  }, []);
+
+  type WikiLinkOption = {
+    key: string;
+    title: string;
+    slug: string;
+    source: "local" | "global";
+  };
+
+  const localWikiLinkCandidates = useMemo<WikiLinkOption[]>(() => {
+    if (!isWikiLinkOpen) return [];
+    const q = wikiLinkQuery.trim().toLowerCase();
+    const active = wikiLinkIntentRef.current?.activeWikiId ?? activeId;
+
+    const base = (wikis || [])
+      .filter((w) => w && typeof w.id === "string")
+      .filter((w) => w.id !== active)
+      // Link value must be slug.
+      .filter((w) => typeof w.slug === "string" && w.slug.trim().length > 0);
+
+    const filtered = (() => {
+      if (!q.length) return base;
+      if (wikiLinkSearchMode === "slug") {
+        return base.filter((w) => String(w.slug || "").toLowerCase().includes(q));
+      }
+      return base.filter((w) => (w.title || "").toLowerCase().includes(q));
+    })();
+
+    return filtered.slice(0, 20).map((w) => ({
+      key: `local:${w.id}`,
+      title: (w.title || "").trim() || "Untitled wiki",
+      slug: String(w.slug).trim(),
+      source: "local",
+    }));
+  }, [activeId, isWikiLinkOpen, wikiLinkQuery, wikiLinkSearchMode, wikis]);
+
+  useEffect(() => {
+    if (!isWikiLinkOpen) return;
+
+    const keyword = wikiLinkQuery.trim();
+    if (!keyword.length) {
+      setGlobalWikiResults([]);
+      setIsGlobalWikiSearching(false);
+      setGlobalWikiSearchError(null);
+      return;
+    }
+
+    let disposed = false;
+    const requestId = ++globalWikiSearchRequestRef.current;
+    const timeoutId = window.setTimeout(async () => {
+      setIsGlobalWikiSearching(true);
+      setGlobalWikiSearchError(null);
+      try {
+        const rows =
+          wikiLinkSearchMode === "slug"
+            ? (() => fetchWikiBySlug(keyword))()
+            : (() => searchWikisByTitle(keyword, { limit: 12 }))();
+
+        const resolved = await rows;
+        if (disposed || requestId !== globalWikiSearchRequestRef.current) return;
+
+        const list = Array.isArray(resolved) ? resolved : resolved ? [resolved] : [];
+        setGlobalWikiResults(list);
+      } catch (err) {
+        if (disposed || requestId !== globalWikiSearchRequestRef.current) return;
+        console.error("Search global wikis failed", err);
+        setGlobalWikiResults([]);
+        setGlobalWikiSearchError("Khong search duoc wiki tren server.");
+      } finally {
+        if (!disposed && requestId === globalWikiSearchRequestRef.current) {
+          setIsGlobalWikiSearching(false);
+        }
+      }
+    }, 260);
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isWikiLinkOpen, wikiLinkQuery, wikiLinkSearchMode]);
+
+  const globalWikiLinkCandidates = useMemo<WikiLinkOption[]>(() => {
+    if (!isWikiLinkOpen) return [];
+    const active = wikiLinkIntentRef.current?.activeWikiId ?? activeId;
+    const activeSlug = (wikis || []).find((w) => w.id === active)?.slug ?? null;
+    const normalizedActiveSlug = typeof activeSlug === "string" ? activeSlug.trim() : "";
+
+    const out: WikiLinkOption[] = [];
+    for (const row of globalWikiResults || []) {
+      const slug = typeof row?.slug === "string" ? row.slug.trim() : "";
+      if (!slug.length) continue;
+      if (normalizedActiveSlug && slug === normalizedActiveSlug) continue;
+      out.push({
+        key: `global:${row.id || slug}`,
+        title: (row.title || "").trim() || "Untitled wiki",
+        slug,
+        source: "global",
+      });
+    }
+    return out.slice(0, 20);
+  }, [activeId, globalWikiResults, isWikiLinkOpen, wikis]);
+
+  const wikiLinkCandidates = useMemo<WikiLinkOption[]>(() => {
+    const localSlugs = new Set(localWikiLinkCandidates.map((w) => w.slug));
+    const dedupedGlobal = globalWikiLinkCandidates.filter((w) => !localSlugs.has(w.slug));
+    return [...localWikiLinkCandidates, ...dedupedGlobal];
+  }, [globalWikiLinkCandidates, localWikiLinkCandidates]);
+
+  const applyWikiLink = useCallback((target: WikiLinkOption) => {
+    const intent = wikiLinkIntentRef.current;
+    const quill = intent?.quill;
+    if (!quill) return;
+
+    const slug = target.slug.trim();
+
+    const range = intent?.range ?? quill.getSelection?.() ?? null;
+    if (!range) {
+      setWikiLinkError("Khong lay duoc vi tri selection trong editor.");
+      return;
+    }
+
+    // Restore selection to ensure format applies to the expected range.
+    quill.setSelection?.(range.index, range.length, "silent");
+
+    if (range.length > 0) {
+      quill.formatText?.(range.index, range.length, "link", slug, "user");
+      closeWikiLinkModal();
+      return;
+    }
+
+    // No selection: insert the wiki title (or slug) and link it.
+    const label = (target.title || "").trim() || slug;
+    quill.insertText?.(range.index, label, { link: slug }, "user");
+    quill.setSelection?.(range.index + label.length, 0, "silent");
+    closeWikiLinkModal();
+  }, [closeWikiLinkModal]);
+
+  const removeWikiLink = useCallback(() => {
+    const intent = wikiLinkIntentRef.current;
+    const quill = intent?.quill;
+    if (!quill) return;
+    const range = intent?.range ?? quill.getSelection?.() ?? null;
+    if (!range) return;
+    quill.setSelection?.(range.index, range.length, "silent");
+    if (range.length > 0) {
+      quill.formatText?.(range.index, range.length, "link", false, "user");
+    } else {
+      quill.format?.("link", false, "user");
+    }
+    closeWikiLinkModal();
+  }, [closeWikiLinkModal]);
+
+  // Keep handler ref updated while keeping modules object stable.
+  wikiLinkHandlerRef.current = (quill: any) => {
+    if (!quill) return;
+    const range = quill.getSelection?.() ?? null;
+    // Try to read current link format (if any) from the selection.
+    const existingHref =
+      range && (quill.getFormat?.(range)?.link ?? quill.getFormat?.(range.index, range.length)?.link) || null;
+
+    wikiLinkIntentRef.current = {
+      quill,
+      range,
+      activeWikiId: activeId,
+      existingHref: typeof existingHref === "string" ? existingHref : null,
+    };
+
+    // Seed query with selected text (best effort).
+    const selectedText =
+      range && range.length > 0 ? String(quill.getText?.(range.index, range.length) || "").trim() : "";
+    setWikiLinkQuery(selectedText.slice(0, 80));
+    setWikiLinkError(null);
+    setIsWikiLinkOpen(true);
+  };
+
+  const quillModules = useMemo(() => {
+    return {
+      toolbar: {
+        container: QUILL_TOOLBAR,
+        handlers: {
+          // NOTE: use function() to preserve Quill toolbar `this` binding.
+          link: function (this: any) {
+            wikiLinkHandlerRef.current(this?.quill);
+          },
+        },
+      },
+    };
+  }, []);
 
   return (
     <div
@@ -496,7 +710,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
                     theme="snow"
                     value={wikiDocHtml}
                     onChange={(content: string) => setWikiDocHtml(content)}
-                    modules={QUILL_MODULES}
+                    modules={quillModules}
                     className="min-h-[320px]"
                     placeholder="Nhap noi dung wiki..."
                     readOnly={!activeId}
@@ -508,6 +722,99 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
 
           <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
             Stored in snapshot_json on commit. This page does not write to DB yet.
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isWikiLinkOpen}
+        onClose={closeWikiLinkModal}
+        className="max-w-[620px] p-6"
+      >
+        <div className="grid gap-4">
+          <div>
+            <div className="text-base font-semibold text-gray-900 dark:text-gray-100">Link wiki</div>
+          </div>
+
+          <div>
+            <Label>Search</Label>
+            <div className="flex items-center gap-2">
+              <input
+                value={wikiLinkQuery}
+                onChange={(e) => setWikiLinkQuery(e.target.value)}
+                className="h-11 flex-1 min-w-0 rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:focus:border-brand-800"
+                placeholder={wikiLinkSearchMode === "slug" ? "Nhap slug..." : "Nhap title wiki..."}
+                autoFocus
+              />
+              <select
+                value={wikiLinkSearchMode}
+                onChange={(e) => setWikiLinkSearchMode(e.target.value === "slug" ? "slug" : "title")}
+                className="h-11 rounded-xl border border-gray-200 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:focus:border-brand-800"
+                aria-label="Search mode"
+              >
+                <option value="title">Title</option>
+                <option value="slug">Slug</option>
+              </select>
+            </div>
+            {wikiLinkError ? (
+              <div className="mt-2 text-xs text-red-600 dark:text-red-300">{wikiLinkError}</div>
+            ) : null}
+            {globalWikiSearchError ? (
+              <div className="mt-2 text-xs text-red-600 dark:text-red-300">{globalWikiSearchError}</div>
+            ) : null}
+          </div>
+
+          <div className="max-h-[320px] overflow-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117]">
+            <div className="p-2 grid gap-1">
+              {isGlobalWikiSearching ? (
+                <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">Searching…</div>
+              ) : null}
+              {wikiLinkCandidates.map((w) => (
+                <button
+                  key={w.key}
+                  type="button"
+                  onClick={() => applyWikiLink(w)}
+                  className="w-full text-left rounded-lg border border-transparent hover:border-gray-200 dark:hover:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.03] px-3 py-2 transition"
+                  title={w.slug || undefined}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {(w.title || "").trim() || "Untitled wiki"}
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        {String(w.slug)}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                        w.source === "local"
+                          ? "border-emerald-300/60 text-emerald-600 dark:text-emerald-300"
+                          : "border-blue-300/60 text-blue-600 dark:text-blue-300"
+                      }`}
+                    >
+                      {w.source}
+                    </span>
+                  </div>
+                </button>
+              ))}
+              {wikiLinkCandidates.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+                  Khong tim thay wiki phu hop (hoac cac wiki khac chua co slug).
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            {wikiLinkIntentRef.current?.existingHref ? (
+              <Button size="sm" variant="outline" onClick={removeWikiLink}>
+                Remove link
+              </Button>
+            ) : null}
+            <Button size="sm" variant="outline" onClick={closeWikiLinkModal}>
+              Cancel
+            </Button>
           </div>
         </div>
       </Modal>
@@ -539,16 +846,14 @@ function CloseIcon() {
   );
 }
 
-const QUILL_MODULES = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ["bold", "italic", "underline", "strike"],
-    [{ list: "ordered" }, { list: "bullet" }],
-    ["blockquote", "code-block"],
-    ["link", "image"],
-    ["clean"],
-  ],
-};
+const QUILL_TOOLBAR = [
+  [{ header: [1, 2, 3, false] }],
+  ["bold", "italic", "underline", "strike"],
+  [{ list: "ordered" }, { list: "bullet" }],
+  ["blockquote", "code-block"],
+  ["link", "image"],
+  ["clean"],
+];
 
 function normalizeWikiDocForQuill(doc: string | null): string {
   const raw = (doc || "").trim();

@@ -1,9 +1,10 @@
 import { API_ENDPOINTS } from "@/uhm/api/config";
-import { requestJson } from "@/uhm/api/http";
+import { ApiError, requestJson } from "@/uhm/api/http";
 
 export type Wiki = {
   id: string;
   title?: string;
+  slug?: string | null;
   content?: string;
   is_deleted?: boolean;
   created_at?: string;
@@ -26,6 +27,18 @@ export async function fetchWikiById(id: string): Promise<Wiki> {
   const wikiId = String(id || "").trim();
   if (!wikiId) throw new Error("Missing wiki id");
   return requestJson<Wiki>(`${API_ENDPOINTS.wikis}/${encodeURIComponent(wikiId)}`);
+}
+
+export async function fetchWikiBySlug(slug: string): Promise<Wiki | null> {
+  const value = String(slug || "").trim();
+  if (!value.length) return null;
+  try {
+    return await requestJson<Wiki>(`${API_ENDPOINTS.wikis}/slug/${encodeURIComponent(value)}`);
+  } catch (err) {
+    // Treat "not found" as an empty result for search UX.
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export async function checkWikiSlugExists(slug: string): Promise<boolean> {

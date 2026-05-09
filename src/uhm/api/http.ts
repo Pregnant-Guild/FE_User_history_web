@@ -90,6 +90,22 @@ async function requestJsonInternal<T>(
             envelope.status === "error";
         if (isError) {
             const message = extractErrorMessage(payload, envelope) || "Request failed";
+
+            // Some backends return 200 with {status:false,message:"Invalid or expired JWT"} instead of HTTP 401.
+            // In that case, try refresh + retry once to keep UX smooth.
+            if (
+                !options?.skipRefresh &&
+                !options?.skipAuth &&
+                typeof input === "string" &&
+                !String(input).includes("/auth/") &&
+                isAuthTokenExpiredMessage(message)
+            ) {
+                const refreshed = await tryRefreshTokens();
+                if (refreshed) {
+                    return requestJsonInternal<T>(input, init, { ...(options || {}), skipRefresh: true });
+                }
+            }
+
             throw new ApiError(message, res.status, stringifyPayload(envelope), normalizeErrors(envelope.errors));
         }
         return (envelope.data ?? null) as T;
@@ -129,6 +145,18 @@ function extractErrorMessage(payload: unknown, envelope: ApiEnvelope<unknown> | 
     if (typeof errors === "string" && errors.trim()) return errors.trim();
     if (Array.isArray(errors) && typeof errors[0] === "string") return errors[0];
     return null;
+}
+
+function isAuthTokenExpiredMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+    if (!normalized) return false;
+    return (
+        normalized.includes("invalid or expired jwt") ||
+        normalized.includes("jwt expired") ||
+        normalized.includes("token expired") ||
+        normalized.includes("invalid token") ||
+        normalized.includes("expired token")
+    );
 }
 
 function stringifyPayload(payload: unknown): string {
