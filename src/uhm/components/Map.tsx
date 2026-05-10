@@ -53,6 +53,18 @@ type MapProps = {
     height?: CSSProperties["height"];
     fitToDraftBounds?: boolean;
     fitBoundsKey?: string | number | null;
+    onHoverFeatureChange?: ((payload: MapHoverPayload | null) => void) | undefined;
+    highlightFeatures?: FeatureCollection | null;
+    focusFeatureCollection?: FeatureCollection | null;
+    focusRequestKey?: string | number | null;
+    focusPadding?: number | maplibregl.PaddingOptions;
+};
+
+export type MapHoverPayload = {
+    featureId: string | number;
+    feature: Feature | null;
+    point: { x: number; y: number };
+    lngLat: { lng: number; lat: number };
 };
 
 type EngineBinding = {
@@ -82,6 +94,11 @@ export default function Map({
     height = "100vh",
     fitToDraftBounds = false,
     fitBoundsKey = null,
+    onHoverFeatureChange,
+    highlightFeatures = null,
+    focusFeatureCollection = null,
+    focusRequestKey = null,
+    focusPadding,
 }: MapProps) {
     // DOM container của map (dùng ref để tránh collision khi render nhiều map).
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -102,10 +119,15 @@ export default function Map({
     const backgroundVisibilityRef = useRef<BackgroundLayerVisibility>(backgroundVisibility);
     // Mirror of geometry visibility for type filtering.
     const geometryVisibilityRef = useRef<MapProps["geometryVisibility"]>(geometryVisibility);
+    const highlightFeaturesRef = useRef<FeatureCollection | null>(highlightFeatures);
+    const focusFeatureCollectionRef = useRef<FeatureCollection | null>(focusFeatureCollection);
+    const focusRequestKeyRef = useRef<MapProps["focusRequestKey"]>(focusRequestKey);
+    const focusPaddingRef = useRef<MapProps["focusPadding"]>(focusPadding);
     // Mirror của selectedFeatureId để filter/select trên map (không phụ thuộc re-render).
     const selectedFeatureIdRef = useRef<string | number | null>(selectedFeatureId);
     // Mirror của callback onSelectFeatureId.
     const onSelectFeatureIdRef = useRef(onSelectFeatureId);
+    const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
     // Mirror của callback onCreateFeature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
     // Mirror của callback onDeleteFeature.
@@ -207,6 +229,10 @@ export default function Map({
     }, [selectedFeatureId]);
 
     useEffect(() => {
+        onHoverFeatureChangeRef.current = onHoverFeatureChange;
+    }, [onHoverFeatureChange]);
+
+    useEffect(() => {
         if (mode !== "select" || selectedFeatureId === null) {
             editingEngineRef.current?.clearEditing();
         }
@@ -228,12 +254,24 @@ export default function Map({
     }, [backgroundVisibility]);
 
     useEffect(() => {
-        geometryVisibilityRef.current = geometryVisibility;
-        // When toggling geometry types, refresh sources immediately (without waiting for parent re-mount).
+        highlightFeaturesRef.current = highlightFeatures;
         const map = mapRef.current;
-        if (!map) return;
-        applyDraftToMap(draftRef.current);
-    }, [geometryVisibility]);
+        if (!map || !map.isStyleLoaded()) return;
+        const source = map.getSource("entity-focus") as maplibregl.GeoJSONSource | undefined;
+        source?.setData(highlightFeatures || EMPTY_FEATURE_COLLECTION);
+    }, [highlightFeatures]);
+
+    useEffect(() => {
+        focusFeatureCollectionRef.current = focusFeatureCollection;
+    }, [focusFeatureCollection]);
+
+    useEffect(() => {
+        focusRequestKeyRef.current = focusRequestKey;
+    }, [focusRequestKey]);
+
+    useEffect(() => {
+        focusPaddingRef.current = focusPadding;
+    }, [focusPadding]);
 
     useEffect(() => {
         onCreateRef.current = onCreateFeature;
@@ -298,6 +336,22 @@ export default function Map({
             fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, visibleDraft);
         }
     }, []);
+
+    const applyHighlightToMap = useCallback((fc: FeatureCollection) => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const source = map.getSource("entity-focus") as maplibregl.GeoJSONSource | undefined;
+        if (!source) return;
+        source.setData(fc);
+    }, []);
+
+    useEffect(() => {
+        geometryVisibilityRef.current = geometryVisibility;
+        const map = mapRef.current;
+        if (!map) return;
+        applyDraftToMap(draftRef.current);
+    }, [applyDraftToMap, geometryVisibility]);
 
     const tryCenterToUserLocation = useCallback(() => {
         if (geolocationCenteredRef.current) return;
@@ -899,7 +953,56 @@ export default function Map({
                 },
             });
 
+            map.addSource("entity-focus", {
+                type: "geojson",
+                data: EMPTY_FEATURE_COLLECTION,
+            });
+
+            map.addLayer({
+                id: "entity-focus-fill",
+                type: "fill",
+                source: "entity-focus",
+                filter: ["==", ["geometry-type"], "Polygon"],
+                paint: {
+                    "fill-color": "#fde047",
+                    "fill-opacity": 0.2,
+                },
+            });
+
+            map.addLayer({
+                id: "entity-focus-line",
+                type: "line",
+                source: "entity-focus",
+                paint: {
+                    "line-color": "#f59e0b",
+                    "line-width": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        1, 2.4,
+                        4, 4,
+                        6, 5.5,
+                    ],
+                    "line-opacity": 0.98,
+                },
+            });
+
+            map.addLayer({
+                id: "entity-focus-points",
+                type: "circle",
+                source: "entity-focus",
+                filter: ["==", ["geometry-type"], "Point"],
+                paint: {
+                    "circle-color": "#f8fafc",
+                    "circle-radius": 8,
+                    "circle-stroke-color": "#f59e0b",
+                    "circle-stroke-width": 3,
+                    "circle-opacity": 1,
+                },
+            });
+
             addPointSymbolLayer(map);
+            applyHighlightToMap(highlightFeaturesRef.current || EMPTY_FEATURE_COLLECTION);
 
             // init drawing
             const drawingEngine = initDrawing(
@@ -1047,10 +1150,59 @@ export default function Map({
                 () => map.off("zoom", syncZoomLevel),
             ];
 
+            const handleHoverMove = (event: maplibregl.MapMouseEvent) => {
+                const callback = onHoverFeatureChangeRef.current;
+                if (!callback) return;
+
+                const selectableLayers = getSelectableLayers(map);
+                if (!selectableLayers.length) {
+                    callback(null);
+                    return;
+                }
+
+                const features = map.queryRenderedFeatures(event.point, {
+                    layers: selectableLayers,
+                }) as maplibregl.MapGeoJSONFeature[];
+
+                const feature = features[0];
+                const rawFeatureId = feature?.id ?? feature?.properties?.id;
+                if (rawFeatureId === undefined || rawFeatureId === null) {
+                    callback(null);
+                    return;
+                }
+
+                const currentFeature =
+                    draftRef.current.features.find(
+                        (item) => String(item.properties.id) === String(rawFeatureId)
+                    ) || null;
+
+                callback({
+                    featureId: rawFeatureId,
+                    feature: currentFeature,
+                    point: { x: event.point.x, y: event.point.y },
+                    lngLat: { lng: event.lngLat.lng, lat: event.lngLat.lat },
+                });
+            };
+
+            const handleCanvasMouseLeave = () => {
+                onHoverFeatureChangeRef.current?.(null);
+            };
+
+            map.on("mousemove", handleHoverMove);
+            mapCleanupFnsRef.current.push(() => map.off("mousemove", handleHoverMove));
+
+            map.getCanvasContainer().addEventListener("mouseleave", handleCanvasMouseLeave);
+            mapCleanupFnsRef.current.push(() => {
+                map.getCanvasContainer().removeEventListener("mouseleave", handleCanvasMouseLeave);
+            });
+
             // after everything mounted, push current draft to sources
             applyDraftToMap(draftRef.current);
             // Khi vao web, thu auto center theo vi tri user (neu co quyen).
             tryCenterToUserLocation();
+            if (focusRequestKeyRef.current !== null && focusRequestKeyRef.current !== undefined && focusFeatureCollectionRef.current?.features.length) {
+                fitMapToFeatureCollection(map, focusFeatureCollectionRef.current, focusPaddingRef.current);
+            }
 
             if (allowGeometryEditing) {
                 editingEngineRef.current?.bindEditEvents(map);
@@ -1072,7 +1224,7 @@ export default function Map({
             }
             map.remove();
         };
-    }, [allowGeometryEditing, applyDraftToMap, tryCenterToUserLocation]);
+    }, [allowGeometryEditing, applyDraftToMap, applyHighlightToMap, tryCenterToUserLocation]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -1125,6 +1277,15 @@ export default function Map({
             }
         }
     }, [allowGeometryEditing, draft, selectedFeatureId, applyDraftToMap]);
+
+    useEffect(() => {
+        if (focusRequestKey === null || focusRequestKey === undefined) return;
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded()) return;
+        const target = focusFeatureCollectionRef.current;
+        if (!target || !target.features.length) return;
+        fitMapToFeatureCollection(map, target, focusPaddingRef.current);
+    }, [focusRequestKey]);
 
     return (
         <div style={{ width: "100%", height, position: "relative" }}>
@@ -1374,6 +1535,19 @@ function createRasterBaseLayer() {
     };
 }
 
+function getSelectableLayers(map: maplibregl.Map): string[] {
+    return [
+        "countries-fill",
+        "countries-line",
+        "routes-line",
+        "routes-path-arrow-fill",
+        "routes-path-arrow-line",
+        "routes-path-hit",
+        "places-circle",
+        "places-symbol",
+    ].filter((layerId) => Boolean(map.getLayer(layerId)));
+}
+
 function filterDraftByBinding(
     fc: FeatureCollection,
     selectedFeatureId: string | number | null
@@ -1470,9 +1644,18 @@ function setSelectedFeatureState(
     }
 }
 
-function fitMapToFeatureCollection(map: maplibregl.Map, fc: FeatureCollection): boolean {
+function fitMapToFeatureCollection(
+    map: maplibregl.Map,
+    fc: FeatureCollection,
+    padding?: number | maplibregl.PaddingOptions
+): boolean {
     const bbox = getFeatureCollectionBBox(fc);
     if (!bbox) return false;
+
+    const resolvedPadding =
+        typeof padding === "number" || padding
+            ? padding
+            : 58;
 
     const lngSpan = Math.abs(bbox.maxLng - bbox.minLng);
     const latSpan = Math.abs(bbox.maxLat - bbox.minLat);
@@ -1480,6 +1663,7 @@ function fitMapToFeatureCollection(map: maplibregl.Map, fc: FeatureCollection): 
         map.easeTo({
             center: [bbox.minLng, bbox.minLat],
             zoom: 6,
+            padding: resolvedPadding,
             duration: 0,
         });
         return true;
@@ -1491,7 +1675,7 @@ function fitMapToFeatureCollection(map: maplibregl.Map, fc: FeatureCollection): 
             [bbox.maxLng, bbox.maxLat],
         ],
         {
-            padding: 58,
+            padding: resolvedPadding,
             maxZoom: 7,
             duration: 0,
         }

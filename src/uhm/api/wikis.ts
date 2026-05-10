@@ -14,8 +14,6 @@ export type Wiki = {
 
 export async function searchWikisByTitle(title: string, options?: { limit?: number; cursor?: string; entityId?: string }): Promise<Wiki[]> {
   const keyword = title.trim();
-  if (!keyword.length) return [];
-
   const params = new URLSearchParams({ title: keyword });
   if (options?.limit && Number.isFinite(options.limit)) params.set("limit", String(Math.trunc(options.limit)));
   if (options?.cursor) params.set("cursor", options.cursor);
@@ -52,11 +50,11 @@ export async function checkWikiSlugExists(slug: string): Promise<boolean> {
 
   if (typeof payload === "boolean") return payload;
   if (payload && typeof payload === "object") {
-    const anyPayload = payload as any;
-    if (typeof anyPayload.exists === "boolean") return anyPayload.exists;
-    if (typeof anyPayload.exists === "number") return anyPayload.exists !== 0;
-    if (typeof anyPayload.is_exists === "boolean") return anyPayload.is_exists;
-    if (typeof anyPayload.is_exists === "number") return anyPayload.is_exists !== 0;
+    const source = payload as Record<string, unknown>;
+    if (typeof source.exists === "boolean") return source.exists;
+    if (typeof source.exists === "number") return source.exists !== 0;
+    if (typeof source.is_exists === "boolean") return source.is_exists;
+    if (typeof source.is_exists === "number") return source.is_exists !== 0;
   }
 
   // Be conservative: unknown payload shape, treat as "exists" to prevent creating conflicting slugs.

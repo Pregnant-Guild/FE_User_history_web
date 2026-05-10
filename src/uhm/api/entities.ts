@@ -4,11 +4,25 @@ import type { Entity } from "@/uhm/types/entities";
 
 export type { Entity } from "@/uhm/types/entities";
 
-export async function fetchEntities(query?: { q?: string }): Promise<Entity[]> {
+export async function fetchEntities(query?: {
+    q?: string;
+    limit?: number;
+    cursor?: string;
+    projectId?: string;
+}): Promise<Entity[]> {
     const params = new URLSearchParams();
     // API mới dùng `name` thay vì `q`.
-    if (query?.q) {
-        params.set("name", query.q);
+    if (query && "q" in query) {
+        params.set("name", String(query.q ?? ""));
+    }
+    if (query?.limit && Number.isFinite(query.limit)) {
+        params.set("limit", String(Math.trunc(query.limit)));
+    }
+    if (query?.cursor) {
+        params.set("cursor", query.cursor);
+    }
+    if (query?.projectId) {
+        params.set("project_id", query.projectId);
     }
     const suffix = params.toString();
     const url = suffix ? `${API_ENDPOINTS.entities}?${suffix}` : API_ENDPOINTS.entities;
