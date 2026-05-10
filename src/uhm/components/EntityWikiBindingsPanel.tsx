@@ -208,9 +208,9 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
                 {!activeEntityId ? (
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>Pick an entity to see/link wikis.</div>
                 ) : activeLinks.size ? (
-                  <div style={{ display: "grid", gap: "6px" }}>
+                  <div style={{ display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>Linked wikis ({activeLinks.size})</div>
-                    {Array.from(activeLinks).slice(0, 8).map((id) => {
+                    {Array.from(activeLinks).map((id) => {
                       const w = wikiChoices.find((x) => x.id === id) || null;
                       return (
                         <div
@@ -264,9 +264,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
                         </div>
                       );
                     })}
-                    {activeLinks.size > 8 ? (
-                      <div style={{ fontSize: 12, color: "#94a3b8" }}>+{activeLinks.size - 8} more…</div>
-                    ) : null}
+
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>No wiki linked yet.</div>

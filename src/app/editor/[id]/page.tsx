@@ -128,8 +128,8 @@ export default function Page() {
         setSnapshotEntities,
         entityStatus,
         setEntityStatus,
-        selectedFeatureId,
-        setSelectedFeatureId,
+        selectedFeatureIds,
+        setSelectedFeatureIds,
         entityForm,
         setEntityForm,
         selectedGeometryEntityIds,
@@ -263,12 +263,20 @@ export default function Page() {
         rows.sort((a, b) => a.name.localeCompare(b.name));
         return rows;
     }, [entities, snapshotEntitiesVisible]);
-    const selectedFeature =
-        selectedFeatureId === null
-            ? null
-            : editor.draft.features.find((feature) =>
-                String(feature.properties.id) === String(selectedFeatureId)
-            ) || null;
+    const selectedFeatures = useMemo(() => {
+        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return [];
+        return selectedFeatureIds
+            .map(id => editor.draft.features.find(f => String(f.properties.id) === String(id)))
+            .filter(Boolean) as Feature[];
+    }, [selectedFeatureIds, editor.draft.features]);
+
+    const isMultiEditValid = useMemo(() => {
+        if (selectedFeatures.length <= 1) return true;
+        const firstShape = selectedFeatures[0].geometry.type;
+        return selectedFeatures.every(f => f.geometry.type === firstShape);
+    }, [selectedFeatures]);
+
+    const selectedFeature = selectedFeatures.length > 0 && isMultiEditValid ? selectedFeatures[0] : null;
 
     const geometryChoices = useMemo(() => {
         const rows = (editor.draft.features || [])
@@ -383,7 +391,7 @@ export default function Page() {
         setSnapshotWikis,
         setSnapshotEntityWikiLinks,
         setEntityFormStatus,
-        setSelectedFeatureId,
+        setSelectedFeatureIds,
         setEntityStatus,
         setIsSaving,
         setIsSubmitting,
@@ -682,14 +690,14 @@ export default function Page() {
     }, [geoSearchRequestRef, searchKind, searchQuery]);
 
     useEffect(() => {
-        if (selectedFeatureId === null) return;
-        const stillExists = timelineVisibleDraft.features.some((feature) =>
-            String(feature.properties.id) === String(selectedFeatureId)
+        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
+        const stillExistIds = selectedFeatureIds.filter(id => 
+            timelineVisibleDraft.features.some(feature => String(feature.properties.id) === String(id))
         );
-        if (!stillExists) {
-            setSelectedFeatureId(null);
+        if (stillExistIds.length !== selectedFeatureIds.length) {
+            setSelectedFeatureIds(stillExistIds);
         }
-    }, [timelineVisibleDraft, selectedFeatureId, setSelectedFeatureId]);
+    }, [timelineVisibleDraft, selectedFeatureIds, setSelectedFeatureIds]);
 
     useEffect(() => {
         if (!selectedFeature) {
@@ -868,8 +876,12 @@ export default function Page() {
     }, [editor, flashEntityFormStatus]);
 
     const handleToggleBindEntityForSelectedGeometry = useCallback((entityId: string, nextChecked: boolean) => {
-        if (!selectedFeature) {
+        if (!selectedFeatures || selectedFeatures.length === 0) {
             flashEntityFormStatus("Chưa chọn geometry để bind entity.");
+            return;
+        }
+        if (!isMultiEditValid) {
+            flashEntityFormStatus("Không thể bind entity cho nhiều geometry khác loại.");
             return;
         }
         const id = String(entityId || "").trim();
@@ -888,10 +900,12 @@ export default function Page() {
         setIsEntitySubmitting(true);
         flashEntityFormStatus(null, 0);
         try {
-            editor.patchFeatureProperties(
-                selectedFeature.properties.id,
-                buildFeatureEntityPatch(selectedFeature, nextEntityIds, entities)
-            );
+            for (const feature of selectedFeatures) {
+                editor.patchFeatureProperties(
+                    feature.properties.id,
+                    buildFeatureEntityPatch(feature, nextEntityIds, entities)
+                );
+            }
             setSelectedGeometryEntityIds(nextEntityIds);
             flashEntityFormStatus(
                 nextChecked
@@ -906,37 +920,53 @@ export default function Page() {
         editor,
         entities,
         flashEntityFormStatus,
-        selectedFeature,
+        selectedFeatures,
+        isMultiEditValid,
         selectedGeometryEntityIds,
         setIsEntitySubmitting,
         setSelectedGeometryEntityIds,
     ]);
 
     const handleToggleBindGeometryForSelectedGeometry = useCallback((geoId: string, nextChecked: boolean) => {
-        if (!selectedFeature) {
+        if (!selectedFeatures || selectedFeatures.length === 0) {
             flashGeoBindingStatus("Chưa chọn geometry để bind.");
+            return;
+        }
+        if (!isMultiEditValid) {
+            flashGeoBindingStatus("Không thể bind geometry cho nhiều geometry khác loại.");
             return;
         }
         const id = String(geoId || "").trim();
         if (!id) return;
-        if (String(selectedFeature.properties.id) === id) return;
+        if (selectedFeatures.some(f => String(f.properties.id) === id)) return;
 
-        const prevBindingIds = normalizeFeatureBindingIds(selectedFeature);
-        const has = prevBindingIds.includes(id);
-        const nextBindingIds = (() => {
-            if (nextChecked) {
-                if (has) return prevBindingIds;
-                return [...prevBindingIds, id];
-            }
-            if (!has) return prevBindingIds;
-            return prevBindingIds.filter((x) => x !== id);
-        })();
+
 
         setIsEntitySubmitting(true);
         flashGeoBindingStatus(null, 0);
         try {
-            editor.patchFeatureProperties(selectedFeature.properties.id, { binding: nextBindingIds });
-            setGeometryMetaForm((prev) => ({ ...prev, binding: nextBindingIds.join(", ") }));
+            for (const feature of selectedFeatures) {
+                const prevBindingIds = normalizeFeatureBindingIds(feature);
+                const has = prevBindingIds.includes(id);
+                const nextBindingIds = (() => {
+                    if (nextChecked) {
+                        if (has) return prevBindingIds;
+                        return [...prevBindingIds, id];
+                    }
+                    if (!has) return prevBindingIds;
+                    return prevBindingIds.filter((x) => x !== id);
+                })();
+                editor.patchFeatureProperties(feature.properties.id, { binding: nextBindingIds });
+            }
+            
+            // Assume selectedFeature (the first one) reflects the representative binding in UI
+            const firstFeaturePrevBindings = normalizeFeatureBindingIds(selectedFeatures[0]);
+            const firstFeatureHas = firstFeaturePrevBindings.includes(id);
+            const nextBindingIdsForUI = (() => {
+                if (nextChecked) return firstFeatureHas ? firstFeaturePrevBindings : [...firstFeaturePrevBindings, id];
+                return firstFeatureHas ? firstFeaturePrevBindings.filter(x => x !== id) : firstFeaturePrevBindings;
+            })();
+            setGeometryMetaForm((prev) => ({ ...prev, binding: nextBindingIdsForUI.join(", ") }));
             flashGeoBindingStatus(
                 nextChecked
                     ? "Đã bind geometry vào binding. Commit khi sẵn sàng."
@@ -949,7 +979,8 @@ export default function Page() {
     }, [
         editor,
         flashGeoBindingStatus,
-        selectedFeature,
+        selectedFeatures,
+        isMultiEditValid,
         setGeometryMetaForm,
         setIsEntitySubmitting,
     ]);
@@ -996,7 +1027,7 @@ export default function Page() {
 
         const existing = editor.draft.features.find((f) => String(f.properties.id) === geoId) || null;
         if (existing) {
-            setSelectedFeatureId(existing.properties.id);
+            setSelectedFeatureIds([existing.properties.id]);
             flashEntityFormStatus("Đã chọn geometry từ kết quả search.", 3000);
             return;
         }
@@ -1027,19 +1058,19 @@ export default function Page() {
         };
 
         editor.createFeature(feature);
-        setSelectedFeatureId(feature.properties.id);
+        setSelectedFeatureIds([feature.properties.id]);
         flashEntityFormStatus("Đã import geometry từ search GEO. Commit khi sẵn sàng.", 3000);
     }, [
         editor,
         flashEntityFormStatus,
         handleAddEntityRefToProject,
-        setSelectedFeatureId,
+        setSelectedFeatureIds,
         setTimelineFilterEnabled,
     ]);
 
     const featureCommands = useFeatureCommands({
         editor,
-        selectedFeature,
+        selectedFeatures,
         geometryMetaForm,
         setGeometryMetaForm,
         selectedGeometryEntityIds,
@@ -1119,7 +1150,7 @@ export default function Page() {
 
     const handleCreateFeature = (feature: Feature) => {
         editor.createFeature(feature);
-        setSelectedFeatureId(feature.properties.id);
+        setSelectedFeatureIds([feature.properties.id]);
     };
 
     return (
@@ -1205,8 +1236,8 @@ export default function Page() {
                         <Map
                             mode={mode}
                             draft={timelineVisibleDraft}
-                            selectedFeatureId={selectedFeatureId}
-                            onSelectFeatureId={setSelectedFeatureId}
+                            selectedFeatureIds={selectedFeatureIds}
+                            onSelectFeatureIds={setSelectedFeatureIds}
                             onCreateFeature={handleCreateFeature}
                             onDeleteFeature={editor.deleteFeature}
                             onUpdateFeature={editor.updateFeature}
@@ -1416,8 +1447,8 @@ export default function Page() {
                                                 </div>
                                             ) : null}
                                             {Array.isArray(item.geometries) && item.geometries.length ? (
-                                                <div style={{ display: "grid", gap: 6 }}>
-                                                    {item.geometries.slice(0, 4).map((geo) => (
+                                                <div style={{ display: "grid", gap: 6, maxHeight: 200, overflowY: "auto", paddingRight: 4 }}>
+                                                    {item.geometries.map((geo) => (
                                                         <div
                                                             key={geo.id}
                                                             style={{
@@ -1462,11 +1493,6 @@ export default function Page() {
                                                             </button>
                                                         </div>
                                                     ))}
-                                                    {item.geometries.length > 4 ? (
-                                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                            +{item.geometries.length - 4} more…
-                                                        </div>
-                                                    ) : null}
                                                 </div>
                                             ) : (
                                                 <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -1520,7 +1546,7 @@ export default function Page() {
                         />
                         {!wikiOnly && selectedFeature ? (
                             <SelectedGeometryPanel
-                                selectedFeature={selectedFeature}
+                                selectedFeatures={selectedFeatures}
                                 selectedFeatureEntitySummary={
                                     selectedFeature
                                         ? formatEntityNamesForDisplay(selectedFeature, entities)

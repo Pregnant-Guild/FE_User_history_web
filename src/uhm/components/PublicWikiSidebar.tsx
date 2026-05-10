@@ -258,11 +258,10 @@ export default function PublicWikiSidebar({
                                 <a
                                     key={item.id}
                                     href={`#${item.id}`}
-                                    className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${
-                                        isActive
+                                    className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${isActive
                                             ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
                                             : "bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                                    }`}
+                                        }`}
                                 >
                                     {item.text}
                                 </a>

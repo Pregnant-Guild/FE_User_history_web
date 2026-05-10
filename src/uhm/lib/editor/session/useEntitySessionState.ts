@@ -14,8 +14,8 @@ export function useEntitySessionState() {
     const [snapshotEntities, setSnapshotEntities] = useState<EntitySnapshot[]>([]);
     // Thông báo trạng thái/lỗi liên quan entity/session.
     const [entityStatus, setEntityStatus] = useState<string | null>(null);
-    // Feature đang được chọn để thao tác bind entities/metadata.
-    const [selectedFeatureId, setSelectedFeatureId] = useState<FeatureId | null>(null);
+    // Features đang được chọn để thao tác bind entities/metadata.
+    const [selectedFeatureIds, setSelectedFeatureIds] = useState<FeatureId[]>([]);
     // Form tạo entity mới (độc lập).
     const [entityForm, setEntityForm] = useState<EntityFormState>({
         name: "",
@@ -50,8 +50,8 @@ export function useEntitySessionState() {
         setSnapshotEntities,
         entityStatus,
         setEntityStatus,
-        selectedFeatureId,
-        setSelectedFeatureId,
+        selectedFeatureIds,
+        setSelectedFeatureIds,
         entityForm,
         setEntityForm,
         selectedGeometryEntityIds,

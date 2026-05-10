@@ -41,7 +41,6 @@ export default function GeometryBindingPanel({
 
   const bindingSet = useMemo(() => new Set(selectedGeometryBindingIds || []), [selectedGeometryBindingIds]);
 
-  const visibleRows = rows.slice(0, 12);
 
   return (
     <div
@@ -101,8 +100,8 @@ export default function GeometryBindingPanel({
       </div>
 
       {collapsed ? null : rows.length ? (
-        <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
-          {visibleRows
+        <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
+          {rows
             .filter((g) => g.id !== selectedGeometryId)
             .map((g) => {
               const isBound = bindingSet.has(g.id);
@@ -176,11 +175,7 @@ export default function GeometryBindingPanel({
                 </div>
               );
             })}
-          {rows.length > visibleRows.length ? (
-            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-              +{rows.length - visibleRows.length} more…
-            </div>
-          ) : null}
+
         </div>
       ) : (
         <div style={{ marginTop: "10px", fontSize: "12px", color: "#94a3b8" }}>

@@ -13,7 +13,7 @@ import {
 import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
 
 type Props = {
-    selectedFeature: Feature | null;
+    selectedFeatures: Feature[];
     selectedFeatureEntitySummary: string;
     selectedFeatureBindingSummary: string;
     entities: Entity[];
@@ -28,7 +28,7 @@ type Props = {
 };
 
 export default function SelectedGeometryPanel({
-    selectedFeature,
+    selectedFeatures,
     selectedFeatureEntitySummary,
     selectedFeatureBindingSummary,
     entities,
@@ -78,10 +78,11 @@ export default function SelectedGeometryPanel({
     const visibleGeoApplyFeedback =
         geoApplyFeedback && geoApplyFeedback.signature === geoMetaSignature ? geoApplyFeedback : null;
 
-    if (!selectedFeature) return null;
+    if (!selectedFeatures || selectedFeatures.length === 0) return null;
+    const representativeFeature = selectedFeatures[0];
 
     const groupedEntityTypeOptions = groupEntityTypeOptions(entityTypeOptions);
-    const featureGeometryPreset = resolveFeatureGeometryPreset(selectedFeature);
+    const featureGeometryPreset = resolveFeatureGeometryPreset(representativeFeature);
     const allowedGroupIds = getAllowedGroupIdsForPreset(featureGeometryPreset);
     const groupedGeoTypeOptions = groupedEntityTypeOptions.filter((group) =>
         allowedGroupIds.includes(group.id)
@@ -130,7 +131,7 @@ export default function SelectedGeometryPanel({
             {collapsed ? null : (
             <div style={{ display: "grid", gap: "8px", fontSize: "13px" }}>
                 <div style={{ color: "#e2e8f0" }}>
-                    ID: {String(selectedFeature.properties.id)}
+                    ID: {selectedFeatures.map(f => String(f.properties.id)).join(", ")}
                 </div>
                 <div style={{ color: "#cbd5e1" }}>
                     Entities hiện tại: {selectedFeatureEntitySummary}

@@ -7,7 +7,7 @@ export function initSelect(
     getMode: ModeGetter,
     onDelete?: (id: string | number) => void,
     onEdit?: (feature: maplibregl.MapGeoJSONFeature) => void,
-    onSelectId?: (id: string | number | null) => void
+    onSelectIds?: (ids: (string | number)[]) => void
 ) {
     const SELECTABLE_LAYERS = [
         "countries-fill",
@@ -35,7 +35,7 @@ export function initSelect(
         selectedIds.forEach((id) => setSelectionStateForId(id, false));
         selectedIds.clear();
         if (emit) {
-            onSelectId?.(null);
+            onSelectIds?.([]);
         }
     }
 
@@ -52,13 +52,13 @@ export function initSelect(
             // Alt + click on an already selected feature removes it from the selection
             setSelectionStateForId(id, false);
             selectedIds.delete(id);
-            onSelectId?.(selectedIds.size === 1 ? Array.from(selectedIds)[0] : null);
+            onSelectIds?.(Array.from(selectedIds));
             return;
         }
 
         setSelectionStateForId(id, true);
         selectedIds.add(id);
-        onSelectId?.(selectedIds.size === 1 ? id : null);
+        onSelectIds?.(Array.from(selectedIds));
     }
 
     // Chọn feature theo click trái, hỗ trợ additive bằng Alt.

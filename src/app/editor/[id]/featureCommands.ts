@@ -16,7 +16,7 @@ type EditorDraftApi = {
 
 type Options = {
     editor: EditorDraftApi;
-    selectedFeature: Feature | null;
+    selectedFeatures: Feature[];
     geometryMetaForm: GeometryMetaFormState;
     setGeometryMetaForm: Dispatch<SetStateAction<GeometryMetaFormState>>;
     selectedGeometryEntityIds: string[];
@@ -29,7 +29,7 @@ type Options = {
 export function useFeatureCommands(options: Options) {
     const {
         editor,
-        selectedFeature,
+        selectedFeatures,
         geometryMetaForm,
         setGeometryMetaForm,
         selectedGeometryEntityIds,
@@ -40,8 +40,8 @@ export function useFeatureCommands(options: Options) {
     } = options;
 
     const applyGeometryMetadata = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
-        if (!selectedFeature) {
-            const msg = "Hãy chọn một geometry trước.";
+        if (!selectedFeatures || selectedFeatures.length === 0) {
+            const msg = "Hãy chọn ít nhất một geometry trước.";
             setEntityFormStatus(msg);
             return { ok: false, error: msg };
         }
@@ -64,7 +64,9 @@ export function useFeatureCommands(options: Options) {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            editor.patchFeatureProperties(selectedFeature.properties.id, metadata.patch);
+            for (const feature of selectedFeatures) {
+                editor.patchFeatureProperties(feature.properties.id, metadata.patch);
+            }
             setGeometryMetaForm(metadata.formState);
             setEntityFormStatus("Đã cập nhật thuộc tính GEO. Commit khi sẵn sàng.");
             return { ok: true };
@@ -74,15 +76,15 @@ export function useFeatureCommands(options: Options) {
     }, [
         editor,
         geometryMetaForm,
-        selectedFeature,
+        selectedFeatures,
         setEntityFormStatus,
         setGeometryMetaForm,
         setIsEntitySubmitting,
     ]);
 
     const applyEntitiesToSelectedGeometry = useCallback(async () => {
-        if (!selectedFeature) {
-            setEntityFormStatus("Hãy chọn một geometry trước.");
+        if (!selectedFeatures || selectedFeatures.length === 0) {
+            setEntityFormStatus("Hãy chọn ít nhất một geometry trước.");
             return;
         }
 
@@ -90,10 +92,12 @@ export function useFeatureCommands(options: Options) {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            editor.patchFeatureProperties(
-                selectedFeature.properties.id,
-                buildFeatureEntityPatch(selectedFeature, entityIds, entities)
-            );
+            for (const feature of selectedFeatures) {
+                editor.patchFeatureProperties(
+                    feature.properties.id,
+                    buildFeatureEntityPatch(feature, entityIds, entities)
+                );
+            }
             setSelectedGeometryEntityIds(entityIds);
             setEntityFormStatus("Đã cập nhật danh sách entity. Commit khi sẵn sàng.");
         } catch (err) {
@@ -108,7 +112,7 @@ export function useFeatureCommands(options: Options) {
     }, [
         editor,
         entities,
-        selectedFeature,
+        selectedFeatures,
         selectedGeometryEntityIds,
         setEntityFormStatus,
         setIsEntitySubmitting,

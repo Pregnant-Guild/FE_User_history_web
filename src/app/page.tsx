@@ -57,7 +57,7 @@ const EMPTY_RELATIONS: RelationIndex = {
 
 export default function Page() {
     const [data, setData] = useState<FeatureCollection>(EMPTY_FEATURE_COLLECTION);
-    const [selectedFeatureId, setSelectedFeatureId] = useState<string | number | null>(null);
+    const [selectedFeatureIds, setSelectedFeatureIds] = useState<(string | number)[]>([]);
     const [timelineYear, setTimelineYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
     const [timelineDraftYear, setTimelineDraftYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
     const [timeRange, setTimeRange] = useState<number>(0);
@@ -94,17 +94,21 @@ export default function Page() {
     const linkEntityPopupRef = useRef<HTMLDivElement | null>(null);
 
     const selectedFeature = useMemo(() => {
-        if (selectedFeatureId === null) return null;
+        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return null;
         return (
-            data.features.find((feature) => String(feature.properties.id) === String(selectedFeatureId)) || null
+            data.features.find((feature) => String(feature.properties.id) === String(selectedFeatureIds[0])) || null
         );
-    }, [data.features, selectedFeatureId]);
+    }, [data.features, selectedFeatureIds]);
 
     useEffect(() => {
-        if (selectedFeatureId === null) return;
-        const stillExists = data.features.some((feature) => String(feature.properties.id) === String(selectedFeatureId));
-        if (!stillExists) setSelectedFeatureId(null);
-    }, [data.features, selectedFeatureId]);
+        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
+        const stillExistIds = selectedFeatureIds.filter(id =>
+            data.features.some(feature => String(feature.properties.id) === String(id))
+        );
+        if (stillExistIds.length !== selectedFeatureIds.length) {
+            setSelectedFeatureIds(stillExistIds);
+        }
+    }, [data.features, selectedFeatureIds]);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -315,25 +319,26 @@ export default function Page() {
         if (options?.focusMap !== false) {
             setEntityFocusToken((prev) => prev + 1);
         }
-        if (options?.selectGeometry && options?.sourceFeatureId !== undefined) {
-            setSelectedFeatureId(options.sourceFeatureId);
+        if (options?.selectGeometry && options?.sourceFeatureId != null) {
+            setSelectedFeatureIds([options.sourceFeatureId]);
         }
     }, [relations.entitiesById, relations.entityWikisById]);
 
     useEffect(() => {
-        if (selectedFeatureId === null) return;
-        const linkedEntityIds = relations.geometryEntityIds[String(selectedFeatureId)] || [];
+        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
+        // For UI simplicity in viewer, just link to the first selected geometry
+        const linkedEntityIds = relations.geometryEntityIds[String(selectedFeatureIds[0])] || [];
         if (linkedEntityIds.length !== 1) return;
 
         const onlyEntityId = linkedEntityIds[0];
         if (activeEntityId === onlyEntityId) return;
 
         selectEntity(onlyEntityId, {
-            sourceFeatureId: selectedFeatureId,
+            sourceFeatureId: selectedFeatureIds[0],
             focusMap: false,
             selectGeometry: false,
         });
-    }, [activeEntityId, relations.geometryEntityIds, selectEntity, selectedFeatureId]);
+    }, [activeEntityId, relations.geometryEntityIds, selectEntity, selectedFeatureIds]);
 
     const handleMapHoverChange = useCallback((payload: MapHoverPayload | null) => {
         clearHoverHideTimer();
@@ -461,12 +466,12 @@ export default function Page() {
                     <Map
                         mode="select"
                         draft={data}
-                        selectedFeatureId={selectedFeatureId}
-                        onSelectFeatureId={setSelectedFeatureId}
+                        selectedFeatureIds={selectedFeatureIds}
+                        onSelectFeatureIds={setSelectedFeatureIds}
                         backgroundVisibility={backgroundVisibility}
                         geometryVisibility={geometryVisibility}
                         allowGeometryEditing={false}
-                        respectBindingFilter={false}
+                        respectBindingFilter={true}
                         onHoverFeatureChange={handleMapHoverChange}
                         highlightFeatures={activeEntityGeometries}
                         focusFeatureCollection={activeEntityGeometries}
@@ -514,11 +519,10 @@ export default function Page() {
                                             key={layer.id}
                                             type="button"
                                             onClick={() => handleToggleBackgroundLayer(layer.id)}
-                                            className={`rounded-md border px-2.5 py-1 text-xs transition ${
-                                                active
+                                            className={`rounded-md border px-2.5 py-1 text-xs transition ${active
                                                     ? "border-sky-400/40 bg-sky-500/10 text-sky-200"
                                                     : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200"
-                                            }`}
+                                                }`}
                                         >
                                             {layer.label}
                                         </button>
@@ -544,11 +548,10 @@ export default function Page() {
                                                     [typeKey]: prev[typeKey] === false,
                                                 }));
                                             }}
-                                            className={`rounded-md border px-2.5 py-1 text-xs capitalize transition ${
-                                                active
+                                            className={`rounded-md border px-2.5 py-1 text-xs capitalize transition ${active
                                                     ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                                                     : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200"
-                                            }`}
+                                                }`}
                                         >
                                             {typeKey.replaceAll("_", " ")}
                                         </button>

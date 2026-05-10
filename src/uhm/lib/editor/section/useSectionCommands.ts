@@ -46,7 +46,7 @@ type Options = {
     setSnapshotEntities: Dispatch<SetStateAction<EntitySnapshot[]>>;
     setSnapshotWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
     setSnapshotEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
-    setSelectedFeatureId: Dispatch<SetStateAction<FeatureId | null>>;
+    setSelectedFeatureIds: Dispatch<SetStateAction<FeatureId[]>>;
     setEntityFormStatus: Dispatch<SetStateAction<string | null>>;
     setEntityStatus: Dispatch<SetStateAction<string | null>>;
     setIsSaving: Dispatch<SetStateAction<boolean>>;
@@ -76,7 +76,7 @@ export function useSectionCommands(options: Options) {
         options.setSnapshotEntities(sessionSnapshot?.entities || []);
         options.setSnapshotWikis(sessionSnapshot?.wikis || []);
         options.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
-        options.setSelectedFeatureId(null);
+        options.setSelectedFeatureIds([]);
         options.setEntityFormStatus(null);
     }, [options]);
 
@@ -271,7 +271,7 @@ export function useSectionCommands(options: Options) {
             options.setSnapshotEntities(sessionSnapshot?.entities || []);
             options.setSnapshotWikis(sessionSnapshot?.wikis || []);
             options.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
-            options.setSelectedFeatureId(null);
+            options.setSelectedFeatureIds([]);
             options.setEntityFormStatus(null);
 
             // Refresh commits list for UI, but keep sectionState/head as-is.

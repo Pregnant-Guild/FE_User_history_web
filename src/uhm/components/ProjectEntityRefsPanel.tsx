@@ -97,8 +97,8 @@ export default function ProjectEntityRefsPanel({
       </div>
 
       {collapsed ? null : entityRefs.length ? (
-        <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
-          {entityRefs.slice(0, 8).map((e) => (
+        <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
+          {entityRefs.map((e) => (
             <div
               key={e.id}
               style={{
@@ -170,7 +170,7 @@ export default function ProjectEntityRefsPanel({
               ) : null}
             </div>
           ))}
-          {entityRefs.length > 8 ? <div style={{ fontSize: "12px", color: "#94a3b8" }}>+{entityRefs.length - 8} more…</div> : null}
+
         </div>
       ) : (
         <div style={{ marginTop: "10px", fontSize: "12px", color: "#94a3b8" }}>No entity ref yet for this project.</div>

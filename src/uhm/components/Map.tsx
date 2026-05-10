@@ -43,8 +43,8 @@ type MapProps = {
     draft: FeatureCollection;
     backgroundVisibility: BackgroundLayerVisibility;
     geometryVisibility?: Record<string, boolean>;
-    selectedFeatureId: string | number | null;
-    onSelectFeatureId: (id: string | number | null) => void;
+    selectedFeatureIds: (string | number)[];
+    onSelectFeatureIds: (ids: (string | number)[]) => void;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
     onDeleteFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
@@ -84,8 +84,8 @@ export default function Map({
     draft,
     backgroundVisibility,
     geometryVisibility,
-    selectedFeatureId,
-    onSelectFeatureId,
+    selectedFeatureIds,
+    onSelectFeatureIds,
     onCreateFeature,
     onDeleteFeature,
     onUpdateFeature,
@@ -123,10 +123,10 @@ export default function Map({
     const focusFeatureCollectionRef = useRef<FeatureCollection | null>(focusFeatureCollection);
     const focusRequestKeyRef = useRef<MapProps["focusRequestKey"]>(focusRequestKey);
     const focusPaddingRef = useRef<MapProps["focusPadding"]>(focusPadding);
-    // Mirror của selectedFeatureId để filter/select trên map (không phụ thuộc re-render).
-    const selectedFeatureIdRef = useRef<string | number | null>(selectedFeatureId);
-    // Mirror của callback onSelectFeatureId.
-    const onSelectFeatureIdRef = useRef(onSelectFeatureId);
+    // Mirror của selectedFeatureIds để filter/select trên map (không phụ thuộc re-render).
+    const selectedFeatureIdsRef = useRef<(string | number)[]>(selectedFeatureIds);
+    // Mirror của callback onSelectFeatureIds.
+    const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
     const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
     // Mirror của callback onCreateFeature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
@@ -225,26 +225,26 @@ export default function Map({
     }, [draft]);
 
     useEffect(() => {
-        selectedFeatureIdRef.current = selectedFeatureId;
-    }, [selectedFeatureId]);
+        selectedFeatureIdsRef.current = selectedFeatureIds;
+    }, [selectedFeatureIds]);
 
     useEffect(() => {
         onHoverFeatureChangeRef.current = onHoverFeatureChange;
     }, [onHoverFeatureChange]);
 
     useEffect(() => {
-        if (mode !== "select" || selectedFeatureId === null) {
+        if (mode !== "select" || !selectedFeatureIds || selectedFeatureIds.length === 0) {
             editingEngineRef.current?.clearEditing();
         }
-    }, [mode, selectedFeatureId]);
+    }, [mode, selectedFeatureIds]);
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;
     }, [fitBoundsKey]);
 
     useEffect(() => {
-        onSelectFeatureIdRef.current = onSelectFeatureId;
-    }, [onSelectFeatureId]);
+        onSelectFeatureIdsRef.current = onSelectFeatureIds;
+    }, [onSelectFeatureIds]);
 
     useEffect(() => {
         backgroundVisibilityRef.current = backgroundVisibility;
@@ -315,7 +315,7 @@ export default function Map({
         }
 
         const visibleDraftRaw = respectBindingFilterRef.current
-            ? filterDraftByBinding(fc, selectedFeatureIdRef.current)
+            ? filterDraftByBinding(fc, selectedFeatureIdsRef.current, highlightFeaturesRef.current)
             : fc;
         const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
         const { polygons, points } = splitDraftFeatures(visibleDraft);
@@ -326,11 +326,15 @@ export default function Map({
         (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)
             ?.setData(pathArrowShapes);
 
-        const selectedId = selectedFeatureIdRef.current;
-        setSelectedFeatureState(map, selectedId, true);
+        const currentSelectedIds = selectedFeatureIdsRef.current;
+        currentSelectedIds.forEach((id) => {
+            setSelectedFeatureState(map, id, true);
+        });
         requestAnimationFrame(() => {
             if (mapRef.current !== map) return;
-            setSelectedFeatureState(map, selectedId, true);
+            currentSelectedIds.forEach((id) => {
+                setSelectedFeatureState(map, id, true);
+            });
         });
         if (fitToDraftBoundsRef.current && !fitBoundsAppliedRef.current) {
             fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, visibleDraft);
@@ -1034,7 +1038,7 @@ export default function Map({
                     ? (id: string | number) => {
                         // ensure edit overlays are cleared when a feature gets removed
                         editingEngineRef.current?.clearEditing();
-                        onSelectFeatureIdRef.current?.(null);
+                        onSelectFeatureIdsRef.current?.([]);
                         onDeleteRef.current?.(id);
                     }
                     : undefined,
@@ -1048,7 +1052,7 @@ export default function Map({
                         editingEngineRef.current?.beginEditing((originalFeature || feature) as any);
                     }
                     : undefined,
-                (id) => onSelectFeatureIdRef.current?.(id)
+                (ids) => onSelectFeatureIdsRef.current?.(ids)
             );
 
             const cleanupPoint = initPoint(
@@ -1283,7 +1287,7 @@ export default function Map({
                 editingEngineRef.current?.clearEditing();
             }
         }
-    }, [allowGeometryEditing, draft, selectedFeatureId, applyDraftToMap]);
+    }, [allowGeometryEditing, draft, selectedFeatureIds, applyDraftToMap]);
 
     useEffect(() => {
         if (focusRequestKey === null || focusRequestKey === undefined) return;
@@ -1557,9 +1561,16 @@ function getSelectableLayers(map: maplibregl.Map): string[] {
 
 function filterDraftByBinding(
     fc: FeatureCollection,
-    selectedFeatureId: string | number | null
+    selectedFeatureIds: (string | number)[],
+    highlightFeatures?: FeatureCollection | null
 ): FeatureCollection {
-    const selectedId = selectedFeatureId !== null ? String(selectedFeatureId) : null;
+    const selectedIds = new Set(selectedFeatureIds.map(String));
+    if (highlightFeatures?.features) {
+        for (const f of highlightFeatures.features) {
+            if (f.properties?.id != null) selectedIds.add(String(f.properties.id));
+        }
+    }
+    
     // Semantics:
     // - A feature's `binding` is a list of "child" geometry ids.
     // - Child geometries are hidden by default, and only shown when their parent is selected.
@@ -1570,21 +1581,24 @@ function filterDraftByBinding(
         }
     }
 
-    if (selectedId === null) {
+    if (selectedIds.size === 0) {
         return { ...fc, features: fc.features.filter((f) => !childIds.has(String(f.properties.id))) };
     }
 
-    const selectedFeature =
-        fc.features.find((feature) => String(feature.properties.id) === selectedId) || null;
-    const selectedChildren = new Set<string>(
-        normalizeBindingIds(selectedFeature?.properties.binding)
-    );
+    const selectedChildren = new Set<string>();
+    for (const feature of fc.features) {
+        if (selectedIds.has(String(feature.properties.id))) {
+            for (const id of normalizeBindingIds(feature.properties.binding)) {
+                selectedChildren.add(id);
+            }
+        }
+    }
 
     return {
         ...fc,
         features: fc.features.filter((feature) => {
             const featureId = String(feature.properties.id);
-            if (featureId === selectedId) return true;
+            if (selectedIds.has(featureId)) return true;
             if (selectedChildren.has(featureId)) return true;
             return !childIds.has(featureId);
         }),
@@ -1778,9 +1792,9 @@ function buildPathArrowGeometry(coords: [number, number][]): Geometry | null {
 
     if (bodyPoints.length < 2) return null;
 
-    const tailWidth = clampNumber(totalLength * 0.018, 25000, 140000);
-    const shoulderWidth = clampNumber(totalLength * 0.055, 60000, 420000);
-    const headWidth = shoulderWidth * 1.65;
+    const tailWidth = clampNumber(totalLength * 0.005, 8000, 40000);
+    const shoulderWidth = clampNumber(totalLength * 0.015, 18000, 100000);
+    const headWidth = shoulderWidth * 2.0;
 
     const leftBody: ProjectedPoint[] = [];
     const rightBody: ProjectedPoint[] = [];

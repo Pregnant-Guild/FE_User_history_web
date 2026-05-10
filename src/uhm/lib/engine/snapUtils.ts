@@ -61,7 +61,8 @@ export function snapToNearestGeometry(
         }
 
         const type = feature.geometry.type;
-        const coords = feature.geometry.coordinates as any;
+        if (type === "GeometryCollection") continue;
+        const coords = (feature.geometry as any).coordinates;
 
         // Xử lý cả Polygon và LineString vì viền bản đồ (border) đôi khi được render dưới dạng LineString
         if (type === "Polygon") {
