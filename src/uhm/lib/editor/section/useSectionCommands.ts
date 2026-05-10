@@ -37,7 +37,6 @@ type Options = {
     snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
     baselineSnapshot: EditorSnapshot | null;
     commitTitle: string;
-    commitNote: string;
     setActiveSection: Dispatch<SetStateAction<Section | null>>;
     setSelectedSectionId: Dispatch<SetStateAction<string>>;
     setSectionState: Dispatch<SetStateAction<SectionState | null>>;
@@ -56,7 +55,6 @@ type Options = {
     setAvailableSections: Dispatch<SetStateAction<Section[]>>;
     setNewSectionTitle: Dispatch<SetStateAction<string>>;
     setCommitTitle: Dispatch<SetStateAction<string>>;
-    setCommitNote: Dispatch<SetStateAction<string>>;
 };
 
 export function useSectionCommands(options: Options) {
@@ -107,7 +105,6 @@ export function useSectionCommands(options: Options) {
                 hasPersistedFeature: options.editor.hasPersistedFeature,
             });
             const editSummary = options.commitTitle.trim()
-                || options.commitNote.trim()
                 || `Edit ${new Date().toLocaleString()}`;
 
             // Guardrail: commit payload can get large and some deployments reject/close connections for big bodies.
@@ -141,7 +138,6 @@ export function useSectionCommands(options: Options) {
             options.setInitialData(options.editor.draft);
             options.editor.clearChanges();
             options.setCommitTitle("");
-            options.setCommitNote("");
             options.setSectionCommits(await fetchSectionCommits(options.activeSection.id));
             options.setEntityFormStatus("Đã tạo commit.");
         } catch (err) {
@@ -218,7 +214,7 @@ export function useSectionCommands(options: Options) {
         }
     }, [openSectionForEditing, options]);
 
-    const submitCurrentSection = useCallback(async () => {
+    const submitCurrentSection = useCallback(async (content: string) => {
         if (!options.activeSection || !options.sectionState?.head_commit_id) {
             options.setEntityStatus("Section hiện tại chưa có head để submit.");
             return;
@@ -231,7 +227,7 @@ export function useSectionCommands(options: Options) {
         options.setIsSubmitting(true);
         options.setEntityStatus(null);
         try {
-            const submission = await submitSection(options.activeSection.id);
+            const submission = await submitSection(options.activeSection.id, content);
             options.setEntityStatus(`Đã submit, submission ${submission.id}.`);
         } catch (err) {
             if (err instanceof ApiError) {

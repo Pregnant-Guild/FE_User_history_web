@@ -113,8 +113,6 @@ export default function Page() {
         setNewSectionTitle,
         commitTitle,
         setCommitTitle,
-        commitNote,
-        setCommitNote,
         editorUserIdInput,
         activeSection,
         setActiveSection,
@@ -375,7 +373,6 @@ export default function Page() {
         snapshotEntityWikiLinks,
         baselineSnapshot,
         commitTitle,
-        commitNote,
         setActiveSection,
         setSelectedSectionId,
         setSectionState,
@@ -394,7 +391,6 @@ export default function Page() {
         setAvailableSections,
         setNewSectionTitle,
         setCommitTitle,
-        setCommitNote,
     });
     const {
         openSectionForEditing,
@@ -1141,9 +1137,7 @@ export default function Page() {
                 sectionTitle={activeSection?.title || "Đang tải project"}
                 sectionStatus={sectionState?.status || "editing"}
                 commitTitle={commitTitle}
-                commitNote={commitNote}
                 onCommitTitleChange={setCommitTitle}
-                onCommitNoteChange={setCommitNote}
                 commitCount={sectionCommits.length}
                 hasHeadCommit={Boolean(sectionState?.head_commit_id)}
                 headCommitId={sectionState?.head_commit_id || null}

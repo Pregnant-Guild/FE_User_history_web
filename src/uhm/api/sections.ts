@@ -124,7 +124,7 @@ export async function restoreSectionCommit(
     return { commit: headCommit, state };
 }
 
-export async function submitSection(sectionId: string): Promise<SectionSubmission> {
+export async function submitSection(sectionId: string, content: string): Promise<SectionSubmission> {
     // Submit latest commit of project
     const project = await requestJson<Section>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}`);
     const commitId = project.latest_commit_id;
@@ -137,7 +137,7 @@ export async function submitSection(sectionId: string): Promise<SectionSubmissio
         jsonRequestInit("POST", {
             project_id: sectionId,
             commit_id: commitId,
-            content: "",
+            content: content,
         })
     );
 }

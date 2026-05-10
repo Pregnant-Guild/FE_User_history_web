@@ -41,8 +41,6 @@ export function useSectionSessionState(options: Options) {
     const [newSectionTitle, setNewSectionTitle] = useState("");
     // Input title cho commit.
     const [commitTitle, setCommitTitle] = useState("");
-    // Input note cho commit.
-    const [commitNote, setCommitNote] = useState("");
     // User ID dùng để gắn vào commit/submit/lock.
     const [editorUserIdInput, setEditorUserIdInput] = useState(options.defaultEditorUserId);
     // Section đang mở để edit (null nếu chưa mở).
@@ -69,8 +67,6 @@ export function useSectionSessionState(options: Options) {
         setNewSectionTitle,
         commitTitle,
         setCommitTitle,
-        commitNote,
-        setCommitNote,
         editorUserIdInput,
         setEditorUserIdInput,
         activeSection,

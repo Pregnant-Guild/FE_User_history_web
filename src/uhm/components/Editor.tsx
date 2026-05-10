@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { UndoAction } from "@/uhm/lib/useEditorState";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
@@ -10,16 +10,14 @@ type Props = {
     entityStatus?: string | null;
     onUndo: () => void;
     onCommit: () => void;
-    onSubmit: () => void;
+    onSubmit: (content: string) => void;
     onRestoreCommit: (commitId: string) => void;
     isSaving: boolean;
     isSubmitting: boolean;
     sectionTitle: string;
     sectionStatus: string;
     commitTitle: string;
-    commitNote: string;
     onCommitTitleChange: (title: string) => void;
-    onCommitNoteChange: (note: string) => void;
     commitCount: number;
     hasHeadCommit: boolean;
     headCommitId: string | null;
@@ -58,9 +56,7 @@ export default function Editor({
     sectionTitle,
     sectionStatus,
     commitTitle,
-    commitNote,
     onCommitTitleChange,
-    onCommitNoteChange,
     commitCount,
     hasHeadCommit,
     headCommitId,
@@ -78,6 +74,23 @@ export default function Editor({
         } else {
             setMode(newMode);
         }
+    };
+
+    const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+    const [submitContent, setSubmitContent] = useState("");
+
+    const handleOpenSubmitModal = () => {
+        setSubmitContent("");
+        setIsSubmitModalOpen(true);
+    };
+
+    const handleConfirmSubmit = () => {
+        setIsSubmitModalOpen(false);
+        onSubmit(submitContent);
+    };
+
+    const handleCancelSubmit = () => {
+        setIsSubmitModalOpen(false);
     };
 
     const recentUndoLabels = (() => {
@@ -227,17 +240,9 @@ export default function Editor({
                 <input
                     value={commitTitle}
                     onChange={(event) => onCommitTitleChange(event.target.value)}
-                    placeholder="Commit title"
+                    placeholder="Edit Summary (Commit Title)"
                     disabled={isSaving || isSubmitting}
                     style={textInputStyle}
-                />
-                <textarea
-                    value={commitNote}
-                    onChange={(event) => onCommitNoteChange(event.target.value)}
-                    placeholder="Commit note"
-                    disabled={isSaving || isSubmitting}
-                    rows={3}
-                    style={textAreaStyle}
                 />
                 <button
                     style={{
@@ -261,7 +266,7 @@ export default function Editor({
                         cursor: isSubmitting || !hasHeadCommit ? "not-allowed" : "pointer",
                         opacity: !hasHeadCommit ? 0.6 : 1,
                     }}
-                    onClick={onSubmit}
+                    onClick={handleOpenSubmitModal}
                     disabled={isSubmitting || !hasHeadCommit}
                 >
                     Submit
@@ -382,6 +387,39 @@ export default function Editor({
                     </ul>
                 )}
             </Panel>
+
+            {isSubmitModalOpen && (
+                <div style={{
+                    position: "fixed",
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0, 0, 0, 0.7)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        background: "#0b1220",
+                        padding: 20,
+                        borderRadius: 8,
+                        border: "1px solid #334155",
+                        width: 400,
+                        color: "white"
+                    }}>
+                        <h3 style={{ marginTop: 0 }}>Nội dung Submit</h3>
+                        <textarea
+                            value={submitContent}
+                            onChange={(e) => setSubmitContent(e.target.value)}
+                            placeholder="Nhập nội dung submit..."
+                            style={{ ...textAreaStyle, height: 100 }}
+                        />
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 15 }}>
+                            <button onClick={handleCancelSubmit} style={{ padding: "8px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #334155", background: "transparent", color: "white" }}>Hủy</button>
+                            <button onClick={handleConfirmSubmit} style={{ padding: "8px 16px", borderRadius: 6, cursor: "pointer", border: "none", background: "#16a34a", color: "white", fontWeight: "bold" }}>Gửi Submit</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
