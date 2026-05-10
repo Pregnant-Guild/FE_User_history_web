@@ -1,6 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/useEditorState";
 import type { ModeGetter } from "@/uhm/lib/engine/engineTypes";
+import { snapToNearestGeometry } from "@/uhm/lib/engine/snapUtils";
 
 // Khởi tạo engine vẽ polygon tự do theo chuỗi click.
 export function initDrawing(
@@ -57,7 +58,13 @@ export function initDrawing(
     function onClick(e: maplibregl.MapLayerMouseEvent) {
         if (getMode() !== "draw") return;
 
-        coords.push([e.lngLat.lng, e.lngLat.lat] as [number, number]);
+        let lngLat = e.lngLat;
+        // Dùng Shift (hoặc Alt nếu Shift bị maplibre chiếm dụng) để snap
+        if (e.originalEvent.shiftKey || e.originalEvent.altKey) {
+            lngLat = snapToNearestGeometry(map, e.lngLat, e.point);
+        }
+
+        coords.push([lngLat.lng, lngLat.lat] as [number, number]);
         update(coords);
     }
 
@@ -65,9 +72,14 @@ export function initDrawing(
     function onMove(e: maplibregl.MapLayerMouseEvent) {
         if (getMode() !== "draw" || coords.length === 0) return;
 
+        let lngLat = e.lngLat;
+        if (e.originalEvent.shiftKey || e.originalEvent.altKey) {
+            lngLat = snapToNearestGeometry(map, e.lngLat, e.point);
+        }
+
         const preview: [number, number][] = [
             ...coords,
-            [e.lngLat.lng, e.lngLat.lat] as [number, number],
+            [lngLat.lng, lngLat.lat] as [number, number],
         ];
         update(preview);
     }
@@ -109,11 +121,17 @@ export function initDrawing(
         }
     }
 
+    // Tắt tính năng box zoom và double click zoom để Shift không bị lỗi
+    map.boxZoom.disable();
+    map.doubleClickZoom.disable();
+
     map.on("click", onClick);
     map.on("mousemove", onMove);
     document.addEventListener("keydown", onKeyDown);
 
     const cleanup = () => {
+        map.boxZoom.enable();
+        map.doubleClickZoom.enable();
         map.off("click", onClick);
         map.off("mousemove", onMove);
         document.removeEventListener("keydown", onKeyDown);
