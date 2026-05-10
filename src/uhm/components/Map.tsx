@@ -1039,7 +1039,14 @@ export default function Map({
                     }
                     : undefined,
                 allowGeometryEditing
-                    ? (feature) => editingEngineRef.current?.beginEditing(feature)
+                    ? (feature) => {
+                        const rawId = feature.id ?? feature.properties?.id;
+                        const originalFeature = draftRef.current.features.find(
+                            (item) => String(item.properties.id) === String(rawId)
+                        );
+                        // Truyền originalFeature (đầy đủ tọa độ) thay vì feature bị cắt (clipped by map tile)
+                        editingEngineRef.current?.beginEditing((originalFeature || feature) as any);
+                    }
                     : undefined,
                 (id) => onSelectFeatureIdRef.current?.(id)
             );
