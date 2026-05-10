@@ -303,11 +303,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           setWikiSaveError("Noi dung file khong phai HTML hop le.");
           return;
         }
-
-        // Quill drops <a> tags that do not have a valid href.
-        // Preserve the intent by inserting a placeholder href.
-        const normalized = ensureAnchorsHaveHref(raw);
-        setWikiDocHtml(normalized);
+        setWikiDocHtml(raw);
         setWikiSaveError(null);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Khong import duoc file.";
@@ -461,6 +457,33 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     quill.setSelection?.(range.index + label.length, 0, "silent");
     closeWikiLinkModal();
   }, [closeWikiLinkModal]);
+
+  const applyMissingWikiLink = useCallback(() => {
+    const intent = wikiLinkIntentRef.current;
+    const quill = intent?.quill;
+    if (!quill) return;
+
+    const href = "__missing__";
+    const range = intent?.range ?? quill.getSelection?.() ?? null;
+    if (!range) {
+      setWikiLinkError("Khong lay duoc vi tri selection trong editor.");
+      return;
+    }
+
+    quill.setSelection?.(range.index, range.length, "silent");
+
+    if (range.length > 0) {
+      quill.formatText?.(range.index, range.length, "link", href, "user");
+      closeWikiLinkModal();
+      return;
+    }
+
+    // No selection: insert query text (best effort) and mark it as a missing link.
+    const label = wikiLinkQuery.trim().slice(0, 120) || "link";
+    quill.insertText?.(range.index, label, { link: href }, "user");
+    quill.setSelection?.(range.index + label.length, 0, "silent");
+    closeWikiLinkModal();
+  }, [closeWikiLinkModal, wikiLinkQuery]);
 
   const removeWikiLink = useCallback(() => {
     const intent = wikiLinkIntentRef.current;
@@ -784,32 +807,8 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           </div>
 
           <div className="mt-5 grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0 overflow-auto">
-            <div className="lg:col-span-1">
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Wikis</div>
-              <div className="flex flex-col gap-2">
-                {wikis.map((w) => (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => setActiveId(w.id)}
-                    className={`text-left rounded-xl border px-3 py-2 text-sm transition ${
-                      w.id === activeId
-                        ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
-                        : "border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117]"
-                    }`}
-                    title={w.title}
-                  >
-                    <div className="font-medium truncate">{w.title}</div>
-                    <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{w.id}</div>
-                  </button>
-                ))}
-                <Button size="sm" variant="outline" onClick={openEditor}>
-                  + New wiki
-                </Button>
-              </div>
-            </div>
 
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-5">
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <Label>Title</Label>
@@ -862,6 +861,19 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         }
         .uhm-wiki-quill .ql-editor p {
           color: #000 !important;
+        }
+        /* Differentiate missing links vs real links inside the editor. */
+        .uhm-wiki-quill .ql-editor a {
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+        .uhm-wiki-quill .ql-editor a[href="__missing__"],
+        .uhm-wiki-quill .ql-editor a:not([href]),
+        .uhm-wiki-quill .ql-editor a[href=""] {
+          color: #dc2626 !important;
+        }
+        .uhm-wiki-quill .ql-editor a[href]:not([href=""]):not([href="__missing__"]) {
+          color: #2563eb !important;
         }
       `}</style>
 
@@ -946,6 +958,9 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           </div>
 
           <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={applyMissingWikiLink}>
+              Empty link
+            </Button>
             {wikiLinkIntentRef.current?.existingHref ? (
               <Button size="sm" variant="outline" onClick={removeWikiLink}>
                 Remove link
@@ -987,6 +1002,7 @@ function CloseIcon() {
 
 const QUILL_TOOLBAR = [
   [{ header: [1, 2, 3, false] }],
+  [{ align: [] }, { align: "center" }, { align: "right" }],
   ["bold", "italic", "underline", "strike"],
   [{ list: "ordered" }, { list: "bullet" }],
   ["blockquote", "code-block"],
@@ -1086,26 +1102,4 @@ function downloadTextFile(filename: string, contents: string, mime: string): voi
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function ensureAnchorsHaveHref(html: string): string {
-  const raw = String(html || "").trim();
-  if (!raw.length) return "";
-  if (typeof window === "undefined") return raw;
-
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(raw, "text/html");
-    const anchors = Array.from(doc.querySelectorAll("a"));
-    for (const a of anchors) {
-      const href = a.getAttribute("href");
-      if (href == null || String(href).trim() === "") {
-        // Placeholder: the viewer will render this as "missing" (red) and will not rewrite it.
-        a.setAttribute("href", "__missing__");
-      }
-    }
-    return doc.body.innerHTML;
-  } catch {
-    return raw;
-  }
 }

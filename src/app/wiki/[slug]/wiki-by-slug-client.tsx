@@ -156,9 +156,25 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
   const [renderHtml, setRenderHtml] = useState<string>("");
   const [toc, setToc] = useState<TocItem[]>([]);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{
+    slug: string;
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    visible: boolean;
+  } | null>(null);
+  const [linkPreviewData, setLinkPreviewData] = useState<{
+    slug: string;
+    title: string;
+    quote: string | null;
+    status: "idle" | "loading" | "ready" | "error";
+  } | null>(null);
 
   const normalizedSlug = useMemo(() => String(slug || "").trim(), [slug]);
   const contentRootRef = useRef<HTMLDivElement | null>(null);
+  const hidePreviewTimerRef = useRef<number | null>(null);
+  const previewCacheRef = useRef<Map<string, { title: string; quote: string | null }>>(new Map());
 
   // Load wiki data by slug.
   useEffect(() => {
@@ -255,6 +271,158 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
     for (const h of headings) obs.observe(h);
     return () => obs.disconnect();
   }, [toc]);
+
+  // Hover preview for internal wiki links (title + first blockquote).
+  useEffect(() => {
+    const root = contentRootRef.current;
+    if (!root) return;
+    if (typeof window === "undefined") return;
+
+    const clearHideTimer = () => {
+      if (hidePreviewTimerRef.current != null) {
+        window.clearTimeout(hidePreviewTimerRef.current);
+        hidePreviewTimerRef.current = null;
+      }
+    };
+
+    const hideSoon = () => {
+      clearHideTimer();
+      hidePreviewTimerRef.current = window.setTimeout(() => {
+        setLinkPreview((prev) => (prev ? { ...prev, visible: false } : prev));
+      }, 140);
+    };
+
+    const resolveInternalWikiSlug = (href: string): string | null => {
+      const h = href.trim();
+      if (!h.length) return null;
+      if (h === "__missing__") return null;
+      if (h.startsWith("#")) return null;
+
+      const stripQueryHash = (s: string) => {
+        const m = s.match(/^([^?#]+)([?#].*)?$/);
+        return String(m?.[1] || "");
+      };
+
+      if (h.startsWith("/wiki/")) {
+        const path = stripQueryHash(h);
+        const slugPart = path.slice("/wiki/".length).trim();
+        return slugPart ? decodeURIComponent(slugPart) : null;
+      }
+
+      const originPrefix = window.location.origin + "/wiki/";
+      if (h.startsWith(originPrefix)) {
+        const rest = stripQueryHash(h.slice(originPrefix.length));
+        const slugPart = rest.trim();
+        return slugPart ? decodeURIComponent(slugPart) : null;
+      }
+
+      return null;
+    };
+
+    const fetchPreview = async (targetSlug: string) => {
+      const key = targetSlug.trim();
+      if (!key.length) return;
+
+      const cached = previewCacheRef.current.get(key);
+      if (cached) {
+        setLinkPreviewData({ slug: key, title: cached.title, quote: cached.quote, status: "ready" });
+        return;
+      }
+
+      setLinkPreviewData((prev) => ({ slug: key, title: prev?.title || key, quote: null, status: "loading" }));
+      try {
+        const row = await fetchWikiBySlug(key);
+        if (!row) {
+          setLinkPreviewData({ slug: key, title: key, quote: null, status: "error" });
+          return;
+        }
+
+        const html = normalizeWikiContentToHtml(row.content ?? "");
+        let quote: string | null = null;
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+          const bq = doc.body.querySelector("blockquote");
+          const txt = String(bq?.textContent || "").trim();
+          quote = txt.length ? txt : null;
+        } catch {
+          quote = null;
+        }
+
+        const title = String(row.title || "").trim() || key;
+        previewCacheRef.current.set(key, { title, quote });
+        setLinkPreviewData({ slug: key, title, quote, status: "ready" });
+      } catch {
+        setLinkPreviewData({ slug: key, title: key, quote: null, status: "error" });
+      }
+    };
+
+    const showForAnchor = (a: HTMLAnchorElement) => {
+      const href = String(a.getAttribute("href") || "").trim();
+      const targetSlug = resolveInternalWikiSlug(href);
+      if (!targetSlug) return;
+
+      // Avoid previews on touch devices.
+      if (window.matchMedia && window.matchMedia("(hover: none)").matches) return;
+
+      const rect = a.getBoundingClientRect();
+      const width = 420;
+      const height = 320;
+      const margin = 12;
+
+      const preferredLeft = rect.right + margin;
+      const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+      const left = Math.min(preferredLeft, maxLeft);
+
+      const preferredTop = rect.top;
+      const maxTop = Math.max(margin, window.innerHeight - height - margin);
+      const top = Math.max(margin, Math.min(preferredTop, maxTop));
+
+      clearHideTimer();
+      setLinkPreview({ slug: targetSlug, top, left, width, height, visible: true });
+      void fetchPreview(targetSlug);
+    };
+
+    const onMouseOver = (evt: MouseEvent) => {
+      const target = evt.target as HTMLElement | null;
+      const a = target?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+      showForAnchor(a);
+    };
+
+    const onMouseOut = (evt: MouseEvent) => {
+      const target = evt.target as HTMLElement | null;
+      const related = evt.relatedTarget as HTMLElement | null;
+      const fromA = target?.closest?.("a");
+      if (!fromA) return;
+      if (related && related.closest?.(".uhm-wiki-link-preview")) return;
+      hideSoon();
+    };
+
+    const onKeyDown = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") {
+        clearHideTimer();
+        setLinkPreview((prev) => (prev ? { ...prev, visible: false } : prev));
+      }
+    };
+
+    const onScroll = () => {
+      setLinkPreview((prev) => (prev ? { ...prev, visible: false } : prev));
+    };
+
+    root.addEventListener("mouseover", onMouseOver);
+    root.addEventListener("mouseout", onMouseOut);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      root.removeEventListener("mouseover", onMouseOver);
+      root.removeEventListener("mouseout", onMouseOut);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll);
+      clearHideTimer();
+    };
+  }, [renderHtml]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
@@ -360,6 +528,60 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
         )}
       </div>
 
+      {linkPreview && linkPreview.visible ? (
+        <div
+          className="uhm-wiki-link-preview fixed z-[9999]"
+          style={{
+            top: linkPreview.top,
+            left: linkPreview.left,
+            width: linkPreview.width,
+            height: linkPreview.height,
+          }}
+          onMouseEnter={() => {
+            if (hidePreviewTimerRef.current != null) {
+              window.clearTimeout(hidePreviewTimerRef.current);
+              hidePreviewTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            setLinkPreview((prev) => (prev ? { ...prev, visible: false } : prev));
+          }}
+        >
+          <div className="h-full w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg">
+            <div className="h-full w-full p-3 grid grid-rows-[auto_1fr] gap-2">
+              <div className="min-w-0">
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 break-all">
+                  /wiki/{linkPreview.slug}
+                </div>
+                <div className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  {linkPreviewData?.slug === linkPreview.slug
+                    ? linkPreviewData.status === "loading"
+                      ? "Loading..."
+                      : linkPreviewData.status === "error"
+                        ? "Not found"
+                        : linkPreviewData.title
+                    : "Loading..."}
+                </div>
+              </div>
+
+              <div className="min-h-0 overflow-auto">
+                {linkPreviewData?.slug === linkPreview.slug && linkPreviewData.status === "ready" ? (
+                  linkPreviewData.quote ? (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words">
+                        {linkPreviewData.quote}
+                      </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 dark:text-gray-400">No resume.</div>
+                  )
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Loading preview...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx global>{`
         /* Quill view container tweaks: allow page-level scrolling instead of inner scroll. */
         .uhm-wiki-view.ql-editor {
@@ -442,10 +664,10 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
           text-decoration-thickness: from-font;
           text-underline-offset: 2px;
         }
-        .uhm-wiki-view.ql-editor a[href]:not([href=""]) {
+        .uhm-wiki-view.ql-editor a[href]:not([href=""]):not([href="__missing__"]) {
           color: #2563eb;
         }
-        :is(.dark *) .uhm-wiki-view.ql-editor a[href]:not([href=""]) {
+        :is(.dark *) .uhm-wiki-view.ql-editor a[href]:not([href=""]):not([href="__missing__"]) {
           color: #60a5fa;
         }
         .uhm-wiki-view.ql-editor a[href="__missing__"] {
