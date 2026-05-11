@@ -1,4 +1,4 @@
-import type { EntityGeometryPreset } from "@/uhm/lib/utils/entityTypeOptions";
+import type { GeometryPreset } from "@/uhm/lib/map/geo/geometryTypeOptions";
 
 export type EditorMode =
     | "idle"
@@ -38,4 +38,4 @@ export type CreatedEntitySummary = {
     name: string;
 };
 
-export type GeometryPreset = EntityGeometryPreset;
+export type { GeometryPreset };

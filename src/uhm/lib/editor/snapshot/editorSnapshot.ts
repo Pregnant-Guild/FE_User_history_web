@@ -1,4 +1,4 @@
-import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/utils/entityTypeOptions";
+import { DEFAULT_GEOMETRY_TYPE_ID } from "@/uhm/lib/map/geo/geometryTypeOptions";
 import { geoTypeCodeToTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
@@ -659,7 +659,7 @@ export function getDefaultTypeIdForFeature(feature: Feature): string {
     if (preset === "line") return "defense_line";
     if (preset === "point") return "city";
     if (preset === "circle-area") return "war";
-    if (preset === "polygon") return DEFAULT_ENTITY_TYPE_ID;
+    if (preset === "polygon") return DEFAULT_GEOMETRY_TYPE_ID;
 
     const geometryType = feature.geometry.type;
     if (geometryType === "LineString" || geometryType === "MultiLineString") {
@@ -668,7 +668,7 @@ export function getDefaultTypeIdForFeature(feature: Feature): string {
     if (geometryType === "Point" || geometryType === "MultiPoint") {
         return "city";
     }
-    return DEFAULT_ENTITY_TYPE_ID;
+    return DEFAULT_GEOMETRY_TYPE_ID;
 }
 
 export function normalizeFeatureEntityIds(feature: Feature): string[] {

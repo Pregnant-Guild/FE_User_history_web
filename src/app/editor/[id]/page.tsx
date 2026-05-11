@@ -31,8 +31,8 @@ import {
     HIDDEN_BACKGROUND_LAYER_VISIBILITY,
 } from "@/uhm/lib/map/styles/backgroundLayers";
 import {
-    ENTITY_TYPE_OPTIONS,
-} from "@/uhm/lib/utils/entityTypeOptions";
+    GEOMETRY_TYPE_OPTIONS,
+} from "@/uhm/lib/map/geo/geometryTypeOptions";
 import {
     EntityFormState,
     GeometryMetaFormState,
@@ -1560,7 +1560,7 @@ export default function Page() {
                                 entities={entities}
                                 selectedGeometryEntityIds={selectedGeometryEntityIds}
                                 onEntityIdsChange={handleEntityIdsChange}
-                                entityTypeOptions={ENTITY_TYPE_OPTIONS}
+                                entityTypeOptions={GEOMETRY_TYPE_OPTIONS}
                                 geometryMetaForm={geometryMetaForm}
                                 onGeometryMetaFormChange={handleGeometryMetaFormChange}
                                 isEntitySubmitting={isEntitySubmitting}

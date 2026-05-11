@@ -4,12 +4,12 @@ import { type CSSProperties, useMemo, useState } from "react";
 import { Entity } from "@/uhm/api/entities";
 import { Feature } from "@/uhm/lib/editor/state/useEditorState";
 import {
-    EntityGeometryPreset,
-    EntityTypeGroupId,
-    EntityTypeOption,
-    findEntityTypeOption,
-    groupEntityTypeOptions,
-} from "@/uhm/lib/utils/entityTypeOptions";
+    GeometryPreset,
+    GeometryTypeGroupId,
+    GeometryTypeOption,
+    findGeometryTypeOption,
+    groupGeometryTypeOptions,
+} from "@/uhm/lib/map/geo/geometryTypeOptions";
 import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
 
 type Props = {
@@ -19,7 +19,7 @@ type Props = {
     entities: Entity[];
     selectedGeometryEntityIds: string[];
     onEntityIdsChange: (values: string[]) => void;
-    entityTypeOptions: EntityTypeOption[];
+    entityTypeOptions: GeometryTypeOption[];
     geometryMetaForm: GeometryMetaFormState;
     onGeometryMetaFormChange: (key: keyof GeometryMetaFormState, value: string) => void;
     isEntitySubmitting: boolean;
@@ -81,13 +81,13 @@ export default function SelectedGeometryPanel({
     if (!selectedFeatures || selectedFeatures.length === 0) return null;
     const representativeFeature = selectedFeatures[0];
 
-    const groupedEntityTypeOptions = groupEntityTypeOptions(entityTypeOptions);
+    const groupedGeometryTypeOptions = groupGeometryTypeOptions(entityTypeOptions);
     const featureGeometryPreset = resolveFeatureGeometryPreset(representativeFeature);
     const allowedGroupIds = getAllowedGroupIdsForPreset(featureGeometryPreset);
-    const groupedGeoTypeOptions = groupedEntityTypeOptions.filter((group) =>
+    const groupedGeoTypeOptions = groupedGeometryTypeOptions.filter((group) =>
         allowedGroupIds.includes(group.id)
     );
-    const selectedTypeOption = findEntityTypeOption(geometryMetaForm.type_key);
+    const selectedTypeOption = findGeometryTypeOption(geometryMetaForm.type_key);
     const hasCurrentVisibleTypeOption = groupedGeoTypeOptions.some((group) =>
         group.options.some((option) => option.value === geometryMetaForm.type_key)
     );
@@ -342,20 +342,20 @@ function MinusIcon() {
     );
 }
 
-function resolveFeatureGeometryPreset(feature: Feature): EntityGeometryPreset {
+function resolveFeatureGeometryPreset(feature: Feature): GeometryPreset {
     const explicitPreset = normalizeGeometryPreset(feature.properties.geometry_preset);
     if (explicitPreset) return explicitPreset;
 
     const semanticType = normalizeTypeId(feature.properties.type) || normalizeTypeId(feature.properties.entity_type_id);
     if (semanticType) {
-        const option = findEntityTypeOption(semanticType);
+        const option = findGeometryTypeOption(semanticType);
         if (option) return option.geometryPreset;
     }
 
     return mapGeometryTypeToPreset(feature.geometry.type);
 }
 
-function normalizeGeometryPreset(value: unknown): EntityGeometryPreset | null {
+function normalizeGeometryPreset(value: unknown): GeometryPreset | null {
     if (typeof value !== "string") return null;
     const normalized = value.trim().toLowerCase();
     if (
@@ -377,7 +377,7 @@ function normalizeTypeId(value: unknown): string | null {
 
 function mapGeometryTypeToPreset(
     geometryType: Feature["geometry"]["type"]
-): EntityGeometryPreset {
+): GeometryPreset {
     if (geometryType === "Point" || geometryType === "MultiPoint") {
         return "point";
     }
@@ -388,8 +388,8 @@ function mapGeometryTypeToPreset(
 }
 
 function getAllowedGroupIdsForPreset(
-    geometryPreset: EntityGeometryPreset
-): EntityTypeGroupId[] {
+    geometryPreset: GeometryPreset
+): GeometryTypeGroupId[] {
     if (geometryPreset === "point") {
         return ["point"];
     }
@@ -405,7 +405,7 @@ function getAllowedGroupIdsForPreset(
     return ["polygon"];
 }
 
-function formatGeometryPresetLabel(preset: EntityGeometryPreset | null): string {
+function formatGeometryPresetLabel(preset: GeometryPreset | null): string {
     if (preset === "point") return "point - Điểm";
     if (preset === "line") return "line - Tuyến";
     if (preset === "circle-area") return "circle - Tròn";

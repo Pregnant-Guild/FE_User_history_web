@@ -1,27 +1,27 @@
-export type EntityTypeGroupId =
+export type GeometryTypeGroupId =
     | "line"
     | "polygon"
     | "circle"
     | "point";
 
-export type EntityGeometryPreset = "line" | "polygon" | "circle-area" | "point";
+export type GeometryPreset = "line" | "polygon" | "circle-area" | "point";
 
-export type EntityTypeGroup = {
-    id: EntityTypeGroupId;
+export type GeometryTypeGroup = {
+    id: GeometryTypeGroupId;
     label: string;
     geometryLabel: string;
     description: string;
 };
 
-export type EntityTypeOption = {
+export type GeometryTypeOption = {
     value: string;
     label: string;
-    groupId: EntityTypeGroupId;
+    groupId: GeometryTypeGroupId;
     groupLabel: string;
-    geometryPreset: EntityGeometryPreset;
+    geometryPreset: GeometryPreset;
 };
 
-export const ENTITY_TYPE_GROUPS: EntityTypeGroup[] = [
+export const GEOMETRY_TYPE_GROUPS: GeometryTypeGroup[] = [
     {
         id: "line",
         label: "line - Tuyến",
@@ -48,18 +48,18 @@ export const ENTITY_TYPE_GROUPS: EntityTypeGroup[] = [
     },
 ];
 
-const GROUP_BY_ID: Record<EntityTypeGroupId, EntityTypeGroup> = {
-    line: ENTITY_TYPE_GROUPS[0],
-    polygon: ENTITY_TYPE_GROUPS[1],
-    circle: ENTITY_TYPE_GROUPS[2],
-    point: ENTITY_TYPE_GROUPS[3],
+const GROUP_BY_ID: Record<GeometryTypeGroupId, GeometryTypeGroup> = {
+    line: GEOMETRY_TYPE_GROUPS[0],
+    polygon: GEOMETRY_TYPE_GROUPS[1],
+    circle: GEOMETRY_TYPE_GROUPS[2],
+    point: GEOMETRY_TYPE_GROUPS[3],
 };
 
-const RAW_ENTITY_TYPE_OPTIONS: Array<{
+const RAW_GEOMETRY_TYPE_OPTIONS: Array<{
     value: string;
     label: string;
-    groupId: EntityTypeGroupId;
-    geometryPreset: EntityGeometryPreset;
+    groupId: GeometryTypeGroupId;
+    geometryPreset: GeometryPreset;
 }> = [
     { value: "defense_line", label: "Defense Line", groupId: "line", geometryPreset: "line" },
 
@@ -94,29 +94,29 @@ const RAW_ENTITY_TYPE_OPTIONS: Array<{
     { value: "bridge", label: "Bridge", groupId: "point", geometryPreset: "point" },
 ];
 
-export const ENTITY_TYPE_OPTIONS: EntityTypeOption[] = RAW_ENTITY_TYPE_OPTIONS.map((item) => ({
+export const GEOMETRY_TYPE_OPTIONS: GeometryTypeOption[] = RAW_GEOMETRY_TYPE_OPTIONS.map((item) => ({
     ...item,
     groupLabel: GROUP_BY_ID[item.groupId].label,
 }));
 
-export const DEFAULT_ENTITY_TYPE_ID = "country";
+export const DEFAULT_GEOMETRY_TYPE_ID = "country";
 
 // Gom option theo group để render select phân nhóm.
-export function groupEntityTypeOptions(options: EntityTypeOption[] = ENTITY_TYPE_OPTIONS): Array<{
-    id: EntityTypeGroupId;
+export function groupGeometryTypeOptions(options: GeometryTypeOption[] = GEOMETRY_TYPE_OPTIONS): Array<{
+    id: GeometryTypeGroupId;
     label: string;
     geometryLabel: string;
     description: string;
-    options: EntityTypeOption[];
+    options: GeometryTypeOption[];
 }> {
-    return ENTITY_TYPE_GROUPS.map((group) => ({
+    return GEOMETRY_TYPE_GROUPS.map((group) => ({
         ...group,
         options: options.filter((option) => option.groupId === group.id),
     })).filter((group) => group.options.length > 0);
 }
 
 // Tìm option theo type id, trả null nếu không tồn tại.
-export function findEntityTypeOption(typeId: string | null | undefined): EntityTypeOption | null {
+export function findGeometryTypeOption(typeId: string | null | undefined): GeometryTypeOption | null {
     if (!typeId) return null;
-    return ENTITY_TYPE_OPTIONS.find((option) => option.value === typeId) || null;
+    return GEOMETRY_TYPE_OPTIONS.find((option) => option.value === typeId) || null;
 }

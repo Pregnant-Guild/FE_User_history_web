@@ -1,4 +1,4 @@
-import type { EntityGeometryPreset } from "@/uhm/lib/utils/entityTypeOptions";
+import type { GeometryPreset } from "@/uhm/lib/map/geo/geometryTypeOptions";
 
 export type Geometry =
     | { type: "Point"; coordinates: [number, number] }
@@ -13,7 +13,7 @@ export type FeatureId = string | number;
 export type FeatureProperties = {
     id: FeatureId;
     type?: string | null;
-    geometry_preset?: EntityGeometryPreset | null;
+    geometry_preset?: GeometryPreset | null;
     time_start?: number | null;
     time_end?: number | null;
     binding?: string[];
