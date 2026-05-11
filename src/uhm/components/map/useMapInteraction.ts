@@ -1,0 +1,317 @@
+import { useEffect, useRef } from "react";
+import maplibregl from "maplibre-gl";
+import { initDrawing } from "@/uhm/lib/engine/drawingEngine";
+import { initSelect } from "@/uhm/lib/engine/selectingEngine";
+import { initPoint } from "@/uhm/lib/engine/pointEngine";
+import { initLine } from "@/uhm/lib/engine/lineEngine";
+import { initPath } from "@/uhm/lib/engine/pathEngine";
+import { initCircle } from "@/uhm/lib/engine/circleEngine";
+import { createEditingEngine } from "@/uhm/lib/engine/editingEngine";
+import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/useEditorState";
+import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
+import { buildClientFeatureId, getSelectableLayers } from "./mapUtils";
+import { MapHoverPayload } from "../Map";
+
+type EngineBinding = {
+    cleanup: () => void;
+    cancel?: () => void;
+    clearSelection?: () => void;
+};
+
+type UseMapInteractionProps = {
+    mapRef: React.MutableRefObject<maplibregl.Map | null>;
+    mode: EditorMode;
+    modeRef: React.MutableRefObject<EditorMode>;
+    draftRef: React.MutableRefObject<FeatureCollection>;
+    allowGeometryEditing: boolean;
+    selectedFeatureIds: (string | number)[];
+    onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
+    onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
+    onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
+    onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
+    onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
+};
+
+export function useMapInteraction({
+    mapRef,
+    mode,
+    modeRef,
+    draftRef,
+    allowGeometryEditing,
+    selectedFeatureIds,
+    onSelectFeatureIdsRef,
+    onCreateRef,
+    onDeleteRef,
+    onUpdateRef,
+    onHoverFeatureChangeRef,
+}: UseMapInteractionProps) {
+    const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
+    const engineBindingsRef = useRef<Partial<Record<EditorMode, EngineBinding>>>({});
+    const previousModeRef = useRef<EditorMode>(mode);
+    const mapCleanupFnsRef = useRef<Array<() => void>>([]);
+
+    useEffect(() => {
+        if (!editingEngineRef.current) {
+            editingEngineRef.current = createEditingEngine({
+                mapRef,
+                onUpdate: (id, geometry) => onUpdateRef.current?.(id, geometry),
+            });
+        }
+    }, [mapRef, onUpdateRef]);
+
+    useEffect(() => {
+        if (mode !== "select" || !selectedFeatureIds || selectedFeatureIds.length === 0) {
+            editingEngineRef.current?.clearEditing();
+        }
+    }, [mode, selectedFeatureIds]);
+
+    useEffect(() => {
+        const previousMode = previousModeRef.current;
+        if (previousMode !== mode) {
+            engineBindingsRef.current[previousMode]?.cancel?.();
+            previousModeRef.current = mode;
+        }
+
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded()) return;
+        if (mode !== "draw") {
+            (map.getSource("draw-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
+                type: "FeatureCollection",
+                features: [],
+            });
+        }
+        if (mode !== "add-line") {
+            (map.getSource("draw-line-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
+                type: "FeatureCollection",
+                features: [],
+            });
+        }
+        if (mode !== "add-path") {
+            (map.getSource("draw-path-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
+                type: "FeatureCollection",
+                features: [],
+            });
+        }
+        if (mode !== "add-circle") {
+            (map.getSource("draw-circle-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
+                type: "FeatureCollection",
+                features: [],
+            });
+        }
+    }, [mode, mapRef]);
+
+    const setupMapInteractions = (map: maplibregl.Map) => {
+        const drawingEngine = initDrawing(
+            map,
+            () => modeRef.current,
+            (geometry: Geometry) => {
+                const id = buildClientFeatureId();
+                onCreateRef.current?.({
+                    type: "Feature",
+                    properties: {
+                        id,
+                        type: "country",
+                        geometry_preset: "polygon",
+                        entity_id: null,
+                        entity_ids: [],
+                        entity_name: null,
+                        entity_type_id: null,
+                        binding: [],
+                    },
+                    geometry,
+                });
+            }
+        );
+
+        const selectEngine = initSelect(
+            map,
+            () => modeRef.current,
+            allowGeometryEditing
+                ? (id: string | number) => {
+                    editingEngineRef.current?.clearEditing();
+                    onSelectFeatureIdsRef.current?.([]);
+                    onDeleteRef.current?.(id);
+                }
+                : undefined,
+            allowGeometryEditing
+                ? (feature) => {
+                    const rawId = feature.id ?? feature.properties?.id;
+                    const originalFeature = draftRef.current.features.find(
+                        (item) => String(item.properties.id) === String(rawId)
+                    );
+                    editingEngineRef.current?.beginEditing((originalFeature || feature) as any);
+                }
+                : undefined,
+            (ids) => onSelectFeatureIdsRef.current?.(ids)
+        );
+
+        const cleanupPoint = initPoint(
+            map,
+            () => modeRef.current,
+            (geometry: Geometry) => {
+                const id = buildClientFeatureId();
+                onCreateRef.current?.({
+                    type: "Feature",
+                    properties: {
+                        id,
+                        type: "city",
+                        geometry_preset: "point",
+                        entity_id: null,
+                        entity_ids: [],
+                        entity_name: null,
+                        entity_type_id: null,
+                        binding: [],
+                    },
+                    geometry,
+                });
+            }
+        );
+
+        const lineEngine = initLine(
+            map,
+            () => modeRef.current,
+            (geometry: Geometry) => {
+                const id = buildClientFeatureId();
+                onCreateRef.current?.({
+                    type: "Feature",
+                    properties: {
+                        id,
+                        type: "defense_line",
+                        geometry_preset: "line",
+                        entity_id: null,
+                        entity_ids: [],
+                        entity_name: null,
+                        entity_type_id: null,
+                        binding: [],
+                    },
+                    geometry,
+                });
+            }
+        );
+
+        const pathEngine = initPath(
+            map,
+            () => modeRef.current,
+            (geometry: Geometry) => {
+                const id = buildClientFeatureId();
+                onCreateRef.current?.({
+                    type: "Feature",
+                    properties: {
+                        id,
+                        type: "attack_route",
+                        geometry_preset: "line",
+                        entity_id: null,
+                        entity_ids: [],
+                        entity_name: null,
+                        entity_type_id: null,
+                        binding: [],
+                    },
+                    geometry,
+                });
+            }
+        );
+
+        const circleEngine = initCircle(
+            map,
+            () => modeRef.current,
+            (geometry: Geometry) => {
+                const id = buildClientFeatureId();
+                onCreateRef.current?.({
+                    type: "Feature",
+                    properties: {
+                        id,
+                        type: "war",
+                        geometry_preset: "circle-area",
+                        entity_id: null,
+                        entity_ids: [],
+                        entity_name: null,
+                        entity_type_id: null,
+                        binding: [],
+                    },
+                    geometry,
+                });
+            }
+        );
+
+        engineBindingsRef.current = {
+            draw: drawingEngine,
+            select: selectEngine,
+            "add-line": lineEngine,
+            "add-path": pathEngine,
+            "add-circle": circleEngine,
+        };
+
+        mapCleanupFnsRef.current.push(
+            circleEngine.cleanup,
+            pathEngine.cleanup,
+            lineEngine.cleanup,
+            cleanupPoint,
+            selectEngine.cleanup,
+            drawingEngine.cleanup
+        );
+
+        const handleHoverMove = (event: maplibregl.MapMouseEvent) => {
+            const callback = onHoverFeatureChangeRef.current;
+            if (!callback) return;
+
+            const selectableLayers = getSelectableLayers(map);
+            if (!selectableLayers.length) {
+                callback(null);
+                return;
+            }
+
+            const features = map.queryRenderedFeatures(event.point, {
+                layers: selectableLayers,
+            }) as maplibregl.MapGeoJSONFeature[];
+
+            const feature = features[0];
+            const rawFeatureId = feature?.id ?? feature?.properties?.id;
+            if (rawFeatureId === undefined || rawFeatureId === null) {
+                callback(null);
+                return;
+            }
+
+            const currentFeature =
+                draftRef.current.features.find(
+                    (item) => String(item.properties.id) === String(rawFeatureId)
+                ) || null;
+
+            callback({
+                featureId: rawFeatureId,
+                feature: currentFeature,
+                point: { x: event.point.x, y: event.point.y },
+                lngLat: { lng: event.lngLat.lng, lat: event.lngLat.lat },
+            });
+        };
+
+        const handleCanvasMouseLeave = () => {
+            onHoverFeatureChangeRef.current?.(null);
+        };
+
+        map.on("mousemove", handleHoverMove);
+        mapCleanupFnsRef.current.push(() => map.off("mousemove", handleHoverMove));
+
+        map.getCanvasContainer().addEventListener("mouseleave", handleCanvasMouseLeave);
+        mapCleanupFnsRef.current.push(() => {
+            map.getCanvasContainer().removeEventListener("mouseleave", handleCanvasMouseLeave);
+        });
+
+        if (allowGeometryEditing) {
+            editingEngineRef.current?.bindEditEvents(map);
+        }
+    };
+
+    const cleanupMapInteractions = () => {
+        for (const cleanupFn of mapCleanupFnsRef.current) {
+            cleanupFn();
+        }
+        mapCleanupFnsRef.current = [];
+        engineBindingsRef.current = {};
+    };
+
+    return {
+        editingEngineRef,
+        setupMapInteractions,
+        cleanupMapInteractions,
+    };
+}

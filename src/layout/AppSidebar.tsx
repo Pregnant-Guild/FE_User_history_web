@@ -54,7 +54,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     name: "Tài Khoản",
     path: "/user/account",
   },
-  
+
 ];
 
 const OTHERS_ITEMS: NavItem[] = [
@@ -164,11 +164,10 @@ const AppSidebar: React.FC = () => {
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
-              className={`menu-item group uppercase ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
+              className={`menu-item group uppercase ${openSubmenu?.type === menuType && openSubmenu?.index === index
                   ? "menu-item-active"
                   : "menu-item-inactive"
-              } cursor-pointer ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
+                } cursor-pointer ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
             >
               <span
                 className={

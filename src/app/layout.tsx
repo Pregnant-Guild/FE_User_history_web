@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} dark:bg-gray-900`}>
         <StoreProvider>
-           <ThemeProvider>
+          <ThemeProvider>
             <SidebarProvider>{children} <Toaster closeButton richColors position="top-right" /> </SidebarProvider>
           </ThemeProvider>
         </StoreProvider>
