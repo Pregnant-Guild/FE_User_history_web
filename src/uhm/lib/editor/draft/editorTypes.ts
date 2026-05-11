@@ -6,7 +6,7 @@ import type {
 } from "@/uhm/types/geo";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 export type Change = GeometryChange;
 

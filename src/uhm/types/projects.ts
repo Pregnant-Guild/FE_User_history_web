@@ -11,7 +11,7 @@ export type EntityWikiLinkSnapshot = {
     operation?: "reference" | "binding" | "delete";
 };
 
-// BackEndGo uses Projects/Commits/Submissions. "Section" is legacy naming in FE.
+// BackEndGo uses Projects/Commits/Submissions. "Project" is legacy naming in FE.
 export type ProjectStatus = string;
 export type ProjectSubmissionStatus = "PENDING" | "APPROVED" | "REJECTED" | string;
 
@@ -71,9 +71,9 @@ export type ProjectSubmission = {
 };
 
 export type EditorSnapshot = {
-    // Legacy: before BEGo flow moved fully to project/commit records, FE stored a minimal "section" ref
+    // Legacy: before BEGo flow moved fully to project/commit records, FE stored a minimal "project" ref
     // inside snapshot_json. New snapshots omit this entirely.
-    section?: {
+    project?: {
         id: string;
         title: string;
     };
@@ -90,13 +90,13 @@ export type EditorSnapshot = {
 export type CommitSnapshot = EditorSnapshot;
 
 export type EditorLoadResponse = {
-    section: Project;
+    project: Project;
     state: ProjectState;
     commit: ProjectCommit | null;
     snapshot: EditorSnapshot | null;
 };
 
-export type CreateSectionInput = {
+export type CreateProjectInput = {
     title: string;
     description?: string | null;
     status?: "PRIVATE" | "PUBLIC" | "ARCHIVE";
@@ -111,10 +111,3 @@ export type RestoreCommitInput = {
     commit_id: string;
 };
 
-// Legacy aliases (to reduce churn in existing FE code). Prefer Project* names above.
-export type SectionStatus = ProjectStatus;
-export type SectionSubmissionStatus = ProjectSubmissionStatus;
-export type SectionState = ProjectState;
-export type Section = Project;
-export type SectionCommit = ProjectCommit;
-export type SectionSubmission = ProjectSubmission;

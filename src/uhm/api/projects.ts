@@ -2,43 +2,43 @@ import { API_BASE_URL, API_ENDPOINTS } from "@/uhm/api/config";
 import { ApiError, jsonRequestInit, requestJson } from "@/uhm/api/http";
 import type {
     CreateCommitInput,
-    CreateSectionInput,
+    CreateProjectInput,
     EditorLoadResponse,
     RestoreCommitInput,
-    Section,
-    SectionCommit,
-    SectionState,
-    SectionSubmission,
-} from "@/uhm/types/sections";
+    Project,
+    ProjectCommit,
+    ProjectState,
+    ProjectSubmission,
+} from "@/uhm/types/projects";
 
 export type {
     CreateCommitInput,
-    CreateSectionInput,
+    CreateProjectInput,
     EditorLoadResponse,
     RestoreCommitInput,
-    Section,
-    SectionCommit,
-    SectionState,
-    SectionSubmission,
-} from "@/uhm/types/sections";
+    Project,
+    ProjectCommit,
+    ProjectState,
+    ProjectSubmission,
+} from "@/uhm/types/projects";
 
-// Sections (API cũ) => Projects (API mới)
+// Projects (API cũ) => Projects (API mới)
 
-export async function fetchSections(): Promise<Section[]> {
+export async function fetchProjects(): Promise<Project[]> {
     // /users/current/project requires JWT.
-    return requestJson<Section[]>(API_ENDPOINTS.currentUserProjects);
+    return requestJson<Project[]>(API_ENDPOINTS.currentUserProjects);
 }
 
-export async function createSection(input: CreateSectionInput): Promise<Section> {
+export async function createProject(input: CreateProjectInput): Promise<Project> {
     // POST /projects
-    return requestJson<Section>(API_ENDPOINTS.projects, jsonRequestInit("POST", input));
+    return requestJson<Project>(API_ENDPOINTS.projects, jsonRequestInit("POST", input));
 }
 
-export async function openSectionEditor(sectionId: string): Promise<EditorLoadResponse> {
+export async function openSectionEditor(projectId: string): Promise<EditorLoadResponse> {
     // API mới không có endpoint "editor". FE tự load:
     // 1) Project details
     // 2) Project commits (to get snapshot_json of latest commit)
-    const project = await requestJson<Section>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}`);
+    const project = await requestJson<Project>(`${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`);
 
     const pending = (project.submissions || []).find((s) => s?.status === "PENDING") || null;
     if (pending) {
@@ -51,33 +51,33 @@ export async function openSectionEditor(sectionId: string): Promise<EditorLoadRe
         );
     }
 
-    const commits = await fetchSectionCommits(sectionId);
+    const commits = await fetchProjectCommits(projectId);
 
     const headCommitId = project.latest_commit_id ?? null;
     const headCommit = headCommitId ? commits.find((c) => c.id === headCommitId) || null : null;
     const snapshot = headCommit?.snapshot_json ?? null;
 
-    const state: SectionState = {
+    const state: ProjectState = {
         status: project.project_status || "ACTIVE",
         head_commit_id: headCommitId,
         locked_by: project.locked_by ?? null,
     };
 
     return {
-        section: project,
+        project: project,
         state,
         commit: headCommit,
         snapshot,
     };
 }
 
-export async function createSectionCommit(
-    sectionId: string,
+export async function createProjectCommit(
+    projectId: string,
     input: CreateCommitInput
-): Promise<{ commit: SectionCommit; state: SectionState }> {
+): Promise<{ commit: ProjectCommit; state: ProjectState }> {
     // POST /projects/{id}/commits
-    const commit = await requestJson<SectionCommit>(
-        `${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}/commits`,
+    const commit = await requestJson<ProjectCommit>(
+        `${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}/commits`,
         jsonRequestInit("POST", {
             snapshot_json: input.snapshot,
             edit_summary: input.edit_summary,
@@ -85,8 +85,8 @@ export async function createSectionCommit(
     );
 
     // Refresh project state (latest_commit_id may have moved).
-    const project = await requestJson<Section>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}`);
-    const state: SectionState = {
+    const project = await requestJson<Project>(`${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`);
+    const state: ProjectState = {
         status: project.project_status || "ACTIVE",
         head_commit_id: project.latest_commit_id ?? null,
         locked_by: project.locked_by ?? null,
@@ -95,27 +95,27 @@ export async function createSectionCommit(
     return { commit, state };
 }
 
-export async function fetchSectionCommits(sectionId: string): Promise<SectionCommit[]> {
-    return requestJson<SectionCommit[]>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}/commits`);
+export async function fetchProjectCommits(projectId: string): Promise<ProjectCommit[]> {
+    return requestJson<ProjectCommit[]>(`${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}/commits`);
 }
 
-export async function restoreSectionCommit(
-    sectionId: string,
+export async function restoreProjectCommit(
+    projectId: string,
     input: RestoreCommitInput
-): Promise<{ commit: SectionCommit | null; state: SectionState }> {
+): Promise<{ commit: ProjectCommit | null; state: ProjectState }> {
     // POST /projects/{id}/commits/restore
     await requestJson(
-        `${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}/commits/restore`,
+        `${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}/commits/restore`,
         jsonRequestInit("POST", { commit_id: input.commit_id })
     );
 
     // Reload commits + project to determine new head commit.
-    const project = await requestJson<Section>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}`);
-    const commits = await fetchSectionCommits(sectionId);
+    const project = await requestJson<Project>(`${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`);
+    const commits = await fetchProjectCommits(projectId);
     const headCommitId = project.latest_commit_id ?? null;
     const headCommit = headCommitId ? commits.find((c) => c.id === headCommitId) || null : null;
 
-    const state: SectionState = {
+    const state: ProjectState = {
         status: project.project_status || "ACTIVE",
         head_commit_id: headCommitId,
         locked_by: project.locked_by ?? null,
@@ -124,18 +124,18 @@ export async function restoreSectionCommit(
     return { commit: headCommit, state };
 }
 
-export async function submitSection(sectionId: string, content: string): Promise<SectionSubmission> {
+export async function submitSection(projectId: string, content: string): Promise<ProjectSubmission> {
     // Submit latest commit of project
-    const project = await requestJson<Section>(`${API_ENDPOINTS.projects}/${encodeURIComponent(sectionId)}`);
+    const project = await requestJson<Project>(`${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}`);
     const commitId = project.latest_commit_id;
     if (!commitId) {
         throw new Error("Project has no latest commit to submit");
     }
 
-    return requestJson<SectionSubmission>(
+    return requestJson<ProjectSubmission>(
         API_ENDPOINTS.submissions,
         jsonRequestInit("POST", {
-            project_id: sectionId,
+            project_id: projectId,
             commit_id: commitId,
             content: content,
         })

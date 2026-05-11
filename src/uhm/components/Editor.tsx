@@ -23,7 +23,7 @@ type Props = {
     isSaving: boolean;
     isSubmitting: boolean;
     sectionTitle: string;
-    sectionStatus: string;
+    projectStatus: string;
     commitTitle: string;
     onCommitTitleChange: (title: string) => void;
     commitCount: number;
@@ -62,7 +62,7 @@ export default function Editor({
     isSaving,
     isSubmitting,
     sectionTitle,
-    sectionStatus,
+    projectStatus,
     commitTitle,
     onCommitTitleChange,
     commitCount,
@@ -109,7 +109,7 @@ export default function Editor({
 
                 <ProjectPanel
                     sectionTitle={sectionTitle}
-                    sectionStatus={sectionStatus}
+                    projectStatus={projectStatus}
                     commitCount={commitCount}
                     latestCommitLabel={latestCommitLabel}
                 />

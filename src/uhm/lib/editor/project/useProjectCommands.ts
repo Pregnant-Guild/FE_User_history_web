@@ -2,17 +2,17 @@ import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { ApiError } from "@/uhm/api/http";
 import {
-    createSection,
-    createSectionCommit,
-    fetchSectionCommits,
-    fetchSections,
+    createProject,
+    createProjectCommit,
+    fetchProjectCommits,
+    fetchProjects,
     openSectionEditor,
     submitSection,
-} from "@/uhm/api/sections";
+} from "@/uhm/api/projects";
 import { buildEditorSnapshot, normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { Feature, FeatureCollection, FeatureId, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
-import type { EditorSnapshot, Section, SectionCommit, SectionState, EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EditorSnapshot, Project, ProjectCommit, ProjectState, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 
@@ -27,9 +27,9 @@ type Options = {
     editor: EditorDraftApi;
     editorUserId: string;
     emptyFeatureCollection: FeatureCollection;
-    activeSection: Section | null;
-    sectionState: SectionState | null;
-    selectedSectionId: string;
+    activeSection: Project | null;
+    projectState: ProjectState | null;
+    selectedProjectId: string;
     newSectionTitle: string;
     pendingSaveCount: number;
     snapshotEntities: EntitySnapshot[];
@@ -37,12 +37,12 @@ type Options = {
     snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
     baselineSnapshot: EditorSnapshot | null;
     commitTitle: string;
-    setActiveSection: Dispatch<SetStateAction<Section | null>>;
-    setSelectedSectionId: Dispatch<SetStateAction<string>>;
-    setSectionState: Dispatch<SetStateAction<SectionState | null>>;
+    setActiveSection: Dispatch<SetStateAction<Project | null>>;
+    setSelectedProjectId: Dispatch<SetStateAction<string>>;
+    setProjectState: Dispatch<SetStateAction<ProjectState | null>>;
     setBaselineSnapshot: Dispatch<SetStateAction<EditorSnapshot | null>>;
     setInitialData: Dispatch<SetStateAction<FeatureCollection>>;
-    setSectionCommits: Dispatch<SetStateAction<SectionCommit[]>>;
+    setProjectCommits: Dispatch<SetStateAction<ProjectCommit[]>>;
     setSnapshotEntities: Dispatch<SetStateAction<EntitySnapshot[]>>;
     setSnapshotWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
     setSnapshotEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
@@ -52,27 +52,27 @@ type Options = {
     setIsSaving: Dispatch<SetStateAction<boolean>>;
     setIsSubmitting: Dispatch<SetStateAction<boolean>>;
     setIsOpeningSection: Dispatch<SetStateAction<boolean>>;
-    setAvailableSections: Dispatch<SetStateAction<Section[]>>;
+    setAvailableSections: Dispatch<SetStateAction<Project[]>>;
     setNewSectionTitle: Dispatch<SetStateAction<string>>;
     setCommitTitle: Dispatch<SetStateAction<string>>;
 };
 
-export function useSectionCommands(options: Options) {
-    const openSectionForEditing = useCallback(async (sectionId: string) => {
-        const editorPayload = await openSectionEditor(sectionId);
+export function useProjectCommands(options: Options) {
+    const openSectionForEditing = useCallback(async (projectId: string) => {
+        const editorPayload = await openSectionEditor(projectId);
         const snapshot = normalizeEditorSnapshot(editorPayload.snapshot);
         // When starting a fresh editor session from a commit snapshot, treat all rows as baseline state:
         // operations should not carry over as deltas into the next commit.
         const sessionSnapshot = snapshot ? toEditorSessionSnapshot(snapshot) : null;
-        const commits = await fetchSectionCommits(sectionId);
+        const commits = await fetchProjectCommits(projectId);
         const nextInitialData = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
 
-        options.setActiveSection(editorPayload.section);
-        options.setSelectedSectionId(editorPayload.section.id);
-        options.setSectionState(editorPayload.state);
+        options.setActiveSection(editorPayload.project);
+        options.setSelectedProjectId(editorPayload.project.id);
+        options.setProjectState(editorPayload.state);
         options.setBaselineSnapshot(sessionSnapshot);
         options.setInitialData(nextInitialData);
-        options.setSectionCommits(commits);
+        options.setProjectCommits(commits);
         options.setSnapshotEntities(sessionSnapshot?.entities || []);
         options.setSnapshotWikis(sessionSnapshot?.wikis || []);
         options.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
@@ -81,8 +81,8 @@ export function useSectionCommands(options: Options) {
     }, [options]);
 
     const commitSection = useCallback(async () => {
-        if (!options.activeSection || !options.sectionState) {
-            options.setEntityStatus("Chưa mở được section editor.");
+        if (!options.activeSection || !options.projectState) {
+            options.setEntityStatus("Chưa mở được project editor.");
             return;
         }
         if (options.pendingSaveCount <= 0) {
@@ -95,7 +95,7 @@ export function useSectionCommands(options: Options) {
         options.setEntityStatus(null);
         try {
             const snapshot = buildEditorSnapshot({
-                section: options.activeSection,
+                project: options.activeSection,
                 draft: options.editor.draft,
                 changes: geometryChanges,
                 snapshotEntities: options.snapshotEntities,
@@ -124,13 +124,13 @@ export function useSectionCommands(options: Options) {
                 // If stringify fails, let API call throw a more actionable error downstream.
             }
 
-            const result = await createSectionCommit(options.activeSection.id, {
+            const result = await createProjectCommit(options.activeSection.id, {
                 snapshot,
                 edit_summary: editSummary,
             });
 
             const sessionSnapshot = toEditorSessionSnapshot(snapshot);
-            options.setSectionState(result.state);
+            options.setProjectState(result.state);
             options.setBaselineSnapshot(sessionSnapshot);
             options.setSnapshotEntities(sessionSnapshot.entities || []);
             options.setSnapshotWikis(sessionSnapshot.wikis || []);
@@ -138,7 +138,7 @@ export function useSectionCommands(options: Options) {
             options.setInitialData(options.editor.draft);
             options.editor.clearChanges();
             options.setCommitTitle("");
-            options.setSectionCommits(await fetchSectionCommits(options.activeSection.id));
+            options.setProjectCommits(await fetchProjectCommits(options.activeSection.id));
             options.setEntityFormStatus("Đã tạo commit.");
         } catch (err) {
             if (err instanceof ApiError) {
@@ -154,26 +154,26 @@ export function useSectionCommands(options: Options) {
     }, [options]);
 
     const openSelectedSection = useCallback(async () => {
-        const sectionId = options.selectedSectionId.trim();
-        if (!sectionId) {
-            options.setEntityStatus("Hãy chọn section để mở.");
+        const projectId = options.selectedProjectId.trim();
+        if (!projectId) {
+            options.setEntityStatus("Hãy chọn project để mở.");
             return;
         }
         if (options.pendingSaveCount > 0) {
-            const confirmed = window.confirm("Section hiện tại có thay đổi chưa Commit. Mở section khác sẽ bỏ các thay đổi này. Tiếp tục?");
+            const confirmed = window.confirm("Project hiện tại có thay đổi chưa Commit. Mở project khác sẽ bỏ các thay đổi này. Tiếp tục?");
             if (!confirmed) return;
         }
 
         options.setIsOpeningSection(true);
         options.setEntityStatus(null);
         try {
-            await openSectionForEditing(sectionId);
-            options.setEntityStatus("Đã mở section để chỉnh sửa.");
+            await openSectionForEditing(projectId);
+            options.setEntityStatus("Đã mở project để chỉnh sửa.");
         } catch (err) {
             if (err instanceof ApiError) {
-                options.setEntityStatus(`Mở section thất bại: ${err.body}`);
+                options.setEntityStatus(`Mở project thất bại: ${err.body}`);
             } else {
-                options.setEntityStatus("Mở section thất bại.");
+                options.setEntityStatus("Mở project thất bại.");
             }
         } finally {
             options.setIsOpeningSection(false);
@@ -183,31 +183,31 @@ export function useSectionCommands(options: Options) {
     const createAndOpenSection = useCallback(async () => {
         const title = options.newSectionTitle.trim();
         if (!title) {
-            options.setEntityStatus("Tên section là bắt buộc.");
+            options.setEntityStatus("Tên project là bắt buộc.");
             return;
         }
         if (options.pendingSaveCount > 0) {
-            const confirmed = window.confirm("Section hiện tại có thay đổi chưa Commit. Tạo section mới sẽ bỏ các thay đổi này. Tiếp tục?");
+            const confirmed = window.confirm("Project hiện tại có thay đổi chưa Commit. Tạo project mới sẽ bỏ các thay đổi này. Tiếp tục?");
             if (!confirmed) return;
         }
 
         options.setIsOpeningSection(true);
         options.setEntityStatus(null);
         try {
-            const section = await createSection({
+            const project = await createProject({
                 title,
                 description: null,
             });
-            const sections = await fetchSections();
-            options.setAvailableSections(sections);
+            const projects = await fetchProjects();
+            options.setAvailableSections(projects);
             options.setNewSectionTitle("");
-            await openSectionForEditing(section.id);
-            options.setEntityStatus("Đã tạo và mở section mới.");
+            await openSectionForEditing(project.id);
+            options.setEntityStatus("Đã tạo và mở project mới.");
         } catch (err) {
             if (err instanceof ApiError) {
-                options.setEntityStatus(`Tạo section thất bại: ${err.body}`);
+                options.setEntityStatus(`Tạo project thất bại: ${err.body}`);
             } else {
-                options.setEntityStatus("Tạo section thất bại.");
+                options.setEntityStatus("Tạo project thất bại.");
             }
         } finally {
             options.setIsOpeningSection(false);
@@ -215,8 +215,8 @@ export function useSectionCommands(options: Options) {
     }, [openSectionForEditing, options]);
 
     const submitCurrentSection = useCallback(async (content: string) => {
-        if (!options.activeSection || !options.sectionState?.head_commit_id) {
-            options.setEntityStatus("Section hiện tại chưa có head để submit.");
+        if (!options.activeSection || !options.projectState?.head_commit_id) {
+            options.setEntityStatus("Project hiện tại chưa có head để submit.");
             return;
         }
         if (options.pendingSaveCount > 0) {
@@ -241,8 +241,8 @@ export function useSectionCommands(options: Options) {
     }, [options]);
 
     const restoreCommit = useCallback(async (commitId: string) => {
-        if (!options.activeSection || !options.sectionState) {
-            options.setEntityStatus("Chưa mở được section editor.");
+        if (!options.activeSection || !options.projectState) {
+            options.setEntityStatus("Chưa mở được project editor.");
             return;
         }
         if (options.pendingSaveCount > 0) {
@@ -255,8 +255,8 @@ export function useSectionCommands(options: Options) {
         try {
             // FE-only restore: load snapshot from selected commit and apply to editor state.
             // Do NOT move project's head commit on backend.
-            const commits = await fetchSectionCommits(options.activeSection.id);
-            const target = commits.find((c: SectionCommit) => c.id === commitId) || null;
+            const commits = await fetchProjectCommits(options.activeSection.id);
+            const target = commits.find((c: ProjectCommit) => c.id === commitId) || null;
             if (!target) {
                 options.setEntityStatus("Không tìm thấy commit để restore.");
                 return;
@@ -274,8 +274,8 @@ export function useSectionCommands(options: Options) {
             options.setSelectedFeatureIds([]);
             options.setEntityFormStatus(null);
 
-            // Refresh commits list for UI, but keep sectionState/head as-is.
-            options.setSectionCommits(commits);
+            // Refresh commits list for UI, but keep projectState/head as-is.
+            options.setProjectCommits(commits);
             options.setEntityFormStatus("Đã load snapshot từ commit (không đổi head trên BE).");
         } catch (err) {
             if (err instanceof ApiError) {

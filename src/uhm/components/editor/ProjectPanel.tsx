@@ -2,14 +2,14 @@ import { Panel } from "./Panel";
 
 type ProjectPanelProps = {
     sectionTitle: string;
-    sectionStatus: string;
+    projectStatus: string;
     commitCount: number;
     latestCommitLabel: string | null;
 };
 
 export function ProjectPanel({
     sectionTitle,
-    sectionStatus,
+    projectStatus,
     commitCount,
     latestCommitLabel,
 }: ProjectPanelProps) {
@@ -18,7 +18,7 @@ export function ProjectPanel({
             <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.4 }}>
                 <div style={{ color: "white", fontWeight: 850, overflowWrap: "anywhere" }}>{sectionTitle}</div>
                 <div style={{ marginTop: 6 }}>
-                    Status: <span style={{ color: "#e2e8f0" }}>{sectionStatus}</span>
+                    Status: <span style={{ color: "#e2e8f0" }}>{projectStatus}</span>
                 </div>
                 <div style={{ marginTop: 6 }}>
                     Commits: <span style={{ color: "#e2e8f0" }}>{commitCount}</span>

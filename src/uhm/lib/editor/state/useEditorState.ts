@@ -11,7 +11,7 @@ import { useUndoStack } from "@/uhm/lib/editor/draft/useUndoStack";
 import type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 export type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
 export type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";

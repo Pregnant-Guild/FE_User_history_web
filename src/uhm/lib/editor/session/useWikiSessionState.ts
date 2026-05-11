@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 export function useWikiSessionState() {
   const [snapshotWikis, setSnapshotWikis] = useState<WikiSnapshot[]>([]);

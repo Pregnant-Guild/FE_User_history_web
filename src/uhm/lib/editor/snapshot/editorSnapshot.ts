@@ -4,9 +4,9 @@ import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
-import type { EditorSnapshot, Section } from "@/uhm/types/sections";
+import type { EditorSnapshot, Project } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -251,7 +251,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
 }
 
 export function buildEditorSnapshot(options: {
-    section: Section;
+    project: Project;
     draft: FeatureCollection;
     changes: Change[];
     snapshotEntities: EntitySnapshot[];

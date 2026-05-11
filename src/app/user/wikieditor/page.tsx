@@ -209,7 +209,7 @@ export default function WikiEditorPage() {
       type: "doc",
       content: [
         { type: "paragraph", content: [{ type: "text", text: "Write your wiki content here." }] },
-        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Section" }] },
+        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Project" }] },
         { type: "paragraph", content: [{ type: "text", text: "Use H1/H2/H3 and the TOC will follow." }] },
       ],
     },

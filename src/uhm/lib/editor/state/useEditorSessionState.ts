@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FeatureCollection } from "@/uhm/types/geo";
 import { useBackgroundSessionState } from "@/uhm/lib/editor/session/useBackgroundSessionState";
 import { useEntitySessionState } from "@/uhm/lib/editor/session/useEntitySessionState";
-import { useSectionSessionState } from "@/uhm/lib/editor/session/useSectionSessionState";
+import { useProjectSessionState } from "@/uhm/lib/editor/session/useProjectSessionState";
 import { useTimelineState } from "@/uhm/lib/editor/session/useTimelineState";
 import { useWikiSessionState } from "@/uhm/lib/editor/session/useWikiSessionState";
 import type { EditorMode, TimelineRange } from "@/uhm/lib/editor/session/sessionTypes";
@@ -24,10 +24,10 @@ type Options = {
 export function useEditorSessionState(options: Options) {
     // Mode thao tác map/editor hiện tại.
     const [mode, setMode] = useState<EditorMode>("idle");
-    // FeatureCollection "gốc" của session hiện tại (global timeline hoặc section snapshot).
+    // FeatureCollection "gốc" của session hiện tại (global timeline hoặc project snapshot).
     const [initialData, setInitialData] = useState<FeatureCollection>(options.emptyFeatureCollection);
 
-    const section = useSectionSessionState({
+    const project = useProjectSessionState({
         defaultEditorUserId: options.defaultEditorUserId,
     });
     const entity = useEntitySessionState();
@@ -43,7 +43,7 @@ export function useEditorSessionState(options: Options) {
         setMode,
         initialData,
         setInitialData,
-        ...section,
+        ...project,
         ...entity,
         ...timeline,
         ...background,

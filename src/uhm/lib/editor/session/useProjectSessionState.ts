@@ -1,15 +1,15 @@
 import { useCallback, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { EditorSnapshot, Section, SectionCommit, SectionState } from "@/uhm/types/sections";
+import type { EditorSnapshot, Project, ProjectCommit, ProjectState } from "@/uhm/types/projects";
 
 type Options = {
     defaultEditorUserId: string;
 };
 
-type SectionTask = "idle" | "saving" | "submitting" | "opening-section";
+type SectionTask = "idle" | "saving" | "submitting" | "opening-project";
 
-export function useSectionSessionState(options: Options) {
-    // Single state machine cho các tác vụ async của section (saving/submitting/opening).
+export function useProjectSessionState(options: Options) {
+    // Single state machine cho các tác vụ async của project (saving/submitting/opening).
     const [sectionTask, setSectionTask] = useState<SectionTask>("idle");
     const setTaskFlag = useCallback((task: Exclude<SectionTask, "idle">, next: SetStateAction<boolean>) => {
         setSectionTask((prev) => {
@@ -22,7 +22,7 @@ export function useSectionSessionState(options: Options) {
 
     const isSaving = sectionTask === "saving";
     const isSubmitting = sectionTask === "submitting";
-    const isOpeningSection = sectionTask === "opening-section";
+    const isOpeningSection = sectionTask === "opening-project";
     const setIsSaving: Dispatch<SetStateAction<boolean>> = useCallback((next) => {
         setTaskFlag("saving", next);
     }, [setTaskFlag]);
@@ -30,25 +30,25 @@ export function useSectionSessionState(options: Options) {
         setTaskFlag("submitting", next);
     }, [setTaskFlag]);
     const setIsOpeningSection: Dispatch<SetStateAction<boolean>> = useCallback((next) => {
-        setTaskFlag("opening-section", next);
+        setTaskFlag("opening-project", next);
     }, [setTaskFlag]);
 
-    // Danh sách sections để user chọn mở.
-    const [availableSections, setAvailableSections] = useState<Section[]>([]);
-    // Section ID đang được chọn trong dropdown.
-    const [selectedSectionId, setSelectedSectionId] = useState("");
-    // Title section mới (để create).
+    // Danh sách projects để user chọn mở.
+    const [availableSections, setAvailableSections] = useState<Project[]>([]);
+    // Project ID đang được chọn trong dropdown.
+    const [selectedProjectId, setSelectedProjectId] = useState("");
+    // Title project mới (để create).
     const [newSectionTitle, setNewSectionTitle] = useState("");
     // Input title cho commit.
     const [commitTitle, setCommitTitle] = useState("");
     // User ID dùng để gắn vào commit/submit/lock.
     const [editorUserIdInput, setEditorUserIdInput] = useState(options.defaultEditorUserId);
-    // Section đang mở để edit (null nếu chưa mở).
-    const [activeSection, setActiveSection] = useState<Section | null>(null);
-    // Trạng thái section (version/head/status/lock).
-    const [sectionState, setSectionState] = useState<SectionState | null>(null);
-    // Danh sách commits của section đang mở.
-    const [sectionCommits, setSectionCommits] = useState<SectionCommit[]>([]);
+    // Project đang mở để edit (null nếu chưa mở).
+    const [activeSection, setActiveSection] = useState<Project | null>(null);
+    // Trạng thái project (version/head/status/lock).
+    const [projectState, setProjectState] = useState<ProjectState | null>(null);
+    // Danh sách commits của project đang mở.
+    const [sectionCommits, setProjectCommits] = useState<ProjectCommit[]>([]);
     // Baseline snapshot currently loaded for this editor session.
     const [baselineSnapshot, setBaselineSnapshot] = useState<EditorSnapshot | null>(null);
 
@@ -61,8 +61,8 @@ export function useSectionSessionState(options: Options) {
         setIsOpeningSection,
         availableSections,
         setAvailableSections,
-        selectedSectionId,
-        setSelectedSectionId,
+        selectedProjectId,
+        setSelectedProjectId,
         newSectionTitle,
         setNewSectionTitle,
         commitTitle,
@@ -71,10 +71,10 @@ export function useSectionSessionState(options: Options) {
         setEditorUserIdInput,
         activeSection,
         setActiveSection,
-        sectionState,
-        setSectionState,
+        projectState,
+        setProjectState,
         sectionCommits,
-        setSectionCommits,
+        setProjectCommits,
         baselineSnapshot,
         setBaselineSnapshot,
     };

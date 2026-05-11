@@ -14,7 +14,7 @@ import GeometryBindingPanel from "@/uhm/components/editor/GeometryBindingPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
-import { SectionCommit } from "@/uhm/api/sections";
+import { ProjectCommit } from "@/uhm/api/projects";
 import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
 import type { EntitySnapshot } from "@/uhm/types/entities";
@@ -57,13 +57,13 @@ import {
     loadBackgroundLayerVisibilityFromStorage,
     persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
-import { useSectionCommands } from "@/uhm/lib/editor/section/useSectionCommands";
+import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/utils/timeline";
 import { useFeatureCommands } from "./featureCommands";
-import { deleteSubmission } from "@/uhm/api/sections";
+import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import UnifiedSearchBar, { type UnifiedSearchKind } from "@/uhm/components/ui/UnifiedSearchBar";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
@@ -107,8 +107,8 @@ export default function Page() {
         isOpeningSection,
         setIsOpeningSection,
         setAvailableSections,
-        selectedSectionId,
-        setSelectedSectionId,
+        selectedProjectId,
+        setSelectedProjectId,
         newSectionTitle,
         setNewSectionTitle,
         commitTitle,
@@ -116,10 +116,10 @@ export default function Page() {
         editorUserIdInput,
         activeSection,
         setActiveSection,
-        sectionState,
-        setSectionState,
+        projectState,
+        setProjectState,
         sectionCommits,
-        setSectionCommits,
+        setProjectCommits,
         baselineSnapshot,
         setBaselineSnapshot,
         entityCatalog,
@@ -367,13 +367,13 @@ export default function Page() {
         + (entitiesDirty ? 1 : 0)
         + (entityWikiDirty ? 1 : 0);
 
-    const sectionCommands = useSectionCommands({
+    const sectionCommands = useProjectCommands({
         editor,
         editorUserId,
         emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
         activeSection,
-        sectionState,
-        selectedSectionId,
+        projectState,
+        selectedProjectId,
         newSectionTitle,
         pendingSaveCount,
         snapshotEntities,
@@ -382,11 +382,11 @@ export default function Page() {
         baselineSnapshot,
         commitTitle,
         setActiveSection,
-        setSelectedSectionId,
-        setSectionState,
+        setSelectedProjectId,
+        setProjectState,
         setBaselineSnapshot,
         setInitialData,
-        setSectionCommits,
+        setProjectCommits,
         setSnapshotEntities,
         setSnapshotWikis,
         setSnapshotEntityWikiLinks,
@@ -1144,8 +1144,8 @@ export default function Page() {
         }
     };
 
-    const headCommit = sectionState?.head_commit_id
-        ? sectionCommits.find((commit) => commit.id === sectionState.head_commit_id) || null
+    const headCommit = projectState?.head_commit_id
+        ? sectionCommits.find((commit) => commit.id === projectState.head_commit_id) || null
         : null;
 
     const handleCreateFeature = (feature: Feature) => {
@@ -1166,12 +1166,12 @@ export default function Page() {
                 isSaving={isSaving}
                 isSubmitting={isSubmitting}
                 sectionTitle={activeSection?.title || "Đang tải project"}
-                sectionStatus={sectionState?.status || "editing"}
+                projectStatus={projectState?.status || "editing"}
                 commitTitle={commitTitle}
                 onCommitTitleChange={setCommitTitle}
                 commitCount={sectionCommits.length}
-                hasHeadCommit={Boolean(sectionState?.head_commit_id)}
-                headCommitId={sectionState?.head_commit_id || null}
+                hasHeadCommit={Boolean(projectState?.head_commit_id)}
+                headCommitId={projectState?.head_commit_id || null}
                 latestCommitLabel={headCommit ? `Head: ${formatCommitTitle(headCommit)}` : null}
                 commits={sectionCommits}
                 changesCount={pendingSaveCount}
@@ -1633,7 +1633,7 @@ function normalizeEditorUserId(value: string): string {
     return normalized || DEFAULT_EDITOR_USER_ID;
 }
 
-function formatCommitTitle(commit: SectionCommit): string {
+function formatCommitTitle(commit: ProjectCommit): string {
     return commit.edit_summary?.trim() || `Commit ${commit.id.slice(0, 8)}`;
 }
 

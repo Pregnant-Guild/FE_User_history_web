@@ -14,7 +14,7 @@ import Badge from "@/components/ui/badge/Badge";
 import { CreateProjectPayload, Project } from "@/interface/project";
 import { apiCreateProject, apiCreateProjectCommit, apiGetProjectCommits, getCurrentProject } from "@/service/projectService";
 import { normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
-import type { EditorSnapshot } from "@/uhm/types/sections";
+import type { EditorSnapshot } from "@/uhm/types/projects";
 
 export type ProjectSortColumn = "created_at" | "updated_at" | "title";
 

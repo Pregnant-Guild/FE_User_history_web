@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Entity } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/sections";
+import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 type EntityChoice = { id: string; name: string };
 type WikiChoice = { id: string; title: string; operation?: string };
