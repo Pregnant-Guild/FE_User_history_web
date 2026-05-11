@@ -1,4 +1,4 @@
-import type { UndoAction } from "@/uhm/lib/useEditorState";
+import type { UndoAction } from "@/uhm/lib/editor/state/useEditorState";
 import { Panel } from "./Panel";
 
 type UndoListPanelProps = {

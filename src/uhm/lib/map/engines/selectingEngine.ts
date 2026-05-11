@@ -1,5 +1,5 @@
 import maplibregl from "maplibre-gl";
-import type { ModeGetter } from "@/uhm/lib/engine/engineTypes";
+import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
 
 // Khởi tạo engine chọn feature và context menu edit/delete.
 export function initSelect(

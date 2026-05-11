@@ -5,8 +5,8 @@ import {
     BACKGROUND_LAYER_OPTIONS,
     BackgroundLayerId,
     BackgroundLayerVisibility,
-} from "@/uhm/lib/backgroundLayers";
-import { GEO_TYPE_KEYS } from "@/uhm/lib/geoTypeMap";
+} from "@/uhm/lib/map/styles/backgroundLayers";
+import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
 
 type Props = {
     visibility: BackgroundLayerVisibility;

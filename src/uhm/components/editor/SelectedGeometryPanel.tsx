@@ -2,14 +2,14 @@
 
 import { type CSSProperties, useMemo, useState } from "react";
 import { Entity } from "@/uhm/api/entities";
-import { Feature } from "@/uhm/lib/useEditorState";
+import { Feature } from "@/uhm/lib/editor/state/useEditorState";
 import {
     EntityGeometryPreset,
     EntityTypeGroupId,
     EntityTypeOption,
     findEntityTypeOption,
     groupEntityTypeOptions,
-} from "@/uhm/lib/entityTypeOptions";
+} from "@/uhm/lib/utils/entityTypeOptions";
 import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
 
 type Props = {

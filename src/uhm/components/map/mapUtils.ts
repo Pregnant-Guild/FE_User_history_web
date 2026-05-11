@@ -1,6 +1,6 @@
 import maplibregl from "maplibre-gl";
-import { BACKGROUND_LAYER_OPTIONS, BackgroundLayerVisibility } from "@/uhm/lib/backgroundLayers";
-import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/useEditorState";
+import { BACKGROUND_LAYER_OPTIONS, BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
+import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import {
     DEFAULT_POINT_ICON_ID,
     FEATURE_STATE_SOURCE_IDS,
@@ -10,9 +10,9 @@ import {
     RASTER_BASE_LAYER_ID,
     RASTER_BASE_SOURCE_ID,
 } from "@/uhm/lib/map/constants";
-import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/style";
+import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getRasterTileTemplateUrl } from "@/uhm/api/tiles";
-import { newId } from "@/uhm/lib/id";
+import { newId } from "@/uhm/lib/utils/id";
 
 export function applyBackgroundLayerVisibility(
     map: maplibregl.Map,

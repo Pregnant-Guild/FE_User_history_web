@@ -1,7 +1,7 @@
 import maplibregl from "maplibre-gl";
-import { Geometry } from "@/uhm/lib/useEditorState";
-import type { ModeGetter } from "@/uhm/lib/engine/engineTypes";
-import { snapToNearestGeometry } from "@/uhm/lib/engine/snapUtils";
+import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
+import { snapToNearestGeometry } from "@/uhm/lib/map/engines/snapUtils";
 
 // Khởi tạo engine vẽ polygon tự do theo chuỗi click.
 export function initDrawing(

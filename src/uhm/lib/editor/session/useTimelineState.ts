@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { TimelineRange } from "@/uhm/lib/editor/session/sessionTypes";
-import { clampYearValue } from "@/uhm/lib/timeline";
+import { clampYearValue } from "@/uhm/lib/utils/timeline";
 
 type Options = {
     currentYear: number;

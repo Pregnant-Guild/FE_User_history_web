@@ -16,7 +16,7 @@ import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
 import { createHistorianCV } from "@/service/historianService";
 import { toast } from "sonner";
-import { newId } from "@/uhm/lib/id";
+import { newId } from "@/uhm/lib/utils/id";
 import Swal from "sweetalert2";
 import { PresignedUrlResponse } from "@/interface/media";
 

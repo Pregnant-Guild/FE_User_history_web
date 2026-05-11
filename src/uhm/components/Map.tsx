@@ -3,8 +3,8 @@
 import { type CSSProperties, useEffect, useRef } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/useEditorState";
-import { BackgroundLayerVisibility } from "@/uhm/lib/backgroundLayers";
+import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
 import { useMapInstance } from "./map/useMapInstance";

@@ -1,5 +1,5 @@
 import maplibregl from "maplibre-gl";
-import { Geometry } from "@/uhm/lib/useEditorState";
+import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 
 export type EditingHandle = {
     id: string | number;

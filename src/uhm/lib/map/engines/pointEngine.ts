@@ -1,6 +1,6 @@
 import maplibregl from "maplibre-gl";
-import { Geometry } from "@/uhm/lib/useEditorState";
-import type { ModeGetter } from "@/uhm/lib/engine/engineTypes";
+import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
 
 // Khởi tạo engine thêm point bằng click đơn.
 export function initPoint(

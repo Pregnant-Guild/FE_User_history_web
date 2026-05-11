@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
     BackgroundLayerVisibility,
     HIDDEN_BACKGROUND_LAYER_VISIBILITY,
-} from "@/uhm/lib/backgroundLayers";
+} from "@/uhm/lib/map/styles/backgroundLayers";
 
 export function useBackgroundSessionState() {
     // Trạng thái bật/tắt layer nền (khởi tạo default hidden; sẽ load từ storage ở page).

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UndoAction } from "@/uhm/lib/useEditorState";
+import type { UndoAction } from "@/uhm/lib/editor/state/useEditorState";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
 import { ProjectPanel } from "./editor/ProjectPanel";

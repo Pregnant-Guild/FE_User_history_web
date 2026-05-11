@@ -2,7 +2,7 @@ import {
     BACKGROUND_LAYER_OPTIONS,
     BackgroundLayerVisibility,
     DEFAULT_BACKGROUND_LAYER_VISIBILITY,
-} from "@/uhm/lib/backgroundLayers";
+} from "@/uhm/lib/map/styles/backgroundLayers";
 
 const BACKGROUND_LAYER_VISIBILITY_STORAGE_KEY = "uhm.backgroundLayerVisibility.v1";
 

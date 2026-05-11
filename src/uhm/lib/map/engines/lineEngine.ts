@@ -1,35 +1,41 @@
 import maplibregl from "maplibre-gl";
-import { Geometry } from "@/uhm/lib/useEditorState";
-import type { ModeGetter } from "@/uhm/lib/engine/engineTypes";
+import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
 
 const EMPTY_PREVIEW: GeoJSON.FeatureCollection = {
     type: "FeatureCollection",
     features: [],
 };
 
-// Khởi tạo engine vẽ path (gấp khúc, sẽ render có mũi tên ở layer path).
-export function initPath(
+// Khởi tạo engine vẽ line (gấp khúc, không mũi tên).
+export function initLine(
     map: maplibregl.Map,
     getMode: ModeGetter,
     onComplete: (geometry: Geometry) => void
 ) {
     let coords: [number, number][] = [];
 
-    // Xóa dữ liệu preview path.
+    // Xóa dữ liệu preview line.
     const clearPreview = () => {
-        (map.getSource("draw-path-preview") as maplibregl.GeoJSONSource | undefined)?.setData(
+        (map.getSource("draw-line-preview") as maplibregl.GeoJSONSource | undefined)?.setData(
             EMPTY_PREVIEW
         );
     };
 
-    // Cập nhật path preview theo danh sách tọa độ tạm.
+    // Hủy phiên vẽ line hiện tại.
+    const cancelLine = () => {
+        coords = [];
+        clearPreview();
+    };
+
+    // Cập nhật line preview theo danh sách tọa độ tạm.
     const updatePreview = (lineCoords: [number, number][]) => {
         if (lineCoords.length < 2) {
             clearPreview();
             return;
         }
 
-        (map.getSource("draw-path-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
+        (map.getSource("draw-line-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
             type: "FeatureCollection",
             features: [
                 {
@@ -44,9 +50,9 @@ export function initPath(
         });
     };
 
-    // Chốt path khi đủ số đỉnh tối thiểu.
-    const finishPath = () => {
-        if (getMode() !== "add-path" || coords.length < 2) return;
+    // Chốt line khi đủ số đỉnh tối thiểu.
+    const finishLine = () => {
+        if (getMode() !== "add-line" || coords.length < 2) return;
 
         const geometry: Geometry = {
             type: "LineString",
@@ -54,38 +60,31 @@ export function initPath(
         };
 
         onComplete(geometry);
-        coords = [];
-        clearPreview();
+        cancelLine();
     };
 
-    // Hủy phiên vẽ path hiện tại.
-    const cancelPath = () => {
-        coords = [];
-        clearPreview();
-    };
-
-    // Xóa đỉnh cuối cùng của path đang vẽ.
+    // Xóa đỉnh cuối cùng trong line đang vẽ.
     const removeLastVertex = () => {
-        if (coords.length === 0) return;
+        if (!coords.length) return;
         coords = coords.slice(0, -1);
         updatePreview(coords);
     };
 
-    // Thêm một đỉnh path khi click map.
+    // Thêm một đỉnh line khi click map.
     const onClick = (e: maplibregl.MapLayerMouseEvent) => {
-        if (getMode() !== "add-path") return;
+        if (getMode() !== "add-line") return;
 
         coords.push([e.lngLat.lng, e.lngLat.lat]);
         updatePreview(coords);
     };
 
-    // Cập nhật preview path động theo vị trí chuột.
+    // Cập nhật preview động theo vị trí chuột.
     const onMove = (e: maplibregl.MapLayerMouseEvent) => {
         const canvas = map.getCanvas();
 
-        if (getMode() !== "add-path") {
+        if (getMode() !== "add-line") {
             if (coords.length) {
-                cancelPath();
+                cancelLine();
             }
             if (canvas.style.cursor === "crosshair") {
                 canvas.style.cursor = "";
@@ -95,23 +94,22 @@ export function initPath(
 
         canvas.style.cursor = "crosshair";
         if (coords.length === 0) return;
-
         updatePreview([...coords, [e.lngLat.lng, e.lngLat.lat]]);
     };
 
-    // Xử lý phím nóng Enter/Escape/Backspace cho chế độ vẽ path.
+    // Xử lý phím nóng Enter/Escape/Backspace cho chế độ vẽ line.
     const onKeyDown = (e: KeyboardEvent) => {
-        if (getMode() !== "add-path") return;
+        if (getMode() !== "add-line") return;
 
         if (e.key === "Enter") {
             e.preventDefault();
-            finishPath();
+            finishLine();
             return;
         }
 
         if (e.key === "Escape") {
             e.preventDefault();
-            cancelPath();
+            cancelLine();
             return;
         }
 
@@ -129,7 +127,7 @@ export function initPath(
         map.off("click", onClick);
         map.off("mousemove", onMove);
         document.removeEventListener("keydown", onKeyDown);
-        cancelPath();
+        cancelLine();
         if (map.getCanvas().style.cursor === "crosshair") {
             map.getCanvas().style.cursor = "";
         }
@@ -137,6 +135,6 @@ export function initPath(
 
     return {
         cleanup,
-        cancel: cancelPath,
+        cancel: cancelLine,
     };
 }

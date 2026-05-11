@@ -12,7 +12,7 @@ import {
 } from "@fullcalendar/core";
 import { useModal } from "@/hooks/useModal";
 import { Modal } from "@/components/ui/modal";
-import { newId } from "@/uhm/lib/id";
+import { newId } from "@/uhm/lib/utils/id";
 
 interface CalendarEvent extends EventInput {
   extendedProps: {

@@ -2,7 +2,7 @@ import { API_ENDPOINTS } from "@/uhm/api/config";
 import { requestJson } from "@/uhm/api/http";
 import type { GeometriesBBoxQuery } from "@/uhm/types/api";
 import type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
-import { geoTypeCodeToTypeKey } from "@/uhm/lib/geoTypeMap";
+import { geoTypeCodeToTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
 
 export type { GeometriesBBoxQuery } from "@/uhm/types/api";
 

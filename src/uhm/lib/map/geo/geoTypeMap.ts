@@ -1,4 +1,4 @@
-import rows from "@/uhm/lib/geoTypeMap.json";
+import rows from "@/uhm/lib/map/geo/geoTypeMap.json";
 
 export type GeoTypeMapRow = {
     type_key: string;

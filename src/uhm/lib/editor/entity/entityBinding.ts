@@ -1,7 +1,7 @@
 import type { Entity } from "@/uhm/types/entities";
 import type { Feature, FeatureProperties } from "@/uhm/types/geo";
 import { normalizeFeatureEntityIds } from "@/uhm/lib/editor/snapshot/editorSnapshot";
-import { newId } from "@/uhm/lib/id";
+import { newId } from "@/uhm/lib/utils/id";
 
 export function mergeEntitySearchResults(
     remoteRows: Entity[],

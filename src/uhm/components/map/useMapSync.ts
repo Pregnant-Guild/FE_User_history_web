@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
-import { FeatureCollection } from "@/uhm/lib/useEditorState";
-import { BackgroundLayerVisibility } from "@/uhm/lib/backgroundLayers";
-import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/geo/constants";
+import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
+import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
+import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { FEATURE_STATE_SOURCE_IDS, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
 import {
     applyBackgroundLayerVisibility,

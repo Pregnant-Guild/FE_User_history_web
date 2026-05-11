@@ -15,14 +15,14 @@ import {
     type BackgroundLayerVisibility,
     DEFAULT_BACKGROUND_LAYER_VISIBILITY,
     HIDDEN_BACKGROUND_LAYER_VISIBILITY,
-} from "@/uhm/lib/backgroundLayers";
+} from "@/uhm/lib/map/styles/backgroundLayers";
 import {
     loadBackgroundLayerVisibilityFromStorage,
     persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
-import { EMPTY_FEATURE_COLLECTION, WORLD_BBOX } from "@/uhm/lib/geo/constants";
-import { GEO_TYPE_KEYS } from "@/uhm/lib/geoTypeMap";
-import { clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/timeline";
+import { EMPTY_FEATURE_COLLECTION, WORLD_BBOX } from "@/uhm/lib/map/geo/constants";
+import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
+import { clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/utils/timeline";
 import type { FeatureCollection } from "@/uhm/types/geo";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();

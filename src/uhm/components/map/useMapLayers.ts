@@ -8,8 +8,8 @@ import {
     POLYGON_FILL_BY_TYPE,
     POLYGON_OPACITY_BY_TYPE,
     POLYGON_STROKE_BY_TYPE,
-} from "@/uhm/lib/map/style";
-import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/geo/constants";
+} from "@/uhm/lib/map/styles/style";
+import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
 import {
     addPointSymbolLayer,
@@ -17,8 +17,8 @@ import {
     buildTypeMatchExpression,
     ensurePathArrowIcon,
 } from "./mapUtils";
-import { BackgroundLayerVisibility } from "@/uhm/lib/backgroundLayers";
-import { FeatureCollection } from "@/uhm/lib/useEditorState";
+import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
+import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
 
 export function getBaseMapStyle(): maplibregl.StyleSpecification {
     return {

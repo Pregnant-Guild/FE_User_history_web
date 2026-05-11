@@ -1,4 +1,4 @@
-import type { EntityGeometryPreset } from "@/uhm/lib/entityTypeOptions";
+import type { EntityGeometryPreset } from "@/uhm/lib/utils/entityTypeOptions";
 
 export type EditorMode =
     | "idle"

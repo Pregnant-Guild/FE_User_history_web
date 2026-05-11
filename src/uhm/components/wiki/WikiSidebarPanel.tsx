@@ -9,7 +9,7 @@ import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import { newId } from "@/uhm/lib/id";
+import { newId } from "@/uhm/lib/utils/id";
 import type ReactQuill from "react-quill-new";
 import { checkWikiSlugExists, fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 

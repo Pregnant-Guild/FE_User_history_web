@@ -1,5 +1,5 @@
-import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/entityTypeOptions";
-import { geoTypeCodeToTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/geoTypeMap";
+import { DEFAULT_ENTITY_TYPE_ID } from "@/uhm/lib/utils/entityTypeOptions";
+import { geoTypeCodeToTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
