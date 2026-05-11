@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Map, { type MapHoverPayload } from "@/uhm/components/Map";
-import PublicWikiSidebar from "@/uhm/components/PublicWikiSidebar";
-import TimelineBar from "@/uhm/components/TimelineBar";
+import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
+import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import { fetchEntities, type Entity } from "@/uhm/api/entities";
 import { fetchGeometriesByBBox } from "@/uhm/api/geometries";
 import { ApiError } from "@/uhm/api/http";
