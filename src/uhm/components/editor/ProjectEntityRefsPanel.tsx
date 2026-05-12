@@ -39,6 +39,22 @@ export default function ProjectEntityRefsPanel({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+  const selectedEntityIdSet = useMemo(
+    () => new Set((selectedGeometryEntityIds || []).map(String)),
+    [selectedGeometryEntityIds]
+  );
+  const sortedEntityRefs = useMemo(() => {
+    const rows = [...(entityRefs || [])];
+    rows.sort((a, b) => {
+      const aBound = selectedEntityIdSet.has(String(a.id));
+      const bBound = selectedEntityIdSet.has(String(b.id));
+      if (aBound !== bBound) return aBound ? -1 : 1;
+      const aLabel = String(a.name || a.id || "");
+      const bLabel = String(b.name || b.id || "");
+      return aLabel.localeCompare(bLabel);
+    });
+    return rows;
+  }, [entityRefs, selectedEntityIdSet]);
 
   const activeEntity = useMemo(
     () => (activeEntityId ? entityRefs.find((e) => String(e.id) === String(activeEntityId)) || null : null),
@@ -90,83 +106,93 @@ export default function ProjectEntityRefsPanel({
         </div>
       </div>
 
-      {collapsed ? null : entityRefs.length ? (
+      {collapsed ? null : sortedEntityRefs.length ? (
         <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
-          {entityRefs.map((e) => (
-            <div
-              key={e.id}
-              style={{
-                padding: "8px",
-                borderRadius: "6px",
-                border: activeEntityId === String(e.id) ? "1px solid #2563eb" : "1px solid #1f2937",
-                background: "transparent",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => openEntityEditor(e)}
-                title="Chon de sua"
+          {sortedEntityRefs.map((e) => {
+            const entityId = String(e.id);
+            const isBoundToSelectedGeometry = selectedEntityIdSet.has(entityId);
+            const isActive = activeEntityId === entityId;
+            return (
+              <div
+                key={e.id}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
-                  textAlign: "left",
-                  border: "none",
-                  background: "transparent",
-                  padding: 0,
-                  cursor: canEditEntity ? "pointer" : "default",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: isActive
+                    ? "1px solid #2563eb"
+                    : isBoundToSelectedGeometry
+                      ? "1px solid rgba(20, 184, 166, 0.65)"
+                      : "1px solid #1f2937",
+                  background: isBoundToSelectedGeometry ? "rgba(20, 184, 166, 0.12)" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
                 }}
-                disabled={!canEditEntity}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  <span style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {e.name || e.id}
-                  </span>
-                  {isNewEntityRef(e) ? <NewBadge /> : null}
-                </div>
-                <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.id}
-                </div>
-              </button>
-              {canBindToggle ? (
                 <button
                   type="button"
-                  title={selectedGeometryEntityIds!.includes(String(e.id)) ? "Unbind from selected geometry" : "Bind to selected geometry"}
-                  onClick={() =>
-                    onToggleBindEntityForSelectedGeometry!(
-                      String(e.id),
-                      !selectedGeometryEntityIds!.includes(String(e.id))
-                    )
-                  }
+                  onClick={() => openEntityEditor(e)}
+                  title="Chon de sua"
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 22,
-                    height: 22,
-                    borderRadius: 6,
-                    border: "1px solid #334155",
-                    background: "#0b1220",
-                    cursor: "pointer",
-                    flex: "0 0 auto",
+                    flex: 1,
+                    minWidth: 0,
+                    textAlign: "left",
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    cursor: canEditEntity ? "pointer" : "default",
                   }}
-                  aria-label={
-                    selectedGeometryEntityIds!.includes(String(e.id))
-                      ? `Unbind entity ${String(e.id)} from selected geometry`
-                      : `Bind entity ${String(e.id)} to selected geometry`
-                  }
+                  disabled={!canEditEntity}
                 >
-                  {selectedGeometryEntityIds!.includes(String(e.id)) ? (
-                    <UnlockIcon />
-                  ) : (
-                    <LockIcon />
-                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    <span style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {e.name || e.id}
+                    </span>
+                    {isBoundToSelectedGeometry ? <span style={boundBadgeStyle}>bound</span> : null}
+                    {isNewEntityRef(e) ? <NewBadge /> : null}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.id}
+                  </div>
                 </button>
-              ) : null}
-            </div>
-          ))}
+                {canBindToggle ? (
+                  <button
+                    type="button"
+                    title={isBoundToSelectedGeometry ? "Unbind from selected geometry" : "Bind to selected geometry"}
+                    onClick={() =>
+                      onToggleBindEntityForSelectedGeometry!(
+                        entityId,
+                        !isBoundToSelectedGeometry
+                      )
+                    }
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      border: "1px solid #334155",
+                      background: "#0b1220",
+                      cursor: "pointer",
+                      flex: "0 0 auto",
+                    }}
+                    aria-label={
+                      isBoundToSelectedGeometry
+                        ? `Unbind entity ${entityId} from selected geometry`
+                        : `Bind entity ${entityId} to selected geometry`
+                    }
+                  >
+                    {isBoundToSelectedGeometry ? (
+                      <UnlockIcon />
+                    ) : (
+                      <LockIcon />
+                    )}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
 
         </div>
       ) : (
@@ -356,6 +382,24 @@ const entityInputStyle: CSSProperties = {
   color: "#f8fafc",
   padding: "6px 8px",
   fontSize: "13px",
+};
+
+const boundBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "0 0 auto",
+  height: 17,
+  padding: "0 6px",
+  borderRadius: 999,
+  border: "1px solid rgba(45, 212, 191, 0.5)",
+  background: "rgba(20, 184, 166, 0.18)",
+  color: "#99f6e4",
+  fontSize: 10,
+  fontWeight: 900,
+  lineHeight: 1,
+  textTransform: "uppercase",
+  letterSpacing: 0,
 };
 
 function LockIcon() {

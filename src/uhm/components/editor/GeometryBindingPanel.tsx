@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import NewBadge from "@/uhm/components/editor/NewBadge";
 
 type GeometryChoice = {
@@ -49,6 +49,16 @@ export default function GeometryBindingPanel({
     if (!selectedGeometryId) return null;
     return rows.find((g) => g.id === selectedGeometryId) || null;
   }, [rows, selectedGeometryId]);
+  const visibleRows = useMemo(() => {
+    return rows
+      .filter((g) => g.id !== selectedGeometryId)
+      .sort((a, b) => {
+        const aBound = bindingSet.has(a.id);
+        const bBound = bindingSet.has(b.id);
+        if (aBound !== bBound) return aBound ? -1 : 1;
+        return a.id.localeCompare(b.id);
+      });
+  }, [bindingSet, rows, selectedGeometryId]);
 
   const handleFocusKeyDown = (event: KeyboardEvent<HTMLDivElement>, geometryId: string) => {
     if (!canFocusGeometry) return;
@@ -174,8 +184,7 @@ export default function GeometryBindingPanel({
 
       {collapsed ? null : rows.length ? (
         <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
-          {rows
-            .filter((g) => g.id !== selectedGeometryId)
+          {visibleRows
             .map((g) => {
               const isBound = bindingSet.has(g.id);
               return (
@@ -184,8 +193,8 @@ export default function GeometryBindingPanel({
                   style={{
                     padding: "8px",
                     borderRadius: "6px",
-                    border: "1px solid #1f2937",
-                    background: "transparent",
+                    border: isBound ? "1px solid rgba(20, 184, 166, 0.65)" : "1px solid #1f2937",
+                    background: isBound ? "rgba(20, 184, 166, 0.12)" : "transparent",
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
@@ -219,6 +228,7 @@ export default function GeometryBindingPanel({
                       >
                         {g.label || g.id}
                       </span>
+                      {isBound ? <span style={boundBadgeStyle}>bound</span> : null}
                       {g.isNew ? <NewBadge /> : null}
                     </div>
                     <div
@@ -282,6 +292,24 @@ export default function GeometryBindingPanel({
     </div>
   );
 }
+
+const boundBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "0 0 auto",
+  height: 17,
+  padding: "0 6px",
+  borderRadius: 999,
+  border: "1px solid rgba(45, 212, 191, 0.5)",
+  background: "rgba(20, 184, 166, 0.18)",
+  color: "#99f6e4",
+  fontSize: 10,
+  fontWeight: 900,
+  lineHeight: 1,
+  textTransform: "uppercase",
+  letterSpacing: 0,
+};
 
 function LockIcon() {
   return (

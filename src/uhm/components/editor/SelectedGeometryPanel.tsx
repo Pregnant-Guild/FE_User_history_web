@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, useMemo, useState } from "react";
-import { Entity } from "@/uhm/api/entities";
 import { Feature } from "@/uhm/lib/editor/state/useEditorState";
 import {
     GeometryPreset,
@@ -14,11 +13,6 @@ import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionType
 
 type Props = {
     selectedFeatures: Feature[];
-    selectedFeatureEntitySummary: string;
-    selectedFeatureBindingSummary: string;
-    entities: Entity[];
-    selectedGeometryEntityIds: string[];
-    onEntityIdsChange: (values: string[]) => void;
     entityTypeOptions: GeometryTypeOption[];
     geometryMetaForm: GeometryMetaFormState;
     onGeometryMetaFormChange: (key: keyof GeometryMetaFormState, value: string) => void;
@@ -29,11 +23,6 @@ type Props = {
 
 export default function SelectedGeometryPanel({
     selectedFeatures,
-    selectedFeatureEntitySummary,
-    selectedFeatureBindingSummary,
-    entities,
-    selectedGeometryEntityIds,
-    onEntityIdsChange,
     entityTypeOptions,
     geometryMetaForm,
     onGeometryMetaFormChange,
@@ -103,7 +92,7 @@ export default function SelectedGeometryPanel({
         >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: "8px" }}>
                 <div style={{ fontWeight: 700, fontSize: "14px" }}>
-                    Entity & Geometry
+                    Geometry property
                 </div>
                 <button
                     type="button"
@@ -130,67 +119,6 @@ export default function SelectedGeometryPanel({
 
             {collapsed ? null : (
             <div style={{ display: "grid", gap: "8px", fontSize: "13px" }}>
-                <div style={{ color: "#e2e8f0" }}>
-                    ID: {selectedFeatures.map(f => String(f.properties.id)).join(", ")}
-                </div>
-                <div style={{ color: "#cbd5e1" }}>
-                    Entities hiện tại: {selectedFeatureEntitySummary}
-                </div>
-                <div style={{ color: "#cbd5e1" }}>
-                    Binding hiện tại: {selectedFeatureBindingSummary}
-                </div>
-                <div style={{ color: "#cbd5e1" }}>
-                    Geometry preset: {formatGeometryPresetLabel(featureGeometryPreset)}
-                </div>
-
-                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                    Entities đã chọn:
-                </div>
-                {selectedGeometryEntityIds.length ? (
-                    <div style={{ display: "grid", gap: "6px" }}>
-                        {selectedGeometryEntityIds.map((entityId) => {
-                            const entity = entities.find((item) => item.id === entityId) || null;
-                            const label = entity?.name
-                                ? `${entity.name} (${entityId})`
-                                : entityId;
-
-                            return (
-                                <div
-                                    key={entityId}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: "8px",
-                                        background: "#111827",
-                                        border: "1px solid #334155",
-                                        borderRadius: "6px",
-                                        padding: "6px 8px",
-                                    }}
-                                >
-                                    <span style={{ color: "#e2e8f0" }}>{label}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            onEntityIdsChange(
-                                                selectedGeometryEntityIds.filter((id) => id !== entityId)
-                                            )
-                                        }
-                                        disabled={isEntitySubmitting}
-                                        style={removeButtonStyle}
-                                    >
-                                        Bỏ
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div style={{ color: "#fca5a5", fontSize: "12px" }}>
-                        Chưa có entity nào được gắn.
-                    </div>
-                )}
-
                     <div
                         style={{
                             display: "grid",
@@ -306,16 +234,6 @@ const entityInputStyle: CSSProperties = {
     fontSize: "13px",
 };
 
-const removeButtonStyle: CSSProperties = {
-    border: "none",
-    borderRadius: "6px",
-    padding: "4px 8px",
-    cursor: "pointer",
-    background: "#7f1d1d",
-    color: "#ffffff",
-    fontSize: "12px",
-};
-
 const primaryGeometryButtonStyle: CSSProperties = {
     border: "none",
     borderRadius: "6px",
@@ -403,12 +321,4 @@ function getAllowedGroupIdsForPreset(
     }
 
     return ["polygon"];
-}
-
-function formatGeometryPresetLabel(preset: GeometryPreset | null): string {
-    if (preset === "point") return "point - Điểm";
-    if (preset === "line") return "line - Tuyến";
-    if (preset === "circle-area") return "circle - Tròn";
-    if (preset === "polygon") return "polygon - Đa giác";
-    return "unknown";
 }

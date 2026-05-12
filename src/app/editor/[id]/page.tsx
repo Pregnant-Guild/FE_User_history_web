@@ -47,13 +47,9 @@ import {
 } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import {
     buildClientEntityId,
-    formatEntityNamesForDisplay,
     mergeEntitySearchResults,
 } from "@/uhm/lib/editor/entity/entityBinding";
 import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
-import {
-    formatBindingIdsForDisplay,
-} from "@/uhm/lib/editor/geometry/geometryMetadata";
 import {
     loadBackgroundLayerVisibilityFromStorage,
     persistBackgroundLayerVisibility,
@@ -826,10 +822,6 @@ export default function Page() {
         setGeometryMetaForm((prev) => ({ ...prev, [key]: value }));
     };
 
-    const handleEntityIdsChange = (values: string[]) => {
-        setSelectedGeometryEntityIds(uniqueEntityIds(values));
-    };
-
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
         const id = String(entity.id || "").trim();
         if (!id) return;
@@ -1600,19 +1592,6 @@ export default function Page() {
                         {!wikiOnly && selectedFeature ? (
                             <SelectedGeometryPanel
                                 selectedFeatures={selectedFeatures}
-                                selectedFeatureEntitySummary={
-                                    selectedFeature
-                                        ? formatEntityNamesForDisplay(selectedFeature, entities)
-                                        : "Chưa gắn"
-                                }
-                                selectedFeatureBindingSummary={
-                                    selectedFeature
-                                        ? formatBindingIdsForDisplay(selectedFeature)
-                                        : "Không có"
-                                }
-                                entities={entities}
-                                selectedGeometryEntityIds={selectedGeometryEntityIds}
-                                onEntityIdsChange={handleEntityIdsChange}
                                 entityTypeOptions={GEOMETRY_TYPE_OPTIONS}
                                 geometryMetaForm={geometryMetaForm}
                                 onGeometryMetaFormChange={handleGeometryMetaFormChange}
