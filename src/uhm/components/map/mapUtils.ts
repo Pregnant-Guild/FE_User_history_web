@@ -2,10 +2,8 @@ import maplibregl from "maplibre-gl";
 import { BACKGROUND_LAYER_OPTIONS, BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import {
-    DEFAULT_POINT_ICON_ID,
     FEATURE_STATE_SOURCE_IDS,
     PATH_ARROW_ICON_ID,
-    POINT_ICON_URL,
     RASTER_BASE_INSERT_BEFORE_LAYER_ID,
     RASTER_BASE_LAYER_ID,
     RASTER_BASE_SOURCE_ID,
@@ -186,6 +184,19 @@ export function splitDraftFeatures(fc: FeatureCollection) {
     } as FeatureCollection;
 
     return { polygons, points };
+}
+
+export function decoratePointFeaturesWithLabels(fc: FeatureCollection): FeatureCollection {
+    return {
+        ...fc,
+        features: fc.features.map((feature) => ({
+            ...feature,
+            properties: {
+                ...feature.properties,
+                point_label: getSingleEntityPointLabel(feature),
+            },
+        })),
+    };
 }
 
 export function setSelectedFeatureState(
@@ -520,47 +531,6 @@ export function createPathArrowImageData(): ImageData | null {
     return ctx.getImageData(0, 0, size, size);
 }
 
-export function addPointSymbolLayer(map: maplibregl.Map) {
-    void ensurePointAssetIcon(map).then((hasPointIcon) => {
-        try {
-            if (!hasPointIcon || !map.getSource("places") || map.getLayer("places-symbol")) return;
-
-            map.addLayer({
-                id: "places-symbol",
-                type: "symbol",
-                source: "places",
-                layout: {
-                    "icon-image": DEFAULT_POINT_ICON_ID,
-                    "icon-size": 0.06,
-                    "icon-anchor": "center",
-                    "icon-allow-overlap": true,
-                },
-            });
-
-            if (map.getLayer("places-circle")) {
-                map.setLayoutProperty("places-circle", "visibility", "none");
-            }
-        } catch (err) {
-            console.warn("Add point symbol layer skipped", err);
-        }
-    });
-}
-
-export async function ensurePointAssetIcon(map: maplibregl.Map): Promise<boolean> {
-    if (map.hasImage(DEFAULT_POINT_ICON_ID)) return true;
-
-    try {
-        const image = await map.loadImage(POINT_ICON_URL);
-        if (!map.hasImage(DEFAULT_POINT_ICON_ID)) {
-            map.addImage(DEFAULT_POINT_ICON_ID, image.data);
-        }
-        return true;
-    } catch (error) {
-        console.error(`Failed to load point icon asset: ${POINT_ICON_URL}`, error);
-        return false;
-    }
-}
-
 export function buildTypeMatchExpression(
     valueByType: Record<string, string | number | boolean>,
     fallback: string | number | boolean
@@ -586,6 +556,29 @@ export function getFeatureTypeExpression(): maplibregl.ExpressionSpecification {
 
 export function roundZoom(value: number): number {
     return Math.round(value * 10) / 10;
+}
+
+function getSingleEntityPointLabel(feature: Feature): string | null {
+    const rawEntityIds = Array.isArray(feature.properties.entity_ids)
+        ? feature.properties.entity_ids
+        : (typeof feature.properties.entity_id === "string" && feature.properties.entity_id.trim().length > 0
+            ? [feature.properties.entity_id]
+            : []);
+
+    const entityIds = Array.from(new Set(
+        rawEntityIds
+            .filter((id): id is string => typeof id === "string")
+            .map((id) => id.trim())
+            .filter((id) => id.length > 0)
+    ));
+
+    if (entityIds.length !== 1) return null;
+
+    const name = typeof feature.properties.entity_name === "string"
+        ? feature.properties.entity_name.trim()
+        : "";
+
+    return name.length ? name : null;
 }
 
 export function buildClientFeatureId(): string {

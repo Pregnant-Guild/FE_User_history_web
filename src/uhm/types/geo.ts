@@ -22,6 +22,7 @@ export type FeatureProperties = {
     entity_name?: string | null;
     entity_names?: string[];
     entity_type_id?: string | null;
+    point_label?: string | null;
 };
 
 export type Feature = {

@@ -11,9 +11,8 @@ import {
 } from "@/uhm/lib/map/styles/style";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
-import { getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypes";
+import { ensurePointGeotypeIcons, getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypes";
 import {
-    addPointSymbolLayer,
     applyBackgroundLayerVisibility,
     buildTypeMatchExpression,
     ensurePathArrowIcon,
@@ -326,7 +325,8 @@ export function setupMapLayers(
         promoteId: "id",
     });
 
-    
+    ensurePointGeotypeIcons(map);
+
     const geotypeLayers = getAllGeotypeLayers("countries", PATH_ARROW_SOURCE_ID, "places");
     for (const layer of geotypeLayers) {
         map.addLayer(layer);
@@ -411,7 +411,5 @@ export function setupMapLayers(
             "circle-opacity": 1,
         },
     });
-
-    addPointSymbolLayer(map);
     applyHighlightToMap(highlightFeatures || EMPTY_FEATURE_COLLECTION);
 }

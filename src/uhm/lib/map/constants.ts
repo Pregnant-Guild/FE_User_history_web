@@ -1,5 +1,3 @@
-export const DEFAULT_POINT_ICON_ID = "point-icon-default";
-export const POINT_ICON_URL = "/point.png";
 export const PATH_ARROW_ICON_ID = "path-arrow-icon";
 
 export const MAP_MIN_ZOOM = 2;

@@ -7,6 +7,7 @@ import { FEATURE_STATE_SOURCE_IDS, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/co
 import {
     applyBackgroundLayerVisibility,
     buildPathArrowFeatureCollection,
+    decoratePointFeaturesWithLabels,
     filterDraftByBinding,
     filterDraftByGeometryVisibility,
     fitMapToFeatureCollection,
@@ -28,7 +29,7 @@ type UseMapSyncProps = {
     focusRequestKey?: string | number | null;
     focusPadding?: number | maplibregl.PaddingOptions;
     allowGeometryEditing: boolean;
-    editingEngineRef: React.MutableRefObject<any>;
+    editingEngineRef: React.MutableRefObject<unknown>;
     geolocationCenteredRef: React.MutableRefObject<boolean>;
 };
 
@@ -97,10 +98,11 @@ export function useMapSync({
             : fc;
         const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
         const { polygons, points } = splitDraftFeatures(visibleDraft);
+        const labeledPoints = decoratePointFeaturesWithLabels(points);
         const pathArrowShapes = buildPathArrowFeatureCollection(visibleDraft);
 
         countriesSource.setData(polygons);
-        placesSource.setData(points);
+        placesSource.setData(labeledPoints);
         (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)?.setData(pathArrowShapes);
 
         const currentSelectedIds = selectedFeatureIdsRef.current;
