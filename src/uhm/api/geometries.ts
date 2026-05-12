@@ -8,7 +8,7 @@ export type { GeometriesBBoxQuery } from "@/uhm/types/api";
 
 export type EntityGeometrySearchGeo = {
     id: string;
-    geo_type: number;
+    type: string | null;
     draw_geometry: unknown;
     binding?: unknown;
     time_start?: number | null;
@@ -25,6 +25,18 @@ export type EntityGeometriesSearchItem = {
 export type SearchGeometriesByEntityNameResponse = {
     items: EntityGeometriesSearchItem[];
     next_cursor?: string;
+};
+
+type EntityGeometrySearchGeoRow = Omit<EntityGeometrySearchGeo, "type"> & {
+    geo_type: number;
+};
+
+type EntityGeometriesSearchItemRow = Omit<EntityGeometriesSearchItem, "geometries"> & {
+    geometries: EntityGeometrySearchGeoRow[];
+};
+
+type SearchGeometriesByEntityNameApiResponse = Omit<SearchGeometriesByEntityNameResponse, "items"> & {
+    items: EntityGeometriesSearchItemRow[];
 };
 
 function buildBBoxQueryString(params: GeometriesBBoxQuery): string {
@@ -71,7 +83,24 @@ export async function searchGeometriesByEntityName(
         params.set("limit", String(Math.trunc(options.limit)));
     }
 
-    return requestJson<SearchGeometriesByEntityNameResponse>(`${API_ENDPOINTS.geometries}/entity?${params.toString()}`);
+    const response = await requestJson<SearchGeometriesByEntityNameApiResponse>(
+        `${API_ENDPOINTS.geometries}/entity?${params.toString()}`
+    );
+
+    return {
+        ...response,
+        items: (response.items || []).map((item) => ({
+            ...item,
+            geometries: (item.geometries || []).map((geometry) => ({
+                id: geometry.id,
+                type: geoTypeCodeToTypeKey(geometry.geo_type) || null,
+                draw_geometry: geometry.draw_geometry,
+                binding: geometry.binding,
+                time_start: geometry.time_start ?? null,
+                time_end: geometry.time_end ?? null,
+            })),
+        })),
+    };
 }
 
 type GeometryRow = {

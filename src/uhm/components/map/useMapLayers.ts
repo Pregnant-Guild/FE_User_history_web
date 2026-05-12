@@ -384,7 +384,11 @@ export function setupMapLayers(
         id: "entity-focus-fill",
         type: "fill",
         source: "entity-focus",
-        filter: ["==", ["geometry-type"], "Polygon"],
+        filter: [
+            "any",
+            ["==", ["geometry-type"], "Polygon"],
+            ["==", ["geometry-type"], "MultiPolygon"],
+        ],
         paint: {
             "fill-color": "#fde047",
             "fill-opacity": 0.2,
@@ -413,7 +417,11 @@ export function setupMapLayers(
         id: "entity-focus-points",
         type: "circle",
         source: "entity-focus",
-        filter: ["==", ["geometry-type"], "Point"],
+        filter: [
+            "any",
+            ["==", ["geometry-type"], "Point"],
+            ["==", ["geometry-type"], "MultiPoint"],
+        ],
         paint: {
             "circle-color": "#f8fafc",
             "circle-radius": 8,

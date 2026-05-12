@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_ENDPOINTS } from "@/uhm/api/config";
 import { ApiError, jsonRequestInit, requestJson } from "@/uhm/api/http";
+import { toApiEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type {
     CreateCommitInput,
     CreateProjectInput,
@@ -76,10 +77,11 @@ export async function createProjectCommit(
     input: CreateCommitInput
 ): Promise<{ commit: ProjectCommit; state: ProjectState }> {
     // POST /projects/{id}/commits
+    const snapshot = toApiEditorSnapshot(input.snapshot);
     const commit = await requestJson<ProjectCommit>(
         `${API_ENDPOINTS.projects}/${encodeURIComponent(projectId)}/commits`,
         jsonRequestInit("POST", {
-            snapshot_json: input.snapshot,
+            snapshot_json: snapshot,
             edit_summary: input.edit_summary,
         })
     );

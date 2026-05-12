@@ -9,6 +9,7 @@ import {
     findGeometryTypeOption,
     groupGeometryTypeOptions,
 } from "@/uhm/lib/map/geo/geometryTypeOptions";
+import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
 import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
 
 type Props = {
@@ -288,9 +289,7 @@ function normalizeGeometryPreset(value: unknown): GeometryPreset | null {
 }
 
 function normalizeTypeId(value: unknown): string | null {
-    if (typeof value !== "string") return null;
-    const normalized = value.trim().toLowerCase();
-    return normalized.length ? normalized : null;
+    return normalizeGeoTypeKey(value);
 }
 
 function mapGeometryTypeToPreset(

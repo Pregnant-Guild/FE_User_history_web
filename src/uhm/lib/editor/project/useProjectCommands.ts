@@ -9,7 +9,7 @@ import {
     openSectionEditor,
     submitSection,
 } from "@/uhm/api/projects";
-import { buildEditorSnapshot, normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import { buildEditorSnapshot, normalizeEditorSnapshot, toApiEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { Feature, FeatureCollection, FeatureId, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { EditorSnapshot, Project, ProjectCommit, ProjectState, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
@@ -110,7 +110,7 @@ export function useProjectCommands(options: Options) {
             // Guardrail: commit payload can get large and some deployments reject/close connections for big bodies.
             // When that happens, browsers often surface it as "TypeError: Failed to fetch".
             try {
-                const payloadText = JSON.stringify({ snapshot_json: snapshot, edit_summary: editSummary });
+                const payloadText = JSON.stringify({ snapshot_json: toApiEditorSnapshot(snapshot), edit_summary: editSummary });
                 const bytes = typeof Blob !== "undefined" ? new Blob([payloadText]).size : payloadText.length;
                 const limitBytes = 3_500_000; // ~3.5MB (conservative vs common default body limits)
                 if (bytes > limitBytes) {

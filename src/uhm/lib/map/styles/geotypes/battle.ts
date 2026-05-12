@@ -1,40 +1,14 @@
 import { LayerSpecification } from "maplibre-gl";
-import { TYPE_MATCH_EXPR } from "./index";
+import { buildPolygonGeotypeLayers } from "./styleBuilders";
 
 export function getBattleLayers(sourceId: string, pathArrowSourceId?: string, pointSourceId?: string): LayerSpecification[] {
-    return [
-        {
-        id: "battle-fill",
-        type: "fill",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "Polygon"], ["==", TYPE_MATCH_EXPR, "battle"]],
-        paint: {
-            "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""], "#ef4444",
-                "#f43f5e"
-            ],
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], 0.6,
-                0.34
-            ]
-        }
-    },
-        {
-        id: "battle-line",
-        type: "line",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "Polygon"], ["==", TYPE_MATCH_EXPR, "battle"]],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#14532d",
-                "#9f1239"
-            ],
-            "line-width": 2
-        }
-    }
-    ];
+    void pathArrowSourceId;
+    void pointSourceId;
+    return buildPolygonGeotypeLayers(sourceId, {
+        typeId: "battle",
+        fillColor: "#f43f5e",
+        strokeColor: "#9f1239",
+        fillOpacity: 0.3,
+        strokeWidth: { z1: 1.5, z4: 2.2, z6: 3 },
+    });
 }

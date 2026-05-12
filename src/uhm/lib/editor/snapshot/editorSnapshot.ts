@@ -1,5 +1,5 @@
 import { DEFAULT_GEOMETRY_TYPE_ID } from "@/uhm/lib/map/geo/geometryTypeOptions";
-import { geoTypeCodeToTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
+import { normalizeGeoTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
@@ -86,12 +86,15 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const source: "inline" | "ref" = existingSource || (refId || !hasInlineGeometry ? "ref" : "inline");
                 const rest: UnknownRecord = { ...g };
                 delete rest.ref;
+                const typeKey = normalizeGeoTypeKey(rest.type) || normalizeGeoTypeKey(rest.geo_type);
+                delete rest.geo_type;
 
                 return {
                     ...(rest as unknown as Omit<GeometrySnapshot, "id" | "source" | "operation">),
                     id,
                     source,
                     operation,
+                    type: typeKey,
                 };
             })
         : undefined;
@@ -210,30 +213,39 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         for (const feature of cloned.features) {
             const gid = String(feature.properties.id);
             const entity_ids = byGeom.get(gid) || [];
+            const p = feature.properties as unknown as UnknownRecord;
+
+            const existingTypeKey = normalizeGeoTypeKey(p.type) || normalizeGeoTypeKey(p.entity_type_id);
+            const fallbackTypeKey = getDefaultTypeIdForFeature(feature);
+            if (existingTypeKey) p.type = existingTypeKey;
+
             if (entity_ids.length || hasLinks) {
-                const props = feature.properties as unknown as UnknownRecord;
-                props.entity_ids = entity_ids;
-                props.entity_id = entity_ids[0] || null;
+                p.entity_ids = entity_ids;
+                p.entity_id = entity_ids[0] || null;
 
                 // Generate denormalized names for UI/map usage.
                 const primaryId = entity_ids[0] || null;
                 const primaryName = primaryId ? (entityNameById.get(primaryId) || "") : "";
                 const names = entity_ids.map((id) => entityNameById.get(id) || "").filter((n) => n.length > 0);
-                props.entity_name = primaryName || null;
-                props.entity_names = names;
+                p.entity_name = primaryName || null;
+                p.entity_names = names;
             }
 
             // Generate geometry metadata onto feature properties (optional in persisted snapshot).
             const geo = geometryById.get(gid) || null;
             if (geo) {
-                const p = feature.properties as unknown as UnknownRecord;
-                // type (semantic key) is derived from geometries[].type (numeric code in string form).
-                const typeCode = typeof geo.type === "string" && geo.type.trim().length ? Number(geo.type) : NaN;
-                const typeKey = geoTypeCodeToTypeKey(Number.isFinite(typeCode) ? typeCode : null);
+                const geoRecord = geo as unknown as UnknownRecord;
+                // type can arrive as numeric geo_type, numeric string, or semantic key depending on backend version.
+                const typeKey = normalizeGeoTypeKey(geoRecord.type)
+                    || normalizeGeoTypeKey(geoRecord.geo_type)
+                    || existingTypeKey
+                    || fallbackTypeKey;
                 if (typeKey) p.type = typeKey;
                 if (Array.isArray(geo.binding) && geo.binding.length) p.binding = geo.binding;
                 if (typeof geo.time_start === "number") p.time_start = geo.time_start;
                 if (typeof geo.time_end === "number") p.time_end = geo.time_end;
+            } else if (!existingTypeKey) {
+                p.type = fallbackTypeKey;
             }
         }
         return cloned;
@@ -375,14 +387,12 @@ export function buildEditorSnapshot(options: {
                         ? "update"
                         : "reference";
         const bbox = getFeatureBBox(feature);
-        const typeKey = feature.properties.type || getDefaultTypeIdForFeature(feature);
-        const typeCode = typeKeyToGeoTypeCode(typeKey);
+        const typeKey = normalizeGeoTypeKey(feature.properties.type) || getDefaultTypeIdForFeature(feature);
         return {
             id,
             operation,
             source: "inline",
-            // BE currently expects geometries[].type as a string. We send the geo_type SMALLINT code as a string.
-            type: String(typeCode ?? 0),
+            type: typeKey,
             draw_geometry: feature.geometry,
             binding: normalizeFeatureBindingIds(feature),
             time_start: feature.properties.time_start ?? null,
@@ -598,6 +608,29 @@ export function buildEditorSnapshot(options: {
             .sort((a, b) => a.id.localeCompare(b.id)),
         entity_wiki: entityWikis,
     };
+}
+
+export function toApiEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
+    const cloned = JSON.parse(JSON.stringify(snapshot)) as EditorSnapshot;
+
+    if (Array.isArray(cloned.geometries)) {
+        cloned.geometries = cloned.geometries.map((geometry) => {
+            const row = { ...(geometry as unknown as UnknownRecord) };
+            const typeKey = normalizeGeoTypeKey(row.type) || normalizeGeoTypeKey(row.geo_type);
+            delete row.geo_type;
+
+            if (typeKey) {
+                const typeCode = typeKeyToGeoTypeCode(typeKey);
+                row.type = typeCode == null ? null : String(typeCode);
+            } else if ("type" in row) {
+                row.type = null;
+            }
+
+            return row as unknown as GeometrySnapshot;
+        });
+    }
+
+    return cloned;
 }
 
 function dedupeAndSortGeometryEntity(rows: GeometryEntitySnapshot[]): GeometryEntitySnapshot[] {

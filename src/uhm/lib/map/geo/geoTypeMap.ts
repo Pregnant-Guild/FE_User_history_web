@@ -39,3 +39,20 @@ export function geoTypeCodeToTypeKey(code: number | null | undefined): string | 
     if (!Number.isFinite(code)) return null;
     return KEY_BY_CODE.get(Math.trunc(code)) ?? null;
 }
+
+export function normalizeGeoTypeKey(value: unknown): string | null {
+    if (typeof value === "number") {
+        return geoTypeCodeToTypeKey(value);
+    }
+
+    if (typeof value !== "string") return null;
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized.length) return null;
+
+    if (/^-?\d+$/.test(normalized)) {
+        return geoTypeCodeToTypeKey(Number(normalized));
+    }
+
+    return normalized;
+}

@@ -1,68 +1,14 @@
 import { LayerSpecification } from "maplibre-gl";
-import { TYPE_MATCH_EXPR } from "./index";
+import { buildLineGeotypeLayers } from "./styleBuilders";
 
 export function getShippingRouteLayers(sourceId: string, pathArrowSourceId?: string, pointSourceId?: string): LayerSpecification[] {
-    return [
-        {
-        id: "shipping_route-line",
-        type: "line",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", TYPE_MATCH_EXPR, "shipping_route"]],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""], "#ef4444",
-                "#2563eb"
-            ],
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 2.2, 4, 3.2, 6, 4.2],
-            "line-opacity": 0.9
-        }
-    },
-        {
-        id: "shipping_route-hit",
-        type: "line",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", TYPE_MATCH_EXPR, "shipping_route"]],
-        paint: {
-            "line-color": "#ffffff",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 12, 4, 18, 6, 24],
-            "line-opacity": 0
-        }
-    },
-        {
-        id: "shipping_route-path-arrow-fill",
-        type: "fill",
-        source: pathArrowSourceId!,
-        filter: ["==", TYPE_MATCH_EXPR, "shipping_route"],
-        paint: {
-            "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""], "#ef4444",
-                "#2563eb"
-            ],
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], 0.92,
-                0.82
-            ]
-        }
-    },
-        {
-        id: "shipping_route-path-arrow-line",
-        type: "line",
-        source: pathArrowSourceId!,
-        filter: ["==", TYPE_MATCH_EXPR, "shipping_route"],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#14532d",
-                "#0f172a"
-            ],
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 4, 0.8, 6, 1.2],
-            "line-opacity": 0.9
-        }
-    }
-    ];
+    void pointSourceId;
+    return buildLineGeotypeLayers(sourceId, pathArrowSourceId, {
+        typeId: "shipping_route",
+        color: "#0ea5e9",
+        strokeColor: "#075985",
+        width: { z1: 2.4, z4: 3.5, z6: 4.7 },
+        dasharray: [7, 4],
+        arrowOpacity: 0.8,
+    });
 }

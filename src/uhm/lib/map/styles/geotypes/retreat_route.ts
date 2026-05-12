@@ -1,68 +1,14 @@
 import { LayerSpecification } from "maplibre-gl";
-import { TYPE_MATCH_EXPR } from "./index";
+import { buildLineGeotypeLayers } from "./styleBuilders";
 
 export function getRetreatRouteLayers(sourceId: string, pathArrowSourceId?: string, pointSourceId?: string): LayerSpecification[] {
-    return [
-        {
-        id: "retreat_route-line",
-        type: "line",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", TYPE_MATCH_EXPR, "retreat_route"]],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""], "#ef4444",
-                "#94a3b8"
-            ],
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 2.2, 4, 3.2, 6, 4.2],
-            "line-opacity": 0.9
-        }
-    },
-        {
-        id: "retreat_route-hit",
-        type: "line",
-        source: sourceId,
-        filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", TYPE_MATCH_EXPR, "retreat_route"]],
-        paint: {
-            "line-color": "#ffffff",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 12, 4, 18, 6, 24],
-            "line-opacity": 0
-        }
-    },
-        {
-        id: "retreat_route-path-arrow-fill",
-        type: "fill",
-        source: pathArrowSourceId!,
-        filter: ["==", TYPE_MATCH_EXPR, "retreat_route"],
-        paint: {
-            "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""], "#ef4444",
-                "#94a3b8"
-            ],
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], 0.92,
-                0.82
-            ]
-        }
-    },
-        {
-        id: "retreat_route-path-arrow-line",
-        type: "line",
-        source: pathArrowSourceId!,
-        filter: ["==", TYPE_MATCH_EXPR, "retreat_route"],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false], "#14532d",
-                "#0f172a"
-            ],
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 4, 0.8, 6, 1.2],
-            "line-opacity": 0.9
-        }
-    }
-    ];
+    void pointSourceId;
+    return buildLineGeotypeLayers(sourceId, pathArrowSourceId, {
+        typeId: "retreat_route",
+        color: "#94a3b8",
+        strokeColor: "#475569",
+        dasharray: [6, 3],
+        opacity: 0.82,
+        arrowOpacity: 0.68,
+    });
 }

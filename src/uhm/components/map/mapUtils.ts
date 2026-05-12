@@ -13,6 +13,7 @@ import {
 import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getRasterTileTemplateUrl } from "@/uhm/api/tiles";
 import { newId } from "@/uhm/lib/utils/id";
+import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
 
 type Coordinate = [number, number];
 type PolygonCoordinates = Coordinate[][];
@@ -342,18 +343,22 @@ export function collectCoordinatePairs(value: unknown): Array<[number, number]> 
 }
 
 export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureCollection {
-    const features = fc.features
-        .map((feature) => {
-            if (!isPathFeature(feature) || feature.geometry.type !== "LineString") return null;
-            const geometry = buildPathArrowGeometry(feature.geometry.coordinates);
-            if (!geometry) return null;
-            return {
-                type: "Feature" as const,
+    const features: Feature[] = [];
+
+    for (const feature of fc.features) {
+        if (!isPathFeature(feature)) continue;
+
+        const coordinateGroups = getLineCoordinateGroups(feature.geometry);
+        for (const coordinates of coordinateGroups) {
+            const geometry = buildPathArrowGeometry(coordinates);
+            if (!geometry) continue;
+            features.push({
+                type: "Feature",
                 properties: { ...feature.properties },
                 geometry,
-            };
-        })
-        .filter((feature): feature is Feature => feature !== null);
+            });
+        }
+    }
 
     return {
         type: "FeatureCollection",
@@ -368,9 +373,7 @@ export function isPathFeature(feature: Feature): boolean {
 
 export function getFeatureSemanticType(feature: Feature): string | null {
     const value = feature.properties.type || feature.properties.entity_type_id || null;
-    if (!value) return null;
-    const normalized = String(value).trim().toLowerCase();
-    return normalized.length ? normalized : null;
+    return normalizeGeoTypeKey(value);
 }
 
 export function buildPathArrowGeometry(coords: [number, number][]): Geometry | null {
@@ -717,6 +720,12 @@ function getSingleEntityName(feature: Feature): string | null {
 
 function isLineGeometry(geometry: Geometry): boolean {
     return geometry.type === "LineString" || geometry.type === "MultiLineString";
+}
+
+function getLineCoordinateGroups(geometry: Geometry): Coordinate[][] {
+    if (geometry.type === "LineString") return [geometry.coordinates];
+    if (geometry.type === "MultiLineString") return geometry.coordinates;
+    return [];
 }
 
 function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {

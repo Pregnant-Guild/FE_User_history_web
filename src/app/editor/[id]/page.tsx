@@ -24,7 +24,7 @@ import {
     Geometry,
     useEditorState,
 } from "@/uhm/lib/editor/state/useEditorState";
-import { GEO_TYPE_KEYS, geoTypeCodeToTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
+import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
 import {
     BackgroundLayerId,
     BackgroundLayerVisibility,
@@ -1080,7 +1080,7 @@ export default function Page() {
         }
 
         const bindingIds = normalizeGeoSearchBindingIds(geo.binding);
-        const typeKey = geoTypeCodeToTypeKey(Number(geo.geo_type)) || null;
+        const typeKey = geo.type || null;
 
         const feature: Feature = {
             type: "Feature",
@@ -1537,7 +1537,7 @@ export default function Page() {
                                                                     #{geo.id}
                                                                 </div>
                                                                 <div style={{ color: "#94a3b8", fontSize: 11 }}>
-                                                                    type: {String(geo.geo_type)}{" "}
+                                                                    type: {geo.type || "unknown"}{" "}
                                                                     {geo.time_start != null || geo.time_end != null
                                                                         ? `| time: ${geo.time_start ?? "?"} → ${geo.time_end ?? "?"}`
                                                                         : ""}
