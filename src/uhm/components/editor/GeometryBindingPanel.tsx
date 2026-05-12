@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
+import NewBadge from "@/uhm/components/editor/NewBadge";
 
 type GeometryChoice = {
   id: string;
   label?: string;
+  isNew?: boolean;
 };
 
 type Props = {
@@ -12,6 +14,7 @@ type Props = {
   selectedGeometryId: string | null;
   selectedGeometryBindingIds: string[];
   onToggleBindGeometryForSelectedGeometry?: (geometryId: string, nextChecked: boolean) => void;
+  onFocusGeometry?: (geometryId: string) => void;
   statusText?: string | null;
   bindingFilterEnabled: boolean;
   onBindingFilterEnabledChange: (next: boolean) => void;
@@ -22,25 +25,37 @@ export default function GeometryBindingPanel({
   selectedGeometryId,
   selectedGeometryBindingIds,
   onToggleBindGeometryForSelectedGeometry,
+  onFocusGeometry,
   statusText,
   bindingFilterEnabled,
   onBindingFilterEnabledChange,
 }: Props) {
   const canBindToggle =
     Boolean(selectedGeometryId) && typeof onToggleBindGeometryForSelectedGeometry === "function";
+  const canFocusGeometry = typeof onFocusGeometry === "function";
 
   const [collapsed, setCollapsed] = useState(false);
 
   const rows = useMemo(() => {
     const cleaned = (geometries || [])
       .filter((g) => g && typeof g.id === "string" && g.id.trim().length > 0)
-      .map((g) => ({ id: g.id.trim(), label: (g.label || "").trim() }));
+      .map((g) => ({ id: g.id.trim(), label: (g.label || "").trim(), isNew: Boolean(g.isNew) }));
     cleaned.sort((a, b) => a.id.localeCompare(b.id));
     return cleaned;
   }, [geometries]);
 
   const bindingSet = useMemo(() => new Set(selectedGeometryBindingIds || []), [selectedGeometryBindingIds]);
+  const selectedGeometry = useMemo(() => {
+    if (!selectedGeometryId) return null;
+    return rows.find((g) => g.id === selectedGeometryId) || null;
+  }, [rows, selectedGeometryId]);
 
+  const handleFocusKeyDown = (event: KeyboardEvent<HTMLDivElement>, geometryId: string) => {
+    if (!canFocusGeometry) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onFocusGeometry?.(geometryId);
+  };
 
   return (
     <div
@@ -99,6 +114,64 @@ export default function GeometryBindingPanel({
         </div>
       </div>
 
+      {collapsed ? null : selectedGeometry ? (
+        <div
+          style={{
+            marginTop: 10,
+            padding: "8px",
+            borderRadius: "6px",
+            border: "1px solid rgba(59, 130, 246, 0.45)",
+            background: "rgba(37, 99, 235, 0.12)",
+            cursor: canFocusGeometry ? "pointer" : "default",
+          }}
+          title={selectedGeometry.id}
+          role={canFocusGeometry ? "button" : undefined}
+          tabIndex={canFocusGeometry ? 0 : undefined}
+          onClick={() => onFocusGeometry?.(selectedGeometry.id)}
+          onKeyDown={(event) => handleFocusKeyDown(event, selectedGeometry.id)}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              color: "#93c5fd",
+              fontWeight: 900,
+              textTransform: "uppercase",
+              lineHeight: 1,
+              marginBottom: 5,
+            }}
+          >
+            Selected
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#e5e7eb",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {selectedGeometry.label || selectedGeometry.id}
+            </span>
+            {selectedGeometry.isNew ? <NewBadge /> : null}
+          </div>
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: "11px",
+              color: "#94a3b8",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {selectedGeometry.id}
+          </div>
+        </div>
+      ) : null}
+
       {collapsed ? null : rows.length ? (
         <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
           {rows
@@ -116,22 +189,37 @@ export default function GeometryBindingPanel({
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
+                    cursor: canFocusGeometry ? "pointer" : "default",
                     opacity: canBindToggle ? 1 : 0.75,
                   }}
                   title={g.id}
+                  role={canFocusGeometry ? "button" : undefined}
+                  tabIndex={canFocusGeometry ? 0 : undefined}
+                  onClick={() => onFocusGeometry?.(g.id)}
+                  onKeyDown={(event) => handleFocusKeyDown(event, g.id)}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: "12px",
-                        color: "#e5e7eb",
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        minWidth: 0,
                       }}
                     >
-                      {g.label || g.id}
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "#e5e7eb",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {g.label || g.id}
+                      </span>
+                      {g.isNew ? <NewBadge /> : null}
                     </div>
                     <div
                       style={{
@@ -150,7 +238,10 @@ export default function GeometryBindingPanel({
                     <button
                       type="button"
                       title={isBound ? "Unbind from selected geometry" : "Bind to selected geometry"}
-                      onClick={() => onToggleBindGeometryForSelectedGeometry!(g.id, !isBound)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleBindGeometryForSelectedGeometry!(g.id, !isBound);
+                      }}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",

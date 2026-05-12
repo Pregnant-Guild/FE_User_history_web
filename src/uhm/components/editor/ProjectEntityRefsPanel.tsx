@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntityFormState } from "@/uhm/lib/editor/session/sessionTypes";
+import NewBadge from "@/uhm/components/editor/NewBadge";
 
 type Props = {
   entityRefs: EntitySnapshot[];
@@ -46,18 +47,11 @@ export default function ProjectEntityRefsPanel({
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
-  useEffect(() => {
-    if (!activeEntityId) return;
-    if (!entityRefs.some((e) => String(e.id) === String(activeEntityId))) {
-      setActiveEntityId(null);
-    }
-  }, [activeEntityId, entityRefs]);
-
-  useEffect(() => {
-    if (!activeEntity) return;
-    setEditName(typeof activeEntity.name === "string" ? activeEntity.name : "");
-    setEditDescription(activeEntity.description == null ? "" : String(activeEntity.description));
-  }, [activeEntity?.description, activeEntity?.id, activeEntity?.name]);
+  const openEntityEditor = (entity: EntitySnapshot) => {
+    setActiveEntityId(String(entity.id));
+    setEditName(typeof entity.name === "string" ? entity.name : "");
+    setEditDescription(entity.description == null ? "" : String(entity.description));
+  };
 
   return (
     <div
@@ -113,7 +107,7 @@ export default function ProjectEntityRefsPanel({
             >
               <button
                 type="button"
-                onClick={() => setActiveEntityId(String(e.id))}
+                onClick={() => openEntityEditor(e)}
                 title="Chon de sua"
                 style={{
                   flex: 1,
@@ -126,8 +120,11 @@ export default function ProjectEntityRefsPanel({
                 }}
                 disabled={!canEditEntity}
               >
-                <div style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.name || e.id}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span style={{ fontSize: "12px", color: "#e5e7eb", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.name || e.id}
+                  </span>
+                  {isNewEntityRef(e) ? <NewBadge /> : null}
                 </div>
                 <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {e.id}
@@ -189,8 +186,11 @@ export default function ProjectEntityRefsPanel({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <div style={{ color: "#a7f3d0", fontWeight: 700, fontSize: "12px" }}>
-              Sua entity
+            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <span style={{ color: "#a7f3d0", fontWeight: 700, fontSize: "12px" }}>
+                Sua entity
+              </span>
+              {isNewEntityRef(activeEntity) ? <NewBadge /> : null}
             </div>
             <button
               type="button"
@@ -342,6 +342,10 @@ export default function ProjectEntityRefsPanel({
       )}
     </div>
   );
+}
+
+function isNewEntityRef(entity: EntitySnapshot | null | undefined): boolean {
+  return entity?.source === "inline" && entity?.operation === "create";
 }
 
 const entityInputStyle: CSSProperties = {

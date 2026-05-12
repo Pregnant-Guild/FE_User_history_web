@@ -265,21 +265,29 @@ export function setSelectedFeatureState(
 export function fitMapToFeatureCollection(
     map: maplibregl.Map,
     fc: FeatureCollection,
-    padding?: number | maplibregl.PaddingOptions
+    padding?: number | maplibregl.PaddingOptions,
+    options?: {
+        duration?: number;
+        maxZoom?: number;
+        pointZoom?: number;
+    }
 ): boolean {
     const bbox = getFeatureCollectionBBox(fc);
     if (!bbox) return false;
 
     const resolvedPadding = typeof padding === "number" || padding ? padding : 58;
+    const duration = options?.duration ?? 0;
+    const maxZoom = options?.maxZoom ?? 7;
+    const pointZoom = options?.pointZoom ?? 6;
 
     const lngSpan = Math.abs(bbox.maxLng - bbox.minLng);
     const latSpan = Math.abs(bbox.maxLat - bbox.minLat);
     if (lngSpan < 0.000001 && latSpan < 0.000001) {
         map.easeTo({
             center: [bbox.minLng, bbox.minLat],
-            zoom: 6,
+            zoom: pointZoom,
             padding: resolvedPadding,
-            duration: 0,
+            duration,
         });
         return true;
     }
@@ -291,8 +299,8 @@ export function fitMapToFeatureCollection(
         ],
         {
             padding: resolvedPadding,
-            maxZoom: 7,
-            duration: 0,
+            maxZoom,
+            duration,
         }
     );
     return true;

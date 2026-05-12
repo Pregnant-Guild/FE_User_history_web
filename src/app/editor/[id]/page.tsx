@@ -20,6 +20,7 @@ import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type Ent
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import {
     Feature,
+    FeatureCollection,
     Geometry,
     useEditorState,
 } from "@/uhm/lib/editor/state/useEditorState";
@@ -93,6 +94,10 @@ export default function Page() {
     const entityFormStatusTimeoutRef = useRef<number | null>(null);
     const geoBindingStatusTimeoutRef = useRef<number | null>(null);
     const [geoBindingStatus, setGeoBindingStatus] = useState<string | null>(null);
+    const [geometryFocusRequest, setGeometryFocusRequest] = useState<{
+        key: number;
+        collection: FeatureCollection;
+    } | null>(null);
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
 
     const {
@@ -279,17 +284,26 @@ export default function Page() {
     const selectedFeature = selectedFeatures.length > 0 && isMultiEditValid ? selectedFeatures[0] : null;
 
     const geometryChoices = useMemo(() => {
+        const createdGeometryIds = new Set<string>();
+        for (const [id, change] of editor.changes.entries()) {
+            if (change.action === "create") createdGeometryIds.add(String(id));
+        }
+
         const rows = (editor.draft.features || [])
             .filter((f) => f && f.properties && (typeof f.properties.id === "string" || typeof f.properties.id === "number"))
             .map((f) => {
                 const id = String(f.properties.id);
                 const semantic = String(f.properties.type || getDefaultTypeIdForFeature(f) || "").trim();
                 const label = semantic.length ? `${semantic} (${f.geometry.type})` : f.geometry.type;
-                return { id, label };
+                return {
+                    id,
+                    label,
+                    isNew: createdGeometryIds.has(id) || !editor.hasPersistedFeature(f.properties.id),
+                };
             });
         rows.sort((a, b) => a.id.localeCompare(b.id));
         return rows;
-    }, [editor.draft.features]);
+    }, [editor]);
 
     const selectedGeometryBindingIds = useMemo(() => {
         if (!selectedFeature) return [];
@@ -985,6 +999,40 @@ export default function Page() {
         setIsEntitySubmitting,
     ]);
 
+    const handleFocusGeometryFromBindingPanel = useCallback((geoId: string) => {
+        const id = String(geoId || "").trim();
+        if (!id) return;
+
+        const feature = editor.draft.features.find((item) => String(item.properties.id) === id) || null;
+        if (!feature) {
+            flashGeoBindingStatus("Không tìm thấy geometry để zoom.");
+            return;
+        }
+
+        const visibleInCurrentTimeline = timelineVisibleDraft.features.some(
+            (item) => String(item.properties.id) === id
+        );
+        if (timelineFilterEnabled && !visibleInCurrentTimeline) {
+            setTimelineFilterEnabled(false);
+        }
+
+        setSelectedFeatureIds([feature.properties.id]);
+        setGeometryFocusRequest((prev) => ({
+            key: (prev?.key ?? 0) + 1,
+            collection: {
+                type: "FeatureCollection",
+                features: [feature],
+            },
+        }));
+    }, [
+        editor.draft.features,
+        flashGeoBindingStatus,
+        setSelectedFeatureIds,
+        setTimelineFilterEnabled,
+        timelineFilterEnabled,
+        timelineVisibleDraft.features,
+    ]);
+
     const handleAddWikiRefToProject = useCallback((wiki: Wiki) => {
         const id = String(wiki.id || "").trim();
         if (!id) return;
@@ -1245,6 +1293,9 @@ export default function Page() {
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={geometryVisibility}
                             respectBindingFilter={geometryBindingFilterEnabled}
+                            focusFeatureCollection={geometryFocusRequest?.collection || null}
+                            focusRequestKey={geometryFocusRequest?.key ?? null}
+                            focusPadding={96}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -1513,6 +1564,7 @@ export default function Page() {
                             selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
                             selectedGeometryBindingIds={selectedGeometryBindingIds}
                             onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
+                            onFocusGeometry={handleFocusGeometryFromBindingPanel}
                             statusText={geoBindingStatus}
                             bindingFilterEnabled={geometryBindingFilterEnabled}
                             onBindingFilterEnabledChange={setGeometryBindingFilterEnabled}

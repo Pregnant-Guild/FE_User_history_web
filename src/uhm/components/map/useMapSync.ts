@@ -65,9 +65,6 @@ export function useMapSync({
     const respectBindingFilterRef = useRef(respectBindingFilter);
     const fitToDraftBoundsRef = useRef(fitToDraftBounds);
     const highlightFeaturesRef = useRef<FeatureCollection | null>(highlightFeatures || null);
-    const focusFeatureCollectionRef = useRef<FeatureCollection | null>(focusFeatureCollection || null);
-    const focusRequestKeyRef = useRef<string | number | null>(focusRequestKey || null);
-    const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
 
     const fitBoundsAppliedRef = useRef(false);
 
@@ -79,9 +76,6 @@ export function useMapSync({
     useEffect(() => { respectBindingFilterRef.current = respectBindingFilter; }, [respectBindingFilter]);
     useEffect(() => { fitToDraftBoundsRef.current = fitToDraftBounds; }, [fitToDraftBounds]);
     useEffect(() => { highlightFeaturesRef.current = highlightFeatures || null; }, [highlightFeatures]);
-    useEffect(() => { focusFeatureCollectionRef.current = focusFeatureCollection || null; }, [focusFeatureCollection]);
-    useEffect(() => { focusRequestKeyRef.current = focusRequestKey || null; }, [focusRequestKey]);
-    useEffect(() => { focusPaddingRef.current = focusPadding; }, [focusPadding]);
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;
@@ -205,11 +199,33 @@ export function useMapSync({
     useEffect(() => {
         if (focusRequestKey === null || focusRequestKey === undefined) return;
         const map = mapRef.current;
-        if (!map || !map.isStyleLoaded()) return;
-        const target = focusFeatureCollectionRef.current;
+        const target = focusFeatureCollection;
         if (!target || !target.features.length) return;
-        fitMapToFeatureCollection(map, target, focusPaddingRef.current);
-    }, [focusRequestKey, mapRef]);
+        if (!map) return;
+
+        let cancelled = false;
+        let rafId: number | null = null;
+
+        const focus = () => {
+            if (cancelled || mapRef.current !== map || !map.isStyleLoaded()) return;
+            fitMapToFeatureCollection(map, target, focusPadding, {
+                duration: 550,
+                maxZoom: 10,
+                pointZoom: 9,
+            });
+        };
+
+        if (map.isStyleLoaded()) {
+            rafId = requestAnimationFrame(focus);
+        } else {
+            map.once("idle", focus);
+        }
+
+        return () => {
+            cancelled = true;
+            if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+    }, [focusFeatureCollection, focusPadding, focusRequestKey, mapRef]);
 
     return {
         applyDraftToMap,

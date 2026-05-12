@@ -27,7 +27,7 @@ export default function LandingPage() {
     {
       name: "Trần Anh Đức",
       role: "Project Manager",
-      desc: "Đẹp trai cao m8",
+      desc: "Fan cứng anh Lại Ngứa Chân",
       avatar: "/images/teamdev/tad.jpeg",
     },
     {

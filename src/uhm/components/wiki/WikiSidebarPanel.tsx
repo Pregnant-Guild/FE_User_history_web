@@ -12,8 +12,29 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { newId } from "@/uhm/lib/utils/id";
 import type ReactQuill from "react-quill-new";
 import { checkWikiSlugExists, fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import NewBadge from "@/uhm/components/editor/NewBadge";
 
 type ReactQuillProps = ComponentProps<typeof ReactQuill>;
+type QuillRange = { index: number; length: number };
+type QuillLike = {
+  getSelection?: () => QuillRange | null;
+  getFormat?: (...args: unknown[]) => Record<string, unknown>;
+  setSelection?: (...args: unknown[]) => void;
+  formatText?: (...args: unknown[]) => void;
+  insertText?: (...args: unknown[]) => void;
+  format?: (...args: unknown[]) => void;
+  getText?: (index: number, length: number) => string;
+};
+type QuillModule = {
+  Quill?: {
+    import?: (path: string) => unknown;
+  };
+};
+type QuillLinkFormat = {
+  sanitize?: (url: unknown) => unknown;
+  __uhmAllowSlugHref?: boolean;
+  __uhmOriginalSanitize?: unknown;
+};
 
 const ReactQuillEditor = dynamic<ReactQuillProps>(() => import("react-quill-new"), {
   ssr: false,
@@ -55,12 +76,12 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
 
   // Quill: custom link UI (link-to-wiki by slug).
   const wikiLinkIntentRef = useRef<{
-    quill: any;
-    range: { index: number; length: number } | null;
+    quill: QuillLike;
+    range: QuillRange | null;
     activeWikiId: string | null;
     existingHref: string | null;
   } | null>(null);
-  const wikiLinkHandlerRef = useRef<(quill: any) => void>(() => {});
+  const wikiLinkHandlerRef = useRef<(quill: QuillLike | null | undefined) => void>(() => {});
   const [isWikiLinkOpen, setIsWikiLinkOpen] = useState(false);
   const [wikiLinkQuery, setWikiLinkQuery] = useState("");
   const [wikiLinkError, setWikiLinkError] = useState<string | null>(null);
@@ -85,13 +106,13 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
 
     (async () => {
       try {
-        const mod: any = await import("react-quill-new");
+        const mod = await import("react-quill-new") as QuillModule;
         const Quill = mod?.Quill;
         if (!Quill) return;
         const Link = Quill.import?.("formats/link");
         if (!Link) return;
 
-        const anyLink = Link as any;
+        const anyLink = Link as QuillLinkFormat;
         if (anyLink.__uhmAllowSlugHref) return;
         const original = anyLink.sanitize;
         anyLink.sanitize = (url: unknown) => {
@@ -135,24 +156,6 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
     ensureActive();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wikis.length]);
-
-  const openEditor = () => {
-    if (!wikis.length) {
-      const id = newId();
-      const seed: WikiSnapshot = {
-        id,
-        source: "inline",
-        operation: "create",
-        title: "Untitled wiki",
-        slug: null,
-        doc: "",
-        updated_at: new Date().toISOString(),
-      };
-      setWikis((prev) => [seed, ...prev]);
-      setActiveId(id);
-    }
-    setOpen(true);
-  };
 
   const createWikiAndOpen = (title?: string, slug?: string | null) => {
     const id = newId();
@@ -501,7 +504,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
   }, [closeWikiLinkModal]);
 
   // Keep handler ref updated while keeping modules object stable.
-  wikiLinkHandlerRef.current = (quill: any) => {
+  wikiLinkHandlerRef.current = (quill: QuillLike | null | undefined) => {
     if (!quill) return;
     const range = quill.getSelection?.() ?? null;
     // Try to read current link format (if any) from the selection.
@@ -529,7 +532,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         container: QUILL_TOOLBAR,
         handlers: {
           // NOTE: use function() to preserve Quill toolbar `this` binding.
-          link: function (this: any) {
+          link: function (this: { quill?: QuillLike }) {
             wikiLinkHandlerRef.current(this?.quill);
           },
         },
@@ -602,14 +605,22 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
                   background: "transparent",
                   color: "#e5e7eb",
                   cursor: "pointer",
-                  fontSize: "12px",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
                 }}
                 title={w.title}
               >
-                {w.title}
+                <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {w.title}
+                  </span>
+                  {isNewWiki(w) ? <NewBadge /> : null}
+                </span>
               </button>
               <button
                 type="button"
@@ -972,6 +983,10 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
       </Modal>
     </div>
   );
+}
+
+function isNewWiki(wiki: WikiSnapshot | null | undefined): boolean {
+  return wiki?.source === "inline" && wiki?.operation === "create";
 }
 
 function PlusIcon() {

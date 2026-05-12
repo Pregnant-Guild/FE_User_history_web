@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { Entity } from "@/uhm/types/entities";
+import { useMemo, useState } from "react";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 type EntityChoice = { id: string; name: string };
-type WikiChoice = { id: string; title: string; operation?: string };
+type WikiChoice = { id: string; title: string };
 
 type Props = {
   entities: EntityChoice[];
@@ -29,7 +28,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     () =>
       (wikis || [])
         .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
-        .map((w) => ({ id: w.id, title: wikiTitle(w), operation: w.operation })),
+        .map((w) => ({ id: w.id, title: wikiTitle(w) })),
     [wikis]
   );
 
@@ -38,17 +37,6 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     cleaned.sort((a, b) => a.name.localeCompare(b.name));
     return cleaned;
   }, [entities]);
-
-  // Don't auto-select entity. The user must explicitly pick one.
-  // Only clear the selection if the currently selected entity is no longer available.
-  useEffect(() => {
-    if (!activeEntityId) return;
-    const stillExists = entityChoices.some((e) => e.id === activeEntityId);
-    if (!stillExists) {
-      setActiveEntityId("");
-      setActiveWikiId("");
-    }
-  }, [activeEntityId, entityChoices]);
 
   const activeLinks = useMemo(() => {
     const set = new Set<string>();
@@ -144,6 +132,12 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
               </option>
             ))}
           </select>
+          {activeEntityId ? (
+            <ActiveSelectionLabel
+              label={entityChoices.find((e) => e.id === activeEntityId)?.name || activeEntityId}
+              id={activeEntityId}
+            />
+          ) : null}
         </div>
 
         <div>
@@ -175,6 +169,12 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
                 </option>
               ))}
             </select>
+            {activeWikiChoice ? (
+              <ActiveSelectionLabel
+                label={activeWikiChoice.title}
+                id={activeWikiChoice.id}
+              />
+            ) : null}
 
             {wikiChoices.length === 0 ? (
               <div style={{ fontSize: "12px", color: "#94a3b8" }}>No wiki in project yet.</div>
@@ -228,17 +228,19 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
                           title={id}
                         >
                           <div style={{ minWidth: 0 }}>
-                            <div
-                              style={{
-                                color: "#e5e7eb",
-                                fontSize: 12,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {w?.title || "Untitled wiki"}
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                              <span
+                                style={{
+                                  color: "#e5e7eb",
+                                  fontSize: 12,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {w?.title || "Untitled wiki"}
+                              </span>
                             </div>
                             <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {id}
@@ -275,6 +277,25 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
         </div>
       </div>
       )}
+    </div>
+  );
+}
+
+function ActiveSelectionLabel({
+  label,
+  id,
+}: {
+  label: string;
+  id: string;
+}) {
+  return (
+    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <span style={{ color: "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {label}
+      </span>
+      <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {id}
+      </span>
     </div>
   );
 }
