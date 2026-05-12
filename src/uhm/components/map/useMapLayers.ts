@@ -338,7 +338,7 @@ export function setupMapLayers(
         map.addLayer(layer);
     }
 
-    const geotypeLabelLayers = getAllGeotypeLabelLayers(POLYGON_LABEL_SOURCE_ID);
+    const geotypeLabelLayers = getAllGeotypeLabelLayers(POLYGON_LABEL_SOURCE_ID, "countries");
     for (const layer of geotypeLabelLayers) {
         map.addLayer(layer);
     }

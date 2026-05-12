@@ -29,6 +29,7 @@ import { getCastleLayers } from "./castle";
 import { getRuinLayers } from "./ruin";
 import { getPortLayers } from "./port";
 import { getBridgeLayers } from "./bridge";
+import { getLineLabelLayers } from "./lineLabels";
 import { getPolygonLabelLayers } from "./polygonLabels";
 
 import { LayerSpecification } from "maplibre-gl";
@@ -65,8 +66,9 @@ export function getAllGeotypeLayers(sourceId: string, pathArrowSourceId?: string
     ];
 }
 
-export function getAllGeotypeLabelLayers(polygonLabelSourceId: string): LayerSpecification[] {
+export function getAllGeotypeLabelLayers(polygonLabelSourceId: string, lineSourceId: string): LayerSpecification[] {
     return [
         ...getPolygonLabelLayers(polygonLabelSourceId),
+        ...getLineLabelLayers(lineSourceId),
     ];
 }

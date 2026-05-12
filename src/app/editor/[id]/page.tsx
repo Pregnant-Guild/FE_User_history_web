@@ -1236,6 +1236,7 @@ export default function Page() {
                         <Map
                             mode={mode}
                             draft={timelineVisibleDraft}
+                            labelContextDraft={editor.draft}
                             selectedFeatureIds={selectedFeatureIds}
                             onSelectFeatureIds={setSelectedFeatureIds}
                             onCreateFeature={handleCreateFeature}

@@ -1,4 +1,5 @@
 import maplibregl from "maplibre-gl";
+import polylabel from "polylabel";
 import { BACKGROUND_LAYER_OPTIONS, BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import {
@@ -15,12 +16,9 @@ import { newId } from "@/uhm/lib/utils/id";
 
 type Coordinate = [number, number];
 type PolygonCoordinates = Coordinate[][];
-type LabelCell = {
-    x: number;
-    y: number;
-    h: number;
-    d: number;
-    max: number;
+type FeatureLabelInfo = {
+    entityId: string;
+    label: string;
 };
 
 export function applyBackgroundLayerVisibility(
@@ -196,24 +194,40 @@ export function splitDraftFeatures(fc: FeatureCollection) {
     return { polygons, points };
 }
 
-export function decoratePointFeaturesWithLabels(fc: FeatureCollection): FeatureCollection {
+export function decoratePointFeaturesWithLabels(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext);
     return {
         ...fc,
         features: fc.features.map((feature) => ({
             ...feature,
             properties: {
                 ...feature.properties,
-                point_label: getSingleEntityFeatureLabel(feature),
+                point_label: getLabel(feature),
             },
         })),
     };
 }
 
-export function buildPolygonLabelFeatureCollection(fc: FeatureCollection): FeatureCollection {
+export function decorateLineFeaturesWithLabels(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext);
+    return {
+        ...fc,
+        features: fc.features.map((feature) => ({
+            ...feature,
+            properties: {
+                ...feature.properties,
+                line_label: isLineGeometry(feature.geometry) ? getLabel(feature) : null,
+            },
+        })),
+    };
+}
+
+export function buildPolygonLabelFeatureCollection(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext);
     const features: Feature[] = [];
 
     for (const feature of fc.features) {
-        const label = getSingleEntityFeatureLabel(feature);
+        const label = getLabel(feature);
         if (!label) continue;
 
         const labelPoint = getPolygonLabelPoint(feature.geometry);
@@ -595,27 +609,106 @@ export function roundZoom(value: number): number {
     return Math.round(value * 10) / 10;
 }
 
-function getSingleEntityFeatureLabel(feature: Feature): string | null {
-    const rawEntityIds = Array.isArray(feature.properties.entity_ids)
+function createFeatureLabelResolver(fc: FeatureCollection): (feature: Feature) => string | null {
+    const directLabelsByFeatureId = new Map<string, FeatureLabelInfo>();
+    const inheritedLabelsByChildId = new Map<string, FeatureLabelInfo | null>();
+
+    for (const feature of fc.features) {
+        const labelInfo = getSingleEntityFeatureLabelInfo(feature);
+        if (!labelInfo) continue;
+        directLabelsByFeatureId.set(String(feature.properties.id), labelInfo);
+    }
+
+    for (const feature of fc.features) {
+        const parentLabel = directLabelsByFeatureId.get(String(feature.properties.id));
+        const featureId = String(feature.properties.id);
+        const bindingIds = normalizeBindingIds(feature.properties.binding);
+
+        if (parentLabel) {
+            for (const childId of bindingIds) {
+                mergeInheritedFeatureLabel(inheritedLabelsByChildId, childId, parentLabel);
+            }
+        }
+
+        for (const parentId of bindingIds) {
+            const linkedParentLabel = directLabelsByFeatureId.get(parentId);
+            if (linkedParentLabel) {
+                mergeInheritedFeatureLabel(inheritedLabelsByChildId, featureId, linkedParentLabel);
+            }
+        }
+    }
+
+    return (feature) => {
+        const featureId = String(feature.properties.id);
+        const directEntityIds = getFeatureEntityIds(feature);
+        if (directEntityIds.length > 0) {
+            return directLabelsByFeatureId.get(featureId)?.label || null;
+        }
+
+        return inheritedLabelsByChildId.get(featureId)?.label || null;
+    };
+}
+
+function mergeInheritedFeatureLabel(
+    labelsByFeatureId: Map<string, FeatureLabelInfo | null>,
+    targetFeatureId: string,
+    labelInfo: FeatureLabelInfo
+) {
+    const current = labelsByFeatureId.get(targetFeatureId);
+    if (current === undefined) {
+        labelsByFeatureId.set(targetFeatureId, labelInfo);
+    } else if (current && current.entityId === labelInfo.entityId) {
+        labelsByFeatureId.set(targetFeatureId, current);
+    } else {
+        labelsByFeatureId.set(targetFeatureId, null);
+    }
+}
+
+function getSingleEntityFeatureLabelInfo(feature: Feature): FeatureLabelInfo | null {
+    const entityIds = getFeatureEntityIds(feature);
+    if (entityIds.length !== 1) return null;
+
+    const label = getSingleEntityName(feature);
+    if (!label) return null;
+
+    return { entityId: entityIds[0], label };
+}
+
+function getFeatureEntityIds(feature: Feature): string[] {
+    const rawEntityIds: unknown[] = Array.isArray(feature.properties.entity_ids)
         ? feature.properties.entity_ids
-        : (typeof feature.properties.entity_id === "string" && feature.properties.entity_id.trim().length > 0
+        : (typeof feature.properties.entity_id === "string" || typeof feature.properties.entity_id === "number"
             ? [feature.properties.entity_id]
             : []);
 
-    const entityIds = Array.from(new Set(
+    return Array.from(new Set(
         rawEntityIds
-            .filter((id): id is string => typeof id === "string")
-            .map((id) => id.trim())
+            .filter((id): id is string | number => typeof id === "string" || typeof id === "number")
+            .map((id) => String(id).trim())
             .filter((id) => id.length > 0)
     ));
+}
 
-    if (entityIds.length !== 1) return null;
-
-    const name = typeof feature.properties.entity_name === "string"
+function getSingleEntityName(feature: Feature): string | null {
+    const directName = typeof feature.properties.entity_name === "string"
         ? feature.properties.entity_name.trim()
         : "";
+    if (directName.length > 0) return directName;
 
-    return name.length ? name : null;
+    const names = Array.isArray(feature.properties.entity_names)
+        ? Array.from(new Set(
+            feature.properties.entity_names
+                .filter((name): name is string => typeof name === "string")
+                .map((name) => name.trim())
+                .filter((name) => name.length > 0)
+        ))
+        : [];
+
+    return names.length === 1 ? names[0] : null;
+}
+
+function isLineGeometry(geometry: Geometry): boolean {
+    return geometry.type === "LineString" || geometry.type === "MultiLineString";
 }
 
 function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
@@ -648,67 +741,20 @@ function getPolygonLabelCandidate(polygon: PolygonCoordinates): { point: Coordin
     const width = bbox.maxX - bbox.minX;
     const height = bbox.maxY - bbox.minY;
     if (width <= 0 || height <= 0) {
-        const fallback = getRingCentroid(outerRing) || [bbox.minX, bbox.minY] as Coordinate;
+        const fallback: Coordinate = [bbox.minX, bbox.minY];
         return { point: fallback, distance: 0 };
-    }
-
-    const cellSize = Math.min(width, height);
-    const h = cellSize / 2;
-    const cells: LabelCell[] = [];
-
-    for (let x = bbox.minX; x < bbox.maxX; x += cellSize) {
-        for (let y = bbox.minY; y < bbox.maxY; y += cellSize) {
-            cells.push(createLabelCell(x + h, y + h, h, polygon));
-        }
-    }
-
-    let best = createLabelCell(bbox.minX + width / 2, bbox.minY + height / 2, 0, polygon);
-    const centroid = getRingCentroid(outerRing);
-    if (centroid) {
-        const centroidCell = createLabelCell(centroid[0], centroid[1], 0, polygon);
-        if (centroidCell.d > best.d) {
-            best = centroidCell;
-        }
     }
 
     const precision = Math.max(Math.max(width, height) / 100, 0.0001);
-    let iterations = 0;
-    while (cells.length && iterations < 4096) {
-        cells.sort((a, b) => b.max - a.max);
-        const cell = cells.shift();
-        if (!cell) break;
-        iterations += 1;
+    const result = polylabel(polygon, precision);
+    const x = result[0];
+    const y = result[1];
 
-        if (cell.d > best.d) {
-            best = cell;
-        }
-
-        if (cell.max - best.d <= precision) continue;
-
-        const nextH = cell.h / 2;
-        cells.push(createLabelCell(cell.x - nextH, cell.y - nextH, nextH, polygon));
-        cells.push(createLabelCell(cell.x + nextH, cell.y - nextH, nextH, polygon));
-        cells.push(createLabelCell(cell.x - nextH, cell.y + nextH, nextH, polygon));
-        cells.push(createLabelCell(cell.x + nextH, cell.y + nextH, nextH, polygon));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return { point: [bbox.minX + width / 2, bbox.minY + height / 2], distance: 0 };
     }
 
-    if (best.d < 0) {
-        const fallback = centroid || [bbox.minX + width / 2, bbox.minY + height / 2] as Coordinate;
-        return { point: fallback, distance: 0 };
-    }
-
-    return { point: [best.x, best.y], distance: best.d };
-}
-
-function createLabelCell(x: number, y: number, h: number, polygon: PolygonCoordinates): LabelCell {
-    const d = pointToPolygonDistance([x, y], polygon);
-    return {
-        x,
-        y,
-        h,
-        d,
-        max: d + h * Math.SQRT2,
-    };
+    return { point: [x, y], distance: Number.isFinite(result.distance) ? result.distance : 0 };
 }
 
 function getRingBbox(ring: Coordinate[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
@@ -731,78 +777,6 @@ function getRingBbox(ring: Coordinate[]): { minX: number; minY: number; maxX: nu
     }
 
     return { minX, minY, maxX, maxY };
-}
-
-function getRingCentroid(ring: Coordinate[]): Coordinate | null {
-    let area = 0;
-    let x = 0;
-    let y = 0;
-
-    for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
-        const a = ring[i];
-        const b = ring[j];
-        const f = a[0] * b[1] - b[0] * a[1];
-        x += (a[0] + b[0]) * f;
-        y += (a[1] + b[1]) * f;
-        area += f * 3;
-    }
-
-    if (area === 0) return null;
-    return [x / area, y / area];
-}
-
-function pointToPolygonDistance(point: Coordinate, polygon: PolygonCoordinates): number {
-    const inside = isPointInRing(point, polygon[0]) && !polygon.slice(1).some((ring) => isPointInRing(point, ring));
-    let minDistSq = Number.POSITIVE_INFINITY;
-
-    for (const ring of polygon) {
-        for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
-            minDistSq = Math.min(minDistSq, getSegmentDistanceSquared(point, ring[j], ring[i]));
-        }
-    }
-
-    const distance = Math.sqrt(minDistSq);
-    return inside ? distance : -distance;
-}
-
-function isPointInRing(point: Coordinate, ring: Coordinate[] | undefined): boolean {
-    if (!ring || ring.length < 3) return false;
-
-    const [x, y] = point;
-    let inside = false;
-
-    for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
-        const xi = ring[i][0];
-        const yi = ring[i][1];
-        const xj = ring[j][0];
-        const yj = ring[j][1];
-        const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-        if (intersects) inside = !inside;
-    }
-
-    return inside;
-}
-
-function getSegmentDistanceSquared(point: Coordinate, a: Coordinate, b: Coordinate): number {
-    let x = a[0];
-    let y = a[1];
-    let dx = b[0] - x;
-    let dy = b[1] - y;
-
-    if (dx !== 0 || dy !== 0) {
-        const t = ((point[0] - x) * dx + (point[1] - y) * dy) / (dx * dx + dy * dy);
-        if (t > 1) {
-            x = b[0];
-            y = b[1];
-        } else if (t > 0) {
-            x += dx * t;
-            y += dy * t;
-        }
-    }
-
-    dx = point[0] - x;
-    dy = point[1] - y;
-    return dx * dx + dy * dy;
 }
 
 export function buildClientFeatureId(): string {

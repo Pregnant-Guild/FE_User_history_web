@@ -8,6 +8,7 @@ import {
     applyBackgroundLayerVisibility,
     buildPolygonLabelFeatureCollection,
     buildPathArrowFeatureCollection,
+    decorateLineFeaturesWithLabels,
     decoratePointFeaturesWithLabels,
     filterDraftByBinding,
     filterDraftByGeometryVisibility,
@@ -19,6 +20,7 @@ import {
 type UseMapSyncProps = {
     mapRef: React.MutableRefObject<maplibregl.Map | null>;
     draft: FeatureCollection;
+    labelContextDraft?: FeatureCollection;
     backgroundVisibility: BackgroundLayerVisibility;
     geometryVisibility?: Record<string, boolean>;
     selectedFeatureIds: (string | number)[];
@@ -40,6 +42,7 @@ type UseMapSyncProps = {
 export function useMapSync({
     mapRef,
     draft,
+    labelContextDraft,
     backgroundVisibility,
     geometryVisibility,
     selectedFeatureIds,
@@ -55,6 +58,7 @@ export function useMapSync({
     geolocationCenteredRef,
 }: UseMapSyncProps) {
     const draftRef = useRef<FeatureCollection>(draft);
+    const labelContextDraftRef = useRef<FeatureCollection | undefined>(labelContextDraft);
     const backgroundVisibilityRef = useRef<BackgroundLayerVisibility>(backgroundVisibility);
     const geometryVisibilityRef = useRef<Record<string, boolean> | undefined>(geometryVisibility);
     const selectedFeatureIdsRef = useRef<(string | number)[]>(selectedFeatureIds);
@@ -68,6 +72,7 @@ export function useMapSync({
     const fitBoundsAppliedRef = useRef(false);
 
     useEffect(() => { draftRef.current = draft; }, [draft]);
+    useEffect(() => { labelContextDraftRef.current = labelContextDraft; }, [labelContextDraft]);
     useEffect(() => { backgroundVisibilityRef.current = backgroundVisibility; }, [backgroundVisibility]);
     useEffect(() => { geometryVisibilityRef.current = geometryVisibility; }, [geometryVisibility]);
     useEffect(() => { selectedFeatureIdsRef.current = selectedFeatureIds; }, [selectedFeatureIds]);
@@ -102,12 +107,14 @@ export function useMapSync({
             ? filterDraftByBinding(fc, selectedFeatureIdsRef.current, highlightFeaturesRef.current)
             : fc;
         const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
+        const labelContext = labelContextDraftRef.current || fc;
         const { polygons, points } = splitDraftFeatures(visibleDraft);
-        const labeledPoints = decoratePointFeaturesWithLabels(points);
-        const polygonLabels = buildPolygonLabelFeatureCollection(polygons);
+        const labeledGeometries = decorateLineFeaturesWithLabels(polygons, labelContext);
+        const labeledPoints = decoratePointFeaturesWithLabels(points, labelContext);
+        const polygonLabels = buildPolygonLabelFeatureCollection(polygons, labelContext);
         const pathArrowShapes = buildPathArrowFeatureCollection(visibleDraft);
 
-        countriesSource.setData(polygons);
+        countriesSource.setData(labeledGeometries);
         placesSource.setData(labeledPoints);
         polygonLabelSource.setData(polygonLabels);
         (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)?.setData(pathArrowShapes);
@@ -183,7 +190,7 @@ export function useMapSync({
                 editingEngineRef.current?.clearEditing();
             }
         }
-    }, [allowGeometryEditing, draft, selectedFeatureIds, applyDraftToMap, editingEngineRef]);
+    }, [allowGeometryEditing, draft, labelContextDraft, selectedFeatureIds, applyDraftToMap, editingEngineRef]);
 
     useEffect(() => {
         if (focusRequestKey === null || focusRequestKey === undefined) return;

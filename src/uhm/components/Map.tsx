@@ -26,6 +26,7 @@ type MapProps = {
     geometryVisibility?: Record<string, boolean>;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIds: (ids: (string | number)[]) => void;
+    labelContextDraft?: FeatureCollection;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
     onDeleteFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
@@ -48,6 +49,7 @@ export default function Map({
     geometryVisibility,
     selectedFeatureIds,
     onSelectFeatureIds,
+    labelContextDraft,
     onCreateFeature,
     onDeleteFeature,
     onUpdateFeature,
@@ -117,6 +119,7 @@ export default function Map({
     } = useMapSync({
         mapRef,
         draft,
+        labelContextDraft,
         backgroundVisibility,
         geometryVisibility,
         selectedFeatureIds,
