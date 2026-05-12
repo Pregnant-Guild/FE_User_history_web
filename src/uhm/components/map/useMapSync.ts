@@ -190,7 +190,17 @@ export function useMapSync({
                 editingEngineRef.current?.clearEditing();
             }
         }
-    }, [allowGeometryEditing, draft, labelContextDraft, selectedFeatureIds, applyDraftToMap, editingEngineRef]);
+    }, [
+        allowGeometryEditing,
+        draft,
+        labelContextDraft,
+        selectedFeatureIds,
+        respectBindingFilter,
+        geometryVisibility,
+        highlightFeatures,
+        applyDraftToMap,
+        editingEngineRef,
+    ]);
 
     useEffect(() => {
         if (focusRequestKey === null || focusRequestKey === undefined) return;
