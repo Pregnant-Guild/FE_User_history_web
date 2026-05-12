@@ -9,6 +9,7 @@ import {
     RASTER_BASE_INSERT_BEFORE_LAYER_ID,
     RASTER_BASE_LAYER_ID,
     RASTER_BASE_SOURCE_ID,
+    PATH_ARROW_SOURCE_ID
 } from "@/uhm/lib/map/constants";
 import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getRasterTileTemplateUrl } from "@/uhm/api/tiles";
@@ -87,16 +88,13 @@ export function createRasterBaseLayer() {
 }
 
 export function getSelectableLayers(map: maplibregl.Map): string[] {
-    return [
-        "countries-fill",
-        "countries-line",
-        "routes-line",
-        "routes-path-arrow-fill",
-        "routes-path-arrow-line",
-        "routes-path-hit",
-        "places-circle",
-        "places-symbol",
-    ].filter((layerId) => Boolean(map.getLayer(layerId)));
+    const selectableSources = ["countries", "places", PATH_ARROW_SOURCE_ID];
+    const style = map.getStyle();
+    if (!style || !style.layers) return [];
+    
+    return style.layers
+        .filter((layer) => "source" in layer && selectableSources.includes(layer.source as string))
+        .map((layer) => layer.id);
 }
 
 export function filterDraftByBinding(

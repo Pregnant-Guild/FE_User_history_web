@@ -11,6 +11,7 @@ import {
 } from "@/uhm/lib/map/styles/style";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
+import { getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypes";
 import {
     addPointSymbolLayer,
     applyBackgroundLayerVisibility,
@@ -319,152 +320,17 @@ export function setupMapLayers(
         promoteId: "id",
     });
 
-    map.addLayer({
-        id: "countries-fill",
-        type: "fill",
-        source: "countries",
-        filter: ["==", ["geometry-type"], "Polygon"],
-        paint: {
-            "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#22c55e",
-                [
-                    "==",
-                    ["coalesce", ["get", "entity_id"], ""],
-                    "",
-                ],
-                "#ef4444",
-                buildTypeMatchExpression(POLYGON_FILL_BY_TYPE, "#f59e0b"),
-            ],
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                0.6,
-                buildTypeMatchExpression(POLYGON_OPACITY_BY_TYPE, 0.5),
-            ],
-        },
-    });
-
-    map.addLayer({
-        id: "countries-line",
-        type: "line",
-        source: "countries",
-        filter: ["==", ["geometry-type"], "Polygon"],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#14532d",
-                buildTypeMatchExpression(POLYGON_STROKE_BY_TYPE, "#fbbf24"),
-            ],
-            "line-width": 2,
-        },
-    });
-
-    map.addLayer({
-        id: "routes-line",
-        type: "line",
-        source: "countries",
-        filter: [
-            "all",
-            ["==", ["geometry-type"], "LineString"],
-            ["!=", buildTypeMatchExpression(PATH_RENDER_BY_TYPE, false), true],
-        ],
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""],
-                "#ef4444",
-                buildTypeMatchExpression(LINE_COLOR_BY_TYPE, "#38bdf8"),
-            ],
-            "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                1, 2.2,
-                4, 3.2,
-                6, 4.2,
-            ],
-            "line-opacity": 0.9,
-        },
-    });
-
-    map.addLayer({
-        id: "routes-path-arrow-fill",
-        type: "fill",
-        source: PATH_ARROW_SOURCE_ID,
-        paint: {
-            "fill-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#22c55e",
-                ["==", ["coalesce", ["get", "entity_id"], ""], ""],
-                "#ef4444",
-                buildTypeMatchExpression(LINE_COLOR_BY_TYPE, "#38bdf8"),
-            ],
-            "fill-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                0.92,
-                0.82,
-            ],
-        },
-    });
-
-    map.addLayer({
-        id: "routes-path-arrow-line",
-        type: "line",
-        source: PATH_ARROW_SOURCE_ID,
-        paint: {
-            "line-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#14532d",
-                "#0f172a",
-            ],
-            "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                1, 0.45,
-                4, 0.8,
-                6, 1.2,
-            ],
-            "line-opacity": 0.9,
-        },
-    });
-
-    map.addLayer({
-        id: "routes-path-hit",
-        type: "line",
-        source: "countries",
-        filter: [
-            "all",
-            ["==", ["geometry-type"], "LineString"],
-            buildTypeMatchExpression(PATH_RENDER_BY_TYPE, false),
-        ],
-        paint: {
-            "line-color": "#ffffff",
-            "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                1, 12,
-                4, 18,
-                6, 24,
-            ],
-            "line-opacity": 0,
-        },
-    });
-
     map.addSource("places", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
         promoteId: "id",
     });
+
+    
+    const geotypeLayers = getAllGeotypeLayers("countries", PATH_ARROW_SOURCE_ID, "places");
+    for (const layer of geotypeLayers) {
+        map.addLayer(layer);
+    }
 
     // editing overlays
     map.addSource("edit-shape", {
@@ -495,62 +361,6 @@ export function setupMapLayers(
             "circle-radius": 12,
             "circle-stroke-color": "#0f172a",
             "circle-stroke-width": 3,
-        },
-    });
-
-    map.addLayer({
-        id: "places-circle",
-        type: "circle",
-        source: "places",
-        paint: {
-            "circle-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#22c55e",
-                "#ef4444",
-            ],
-            "circle-radius": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                8,
-                4,
-            ],
-            "circle-stroke-color": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                "#14532d",
-                "#ffffff",
-            ],
-            "circle-stroke-width": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                3,
-                1,
-            ],
-            "circle-opacity": 0.9,
-        },
-    });
-
-    map.addLayer({
-        id: "places-selected-halo",
-        type: "circle",
-        source: "places",
-        paint: {
-            "circle-color": "#22c55e",
-            "circle-radius": 13,
-            "circle-opacity": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                0.28,
-                0,
-            ],
-            "circle-stroke-color": "#14532d",
-            "circle-stroke-width": [
-                "case",
-                ["boolean", ["feature-state", "selected"], false],
-                2,
-                0,
-            ],
         },
     });
 

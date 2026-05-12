@@ -9,16 +9,7 @@ export function initSelect(
     onEdit?: (feature: maplibregl.MapGeoJSONFeature) => void,
     onSelectIds?: (ids: (string | number)[]) => void
 ) {
-    const SELECTABLE_LAYERS = [
-        "countries-fill",
-        "countries-line",
-        "routes-line",
-        "routes-path-arrow-fill",
-        "routes-path-arrow-line",
-        "routes-path-hit",
-        "places-circle",
-        "places-symbol",
-    ] as const;
+
     const FEATURE_STATE_SOURCES = [
         "countries",
         "places",
@@ -129,7 +120,11 @@ export function initSelect(
     }
 
     function getSelectableLayers(): string[] {
-        return SELECTABLE_LAYERS.filter((layerId) => Boolean(map.getLayer(layerId)));
+        const style = map.getStyle();
+        if (!style || !style.layers) return [];
+        return style.layers
+            .filter((layer) => "source" in layer && FEATURE_STATE_SOURCES.includes(layer.source as any))
+            .map((layer) => layer.id);
     }
 
     function setSelectionStateForId(id: string | number, selected: boolean) {
