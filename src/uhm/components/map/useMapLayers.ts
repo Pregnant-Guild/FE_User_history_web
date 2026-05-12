@@ -10,8 +10,8 @@ import {
     POLYGON_STROKE_BY_TYPE,
 } from "@/uhm/lib/map/styles/style";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
-import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
-import { ensurePointGeotypeIcons, getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypes";
+import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID, POLYGON_LABEL_SOURCE_ID } from "@/uhm/lib/map/constants";
+import { ensurePointGeotypeIcons, getAllGeotypeLabelLayers, getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypes";
 import {
     applyBackgroundLayerVisibility,
     buildTypeMatchExpression,
@@ -325,10 +325,21 @@ export function setupMapLayers(
         promoteId: "id",
     });
 
+    map.addSource(POLYGON_LABEL_SOURCE_ID, {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+        promoteId: "id",
+    });
+
     ensurePointGeotypeIcons(map);
 
     const geotypeLayers = getAllGeotypeLayers("countries", PATH_ARROW_SOURCE_ID, "places");
     for (const layer of geotypeLayers) {
+        map.addLayer(layer);
+    }
+
+    const geotypeLabelLayers = getAllGeotypeLabelLayers(POLYGON_LABEL_SOURCE_ID);
+    for (const layer of geotypeLabelLayers) {
         map.addLayer(layer);
     }
 

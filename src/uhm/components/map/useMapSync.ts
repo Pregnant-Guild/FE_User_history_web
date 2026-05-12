@@ -3,9 +3,10 @@ import maplibregl from "maplibre-gl";
 import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
 import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
-import { FEATURE_STATE_SOURCE_IDS, PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
+import { FEATURE_STATE_SOURCE_IDS, PATH_ARROW_SOURCE_ID, POLYGON_LABEL_SOURCE_ID } from "@/uhm/lib/map/constants";
 import {
     applyBackgroundLayerVisibility,
+    buildPolygonLabelFeatureCollection,
     buildPathArrowFeatureCollection,
     decoratePointFeaturesWithLabels,
     filterDraftByBinding,
@@ -29,7 +30,10 @@ type UseMapSyncProps = {
     focusRequestKey?: string | number | null;
     focusPadding?: number | maplibregl.PaddingOptions;
     allowGeometryEditing: boolean;
-    editingEngineRef: React.MutableRefObject<unknown>;
+    editingEngineRef: React.MutableRefObject<{
+        editingRef: React.MutableRefObject<{ id: string | number } | null>;
+        clearEditing: () => void;
+    } | null>;
     geolocationCenteredRef: React.MutableRefObject<boolean>;
 };
 
@@ -84,8 +88,9 @@ export function useMapSync({
 
         const countriesSource = map.getSource("countries") as maplibregl.GeoJSONSource | undefined;
         const placesSource = map.getSource("places") as maplibregl.GeoJSONSource | undefined;
+        const polygonLabelSource = map.getSource(POLYGON_LABEL_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
 
-        if (!countriesSource || !placesSource) return;
+        if (!countriesSource || !placesSource || !polygonLabelSource) return;
 
         for (const sourceId of FEATURE_STATE_SOURCE_IDS) {
             if (map.getSource(sourceId)) {
@@ -99,10 +104,12 @@ export function useMapSync({
         const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
         const { polygons, points } = splitDraftFeatures(visibleDraft);
         const labeledPoints = decoratePointFeaturesWithLabels(points);
+        const polygonLabels = buildPolygonLabelFeatureCollection(polygons);
         const pathArrowShapes = buildPathArrowFeatureCollection(visibleDraft);
 
         countriesSource.setData(polygons);
         placesSource.setData(labeledPoints);
+        polygonLabelSource.setData(polygonLabels);
         (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)?.setData(pathArrowShapes);
 
         const currentSelectedIds = selectedFeatureIdsRef.current;

@@ -13,6 +13,16 @@ import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getRasterTileTemplateUrl } from "@/uhm/api/tiles";
 import { newId } from "@/uhm/lib/utils/id";
 
+type Coordinate = [number, number];
+type PolygonCoordinates = Coordinate[][];
+type LabelCell = {
+    x: number;
+    y: number;
+    h: number;
+    d: number;
+    max: number;
+};
+
 export function applyBackgroundLayerVisibility(
     map: maplibregl.Map,
     visibility: BackgroundLayerVisibility
@@ -193,10 +203,37 @@ export function decoratePointFeaturesWithLabels(fc: FeatureCollection): FeatureC
             ...feature,
             properties: {
                 ...feature.properties,
-                point_label: getSingleEntityPointLabel(feature),
+                point_label: getSingleEntityFeatureLabel(feature),
             },
         })),
     };
+}
+
+export function buildPolygonLabelFeatureCollection(fc: FeatureCollection): FeatureCollection {
+    const features: Feature[] = [];
+
+    for (const feature of fc.features) {
+        const label = getSingleEntityFeatureLabel(feature);
+        if (!label) continue;
+
+        const labelPoint = getPolygonLabelPoint(feature.geometry);
+        if (!labelPoint) continue;
+
+        features.push({
+            type: "Feature",
+            properties: {
+                ...feature.properties,
+                id: `${feature.properties.id}:polygon-label`,
+                polygon_label: label,
+            },
+            geometry: {
+                type: "Point",
+                coordinates: labelPoint,
+            },
+        });
+    }
+
+    return { type: "FeatureCollection", features };
 }
 
 export function setSelectedFeatureState(
@@ -558,7 +595,7 @@ export function roundZoom(value: number): number {
     return Math.round(value * 10) / 10;
 }
 
-function getSingleEntityPointLabel(feature: Feature): string | null {
+function getSingleEntityFeatureLabel(feature: Feature): string | null {
     const rawEntityIds = Array.isArray(feature.properties.entity_ids)
         ? feature.properties.entity_ids
         : (typeof feature.properties.entity_id === "string" && feature.properties.entity_id.trim().length > 0
@@ -579,6 +616,193 @@ function getSingleEntityPointLabel(feature: Feature): string | null {
         : "";
 
     return name.length ? name : null;
+}
+
+function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
+    if (geometry.type === "Polygon") {
+        return getPolygonLabelCandidate(geometry.coordinates)?.point || null;
+    }
+
+    if (geometry.type === "MultiPolygon") {
+        let best: { point: Coordinate; distance: number } | null = null;
+        for (const polygon of geometry.coordinates) {
+            const candidate = getPolygonLabelCandidate(polygon);
+            if (!candidate) continue;
+            if (!best || candidate.distance > best.distance) {
+                best = candidate;
+            }
+        }
+        return best?.point || null;
+    }
+
+    return null;
+}
+
+function getPolygonLabelCandidate(polygon: PolygonCoordinates): { point: Coordinate; distance: number } | null {
+    const outerRing = polygon[0];
+    if (!outerRing || outerRing.length < 3) return null;
+
+    const bbox = getRingBbox(outerRing);
+    if (!bbox) return null;
+
+    const width = bbox.maxX - bbox.minX;
+    const height = bbox.maxY - bbox.minY;
+    if (width <= 0 || height <= 0) {
+        const fallback = getRingCentroid(outerRing) || [bbox.minX, bbox.minY] as Coordinate;
+        return { point: fallback, distance: 0 };
+    }
+
+    const cellSize = Math.min(width, height);
+    const h = cellSize / 2;
+    const cells: LabelCell[] = [];
+
+    for (let x = bbox.minX; x < bbox.maxX; x += cellSize) {
+        for (let y = bbox.minY; y < bbox.maxY; y += cellSize) {
+            cells.push(createLabelCell(x + h, y + h, h, polygon));
+        }
+    }
+
+    let best = createLabelCell(bbox.minX + width / 2, bbox.minY + height / 2, 0, polygon);
+    const centroid = getRingCentroid(outerRing);
+    if (centroid) {
+        const centroidCell = createLabelCell(centroid[0], centroid[1], 0, polygon);
+        if (centroidCell.d > best.d) {
+            best = centroidCell;
+        }
+    }
+
+    const precision = Math.max(Math.max(width, height) / 100, 0.0001);
+    let iterations = 0;
+    while (cells.length && iterations < 4096) {
+        cells.sort((a, b) => b.max - a.max);
+        const cell = cells.shift();
+        if (!cell) break;
+        iterations += 1;
+
+        if (cell.d > best.d) {
+            best = cell;
+        }
+
+        if (cell.max - best.d <= precision) continue;
+
+        const nextH = cell.h / 2;
+        cells.push(createLabelCell(cell.x - nextH, cell.y - nextH, nextH, polygon));
+        cells.push(createLabelCell(cell.x + nextH, cell.y - nextH, nextH, polygon));
+        cells.push(createLabelCell(cell.x - nextH, cell.y + nextH, nextH, polygon));
+        cells.push(createLabelCell(cell.x + nextH, cell.y + nextH, nextH, polygon));
+    }
+
+    if (best.d < 0) {
+        const fallback = centroid || [bbox.minX + width / 2, bbox.minY + height / 2] as Coordinate;
+        return { point: fallback, distance: 0 };
+    }
+
+    return { point: [best.x, best.y], distance: best.d };
+}
+
+function createLabelCell(x: number, y: number, h: number, polygon: PolygonCoordinates): LabelCell {
+    const d = pointToPolygonDistance([x, y], polygon);
+    return {
+        x,
+        y,
+        h,
+        d,
+        max: d + h * Math.SQRT2,
+    };
+}
+
+function getRingBbox(ring: Coordinate[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (!ring.length) return null;
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const [x, y] of ring) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+        return null;
+    }
+
+    return { minX, minY, maxX, maxY };
+}
+
+function getRingCentroid(ring: Coordinate[]): Coordinate | null {
+    let area = 0;
+    let x = 0;
+    let y = 0;
+
+    for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+        const a = ring[i];
+        const b = ring[j];
+        const f = a[0] * b[1] - b[0] * a[1];
+        x += (a[0] + b[0]) * f;
+        y += (a[1] + b[1]) * f;
+        area += f * 3;
+    }
+
+    if (area === 0) return null;
+    return [x / area, y / area];
+}
+
+function pointToPolygonDistance(point: Coordinate, polygon: PolygonCoordinates): number {
+    const inside = isPointInRing(point, polygon[0]) && !polygon.slice(1).some((ring) => isPointInRing(point, ring));
+    let minDistSq = Number.POSITIVE_INFINITY;
+
+    for (const ring of polygon) {
+        for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+            minDistSq = Math.min(minDistSq, getSegmentDistanceSquared(point, ring[j], ring[i]));
+        }
+    }
+
+    const distance = Math.sqrt(minDistSq);
+    return inside ? distance : -distance;
+}
+
+function isPointInRing(point: Coordinate, ring: Coordinate[] | undefined): boolean {
+    if (!ring || ring.length < 3) return false;
+
+    const [x, y] = point;
+    let inside = false;
+
+    for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+        const xi = ring[i][0];
+        const yi = ring[i][1];
+        const xj = ring[j][0];
+        const yj = ring[j][1];
+        const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+        if (intersects) inside = !inside;
+    }
+
+    return inside;
+}
+
+function getSegmentDistanceSquared(point: Coordinate, a: Coordinate, b: Coordinate): number {
+    let x = a[0];
+    let y = a[1];
+    let dx = b[0] - x;
+    let dy = b[1] - y;
+
+    if (dx !== 0 || dy !== 0) {
+        const t = ((point[0] - x) * dx + (point[1] - y) * dy) / (dx * dx + dy * dy);
+        if (t > 1) {
+            x = b[0];
+            y = b[1];
+        } else if (t > 0) {
+            x += dx * t;
+            y += dy * t;
+        }
+    }
+
+    dx = point[0] - x;
+    dy = point[1] - y;
+    return dx * dx + dy * dy;
 }
 
 export function buildClientFeatureId(): string {
