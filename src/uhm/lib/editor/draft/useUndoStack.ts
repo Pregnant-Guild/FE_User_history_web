@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
 import { geometryEquals } from "@/uhm/lib/editor/draft/draftDiff";
 
@@ -10,31 +10,32 @@ export function useUndoStack(options: Options) {
     const { applyUndoAction } = options;
     // Stack thao tác undo (append-only, pop khi undo).
     const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
+    const undoStackRef = useRef<UndoAction[]>([]);
 
     const pushUndo = useCallback((action: UndoAction) => {
-        setUndoStack((prev) => {
-            const last = prev[prev.length - 1];
-            if (isSameUndo(last, action)) return prev;
-            return [...prev, action];
-        });
+        const prev = undoStackRef.current;
+        const last = prev[prev.length - 1];
+        if (isSameUndo(last, action)) return;
+        const next = [...prev, action];
+        undoStackRef.current = next;
+        setUndoStack(next);
     }, []);
 
     const undo = useCallback(() => {
-        let applied = false;
-        setUndoStack((prev) => {
-            if (applied) return prev;
-            if (!prev.length) return prev;
+        const current = undoStackRef.current;
+        if (!current.length) return;
 
-            const last = prev[prev.length - 1];
-            const remaining = prev.slice(0, -1);
-            applied = true;
+        const last = current[current.length - 1];
+        const didApply = applyUndoAction(last);
+        if (!didApply) return;
 
-            const didApply = applyUndoAction(last);
-            return didApply ? remaining : prev;
-        });
+        const remaining = current.slice(0, -1);
+        undoStackRef.current = remaining;
+        setUndoStack(remaining);
     }, [applyUndoAction]);
 
     const clearUndo = useCallback(() => {
+        undoStackRef.current = [];
         setUndoStack([]);
     }, []);
 
@@ -86,6 +87,10 @@ function isSameUndo(a: UndoAction | undefined, b: UndoAction) {
         case "snapshot_entity_wiki": {
             const next = b as Extract<UndoAction, { type: "snapshot_entity_wiki" }>;
             return a.label === next.label && JSON.stringify(a.prev) === JSON.stringify(next.prev);
+        }
+        case "group": {
+            const next = b as Extract<UndoAction, { type: "group" }>;
+            return a.label === next.label && JSON.stringify(a.actions) === JSON.stringify(next.actions);
         }
         default:
             return false;

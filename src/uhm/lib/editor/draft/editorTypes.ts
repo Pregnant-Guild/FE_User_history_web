@@ -18,4 +18,5 @@ export type UndoAction =
     // Snapshot-scoped undo (affects commit snapshot but not GeoJSON draft directly)
     | { type: "snapshot_entities"; label: string; prev: EntitySnapshot[] }
     | { type: "snapshot_wikis"; label: string; prev: WikiSnapshot[] }
-    | { type: "snapshot_entity_wiki"; label: string; prev: EntityWikiLinkSnapshot[] };
+    | { type: "snapshot_entity_wiki"; label: string; prev: EntityWikiLinkSnapshot[] }
+    | { type: "group"; label: string; actions: UndoAction[] };

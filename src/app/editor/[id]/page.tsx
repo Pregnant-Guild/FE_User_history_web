@@ -94,6 +94,7 @@ export default function Page() {
         key: number;
         collection: FeatureCollection;
     } | null>(null);
+    const localCreatedEntityIdsRef = useRef<Set<string>>(new Set());
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
 
     const {
@@ -239,6 +240,27 @@ export default function Page() {
         }
         return Array.from(byId.values());
     }, [snapshotEntities]);
+
+    useEffect(() => {
+        const localCreatedIds = localCreatedEntityIdsRef.current;
+        if (!localCreatedIds.size) return;
+
+        const snapshotIds = new Set((snapshotEntities || []).map((entity) => String(entity.id || "")));
+        setEntityCatalog((prev) => {
+            let changed = false;
+            const next = (prev || []).filter((entity) => {
+                const id = String(entity?.id || "");
+                const shouldDrop = localCreatedIds.has(id) && !snapshotIds.has(id);
+                if (shouldDrop) {
+                    changed = true;
+                    localCreatedIds.delete(id);
+                    return false;
+                }
+                return true;
+            });
+            return changed ? next : prev;
+        });
+    }, [snapshotEntities, setEntityCatalog]);
 
     // Timeline filter: only affects persisted snapshot features.
     // New features created in the current session remain visible regardless of time range.
@@ -906,12 +928,13 @@ export default function Page() {
         setIsEntitySubmitting(true);
         flashEntityFormStatus(null, 0);
         try {
-            for (const feature of selectedFeatures) {
-                editor.patchFeatureProperties(
-                    feature.properties.id,
-                    buildFeatureEntityPatch(feature, nextEntityIds, entities)
-                );
-            }
+            editor.patchFeaturePropertiesBatch(
+                selectedFeatures.map((feature) => ({
+                    id: feature.properties.id,
+                    patch: buildFeatureEntityPatch(feature, nextEntityIds, entities),
+                })),
+                nextChecked ? "Bind entity vào GEO" : "Unbind entity khỏi GEO"
+            );
             setSelectedGeometryEntityIds(nextEntityIds);
             flashEntityFormStatus(
                 nextChecked
@@ -951,7 +974,7 @@ export default function Page() {
         setIsEntitySubmitting(true);
         flashGeoBindingStatus(null, 0);
         try {
-            for (const feature of selectedFeatures) {
+            const bindingPatches = selectedFeatures.map((feature) => {
                 const prevBindingIds = normalizeFeatureBindingIds(feature);
                 const has = prevBindingIds.includes(id);
                 const nextBindingIds = (() => {
@@ -962,8 +985,15 @@ export default function Page() {
                     if (!has) return prevBindingIds;
                     return prevBindingIds.filter((x) => x !== id);
                 })();
-                editor.patchFeatureProperties(feature.properties.id, { binding: nextBindingIds });
-            }
+                return {
+                    id: feature.properties.id,
+                    patch: { binding: nextBindingIds },
+                };
+            });
+            editor.patchFeaturePropertiesBatch(
+                bindingPatches,
+                nextChecked ? "Bind geometry vào GEO" : "Unbind geometry khỏi GEO"
+            );
             
             // Assume selectedFeature (the first one) reflects the representative binding in UI
             const firstFeaturePrevBindings = normalizeFeatureBindingIds(selectedFeatures[0]);
@@ -1056,17 +1086,18 @@ export default function Page() {
         // Ensure the geometry stays selectable even if it doesn't match the current timeline year.
         setTimelineFilterEnabled(false);
 
-        // Keep entity store consistent: importing a geo implies the entity should exist in snapshot + catalog.
-        handleAddEntityRefToProject({
+        const importedEntity: Entity = {
             id: entityItem.entity_id,
             name: (entityItem.name || "").trim() || entityItem.entity_id,
             description: (entityItem.description || "").trim() || null,
             status: 1,
             geometry_count: 0,
-        });
+        };
 
         const existing = editor.draft.features.find((f) => String(f.properties.id) === geoId) || null;
         if (existing) {
+            // Keep entity store consistent: importing/selecting a geo implies the entity should exist in snapshot + catalog.
+            handleAddEntityRefToProject(importedEntity);
             setSelectedFeatureIds([existing.properties.id]);
             flashEntityFormStatus("Đã chọn geometry từ kết quả search.", 3000);
             return;
@@ -1097,13 +1128,39 @@ export default function Page() {
             geometry,
         };
 
-        editor.createFeature(feature);
+        editor.createFeatureWithSnapshotEntities(
+            feature,
+            (prev) => {
+                if (prev.some((e) => String(e.id) === importedEntity.id)) return prev;
+                return [
+                    {
+                        id: importedEntity.id,
+                        source: "ref",
+                        operation: "reference",
+                        name: importedEntity.name,
+                        description: importedEntity.description ?? null,
+                    },
+                    ...prev,
+                ];
+            },
+            `Import GEO #${geoId}`
+        );
+        setEntityCatalog((prev) => {
+            const byId = new globalThis.Map<string, Entity>();
+            for (const row of prev || []) {
+                if (!row?.id) continue;
+                byId.set(String(row.id), row);
+            }
+            byId.set(importedEntity.id, importedEntity);
+            return Array.from(byId.values());
+        });
         setSelectedFeatureIds([feature.properties.id]);
         flashEntityFormStatus("Đã import geometry từ search GEO. Commit khi sẵn sàng.", 3000);
     }, [
         editor,
         flashEntityFormStatus,
         handleAddEntityRefToProject,
+        setEntityCatalog,
         setSelectedFeatureIds,
         setTimelineFilterEnabled,
     ]);
@@ -1162,6 +1219,7 @@ export default function Page() {
                     ...prev,
                 ];
             }, `Tạo entity #${entityId}`);
+            localCreatedEntityIdsRef.current.add(entityId);
             setEntityCatalog((prev) => {
                 const byId = new globalThis.Map<string, Entity>();
                 for (const row of prev || []) {

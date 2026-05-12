@@ -5,7 +5,7 @@ import type {
     FeatureProperties,
     Geometry,
 } from "@/uhm/types/geo";
-import { buildInitialMap, deepClone, diffDraftToInitial } from "@/uhm/lib/editor/draft/draftDiff";
+import { buildInitialMap, deepClone, diffDraftToInitial, geometryEquals } from "@/uhm/lib/editor/draft/draftDiff";
 import { useDraftState } from "@/uhm/lib/editor/draft/useDraftState";
 import { useUndoStack } from "@/uhm/lib/editor/draft/useUndoStack";
 import type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
@@ -23,6 +23,11 @@ type SnapshotUndoApi = {
     setSnapshotWikis: Dispatch<SetStateAction<WikiSnapshot[]>>;
     snapshotEntityWikiLinksRef: { current: EntityWikiLinkSnapshot[] };
     setSnapshotEntityWikiLinks: Dispatch<SetStateAction<EntityWikiLinkSnapshot[]>>;
+};
+
+type FeaturePropertiesPatch = {
+    id: FeatureProperties["id"];
+    patch: Partial<FeatureProperties>;
 };
 
 // State trung tâm của editor:
@@ -86,18 +91,31 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
             }
             case "snapshot_entities": {
                 if (!snapshotUndo) return false;
-                snapshotUndo.setSnapshotEntities(deepClone(action.prev));
+                const prev = deepClone(action.prev);
+                snapshotUndo.snapshotEntitiesRef.current = prev;
+                snapshotUndo.setSnapshotEntities(prev);
                 return true;
             }
             case "snapshot_wikis": {
                 if (!snapshotUndo) return false;
-                snapshotUndo.setSnapshotWikis(deepClone(action.prev));
+                const prev = deepClone(action.prev);
+                snapshotUndo.snapshotWikisRef.current = prev;
+                snapshotUndo.setSnapshotWikis(prev);
                 return true;
             }
             case "snapshot_entity_wiki": {
                 if (!snapshotUndo) return false;
-                snapshotUndo.setSnapshotEntityWikiLinks(deepClone(action.prev));
+                const prev = deepClone(action.prev);
+                snapshotUndo.snapshotEntityWikiLinksRef.current = prev;
+                snapshotUndo.setSnapshotEntityWikiLinks(prev);
                 return true;
+            }
+            case "group": {
+                let applied = true;
+                for (let i = action.actions.length - 1; i >= 0; i -= 1) {
+                    applied = applyUndoAction(action.actions[i]) && applied;
+                }
+                return applied;
             }
             default:
                 return false;
@@ -129,6 +147,51 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         pushUndo({ type: "create", id: featureClone.properties.id });
     }
 
+    function createFeatureWithSnapshotEntities(
+        feature: Feature,
+        nextEntities: SetStateAction<EntitySnapshot[]>,
+        label = "Import geometry"
+    ) {
+        const featureClone = deepClone(feature);
+        const undoActions: UndoAction[] = [];
+
+        if (snapshotUndo) {
+            const prevEntities = snapshotUndo.snapshotEntitiesRef.current || [];
+            const prevEntitiesClone = deepClone(prevEntities);
+            const computedEntities = typeof nextEntities === "function"
+                ? (nextEntities as (p: EntitySnapshot[]) => EntitySnapshot[])(prevEntitiesClone)
+                : nextEntities;
+            let entitiesChanged = true;
+            try {
+                entitiesChanged = JSON.stringify(prevEntities) !== JSON.stringify(computedEntities);
+            } catch {
+                entitiesChanged = true;
+            }
+
+            if (entitiesChanged) {
+                const computedEntitiesClone = deepClone(computedEntities);
+                undoActions.push({
+                    type: "snapshot_entities",
+                    label: "Cập nhật entities",
+                    prev: prevEntitiesClone,
+                });
+                snapshotUndo.snapshotEntitiesRef.current = computedEntitiesClone;
+                snapshotUndo.setSnapshotEntities(computedEntitiesClone);
+            }
+        }
+
+        undoActions.push({ type: "create", id: featureClone.properties.id });
+        pushUndo(
+            undoActions.length === 1
+                ? undoActions[0]
+                : { type: "group", label, actions: undoActions }
+        );
+        commitDraft({
+            ...draftRef.current,
+            features: [...draftRef.current.features, featureClone],
+        });
+    }
+
     function patchFeatureProperties(
         id: FeatureProperties["id"],
         patch: Partial<FeatureProperties>
@@ -154,12 +217,63 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         commitDraft({ ...draftRef.current, features: nextFeatures });
     }
 
+    function patchFeaturePropertiesBatch(
+        patches: FeaturePropertiesPatch[],
+        label = "Cập nhật nhiều geometry"
+    ) {
+        const mergedPatches = new Map<FeatureProperties["id"], Partial<FeatureProperties>>();
+        for (const item of patches || []) {
+            if (!item) continue;
+            const prev = mergedPatches.get(item.id) || {};
+            mergedPatches.set(item.id, {
+                ...prev,
+                ...deepClone(item.patch),
+            });
+        }
+        if (!mergedPatches.size) return;
+
+        const nextFeatures = [...draftRef.current.features];
+        const undoActions: UndoAction[] = [];
+
+        for (const [id, patch] of mergedPatches.entries()) {
+            const idx = nextFeatures.findIndex((feature) => feature.properties.id === id);
+            if (idx === -1) continue;
+
+            const prevProperties = deepClone(nextFeatures[idx].properties);
+            const nextProperties = {
+                ...nextFeatures[idx].properties,
+                ...deepClone(patch),
+            };
+            if (JSON.stringify(prevProperties) === JSON.stringify(nextProperties)) {
+                continue;
+            }
+
+            nextFeatures[idx] = {
+                ...nextFeatures[idx],
+                properties: nextProperties,
+            };
+            undoActions.push({ type: "properties", id, prevProperties });
+        }
+
+        if (!undoActions.length) return;
+
+        pushUndo(
+            undoActions.length === 1
+                ? undoActions[0]
+                : { type: "group", label, actions: undoActions }
+        );
+        commitDraft({ ...draftRef.current, features: nextFeatures });
+    }
+
     function updateFeature(id: FeatureProperties["id"], newGeometry: Geometry) {
         const idx = draftRef.current.features.findIndex((feature) => feature.properties.id === id);
         if (idx === -1) return;
 
         const prevFeature = draftRef.current.features[idx];
         const prevGeometry = deepClone(prevFeature.geometry);
+        if (geometryEquals(prevGeometry, newGeometry)) {
+            return;
+        }
         const nextFeatures = [...draftRef.current.features];
         nextFeatures[idx] = {
             ...prevFeature,
@@ -201,20 +315,21 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         label = "Cập nhật entities"
     ) => {
         if (!snapshotUndo) return;
-        snapshotUndo.setSnapshotEntities((prev) => {
-            const prevClone = deepClone(prev);
-            const computed = typeof next === "function" ? (next as (p: EntitySnapshot[]) => EntitySnapshot[])(prev) : next;
-            let changed = true;
-            try {
-                changed = JSON.stringify(prev) !== JSON.stringify(computed);
-            } catch {
-                changed = true;
-            }
-            if (changed) {
-                pushUndo({ type: "snapshot_entities", label, prev: prevClone });
-            }
-            return computed;
-        });
+        const prev = snapshotUndo.snapshotEntitiesRef.current || [];
+        const prevClone = deepClone(prev);
+        const computed = typeof next === "function" ? (next as (p: EntitySnapshot[]) => EntitySnapshot[])(prevClone) : next;
+        let changed = true;
+        try {
+            changed = JSON.stringify(prev) !== JSON.stringify(computed);
+        } catch {
+            changed = true;
+        }
+        if (!changed) return;
+
+        const computedClone = deepClone(computed);
+        pushUndo({ type: "snapshot_entities", label, prev: prevClone });
+        snapshotUndo.snapshotEntitiesRef.current = computedClone;
+        snapshotUndo.setSnapshotEntities(computedClone);
     }, [pushUndo, snapshotUndo]);
 
     const setSnapshotWikisUndoable = useCallback((
@@ -222,20 +337,21 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         label = "Cập nhật wikis"
     ) => {
         if (!snapshotUndo) return;
-        snapshotUndo.setSnapshotWikis((prev) => {
-            const prevClone = deepClone(prev);
-            const computed = typeof next === "function" ? (next as (p: WikiSnapshot[]) => WikiSnapshot[])(prev) : next;
-            let changed = true;
-            try {
-                changed = JSON.stringify(prev) !== JSON.stringify(computed);
-            } catch {
-                changed = true;
-            }
-            if (changed) {
-                pushUndo({ type: "snapshot_wikis", label, prev: prevClone });
-            }
-            return computed;
-        });
+        const prev = snapshotUndo.snapshotWikisRef.current || [];
+        const prevClone = deepClone(prev);
+        const computed = typeof next === "function" ? (next as (p: WikiSnapshot[]) => WikiSnapshot[])(prevClone) : next;
+        let changed = true;
+        try {
+            changed = JSON.stringify(prev) !== JSON.stringify(computed);
+        } catch {
+            changed = true;
+        }
+        if (!changed) return;
+
+        const computedClone = deepClone(computed);
+        pushUndo({ type: "snapshot_wikis", label, prev: prevClone });
+        snapshotUndo.snapshotWikisRef.current = computedClone;
+        snapshotUndo.setSnapshotWikis(computedClone);
     }, [pushUndo, snapshotUndo]);
 
     const setSnapshotEntityWikiLinksUndoable = useCallback((
@@ -243,22 +359,23 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         label = "Cập nhật entity-wiki"
     ) => {
         if (!snapshotUndo) return;
-        snapshotUndo.setSnapshotEntityWikiLinks((prev) => {
-            const prevClone = deepClone(prev);
-            const computed = typeof next === "function"
-                ? (next as (p: EntityWikiLinkSnapshot[]) => EntityWikiLinkSnapshot[])(prev)
-                : next;
-            let changed = true;
-            try {
-                changed = JSON.stringify(prev) !== JSON.stringify(computed);
-            } catch {
-                changed = true;
-            }
-            if (changed) {
-                pushUndo({ type: "snapshot_entity_wiki", label, prev: prevClone });
-            }
-            return computed;
-        });
+        const prev = snapshotUndo.snapshotEntityWikiLinksRef.current || [];
+        const prevClone = deepClone(prev);
+        const computed = typeof next === "function"
+            ? (next as (p: EntityWikiLinkSnapshot[]) => EntityWikiLinkSnapshot[])(prevClone)
+            : next;
+        let changed = true;
+        try {
+            changed = JSON.stringify(prev) !== JSON.stringify(computed);
+        } catch {
+            changed = true;
+        }
+        if (!changed) return;
+
+        const computedClone = deepClone(computed);
+        pushUndo({ type: "snapshot_entity_wiki", label, prev: prevClone });
+        snapshotUndo.snapshotEntityWikiLinksRef.current = computedClone;
+        snapshotUndo.setSnapshotEntityWikiLinks(computedClone);
     }, [pushUndo, snapshotUndo]);
 
     return {
@@ -267,7 +384,9 @@ export function useEditorState(initialData: FeatureCollection, snapshotUndo?: Sn
         undoStack,
         changeCount,
         createFeature,
+        createFeatureWithSnapshotEntities,
         patchFeatureProperties,
+        patchFeaturePropertiesBatch,
         updateFeature,
         deleteFeature,
         undo,

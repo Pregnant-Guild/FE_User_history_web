@@ -12,6 +12,10 @@ import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionType
 
 type EditorDraftApi = {
     patchFeatureProperties: (id: FeatureProperties["id"], patch: Partial<FeatureProperties>) => void;
+    patchFeaturePropertiesBatch: (
+        patches: Array<{ id: FeatureProperties["id"]; patch: Partial<FeatureProperties> }>,
+        label?: string
+    ) => void;
 };
 
 type Options = {
@@ -64,9 +68,13 @@ export function useFeatureCommands(options: Options) {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            for (const feature of selectedFeatures) {
-                editor.patchFeatureProperties(feature.properties.id, metadata.patch);
-            }
+            editor.patchFeaturePropertiesBatch(
+                selectedFeatures.map((feature) => ({
+                    id: feature.properties.id,
+                    patch: metadata.patch,
+                })),
+                "Cập nhật thuộc tính GEO"
+            );
             setGeometryMetaForm(metadata.formState);
             setEntityFormStatus("Đã cập nhật thuộc tính GEO. Commit khi sẵn sàng.");
             return { ok: true };
@@ -92,12 +100,13 @@ export function useFeatureCommands(options: Options) {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            for (const feature of selectedFeatures) {
-                editor.patchFeatureProperties(
-                    feature.properties.id,
-                    buildFeatureEntityPatch(feature, entityIds, entities)
-                );
-            }
+            editor.patchFeaturePropertiesBatch(
+                selectedFeatures.map((feature) => ({
+                    id: feature.properties.id,
+                    patch: buildFeatureEntityPatch(feature, entityIds, entities),
+                })),
+                "Cập nhật entity cho GEO"
+            );
             setSelectedGeometryEntityIds(entityIds);
             setEntityFormStatus("Đã cập nhật danh sách entity. Commit khi sẵn sàng.");
         } catch (err) {
