@@ -9,7 +9,6 @@ import { ToolsPanel } from "./editor/ToolsPanel";
 import { CommitPanel } from "./editor/CommitPanel";
 import { CommitHistoryPanel } from "./editor/CommitHistoryPanel";
 import { UndoListPanel } from "./editor/UndoListPanel";
-import { SessionPanel } from "./editor/SessionPanel";
 import { SubmitModal } from "./editor/SubmitModal";
 
 type Props = {
@@ -38,16 +37,6 @@ type Props = {
     }>;
     changesCount: number;
     undoStack: UndoAction[];
-    createdEntities: Array<{
-        id: string;
-        name: string;
-    }>;
-    createdGeometries: Array<{
-        id: string | number;
-        geometryType: string;
-        semanticType?: string | null;
-        entityNames: string[];
-    }>;
     width?: number;
 };
 
@@ -72,8 +61,6 @@ export default function Editor({
     commits,
     changesCount,
     undoStack,
-    createdEntities,
-    createdGeometries,
     width = 280,
 }: Props) {
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -158,11 +145,6 @@ export default function Editor({
             />
 
             <UndoListPanel undoStack={undoStack} />
-
-            <SessionPanel
-                createdEntities={createdEntities}
-                createdGeometries={createdGeometries}
-            />
 
             <SubmitModal
                 isSubmitModalOpen={isSubmitModalOpen}

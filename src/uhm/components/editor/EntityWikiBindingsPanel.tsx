@@ -3,9 +3,19 @@
 import { useMemo, useState } from "react";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import NewBadge from "@/uhm/components/editor/NewBadge";
 
-type EntityChoice = { id: string; name: string };
-type WikiChoice = { id: string; title: string };
+type EntityChoice = { id: string; name: string; isNew?: boolean };
+type WikiChoice = { id: string; title: string; isNew?: boolean };
+type BindingRow = {
+  entityId: string;
+  entityName: string;
+  entityIsNew: boolean;
+  wikiId: string;
+  wikiTitle: string;
+  wikiIsNew: boolean;
+  linkIsNew: boolean;
+};
 
 type Props = {
   entities: EntityChoice[];
@@ -28,7 +38,11 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     () =>
       (wikis || [])
         .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
-        .map((w) => ({ id: w.id, title: wikiTitle(w) })),
+        .map((w) => ({
+          id: w.id,
+          title: wikiTitle(w),
+          isNew: w.source === "inline" && w.operation === "create",
+        })),
     [wikis]
   );
 
@@ -47,6 +61,41 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     }
     return set;
   }, [activeEntityId, links]);
+
+  const activeBindingRows = useMemo<BindingRow[]>(() => {
+    const byKey = new Map<string, EntityWikiLinkSnapshot>();
+    for (const link of links || []) {
+      const entityId = String(link?.entity_id || "").trim();
+      const wikiId = String(link?.wiki_id || "").trim();
+      if (!entityId || !wikiId) continue;
+      if (link.operation === "delete") continue;
+      byKey.set(`${entityId}::${wikiId}`, link);
+    }
+
+    const rows = Array.from(byKey.values()).map((link) => {
+      const entityId = String(link.entity_id);
+      const wikiId = String(link.wiki_id);
+      const entity = entityChoices.find((item) => item.id === entityId) || null;
+      const wiki = wikiChoices.find((item) => item.id === wikiId) || null;
+      return {
+        entityId,
+        entityName: entity?.name || entityId,
+        entityIsNew: Boolean(entity?.isNew),
+        wikiId,
+        wikiTitle: wiki?.title || wikiId,
+        wikiIsNew: Boolean(wiki?.isNew),
+        linkIsNew: link.operation === "binding",
+      };
+    });
+
+    rows.sort((a, b) => {
+      if (a.linkIsNew !== b.linkIsNew) return a.linkIsNew ? -1 : 1;
+      const entityCompare = a.entityName.localeCompare(b.entityName);
+      if (entityCompare !== 0) return entityCompare;
+      return a.wikiTitle.localeCompare(b.wikiTitle);
+    });
+    return rows;
+  }, [entityChoices, links, wikiChoices]);
 
   const toggle = (wikiId: string) => {
     if (!activeEntityId) return;
@@ -69,6 +118,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
 
   const activeWikiLinked = activeEntityId && activeWikiId ? activeLinks.has(activeWikiId) : false;
   const activeWikiChoice = activeWikiId ? wikiChoices.find((w) => w.id === activeWikiId) || null : null;
+  const activeEntityChoice = activeEntityId ? entityChoices.find((e) => e.id === activeEntityId) || null : null;
 
   return (
     <div
@@ -82,7 +132,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontWeight: 700, fontSize: "14px" }}>Entity ↔ Wiki</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{links.length}</div>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{activeBindingRows.length}</div>
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
@@ -134,8 +184,9 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
           </select>
           {activeEntityId ? (
             <ActiveSelectionLabel
-              label={entityChoices.find((e) => e.id === activeEntityId)?.name || activeEntityId}
+              label={activeEntityChoice?.name || activeEntityId}
               id={activeEntityId}
+              isNew={Boolean(activeEntityChoice?.isNew)}
             />
           ) : null}
         </div>
@@ -173,6 +224,7 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
               <ActiveSelectionLabel
                 label={activeWikiChoice.title}
                 id={activeWikiChoice.id}
+                isNew={Boolean(activeWikiChoice.isNew)}
               />
             ) : null}
 
@@ -275,6 +327,82 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
             )}
           </div>
         </div>
+
+        <div
+          style={{
+            borderTop: "1px solid #1f2937",
+            paddingTop: 8,
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            All bindings ({activeBindingRows.length})
+          </div>
+          {activeBindingRows.length ? (
+            <div style={{ display: "grid", gap: 6, maxHeight: 260, overflowY: "auto", paddingRight: 4 }}>
+              {activeBindingRows.map((row) => (
+                <div
+                  key={`${row.entityId}::${row.wikiId}`}
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    border: row.linkIsNew ? "1px solid rgba(45, 212, 191, 0.55)" : "1px solid #1f2937",
+                    background: row.linkIsNew ? "rgba(20, 184, 166, 0.12)" : "#111827",
+                    display: "grid",
+                    gap: 5,
+                  }}
+                  title={`${row.entityId} ↔ ${row.wikiId}`}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    <span
+                      style={{
+                        color: "#e5e7eb",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {row.entityName}
+                    </span>
+                    {row.entityIsNew ? <NewBadge title="Entity mới trong phiên này" /> : null}
+                    {row.linkIsNew ? <NewBadge title="Binding mới trong phiên này" /> : null}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    <span style={{ color: "#93c5fd", fontSize: 11, flex: "0 0 auto" }}>Wiki</span>
+                    <span
+                      style={{
+                        color: "#cbd5e1",
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {row.wikiTitle}
+                    </span>
+                    {row.wikiIsNew ? <NewBadge title="Wiki mới trong phiên này" /> : null}
+                  </div>
+                  <div
+                    style={{
+                      color: "#64748b",
+                      fontSize: 11,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {row.entityId} ↔ {row.wikiId}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>No entity-wiki binding yet.</div>
+          )}
+        </div>
       </div>
       )}
     </div>
@@ -284,9 +412,11 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
 function ActiveSelectionLabel({
   label,
   id,
+  isNew,
 }: {
   label: string;
   id: string;
+  isNew?: boolean;
 }) {
   return (
     <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -296,6 +426,7 @@ function ActiveSelectionLabel({
       <span style={{ color: "#64748b", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {id}
       </span>
+      {isNew ? <NewBadge /> : null}
     </div>
   );
 }

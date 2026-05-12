@@ -280,8 +280,13 @@ export default function Page() {
         const ids = new Set<string>();
         for (const ref of snapshotEntitiesVisible) ids.add(String(ref.id));
         const rows = Array.from(ids).map((id) => {
+            const ref = snapshotEntitiesVisible.find((entity) => String(entity.id) === id) || null;
             const found = entities.find((e) => e.id === id) || null;
-            return { id, name: found?.name || id };
+            return {
+                id,
+                name: found?.name || id,
+                isNew: ref?.source === "inline" && ref?.operation === "create",
+            };
         });
         rows.sort((a, b) => a.name.localeCompare(b.name));
         return rows;
@@ -327,41 +332,6 @@ export default function Page() {
         if (!selectedFeature) return [];
         return normalizeFeatureBindingIds(selectedFeature);
     }, [selectedFeature]);
-
-    const createdEntities = useMemo(() => {
-        return (snapshotEntities || [])
-            .filter((e) => e && e.source === "inline" && e.operation === "create")
-            .map((e) => ({
-                id: String(e.id || ""),
-                name: String(e.name || "").trim() || String(e.id || ""),
-            }))
-            .filter((e) => e.id.length > 0 && e.name.length > 0);
-    }, [snapshotEntities]);
-
-    const createdGeometries = useMemo(() => {
-        const rows: Array<{
-            id: string | number;
-            geometryType: string;
-            semanticType?: string | null;
-            entityNames: string[];
-        }> = [];
-
-        for (const change of editor.changes.values()) {
-            if (change.action !== "create") continue;
-            const feature = change.feature;
-            const entityNames = normalizeFeatureEntityIds(feature)
-                .map((entityId) => entities.find((entity) => entity.id === entityId)?.name || entityId);
-
-            rows.push({
-                id: feature.properties.id,
-                geometryType: feature.geometry.type,
-                semanticType: feature.properties.type || getDefaultTypeIdForFeature(feature),
-                entityNames,
-            });
-        }
-
-        return rows;
-    }, [editor.changes, entities]);
 
     const wikiDirty = useMemo(() => {
         const prev = normalizeWikisForCompare(baselineSnapshot?.wikis);
@@ -1274,8 +1244,6 @@ export default function Page() {
                 commits={sectionCommits}
                 changesCount={pendingSaveCount}
                 undoStack={editor.undoStack}
-                createdEntities={createdEntities}
-                createdGeometries={createdGeometries}
                 width={leftPanelWidth}
             />
 
