@@ -4,7 +4,6 @@ import { clearStoredTokens, setStoredTokens } from "@/auth/tokenStore";
 
 export type AuthTokens = {
     access_token: string;
-    refresh_token: string;
 };
 
 export type CurrentUser = {
@@ -21,7 +20,7 @@ export async function signIn(email: string, password: string): Promise<AuthToken
         jsonRequestInit("POST", { email, password }),
         { skipAuth: true }
     );
-    if (res?.access_token && res?.refresh_token) setStoredTokens(res);
+    if (res?.access_token) setStoredTokens(res);
     return res;
 }
 

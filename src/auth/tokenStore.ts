@@ -1,6 +1,5 @@
 export type StoredTokens = {
     access_token: string;
-    refresh_token: string;
 };
 
 const LS_KEY = "uhm_auth_tokens_v1";
@@ -12,9 +11,9 @@ function safeParseTokens(raw: string | null): StoredTokens | null {
     try {
         const v = JSON.parse(raw) as Partial<StoredTokens>;
         if (!v || typeof v !== "object") return null;
-        if (typeof v.access_token !== "string" || typeof v.refresh_token !== "string") return null;
-        if (!v.access_token.trim() || !v.refresh_token.trim()) return null;
-        return { access_token: v.access_token, refresh_token: v.refresh_token };
+        if (typeof v.access_token !== "string") return null;
+        if (!v.access_token.trim()) return null;
+        return { access_token: v.access_token };
     } catch {
         return null;
     }
@@ -39,10 +38,6 @@ export function setStoredTokens(tokens: StoredTokens | null): void {
 
 export function getAccessToken(): string | null {
     return getStoredTokens()?.access_token ?? null;
-}
-
-export function getRefreshToken(): string | null {
-    return getStoredTokens()?.refresh_token ?? null;
 }
 
 export function clearStoredTokens(): void {
@@ -72,8 +67,8 @@ export function extractTokensFromResponsePayload(payload: any): StoredTokens | n
         tokenContainer?.refreshToken ??
         tokenContainer?.refresh ??
         null;
-    if (typeof access === "string" && typeof refresh === "string" && access.trim() && refresh.trim()) {
-        return { access_token: access, refresh_token: refresh };
+    if (typeof access === "string" && access.trim()) {
+        return { access_token: access };
     }
     return null;
 }

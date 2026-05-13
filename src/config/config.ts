@@ -4,7 +4,6 @@ import {
   clearStoredTokens,
   extractTokensFromResponsePayload,
   getAccessToken,
-  getRefreshToken,
   setStoredTokens,
 } from "@/auth/tokenStore"
 
@@ -118,31 +117,11 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
   isRefreshing = true
 
   try {
-    const refreshToken = getRefreshToken()
-
-    const tryHeaderRefresh = async () => {
-      if (!refreshToken) return null
-      // Use dedicated refreshApi to handle baseURL and credentials consistently.
-      return refreshApi.post("/auth/refresh", {}, {
-        headers: { Authorization: `Bearer ${refreshToken}` }
-      })
-    }
-
     const tryCookieRefresh = async () => {
       return refreshApi.post("/auth/refresh", {})
     }
 
-    let refreshRes: any = null
-    try {
-      refreshRes = (await tryHeaderRefresh()) || (await tryCookieRefresh())
-    } catch (e: any) {
-      // If header-based refresh fails (wrong token type), fall back to cookie refresh.
-      if (refreshToken && e?.response?.status === 401) {
-        refreshRes = await tryCookieRefresh()
-      } else {
-        throw e
-      }
-    }
+    let refreshRes: any = await tryCookieRefresh()
 
     const nextTokens = extractTokensFromResponsePayload(refreshRes?.data)
     if (nextTokens) setStoredTokens(nextTokens)
@@ -159,10 +138,8 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
   } catch (refreshErr: any) {
     processQueue(refreshErr)
     // Only force logout when refresh token/session is truly invalid (401).
-    // CRITICAL: Only redirect if we HAD a refresh token. If we didn't, it means 
-    // the user was anonymous, and we should just let the error bubble up.
-    const refreshToken = getRefreshToken()
-    if (refreshToken && refreshErr?.response?.status === 401) {
+    // CRITICAL: We only redirect if it's a 401, which means the HttpOnly cookie is missing or invalid.
+    if (refreshErr?.response?.status === 401) {
       clearStoredTokens()
       if (typeof window !== "undefined") {
         window.location.href = "/signin"
