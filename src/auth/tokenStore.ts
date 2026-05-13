@@ -64,6 +64,7 @@ export function extractTokensFromResponsePayload(payload: any): StoredTokens | n
         tokenContainer?.accessToken ??
         tokenContainer?.token ??
         tokenContainer?.access ??
+        tokenContainer?.jwt ??
         null;
 
     const refresh =

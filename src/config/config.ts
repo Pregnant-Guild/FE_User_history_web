@@ -55,14 +55,15 @@ api.interceptors.request.use((config: any) => {
 function isAuthTokenExpiredMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase()
   if (!normalized) return false
+  // Be specific: don't match general "unauthorized" or "access denied" which could be 403.
+  // Match only messages clearly indicating token expiration or invalidity.
   return (
     normalized.includes("invalid or expired jwt") ||
     normalized.includes("jwt expired") ||
     normalized.includes("token expired") ||
     normalized.includes("invalid token") ||
     normalized.includes("expired token") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("access denied") ||
+    normalized.includes("token is invalid") ||
     normalized.includes("not authenticated")
   )
 }
@@ -158,7 +159,10 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
   } catch (refreshErr: any) {
     processQueue(refreshErr)
     // Only force logout when refresh token/session is truly invalid (401).
-    if (refreshErr?.response?.status === 401) {
+    // CRITICAL: Only redirect if we HAD a refresh token. If we didn't, it means 
+    // the user was anonymous, and we should just let the error bubble up.
+    const refreshToken = getRefreshToken()
+    if (refreshToken && refreshErr?.response?.status === 401) {
       clearStoredTokens()
       if (typeof window !== "undefined") {
         window.location.href = "/signin"
