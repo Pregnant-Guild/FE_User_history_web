@@ -97,9 +97,12 @@ export default function Page() {
     const localCreatedEntityIdsRef = useRef<Set<string>>(new Set());
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
 
+    const [replayFeatureId, setReplayFeatureId] = useState<string | number | null>(null);
+    const [hideOutside, setHideOutside] = useState(false);
+
     const {
         mode,
-        setMode,
+        setMode: internalSetMode,
         initialData,
         setInitialData,
         isSaving,
@@ -409,6 +412,52 @@ export default function Page() {
         restoreCommit,
     } = sectionCommands;
 
+    const setMode = useCallback((m: EditorMode, featureId?: string | number) => {
+        if (m === "replay" && featureId) {
+            setReplayFeatureId(featureId);
+        } else if (m !== "replay") {
+            setReplayFeatureId(null);
+            setHideOutside(false);
+        }
+        internalSetMode(m);
+    }, [internalSetMode]);
+
+    const onSetMode = setMode;
+
+    const effectiveGeometryVisibility = useMemo(() => {
+        const visibility: Record<string, boolean> = { ...geometryVisibility };
+
+        if (mode === "replay" && replayFeatureId) {
+            // Ẩn chính geo được chọn làm replay
+            visibility[String(replayFeatureId)] = false;
+
+            if (hideOutside) {
+                // Tìm feature đang replay để lấy danh sách binding
+                const replayFeature = editor.draft.features.find(
+                    (f) => String(f.properties.id) === String(replayFeatureId)
+                );
+                const boundIds = new Set<string>();
+                if (replayFeature?.properties?.binding) {
+                    replayFeature.properties.binding.forEach((id: string) => boundIds.add(String(id)));
+                }
+
+                // Ẩn tất cả các geo không nằm trong binding
+                editor.draft.features.forEach((f) => {
+                    const fid = String(f.properties.id);
+                    if (fid !== String(replayFeatureId) && !boundIds.has(fid)) {
+                        visibility[fid] = false;
+                    }
+                });
+            }
+        }
+
+        return visibility;
+    }, [geometryVisibility, mode, replayFeatureId, hideOutside, editor.draft.features]);
+
+    const onToggleHideOutside = useCallback(() => {
+        setHideOutside((prev) => !prev);
+    }, []);
+
     const openProject = useCallback(async () => {
         if (!projectId) return;
         try {
@@ -693,7 +742,7 @@ export default function Page() {
 
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
-        const stillExistIds = selectedFeatureIds.filter(id => 
+        const stillExistIds = selectedFeatureIds.filter(id =>
             timelineVisibleDraft.features.some(feature => String(feature.properties.id) === String(id))
         );
         if (stillExistIds.length !== selectedFeatureIds.length) {
@@ -964,7 +1013,7 @@ export default function Page() {
                 bindingPatches,
                 nextChecked ? "Bind geometry vào GEO" : "Unbind geometry khỏi GEO"
             );
-            
+
             // Assume selectedFeature (the first one) reflects the representative binding in UI
             const firstFeaturePrevBindings = normalizeFeatureBindingIds(selectedFeatures[0]);
             const firstFeatureHas = firstFeaturePrevBindings.includes(id);
@@ -1223,36 +1272,40 @@ export default function Page() {
 
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
-            <Editor
-                mode={mode}
-                setMode={setMode}
-                entityStatus={entityStatus}
-                onUndo={editor.undo}
-                onCommit={commitSection}
-                onSubmit={submitCurrentSection}
-                onRestoreCommit={restoreCommit}
-                isSaving={isSaving}
-                isSubmitting={isSubmitting}
-                sectionTitle={activeSection?.title || "Đang tải project"}
-                projectStatus={projectState?.status || "editing"}
-                commitTitle={commitTitle}
-                onCommitTitleChange={setCommitTitle}
-                commitCount={sectionCommits.length}
-                hasHeadCommit={Boolean(projectState?.head_commit_id)}
-                headCommitId={projectState?.head_commit_id || null}
-                latestCommitLabel={headCommit ? `Head: ${formatCommitTitle(headCommit)}` : null}
-                commits={sectionCommits}
-                changesCount={pendingSaveCount}
-                undoStack={editor.undoStack}
-                width={leftPanelWidth}
-            />
+            {mode !== "replay" && (
+                <>
+                    <Editor
+                        mode={mode}
+                        setMode={setMode}
+                        entityStatus={entityStatus}
+                        onUndo={editor.undo}
+                        onCommit={commitSection}
+                        onSubmit={submitCurrentSection}
+                        onRestoreCommit={restoreCommit}
+                        isSaving={isSaving}
+                        isSubmitting={isSubmitting}
+                        sectionTitle={activeSection?.title || "Đang tải project"}
+                        projectStatus={projectState?.status || "editing"}
+                        commitTitle={commitTitle}
+                        onCommitTitleChange={setCommitTitle}
+                        commitCount={sectionCommits.length}
+                        hasHeadCommit={Boolean(projectState?.head_commit_id)}
+                        headCommitId={projectState?.head_commit_id || null}
+                        latestCommitLabel={headCommit ? `Head: ${formatCommitTitle(headCommit)}` : null}
+                        commits={sectionCommits}
+                        changesCount={pendingSaveCount}
+                        undoStack={editor.undoStack}
+                        width={leftPanelWidth}
+                    />
 
-            <ResizeHandle
-                title="Resize left panel"
-                onDrag={(deltaX) => {
-                    setLeftPanelWidth((prev) => clampNumber(prev + deltaX, 220, 520));
-                }}
-            />
+                    <ResizeHandle
+                        title="Resize left panel"
+                        onDrag={(deltaX) => {
+                            setLeftPanelWidth((prev) => clampNumber(prev + deltaX, 220, 520));
+                        }}
+                    />
+                </>
+            )}
 
             {blockedPendingSubmissionId ? (
                 <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220", color: "white", padding: "24px" }}>
@@ -1301,6 +1354,7 @@ export default function Page() {
                     {isBackgroundVisibilityReady ? (
                         <Map
                             mode={mode}
+                            onSetMode={setMode}
                             draft={timelineVisibleDraft}
                             labelContextDraft={editor.draft}
                             selectedFeatureIds={selectedFeatureIds}
@@ -1309,326 +1363,334 @@ export default function Page() {
                             onDeleteFeature={editor.deleteFeature}
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
-                            geometryVisibility={geometryVisibility}
+                            geometryVisibility={effectiveGeometryVisibility}
                             respectBindingFilter={geometryBindingFilterEnabled}
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
                             focusPadding={96}
+                            hideOutside={hideOutside}
+                            onToggleHideOutside={onToggleHideOutside}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
                     )}
-                    <TimelineBar
-                        year={timelineDraftYear}
-                        onYearChange={handleTimelineYearChange}
-                        isLoading={false}
-                        disabled={false}
-                        statusText={null}
-                        filterEnabled={timelineFilterEnabled}
-                        onFilterEnabledChange={setTimelineFilterEnabled}
-                    />
+                    {mode !== "replay" && (
+                        <TimelineBar
+                            year={timelineDraftYear}
+                            onYearChange={handleTimelineYearChange}
+                            isLoading={false}
+                            disabled={false}
+                            statusText={null}
+                            filterEnabled={timelineFilterEnabled}
+                            onFilterEnabledChange={setTimelineFilterEnabled}
+                        />
+                    )}
                 </div>
             ) : blockedPendingSubmissionId ? null : (
                 // Wiki-only mode: avoid mounting Map/Timeline (WebGL + geometry fetching) to reduce lag.
                 <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220" }} />
             )}
 
-            <ResizeHandle
-                title="Resize right panel"
-                onDrag={(deltaX) => {
-                    // dragging handle (between map and right panel): moving right increases right panel width
-                    setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
-                }}
-            />
+            {mode !== "replay" && (
+                <>
+                    <ResizeHandle
+                        title="Resize right panel"
+                        onDrag={(deltaX) => {
+                            // dragging handle (between map and right panel): moving right increases right panel width
+                            setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
+                        }}
+                    />
 
-            <BackgroundLayersPanel
-                visibility={backgroundVisibility}
-                onToggleLayer={handleToggleBackgroundLayer}
-                onShowAll={handleShowAllBackgroundLayers}
-                onHideAll={handleHideAllBackgroundLayers}
-                geometryVisibility={geometryVisibility}
-                onToggleGeometryType={(typeKey) => {
-                    setGeometryVisibility((prev) => ({ ...prev, [typeKey]: prev[typeKey] === false }));
-                }}
-                width={rightPanelWidth}
-                topContent={
-                    <div style={{ display: "grid", gap: "12px" }}>
-                        <UnifiedSearchBar
-                            kind={searchKind}
-                            onKindChange={(next) => {
-                                setSearchKind(next);
-                                setSearchQuery("");
-                                setSearchQueryDraft("");
-                            }}
-                            query={searchQuery}
-                            onQueryChange={setSearchQuery}
-                            onLocalQueryChange={setSearchQueryDraft}
-                        />
+                    <BackgroundLayersPanel
+                        visibility={backgroundVisibility}
+                        onToggleLayer={handleToggleBackgroundLayer}
+                        onShowAll={handleShowAllBackgroundLayers}
+                        onHideAll={handleHideAllBackgroundLayers}
+                        geometryVisibility={geometryVisibility}
+                        onToggleGeometryType={(typeKey) => {
+                            setGeometryVisibility((prev) => ({ ...prev, [typeKey]: prev[typeKey] === false }));
+                        }}
+                        width={rightPanelWidth}
+                        topContent={
+                            <div style={{ display: "grid", gap: "12px" }}>
+                                <UnifiedSearchBar
+                                    kind={searchKind}
+                                    onKindChange={(next) => {
+                                        setSearchKind(next);
+                                        setSearchQuery("");
+                                        setSearchQueryDraft("");
+                                    }}
+                                    query={searchQuery}
+                                    onQueryChange={setSearchQuery}
+                                    onLocalQueryChange={setSearchQueryDraft}
+                                />
 
-                        {searchKind === "entity" && searchQueryDraft.trim().length > 0 ? (
-                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Entity Results</div>
-                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                        {isEntitySearchLoading ? "Searching…" : `${entitySearchResults.length} results`}
-                                    </div>
-                                </div>
-                                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                                    {entitySearchResults.slice(0, 8).map((e) => (
-                                        <div
-                                            key={e.id}
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                padding: 8,
-                                                borderRadius: 6,
-                                                border: "1px solid #1f2937",
-                                                background: "transparent",
-                                            }}
-                                        >
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                    {e.name}
-                                                </div>
-                                                <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                    {e.id}
-                                                </div>
+                                {searchKind === "entity" && searchQueryDraft.trim().length > 0 ? (
+                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Entity Results</div>
+                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                {isEntitySearchLoading ? "Searching…" : `${entitySearchResults.length} results`}
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAddEntityRefToProject(e)}
-                                                style={{
-                                                    border: "none",
-                                                    background: "#111827",
-                                                    color: "#93c5fd",
-                                                    cursor: "pointer",
-                                                    borderRadius: 6,
-                                                    padding: "6px 8px",
-                                                    fontSize: 12,
-                                                    fontWeight: 700,
-                                                }}
-                                                title="Add entity ref to project snapshot"
-                                            >
-                                                Add
-                                            </button>
                                         </div>
-                                    ))}
-                                    {!isEntitySearchLoading && entitySearchResults.length === 0 ? (
-                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {searchKind === "wiki" && searchQueryDraft.trim().length > 0 ? (
-                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Wiki Results</div>
-                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                        {isWikiSearching ? "Searching…" : `${wikiSearchResults.length} results`}
-                                    </div>
-                                </div>
-                                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                                    {wikiSearchResults.slice(0, 8).map((w) => (
-                                        <div
-                                            key={w.id}
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                padding: 8,
-                                                borderRadius: 6,
-                                                border: "1px solid #1f2937",
-                                                background: "transparent",
-                                            }}
-                                        >
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                    {(w.title || "").trim() || "Untitled wiki"}
-                                                </div>
-                                                <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                    {w.id}
-                                                </div>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAddWikiRefToProject(w)}
-                                                style={{
-                                                    border: "none",
-                                                    background: "#111827",
-                                                    color: "#93c5fd",
-                                                    cursor: "pointer",
-                                                    borderRadius: 6,
-                                                    padding: "6px 8px",
-                                                    fontSize: 12,
-                                                    fontWeight: 700,
-                                                }}
-                                                title="Add wiki ref to project snapshot"
-                                            >
-                                                Add
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {!isWikiSearching && wikiSearchResults.length === 0 ? (
-                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {searchKind === "geo" && searchQueryDraft.trim().length > 0 ? (
-                            <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Geo Results</div>
-                                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                        {isGeoSearching ? "Searching…" : `${geoSearchResults.length} entities`}
-                                    </div>
-                                </div>
-                                <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
-                                    {geoSearchResults.slice(0, 6).map((item) => (
-                                        <div
-                                            key={item.entity_id}
-                                            style={{
-                                                padding: 8,
-                                                borderRadius: 6,
-                                                border: "1px solid #1f2937",
-                                                background: "transparent",
-                                                display: "grid",
-                                                gap: 6,
-                                            }}
-                                        >
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <div style={{ color: "#e5e7eb", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                        {item.name?.trim() || item.entity_id}
-                                                    </div>
-                                                    <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                        {item.entity_id}
-                                                    </div>
-                                                </div>
-                                                <div style={{ fontSize: 12, color: "#94a3b8", flex: "0 0 auto" }}>
-                                                    {Array.isArray(item.geometries) ? item.geometries.length : 0} geos
-                                                </div>
-                                            </div>
-                                            {item.description?.trim() ? (
-                                                <div style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 1.35 }}>
-                                                    {item.description.trim()}
-                                                </div>
-                                            ) : null}
-                                            {Array.isArray(item.geometries) && item.geometries.length ? (
-                                                <div style={{ display: "grid", gap: 6, maxHeight: 200, overflowY: "auto", paddingRight: 4 }}>
-                                                    {item.geometries.map((geo) => (
-                                                        <div
-                                                            key={geo.id}
-                                                            style={{
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "space-between",
-                                                                gap: 8,
-                                                                padding: 8,
-                                                                borderRadius: 6,
-                                                                border: "1px solid #243244",
-                                                                background: "#0f172a",
-                                                            }}
-                                                        >
-                                                            <div style={{ minWidth: 0 }}>
-                                                                <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                                    #{geo.id}
-                                                                </div>
-                                                                <div style={{ color: "#94a3b8", fontSize: 11 }}>
-                                                                    type: {geo.type || "unknown"}{" "}
-                                                                    {geo.time_start != null || geo.time_end != null
-                                                                        ? `| time: ${geo.time_start ?? "?"} → ${geo.time_end ?? "?"}`
-                                                                        : ""}
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleImportGeoFromSearch(item, geo)}
-                                                                style={{
-                                                                    border: "none",
-                                                                    background: "#111827",
-                                                                    color: "#93c5fd",
-                                                                    cursor: "pointer",
-                                                                    borderRadius: 6,
-                                                                    padding: "6px 8px",
-                                                                    fontSize: 12,
-                                                                    fontWeight: 700,
-                                                                    flex: "0 0 auto",
-                                                                }}
-                                                                title="Import geometry into current editor draft"
-                                                            >
-                                                                Import
-                                                            </button>
+                                        <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                                            {entitySearchResults.slice(0, 8).map((e) => (
+                                                <div
+                                                    key={e.id}
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        padding: 8,
+                                                        borderRadius: 6,
+                                                        border: "1px solid #1f2937",
+                                                        background: "transparent",
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {e.name}
                                                         </div>
-                                                    ))}
+                                                        <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {e.id}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAddEntityRefToProject(e)}
+                                                        style={{
+                                                            border: "none",
+                                                            background: "#111827",
+                                                            color: "#93c5fd",
+                                                            cursor: "pointer",
+                                                            borderRadius: 6,
+                                                            padding: "6px 8px",
+                                                            fontSize: 12,
+                                                            fontWeight: 700,
+                                                        }}
+                                                        title="Add entity ref to project snapshot"
+                                                    >
+                                                        Add
+                                                    </button>
                                                 </div>
-                                            ) : (
-                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                    No geometry linked.
-                                                </div>
-                                            )}
+                                            ))}
+                                            {!isEntitySearchLoading && entitySearchResults.length === 0 ? (
+                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                            ) : null}
                                         </div>
-                                    ))}
-                                    {!isGeoSearching && geoSearchResults.length === 0 ? (
-                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                    ) : null}
-                                </div>
+                                    </div>
+                                ) : null}
+
+                                {searchKind === "wiki" && searchQueryDraft.trim().length > 0 ? (
+                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Wiki Results</div>
+                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                {isWikiSearching ? "Searching…" : `${wikiSearchResults.length} results`}
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                                            {wikiSearchResults.slice(0, 8).map((w) => (
+                                                <div
+                                                    key={w.id}
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        padding: 8,
+                                                        borderRadius: 6,
+                                                        border: "1px solid #1f2937",
+                                                        background: "transparent",
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {(w.title || "").trim() || "Untitled wiki"}
+                                                        </div>
+                                                        <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                            {w.id}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAddWikiRefToProject(w)}
+                                                        style={{
+                                                            border: "none",
+                                                            background: "#111827",
+                                                            color: "#93c5fd",
+                                                            cursor: "pointer",
+                                                            borderRadius: 6,
+                                                            padding: "6px 8px",
+                                                            fontSize: 12,
+                                                            fontWeight: 700,
+                                                        }}
+                                                        title="Add wiki ref to project snapshot"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {!isWikiSearching && wikiSearchResults.length === 0 ? (
+                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {searchKind === "geo" && searchQueryDraft.trim().length > 0 ? (
+                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Geo Results</div>
+                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                {isGeoSearching ? "Searching…" : `${geoSearchResults.length} entities`}
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
+                                            {geoSearchResults.slice(0, 6).map((item) => (
+                                                <div
+                                                    key={item.entity_id}
+                                                    style={{
+                                                        padding: 8,
+                                                        borderRadius: 6,
+                                                        border: "1px solid #1f2937",
+                                                        background: "transparent",
+                                                        display: "grid",
+                                                        gap: 6,
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ color: "#e5e7eb", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                {item.name?.trim() || item.entity_id}
+                                                            </div>
+                                                            <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                {item.entity_id}
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: "#94a3b8", flex: "0 0 auto" }}>
+                                                            {Array.isArray(item.geometries) ? item.geometries.length : 0} geos
+                                                        </div>
+                                                    </div>
+                                                    {item.description?.trim() ? (
+                                                        <div style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 1.35 }}>
+                                                            {item.description.trim()}
+                                                        </div>
+                                                    ) : null}
+                                                    {Array.isArray(item.geometries) && item.geometries.length ? (
+                                                        <div style={{ display: "grid", gap: 6, maxHeight: 200, overflowY: "auto", paddingRight: 4 }}>
+                                                            {item.geometries.map((geo) => (
+                                                                <div
+                                                                    key={geo.id}
+                                                                    style={{
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        justifyContent: "space-between",
+                                                                        gap: 8,
+                                                                        padding: 8,
+                                                                        borderRadius: 6,
+                                                                        border: "1px solid #243244",
+                                                                        background: "#0f172a",
+                                                                    }}
+                                                                >
+                                                                    <div style={{ minWidth: 0 }}>
+                                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                                            #{geo.id}
+                                                                        </div>
+                                                                        <div style={{ color: "#94a3b8", fontSize: 11 }}>
+                                                                            type: {geo.type || "unknown"}{" "}
+                                                                            {geo.time_start != null || geo.time_end != null
+                                                                                ? `| time: ${geo.time_start ?? "?"} → ${geo.time_end ?? "?"}`
+                                                                                : ""}
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleImportGeoFromSearch(item, geo)}
+                                                                        style={{
+                                                                            border: "none",
+                                                                            background: "#111827",
+                                                                            color: "#93c5fd",
+                                                                            cursor: "pointer",
+                                                                            borderRadius: 6,
+                                                                            padding: "6px 8px",
+                                                                            fontSize: 12,
+                                                                            fontWeight: 700,
+                                                                            flex: "0 0 auto",
+                                                                        }}
+                                                                        title="Import geometry into current editor draft"
+                                                                    >
+                                                                        Import
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                                            No geometry linked.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {!isGeoSearching && geoSearchResults.length === 0 ? (
+                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : null}
+                                <GeometryBindingPanel
+                                    geometries={geometryChoices}
+                                    selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
+                                    selectedGeometryBindingIds={selectedGeometryBindingIds}
+                                    onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
+                                    onFocusGeometry={handleFocusGeometryFromBindingPanel}
+                                    statusText={geoBindingStatus}
+                                    bindingFilterEnabled={geometryBindingFilterEnabled}
+                                    onBindingFilterEnabledChange={setGeometryBindingFilterEnabled}
+                                />
+
+                                <ProjectEntityRefsPanel
+                                    entityRefs={snapshotEntitiesVisible}
+                                    entityForm={entityForm}
+                                    onEntityFormChange={handleEntityFormChange}
+                                    isEntitySubmitting={isEntitySubmitting}
+                                    onCreateEntityOnly={handleCreateEntityOnly}
+                                    onUpdateEntity={handleUpdateEntityInProject}
+                                    entityFormStatus={entityFormStatus}
+                                    hasSelectedGeometry={Boolean(selectedFeature)}
+                                    selectedGeometryEntityIds={selectedGeometryEntityIds}
+                                    onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
+                                />
+
+                                <WikiSidebarPanel
+                                    projectId={projectId}
+                                    wikis={snapshotWikis}
+                                    setWikis={setSnapshotWikisUndoable}
+                                    autoOpen={autoOpenWiki}
+                                    requestedActiveId={requestedActiveWikiId}
+                                />
+
+                                <EntityWikiBindingsPanel
+                                    entities={projectEntityChoices}
+                                    wikis={snapshotWikis}
+                                    links={snapshotEntityWikiLinks}
+                                    setLinks={setSnapshotEntityWikiLinksUndoable}
+                                />
+                                {!wikiOnly && selectedFeature ? (
+                                    <SelectedGeometryPanel
+                                        selectedFeatures={selectedFeatures}
+                                        entityTypeOptions={GEOMETRY_TYPE_OPTIONS}
+                                        geometryMetaForm={geometryMetaForm}
+                                        onGeometryMetaFormChange={handleGeometryMetaFormChange}
+                                        isEntitySubmitting={isEntitySubmitting}
+                                        onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
+                                        changeCount={editor.changeCount}
+                                    />
+                                ) : null}
                             </div>
-                        ) : null}
-                        <GeometryBindingPanel
-                            geometries={geometryChoices}
-                            selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
-                            selectedGeometryBindingIds={selectedGeometryBindingIds}
-                            onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
-                            onFocusGeometry={handleFocusGeometryFromBindingPanel}
-                            statusText={geoBindingStatus}
-                            bindingFilterEnabled={geometryBindingFilterEnabled}
-                            onBindingFilterEnabledChange={setGeometryBindingFilterEnabled}
-                        />
-
-                        <ProjectEntityRefsPanel
-                            entityRefs={snapshotEntitiesVisible}
-                            entityForm={entityForm}
-                            onEntityFormChange={handleEntityFormChange}
-                            isEntitySubmitting={isEntitySubmitting}
-                            onCreateEntityOnly={handleCreateEntityOnly}
-                            onUpdateEntity={handleUpdateEntityInProject}
-                            entityFormStatus={entityFormStatus}
-                            hasSelectedGeometry={Boolean(selectedFeature)}
-                            selectedGeometryEntityIds={selectedGeometryEntityIds}
-                            onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
-                        />
-
-                        <WikiSidebarPanel
-                            projectId={projectId}
-                            wikis={snapshotWikis}
-                            setWikis={setSnapshotWikisUndoable}
-                            autoOpen={autoOpenWiki}
-                            requestedActiveId={requestedActiveWikiId}
-                        />
-
-                        <EntityWikiBindingsPanel
-                            entities={projectEntityChoices}
-                            wikis={snapshotWikis}
-                            links={snapshotEntityWikiLinks}
-                            setLinks={setSnapshotEntityWikiLinksUndoable}
-                        />
-                        {!wikiOnly && selectedFeature ? (
-                            <SelectedGeometryPanel
-                                selectedFeatures={selectedFeatures}
-                                entityTypeOptions={GEOMETRY_TYPE_OPTIONS}
-                                geometryMetaForm={geometryMetaForm}
-                                onGeometryMetaFormChange={handleGeometryMetaFormChange}
-                                isEntitySubmitting={isEntitySubmitting}
-                                onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
-                                changeCount={editor.changeCount}
-                            />
-                        ) : null}
-                    </div>
-                }
-            />
+                        }
+                    />
+                </>
+            )}
         </div>
     );
 }

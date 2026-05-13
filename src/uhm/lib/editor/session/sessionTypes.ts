@@ -7,7 +7,8 @@ export type EditorMode =
     | "add-point"
     | "add-line"
     | "add-path"
-    | "add-circle";
+    | "add-circle"
+    | "replay";
 
 export type TimelineRange = {
     min: number;

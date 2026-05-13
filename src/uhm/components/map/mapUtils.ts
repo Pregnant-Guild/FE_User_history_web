@@ -156,8 +156,13 @@ export function filterDraftByGeometryVisibility(
     return {
         ...fc,
         features: fc.features.filter((feature) => {
+            const id = String(feature.properties.id);
+            // Kiểm tra ẩn theo ID cụ thể (ưu tiên cao nhất)
+            if (visibility[id] === false) return false;
+
             const key = getFeatureSemanticType(feature);
             if (!key) return true;
+            // Kiểm tra ẩn theo loại (semantic type)
             return visibility[key] !== false;
         }),
     };

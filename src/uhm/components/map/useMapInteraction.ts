@@ -26,6 +26,7 @@ type UseMapInteractionProps = {
     allowGeometryEditing: boolean;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
+    onSetModeRef: React.MutableRefObject<((mode: EditorMode) => void) | undefined>;
     onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
     onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
@@ -40,6 +41,7 @@ export function useMapInteraction({
     allowGeometryEditing,
     selectedFeatureIds,
     onSelectFeatureIdsRef,
+    onSetModeRef,
     onCreateRef,
     onDeleteRef,
     onUpdateRef,
@@ -142,7 +144,8 @@ export function useMapInteraction({
                     editingEngineRef.current?.beginEditing((originalFeature || feature) as any);
                 }
                 : undefined,
-            (ids) => onSelectFeatureIdsRef.current?.(ids)
+            (ids) => onSelectFeatureIdsRef.current?.(ids),
+            (id: string | number) => onSetModeRef.current?.("replay", id)
         );
 
         const cleanupPoint = initPoint(
@@ -236,6 +239,7 @@ export function useMapInteraction({
         engineBindingsRef.current = {
             draw: drawingEngine,
             select: selectEngine,
+            replay: selectEngine,
             "add-line": lineEngine,
             "add-path": pathEngine,
             "add-circle": circleEngine,

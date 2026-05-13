@@ -7,7 +7,8 @@ export function initSelect(
     getMode: ModeGetter,
     onDelete?: (id: string | number) => void,
     onEdit?: (feature: maplibregl.MapGeoJSONFeature) => void,
-    onSelectIds?: (ids: (string | number)[]) => void
+    onSelectIds?: (ids: (string | number)[]) => void,
+    onReplayEdit?: (id: string | number) => void
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -16,7 +17,7 @@ export function initSelect(
         "path-arrow-shapes",
     ] as const;
     const selectedIds = new Set<number | string>();
-    const hasContextActions = Boolean(onDelete || onEdit);
+    const hasContextActions = Boolean(onDelete || onEdit || onReplayEdit);
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
 
@@ -54,7 +55,7 @@ export function initSelect(
 
     // Chọn feature theo click trái, hỗ trợ additive bằng Alt.
     function onClick(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select") return;
+        if (getMode() !== "select" && getMode() !== "replay") return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) return;
 
@@ -74,11 +75,12 @@ export function initSelect(
     // Hiển thị menu ngữ cảnh (sửa/xóa) khi click chuột phải.
     // Mở menu thao tác khi click phải lên feature.
     function onRightClick(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select") return;
+        if (getMode() !== "select" && getMode() !== "replay") return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) return;
 
         e.preventDefault(); // block browser menu
+        if (getMode() === "replay") return;
 
         const features = map.queryRenderedFeatures(e.point, {
             layers: selectableLayers,
@@ -105,7 +107,7 @@ export function initSelect(
 
     // Đổi cursor pointer khi hover lên đối tượng có thể chọn.
     function onMove(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select") return;
+        if (getMode() !== "select" && getMode() !== "replay") return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) {
             map.getCanvas().style.cursor = "";
@@ -216,6 +218,17 @@ export function initSelect(
             const single = clickedFeature;
             menu.appendChild(createItem("Chỉnh sửa", () => onEdit(single)));
             hasMenuItems = true;
+        }
+
+        if (
+            selectedCount === 1 &&
+            onReplayEdit
+        ) {
+            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+            if (featureId) {
+                menu.appendChild(createItem("Replay Edit", () => onReplayEdit(featureId)));
+                hasMenuItems = true;
+            }
         }
 
         if (onDelete) {

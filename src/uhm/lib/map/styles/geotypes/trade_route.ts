@@ -1,5 +1,5 @@
 import { LayerSpecification } from "maplibre-gl";
-import { buildLineGeotypeLayers } from "./styleBuilders";
+import { buildLineGeotypeLayers } from "../shared/styleBuilders";
 
 export function getTradeRouteLayers(sourceId: string, pathArrowSourceId?: string, pointSourceId?: string): LayerSpecification[] {
     void pointSourceId;

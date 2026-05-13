@@ -36,5 +36,12 @@ export function ModeHint({ mode }: { mode: EditorMode }) {
             </div>
         )
     }
+    if (mode === "replay") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Đang trong chế độ trình diễn diễn biến kịch bản.
+            </div>
+        )
+    }
     return null;
 }

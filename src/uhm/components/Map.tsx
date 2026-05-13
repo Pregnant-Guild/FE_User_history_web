@@ -26,6 +26,7 @@ type MapProps = {
     geometryVisibility?: Record<string, boolean>;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIds: (ids: (string | number)[]) => void;
+    onSetMode?: (mode: EditorMode, featureId?: string | number) => void;
     labelContextDraft?: FeatureCollection;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
     onDeleteFeature?: (id: string | number) => void;
@@ -40,10 +41,13 @@ type MapProps = {
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
+    hideOutside?: boolean;
+    onToggleHideOutside?: () => void;
 };
 
 export default function Map({
     mode,
+    onSetMode,
     draft,
     backgroundVisibility,
     geometryVisibility,
@@ -63,10 +67,13 @@ export default function Map({
     focusFeatureCollection = null,
     focusRequestKey = null,
     focusPadding,
+    hideOutside = false,
+    onToggleHideOutside,
 }: MapProps) {
     const modeRef = useRef<MapProps["mode"]>(mode);
     const draftRef = useRef<FeatureCollection>(draft);
     const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
+    const onSetModeRef = useRef(onSetMode);
     const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
     const onDeleteRef = useRef<MapProps["onDeleteFeature"]>(onDeleteFeature);
@@ -75,6 +82,7 @@ export default function Map({
     useEffect(() => { modeRef.current = mode; }, [mode]);
     useEffect(() => { draftRef.current = draft; }, [draft]);
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
+    useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
     useEffect(() => { onHoverFeatureChangeRef.current = onHoverFeatureChange; }, [onHoverFeatureChange]);
     useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
     useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
@@ -106,6 +114,7 @@ export default function Map({
         allowGeometryEditing,
         selectedFeatureIds,
         onSelectFeatureIdsRef,
+        onSetModeRef,
         onCreateRef,
         onDeleteRef,
         onUpdateRef,
@@ -149,6 +158,14 @@ export default function Map({
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMapLoaded]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (map && isMapLoaded) {
+            // Trigger resize after a short delay to allow layout to settle
+            setTimeout(() => map.resize(), 100);
+        }
+    }, [mode, isMapLoaded]);
 
     return (
         <div style={{ width: "100%", height, position: "relative" }}>
@@ -198,7 +215,7 @@ export default function Map({
             >
                 <div
                     style={{
-                        maxWidth: "520px",
+                        maxWidth: "650px",
                         margin: "0 auto",
                         display: "flex",
                         alignItems: "center",
@@ -212,6 +229,72 @@ export default function Map({
                         pointerEvents: "auto",
                     }}
                 >
+                    {mode === "replay" && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => onSetMode?.("select")}
+                                style={{
+                                    ...zoomButtonStyle,
+                                    width: "auto",
+                                    padding: "0 12px",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    background: "#7f1d1d",
+                                    color: "white",
+                                    border: "1px solid #991b1b",
+                                    borderRadius: "999px",
+                                    cursor: "pointer",
+                                    marginRight: "4px",
+                                }}
+                            >
+                                Thoát Replay Edit
+                            </button>
+
+                            <div
+                                onClick={onToggleHideOutside}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    cursor: "pointer",
+                                    marginRight: "8px",
+                                    userSelect: "none",
+                                }}
+                            >
+                                <span style={{ fontSize: "12px", fontWeight: 700, color: hideOutside ? "#fb7185" : "#94a3b8" }}>
+                                    Hide Outside
+                                </span>
+                                <div
+                                    style={{
+                                        width: "32px",
+                                        height: "18px",
+                                        borderRadius: "10px",
+                                        background: hideOutside ? "#e11d48" : "#334155",
+                                        position: "relative",
+                                        transition: "background 0.2s",
+                                        border: "1px solid rgba(255,255,255,0.1)",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            top: "2px",
+                                            left: hideOutside ? "16px" : "2px",
+                                            width: "12px",
+                                            height: "12px",
+                                            borderRadius: "50%",
+                                            background: "white",
+                                            transition: "left 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                            boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ width: "1px", height: "20px", background: "rgba(148, 163, 184, 0.3)", marginRight: "4px" }} />
+                        </>
+                    )}
+
                     <label
                         title={
                             isGlobeProjection

@@ -1,5 +1,5 @@
 import { LayerSpecification } from "maplibre-gl";
-import { buildPolygonGeotypeLayers } from "./styleBuilders";
+import { buildPolygonGeotypeLayers } from "../shared/styleBuilders";
 
 export function getStateLayers(sourceId: string, pathArrowSourceId?: string, pointSourceId?: string): LayerSpecification[] {
     void pathArrowSourceId;

@@ -15,6 +15,54 @@ export type CommitSnapshot = {
   geometry_entity: GeometryEntitySnapshot[];
   wikis: WikiSnapshot[];
   entity_wiki: EntityWikiLinkSnapshot[];
+  replays?: BattleReplay[];
+};
+
+// ---- Replay / Scripting System ----
+
+export type UIFunctionName =
+  | "hide_timeline"
+  | "hide_layer_panel"
+  | "hide_wiki_panel"
+  | "hide_zoom_panel"
+  | "hide_all_UI"
+  | "open_wiki";
+
+export type MapFunctionName =
+  | "zoom_to_lnglat"
+  | "zoom_scale"
+  | "zoom_geometries"
+  | "change_geometry_color"
+  | "change_geometries_color"
+  | "change_geometry_texture"
+  | "change_geometries_texture"
+  | "hide_geometries";
+
+export type NarrativeFunctionName = "set_title" | "set_descriptions";
+
+export type ReplayAction<T> = {
+  function_name: T;
+  params: any[];
+};
+
+export type ReplayStep = {
+  duration: number; // Trọng số thời gian của step trong 1 stage
+  use_UI_function: ReplayAction<UIFunctionName>[];
+  use_map_function: ReplayAction<MapFunctionName>[];
+  use_narrow_function: ReplayAction<NarrativeFunctionName>[];
+};
+
+export type ReplayStage = {
+  id: number; // số đếm thứ tự từ 0
+  title?: string;
+  detail_time_start: string;
+  detail_time_stop: string;
+  steps: ReplayStep[];
+};
+
+export type BattleReplay = {
+  geometry_id: string; // geometry mà khi nhấn vào là có thể replay
+  detail: ReplayStage[];
 };
 
 // ---- GeoJSON / FeatureCollection ----
