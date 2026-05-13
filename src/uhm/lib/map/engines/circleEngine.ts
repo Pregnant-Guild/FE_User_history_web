@@ -1,8 +1,8 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
+import { buildCircleRing, distanceMeters } from "@/uhm/lib/map/geo/geoMath";
 
-const EARTH_RADIUS_METERS = 6371008.8;
 const CIRCLE_SEGMENTS = 72;
 const MIN_RADIUS_METERS = 1;
 const EMPTY_PREVIEW: GeoJSON.FeatureCollection = {
@@ -123,6 +123,8 @@ export function initCircle(
         onComplete({
             type: "Polygon",
             coordinates: [ring],
+            circle_center: center,
+            circle_radius: radiusMeters,
         });
         resetDrawingState();
     };
@@ -162,86 +164,4 @@ export function initCircle(
         cleanup,
         cancel: resetDrawingState,
     };
-}
-
-// Tạo vòng polygon xấp xỉ hình tròn từ tâm, bán kính và số phân đoạn.
-function buildCircleRing(
-    center: [number, number],
-    radiusMeters: number,
-    segments: number
-): [number, number][] {
-    const ring: [number, number][] = [];
-    for (let i = 0; i <= segments; i += 1) {
-        const bearingDeg = (i / segments) * 360; // Chia đều 360 do quanh tâm để tạo các điểm trên vòng tròn.
-        ring.push(destinationPoint(center, radiusMeters, bearingDeg));
-    }
-    return ring;
-}
-
-// Tính khoảng cách hai điểm theo công thức Haversine (đơn vị mét).
-function distanceMeters(a: [number, number], b: [number, number]): number {
-    const lat1 = toRad(a[1]);
-    const lat2 = toRad(b[1]);
-    const dLat = lat2 - lat1; // Delta vĩ độ (radian).
-    const dLng = toRad(b[0] - a[0]); // Delta kinh độ (radian).
-
-    const sinLat = Math.sin(dLat / 2); // Thành phần sin(dLat/2) của công thức Haversine.
-    const sinLng = Math.sin(dLng / 2); // Thành phần sin(dLng/2) của công thức Haversine.
-    const h =
-        sinLat * sinLat +
-        Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng; // h = haversine(d/R), độ lớn cung tròn chuẩn hóa.
-    const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)); // Góc tâm (radian) giữa hai điểm trên mặt cầu.
-    return EARTH_RADIUS_METERS * c; // Khoảng cách cung tròn: d = R * c.
-}
-
-// Tính tọa độ điểm đích từ tâm, khoảng cách và góc phương vị.
-function destinationPoint(
-    center: [number, number],
-    distance: number,
-    bearingDeg: number
-): [number, number] {
-    const lat1 = toRad(center[1]);
-    const lng1 = toRad(center[0]);
-    const bearing = toRad(bearingDeg);
-    const angularDistance = distance / EARTH_RADIUS_METERS; // d/R: khoảng cách góc trên mặt cầu.
-
-    const sinLat1 = Math.sin(lat1);
-    const cosLat1 = Math.cos(lat1);
-    const sinAngular = Math.sin(angularDistance);
-    const cosAngular = Math.cos(angularDistance);
-
-    const sinLat2 =
-        sinLat1 * cosAngular +
-        cosLat1 * sinAngular * Math.cos(bearing); // Công thức vĩ độ điểm đích theo great-circle.
-    const lat2 = Math.asin(clamp(sinLat2, -1, 1)); // Kẹp [-1,1] để tránh sai số số học trước khi asin.
-
-    const y = Math.sin(bearing) * sinAngular * cosLat1; // Tử số atan2 cho biến thiên kinh độ.
-    const x = cosAngular - sinLat1 * Math.sin(lat2); // Mẫu số atan2 cho biến thiên kinh độ.
-    const lng2 = lng1 + Math.atan2(y, x); // Kinh độ đích = kinh độ gốc + delta kinh độ.
-
-    return [normalizeLng(toDeg(lng2)), toDeg(lat2)];
-}
-
-// Chuẩn hóa kinh độ về miền [-180, 180].
-function normalizeLng(lng: number): number {
-    let normalized = ((lng + 540) % 360) - 180; // Wrap về khoảng [-180, 180).
-    if (normalized === -180) normalized = 180;
-    return normalized;
-}
-
-// Kẹp giá trị trong đoạn [min, max].
-function clamp(value: number, min: number, max: number): number {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-}
-
-// Đổi đơn vị góc từ độ sang radian.
-function toRad(value: number): number {
-    return (value * Math.PI) / 180; // Đổi độ sang radian.
-}
-
-// Đổi đơn vị góc từ radian sang độ.
-function toDeg(value: number): number {
-    return (value * 180) / Math.PI; // Đổi radian sang độ.
 }

@@ -1,10 +1,14 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import { buildCircleRing, destinationPoint, distanceMeters } from "@/uhm/lib/map/geo/geoMath";
 
 export type EditingHandle = {
     id: string | number;
     ring: [number, number][];
     original: Geometry;
+    isCircle?: boolean;
+    circleCenter?: [number, number];
+    circleRadius?: number;
 };
 
 export type EditingAPI = {
@@ -40,26 +44,62 @@ export function createEditingEngine(options: {
         const map = mapRef.current;
         if (!editing || !map) return;
 
-        const closedRing = [...editing.ring, editing.ring[0]];
-        const shape: GeoJSON.FeatureCollection<GeoJSON.Polygon> = {
-            type: "FeatureCollection",
-            features: [
-                {
-                    type: "Feature",
-                    geometry: { type: "Polygon", coordinates: [closedRing] },
-                    properties: {},
-                },
-            ],
-        };
+        let shape: GeoJSON.FeatureCollection<GeoJSON.Polygon>;
+        let handles: GeoJSON.FeatureCollection<GeoJSON.Point>;
 
-        const handles: GeoJSON.FeatureCollection<GeoJSON.Point> = {
-            type: "FeatureCollection",
-            features: editing.ring.map((c, idx) => ({
-                type: "Feature",
-                geometry: { type: "Point", coordinates: c },
-                properties: { idx },
-            })),
-        };
+        if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
+            const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
+            const closedRing = [...ring, ring[0]];
+            shape = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        geometry: { type: "Polygon", coordinates: [closedRing] },
+                        properties: {},
+                    },
+                ],
+            };
+
+            // Circle handles: 0 = center, 1 = radius control
+            const radiusHandlePoint = destinationPoint(editing.circleCenter, editing.circleRadius, 90);
+            handles = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: editing.circleCenter },
+                        properties: { idx: 0, type: "center" },
+                    },
+                    {
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: radiusHandlePoint },
+                        properties: { idx: 1, type: "radius" },
+                    },
+                ],
+            };
+        } else {
+            const closedRing = [...editing.ring, editing.ring[0]];
+            shape = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        geometry: { type: "Polygon", coordinates: [closedRing] },
+                        properties: {},
+                    },
+                ],
+            };
+
+            handles = {
+                type: "FeatureCollection",
+                features: editing.ring.map((c, idx) => ({
+                    type: "Feature",
+                    geometry: { type: "Point", coordinates: c },
+                    properties: { idx },
+                })),
+            };
+        }
 
         (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(shape);
         (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(handles);
@@ -69,10 +109,23 @@ export function createEditingEngine(options: {
     const finishEditing = () => {
         const editing = editingRef.current;
         if (!editing) return;
-        const geometry: Geometry = {
-            type: "Polygon",
-            coordinates: [[...editing.ring, editing.ring[0]]],
-        };
+
+        let geometry: Geometry;
+        if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
+            const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
+            geometry = {
+                type: "Polygon",
+                coordinates: [[...ring, ring[0]]],
+                circle_center: editing.circleCenter,
+                circle_radius: editing.circleRadius,
+            };
+        } else {
+            geometry = {
+                type: "Polygon",
+                coordinates: [[...editing.ring, editing.ring[0]]],
+            };
+        }
+
         onUpdate(editing.id, geometry);
         clearEditing();
     };
@@ -85,15 +138,21 @@ export function createEditingEngine(options: {
     // Bắt đầu chỉnh sửa từ feature polygon được chọn.
     const beginEditing = (feature: maplibregl.MapGeoJSONFeature) => {
         if (feature.geometry.type !== "Polygon") return;
-        const coords = (feature.geometry.coordinates?.[0] ?? []) as [number, number][];
+        const geom = feature.geometry as Geometry;
+        const coords = (geom.coordinates?.[0] ?? []) as [number, number][];
         if (coords.length < 4) return;
+
+        const isCircle = !!geom.circle_center;
 
         // remove duplicated closing point
         const ring = coords.slice(0, -1).map((c) => [c[0], c[1]] as [number, number]);
         editingRef.current = {
             id: feature.id ?? feature.properties?.id,
             ring,
-            original: feature.geometry as Geometry,
+            original: geom,
+            isCircle,
+            circleCenter: geom.circle_center,
+            circleRadius: geom.circle_radius,
         };
         updateEditSources();
     };
@@ -129,7 +188,20 @@ export function createEditingEngine(options: {
             const editing = editingRef.current;
             if (!drag || !editing) return;
 
-            editing.ring[drag.idx] = [e.lngLat.lng, e.lngLat.lat];
+            if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
+                if (drag.idx === 0) {
+                    // Move center
+                    editing.circleCenter = [e.lngLat.lng, e.lngLat.lat];
+                } else if (drag.idx === 1) {
+                    // Change radius
+                    editing.circleRadius = distanceMeters(editing.circleCenter, [
+                        e.lngLat.lng,
+                        e.lngLat.lat,
+                    ]);
+                }
+            } else {
+                editing.ring[drag.idx] = [e.lngLat.lng, e.lngLat.lat];
+            }
             updateEditSources();
         };
 
@@ -166,7 +238,7 @@ export function createEditingEngine(options: {
 
         // Chèn thêm một đỉnh mới vào ring tại vị trí gần điểm click nhất.
         const onInsertHandle = (e: maplibregl.MapLayerMouseEvent) => {
-            if (!editingRef.current) return;
+            if (!editingRef.current || editingRef.current.isCircle) return;
             if (!isModifierPressed(e)) return;
             e.preventDefault();
             const editing = editingRef.current;

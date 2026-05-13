@@ -1,12 +1,17 @@
 import type { GeometryPreset } from "@/uhm/lib/map/geo/geometryTypeOptions";
 
 export type Geometry =
-    | { type: "Point"; coordinates: [number, number] }
-    | { type: "MultiPoint"; coordinates: [number, number][] }
-    | { type: "LineString"; coordinates: [number, number][] }
-    | { type: "MultiLineString"; coordinates: [number, number][][] }
-    | { type: "Polygon"; coordinates: [number, number][][] }
-    | { type: "MultiPolygon"; coordinates: [number, number][][][] };
+    | ({ type: "Point"; coordinates: [number, number] } & CircleGeometryMetadata)
+    | ({ type: "MultiPoint"; coordinates: [number, number][] } & CircleGeometryMetadata)
+    | ({ type: "LineString"; coordinates: [number, number][] } & CircleGeometryMetadata)
+    | ({ type: "MultiLineString"; coordinates: [number, number][][] } & CircleGeometryMetadata)
+    | ({ type: "Polygon"; coordinates: [number, number][][] } & CircleGeometryMetadata)
+    | ({ type: "MultiPolygon"; coordinates: [number, number][][][] } & CircleGeometryMetadata);
+
+export type CircleGeometryMetadata = {
+    circle_center?: [number, number];
+    circle_radius?: number;
+};
 
 export type FeatureId = string | number;
 
