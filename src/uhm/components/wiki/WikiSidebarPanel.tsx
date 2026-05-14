@@ -109,6 +109,16 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         const mod = await import("react-quill-new") as QuillModule;
         const Quill = mod?.Quill;
         if (!Quill) return;
+
+        try {
+          const BlotFormatterModule = await import("quill-blot-formatter");
+          const BlotFormatter = BlotFormatterModule.default;
+          // Only register if not already registered to avoid errors in dev/HMR
+          Quill.register("modules/blotFormatter", BlotFormatter, true);
+        } catch (err) {
+          console.error("Failed to load quill-blot-formatter", err);
+        }
+
         const Link = Quill.import?.("formats/link");
         if (!Link) return;
 
@@ -537,6 +547,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           },
         },
       },
+      blotFormatter: {},
     };
   }, []);
 
