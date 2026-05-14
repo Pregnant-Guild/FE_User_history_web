@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Map from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/editor/BackgroundLayersPanel";
@@ -70,11 +70,8 @@ const DEFAULT_EDITOR_USER_ID = "local-editor";
 export default function Page() {
     const params = useParams();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const projectId = String(params.id || "");
     const openedProjectIdRef = useRef<string | null>(null);
-    const autoOpenWiki = searchParams.get("only") === "wiki";
-    const wikiOnly = autoOpenWiki;
     const [blockedPendingSubmissionId, setBlockedPendingSubmissionId] = useState<string | null>(null);
     const [searchKind, setSearchKind] = useState<UnifiedSearchKind>("entity");
     const [searchQuery, setSearchQuery] = useState("");
@@ -422,8 +419,6 @@ export default function Page() {
         }
         internalSetMode(m);
     }, [internalSetMode]);
-
-    const onSetMode = setMode;
 
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
@@ -1360,7 +1355,7 @@ export default function Page() {
                 </div>
             ) : null}
 
-            {!wikiOnly && !blockedPendingSubmissionId ? (
+            {!blockedPendingSubmissionId ? (
                 <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
                     {isBackgroundVisibilityReady ? (
                         <Map
@@ -1397,10 +1392,7 @@ export default function Page() {
                         />
                     )}
                 </div>
-            ) : blockedPendingSubmissionId ? null : (
-                // Wiki-only mode: avoid mounting Map/Timeline (WebGL + geometry fetching) to reduce lag.
-                <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220" }} />
-            )}
+            ) : null}
 
             {mode !== "replay" ? (
                 <>
@@ -1676,7 +1668,6 @@ export default function Page() {
                                     projectId={projectId}
                                     wikis={snapshotWikis}
                                     setWikis={setSnapshotWikisUndoable}
-                                    autoOpen={autoOpenWiki}
                                     requestedActiveId={requestedActiveWikiId}
                                 />
 
@@ -1686,7 +1677,7 @@ export default function Page() {
                                     links={snapshotEntityWikiLinks}
                                     setLinks={setSnapshotEntityWikiLinksUndoable}
                                 />
-                                {!wikiOnly && selectedFeature ? (
+                                {selectedFeature ? (
                                     <SelectedGeometryPanel
                                         selectedFeatures={selectedFeatures}
                                         entityTypeOptions={GEOMETRY_TYPE_OPTIONS}

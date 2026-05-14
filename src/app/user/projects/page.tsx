@@ -380,21 +380,6 @@ export default function ProjectsPage() {
                             </span>
                           </div>
 
-                          <div className="relative group/btn3 inline-flex">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="!p-0 w-9 h-9 flex items-center justify-center"
-                              onClick={() => router.push(`/editor/${project.id}?only=wiki`)}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                              </svg>
-                            </Button>
-                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn3:scale-100 group-hover/btn3:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
-                              Wiki Editor
-                            </span>
-                          </div>
                         </div>
                       </div>
                     ))}

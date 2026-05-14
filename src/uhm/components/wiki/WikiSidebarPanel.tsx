@@ -48,7 +48,6 @@ type Props = {
   projectId: string;
   wikis: WikiSnapshot[];
   setWikis: React.Dispatch<React.SetStateAction<WikiSnapshot[]>>;
-  autoOpen?: boolean;
   requestedActiveId?: string | null;
 };
 
@@ -57,7 +56,7 @@ function clampTitle(title: string) {
   return t.length ? t.slice(0, 120) : "Untitled wiki";
 }
 
-export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen, requestedActiveId }: Props) {
+export default function WikiSidebarPanel({ projectId, wikis, setWikis, requestedActiveId }: Props) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -92,12 +91,6 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
   const [globalWikiSearchError, setGlobalWikiSearchError] = useState<string | null>(null);
   const globalWikiSearchRequestRef = useRef(0);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!autoOpen) return;
-    // open once on mount
-    setOpen(true);
-  }, [autoOpen]);
 
   // Allow Quill to keep wiki links where href is a slug (no scheme).
   useEffect(() => {

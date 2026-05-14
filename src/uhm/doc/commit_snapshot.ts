@@ -1,3 +1,14 @@
+/**
+ * Tài liệu schema tham chiếu cho snapshot commit.
+ *
+ * Lưu ý:
+ * - Đây không phải "single source of truth" của runtime hiện tại; logic normalize/build thật nằm ở
+ *   `src/uhm/lib/editor/snapshot/editorSnapshot.ts`.
+ * - Các phần như `replays` và nhóm `UIFunctionName` / `MapFunctionName` mô tả schema dự phòng hoặc tương lai.
+ *   Editor route `/editor/[id]` hiện có mode `replay`, nhưng chưa thực thi hệ thống scripted replay đầy đủ theo file này.
+ * - Các field denormalized dùng cho UI như `entity_ids`, `entity_name`, `binding`, `time_start`, `time_end`
+ *   có thể xuất hiện trong editor runtime, nhưng frontend sẽ strip hoặc tái sinh chúng khi build snapshot API.
+ */
 
 // ---- Root request ----
 
