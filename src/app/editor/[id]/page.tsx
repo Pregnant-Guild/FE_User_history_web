@@ -1272,7 +1272,7 @@ export default function Page() {
 
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
-            {mode !== "replay" && (
+            {mode !== "replay" ? (
                 <>
                     <Editor
                         mode={mode}
@@ -1298,6 +1298,16 @@ export default function Page() {
                         width={leftPanelWidth}
                     />
 
+                    <ResizeHandle
+                        title="Resize left panel"
+                        onDrag={(deltaX) => {
+                            setLeftPanelWidth((prev) => clampNumber(prev + deltaX, 220, 520));
+                        }}
+                    />
+                </>
+            ) : (
+                <>
+                    <div style={{ width: leftPanelWidth, height: "100vh", background: "#0b1220", borderRight: "1px solid #1f2937", flex: "0 0 auto" }} />
                     <ResizeHandle
                         title="Resize left panel"
                         onDrag={(deltaX) => {
@@ -1391,7 +1401,7 @@ export default function Page() {
                 <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220" }} />
             )}
 
-            {mode !== "replay" && (
+            {mode !== "replay" ? (
                 <>
                     <ResizeHandle
                         title="Resize right panel"
@@ -1689,6 +1699,16 @@ export default function Page() {
                             </div>
                         }
                     />
+                </>
+            ) : (
+                <>
+                    <ResizeHandle
+                        title="Resize right panel"
+                        onDrag={(deltaX) => {
+                            setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
+                        }}
+                    />
+                    <div style={{ width: rightPanelWidth, height: "100vh", background: "#111827", borderLeft: "1px solid #1f2937", flex: "0 0 auto" }} />
                 </>
             )}
         </div>
