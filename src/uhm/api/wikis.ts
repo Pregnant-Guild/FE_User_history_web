@@ -4,19 +4,20 @@ import { ApiError, requestJson } from "@/uhm/api/http";
 
 export type Wiki = {
   id: string;
-  project_id?: string;
+  project_id: string;
   title?: string;
   slug?: string | null;
   content?: string;
   is_deleted?: boolean;
   created_at?: string;
   updated_at?: string;
-  content_sample?:{
-    created_at?: string;
-    content?: string;
-    id?: string;
+  content_sample?: {
+    id: string;
+    title: string;
+    created_at: string;
   }[];
 };
+
 
 export async function searchWikisByTitle(title: string, options?: { limit?: number; cursor?: string; entityId?: string }): Promise<Wiki[]> {
   const keyword = title.trim();

@@ -497,9 +497,11 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
           createdAt: sample?.created_at || 'Unknown date',
           title: `Phiên bản lúc ${formatDate(sample?.created_at)}`
         };
-        if (sample?.isCurrent) {
-          return { ...versionInfo, content: sample.content || '' };
+        if (sample && "content" in sample && (sample as any).isCurrent) {
+          return { ...versionInfo, content: (sample as any).content || "" };
         }
+
+
         const contentResp = await getContentByVersionWikiId(versionId);
         return { ...versionInfo, content: contentResp?.data?.content || "" };
       });

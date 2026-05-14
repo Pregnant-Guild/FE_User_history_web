@@ -10,6 +10,8 @@ import { Profile, UserMetaCardProps } from "@/interface/user";
 import { apiUpdateUser } from "@/service/userService";
 import { toast } from "sonner";
 import Link from "next/link";
+import { AxiosError } from "axios";
+
 
 export default function UserInfoCard({ data }: { data: UserMetaCardProps }) {
   const router = useRouter();
@@ -62,8 +64,9 @@ export default function UserInfoCard({ data }: { data: UserMetaCardProps }) {
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-    } catch (error: any) {
-      const serverResponse = error.response?.data;
+    } catch (error) {
+      const axiosError = error as AxiosError<{ status: boolean; message: string }>;
+      const serverResponse = axiosError.response?.data;
 
       if (serverResponse && serverResponse.status === false) {
         const msg = serverResponse.message || "";
@@ -77,8 +80,9 @@ export default function UserInfoCard({ data }: { data: UserMetaCardProps }) {
         toast.error("Không thể kết nối đến máy chủ hoặc lỗi hệ thống.");
       }
 
-      console.error("Lỗi chi tiết:", error);
+      console.error("Lỗi chi tiết:", axiosError);
     }
+
   };
 
   return (

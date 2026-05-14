@@ -7,9 +7,10 @@ import "react-quill-new/dist/quill.snow.css";
 const ReactQuillEditor = dynamic(
   async () => {
     const { default: RQ } = await import("react-quill-new");
-    return ({ forwardedRef, ...props }: any) => (
+    return ({ forwardedRef, ...props }: { forwardedRef: React.Ref<any>; [key: string]: any }) => (
       <RQ ref={forwardedRef} {...props} />
     );
+
   },
   {
     ssr: false,

@@ -4,8 +4,14 @@ export type ApiEnvelope<T> = {
     status: boolean | "success" | "error" | string;
     data?: T;
     message?: string;
-    errors?: unknown;
-    pagination?: unknown;
+    errors?: string | Record<string, string[]> | null;
+    pagination?: {
+        current_page: number;
+        page_size: number;
+        total_records: number;
+        total_pages: number;
+    } | null;
+
 };
 
 export type GeometriesBBoxQuery = {

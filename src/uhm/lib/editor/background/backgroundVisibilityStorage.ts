@@ -41,7 +41,9 @@ export function persistBackgroundLayerVisibility(visibility: BackgroundLayerVisi
 function normalizeBackgroundLayerVisibility(raw: unknown): BackgroundLayerVisibility | null {
     if (!raw || typeof raw !== "object") return null;
 
-    const source = raw as Record<string, unknown>;
+    const source = raw as Partial<Record<string, boolean>>;
+
+
     const next: BackgroundLayerVisibility = {
         ...DEFAULT_BACKGROUND_LAYER_VISIBILITY,
     };

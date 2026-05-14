@@ -9,7 +9,17 @@ export const apiGetListUser = async (payload: getUserDto) => {
   return response?.data;
 };
 
-export const apiChangeRole = async (id: string, payload: any) => {
+export interface ChangeRolePayload {
+  role_ids: string[];
+  user_id: string;
+}
+
+export interface UpdateApplicationStatusPayload {
+  status: "APPROVED" | "REJECTED";
+  review_note: string;
+}
+
+export const apiChangeRole = async (id: string, payload: ChangeRolePayload) => {
   const response = await api.patch(API.Admin.CHANGE_ROLE(id), payload);
   return response?.data;
 };
@@ -32,10 +42,11 @@ export const apiGetUserMedia = async (id: string) => {
   return response?.data;
 };
 
-export const apiUpdateApplicationStatus = async (id: string, payload: any) => {
+export const apiUpdateApplicationStatus = async (id: string, payload: UpdateApplicationStatusPayload) => {
   const response = await api.put(API.Admin.UPDATE_APPLICATION_STATUS(id), payload);
   return response?.data;
 };
+
 
 export const apiGetUserById = async (userId: string) => {
   const response = await api.get(API.Admin.GET_USER_BY_ID(userId)); 

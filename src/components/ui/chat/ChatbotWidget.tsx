@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChatbotPayload } from "@/interface/chatbot";
 import { apiChatbot } from "@/service/chatbotService";
+import { AxiosError } from "axios";
+
 
 type Message = {
   id: string;
@@ -67,16 +69,18 @@ export default function ChatbotWidget({
       };
 
       setMessages((prev) => [...prev, botMessage]);
-    } catch (error: any) {
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         sender: "bot",
         text:
-          error?.response?.data?.message ||
+          axiosError.response?.data?.message ||
           "Có lỗi xảy ra khi kết nối. Vui lòng thử lại sau.",
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+
       setIsLoading(false);
     }
   };

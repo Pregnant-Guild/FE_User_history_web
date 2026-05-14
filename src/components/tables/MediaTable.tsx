@@ -23,7 +23,8 @@ export interface MediaItem {
   original_name: string;
   mime_type: string;
   size: number;
-  file_metadata: any;
+  file_metadata: Record<string, unknown> | null;
+
   created_at: string;
   updated_at: string;
 }

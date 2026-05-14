@@ -15,10 +15,13 @@ import { IsolatedContent } from "@/components/ui/IsolatedContent";
 import { apiDeleteHistorianCV } from "@/service/historianService";
 import { statusConfig } from "@/service/handler";
 
+import { Application } from "@/interface/historian";
+import { MediaItem } from "@/components/tables/MediaTable";
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  application: any;
+  application: Application | null;
   onRefresh: () => void;
 }
 
@@ -42,7 +45,7 @@ export default function ApplicationDetailModal({
     }
   }, [isOpen, application]);
 
-  const isImageFile = (file: any) => {
+  const isImageFile = (file: MediaItem) => {
     const isImageMime = file.mime_type?.startsWith("image/");
     const isImageExt = /\.(jpg|jpeg|png|webp|gif)$/i.test(file.storage_key);
     return isImageMime || isImageExt;
@@ -51,17 +54,17 @@ export default function ApplicationDetailModal({
   const mediaList = application?.media || [];
   const imageMediaOnly = mediaList.filter(isImageFile);
 
-  const imageSlides = imageMediaOnly.map((item: any) => ({
+  const imageSlides = imageMediaOnly.map((item: MediaItem) => ({
     src: `${URL_MEDIA}${item.storage_key}`,
     title: item.original_name,
     description: `Dung lượng: ${(item.size / 1024).toFixed(2)} KB`,
   }));
 
-  const handleMediaClick = (item: any) => {
+  const handleMediaClick = (item: MediaItem) => {
     const fileUrl = `${URL_MEDIA}${item.storage_key}`;
     if (isImageFile(item)) {
       const photoIndex = imageMediaOnly.findIndex(
-        (img: any) => img.id === item.id,
+        (img: MediaItem) => img.id === item.id,
       );
       setIndex(photoIndex);
     } else {
@@ -93,7 +96,9 @@ export default function ApplicationDetailModal({
   };
 
   const handleDeleteApplication = async () => {
+    if (!application) return;
     await apiDeleteHistorianCV(application.id);
+
     Swal.fire("Thành công!", "Hồ sơ đã được xóa.", "success");
     onRefresh();
     onClose();
@@ -186,7 +191,7 @@ export default function ApplicationDetailModal({
               </h4>
               {mediaList.length > 0 ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                  {mediaList.map((media: any, idx: number) => {
+                  {mediaList.map((media: MediaItem, idx: number) => {
                     const isImg = isImageFile(media);
                     return (
                       <div

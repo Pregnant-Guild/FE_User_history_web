@@ -11,6 +11,8 @@ import { URL_MEDIA } from "../../../api";
 
 import { deleteMedia } from "@/service/mediaService";
 import { INITIAL_LIMIT } from "../../../constant";
+import { MediaItem } from "../tables/MediaTable";
+
 
 export default function MediaLibrary({
   data,
@@ -32,7 +34,7 @@ export default function MediaLibrary({
     setLocalMedia(data?.data || []);
   }, [data]);
 
-  const isImageFile = (file: any) => {
+  const isImageFile = (file: MediaItem) => {
     const isImageMime = file.mime_type?.startsWith("image/");
     const isImageExt = /\.(jpg|jpeg|png|webp|gif)$/i.test(file.storage_key);
     return isImageMime || isImageExt;
@@ -77,7 +79,7 @@ export default function MediaLibrary({
     }
   };
 
-  const handleItemClick = (item: any, idx: number, isImage: boolean) => {
+  const handleItemClick = (item: MediaItem, idx: number, isImage: boolean) => {
     if (isSelectionMode) {
       toggleItemSelection(item.id);
     } else {
@@ -166,7 +168,7 @@ export default function MediaLibrary({
     }
   };
 
-  const renderItemCard = (item: any, isImage: boolean, idx: number) => {
+  const renderItemCard = (item: MediaItem, isImage: boolean, idx: number) => {
     const isSelected = selectedIds.includes(item.id);
 
     return (
@@ -253,6 +255,7 @@ export default function MediaLibrary({
       </div>
     );
   };
+
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6  dark:border-zinc-800 dark:bg-zinc-900/50">

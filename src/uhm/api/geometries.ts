@@ -9,8 +9,9 @@ export type { GeometriesBBoxQuery } from "@/uhm/types/api";
 export type EntityGeometrySearchGeo = {
     id: string;
     type: string | null;
-    draw_geometry: unknown;
-    binding?: unknown;
+    draw_geometry: Geometry;
+    binding?: string[];
+
     time_start?: number | null;
     time_end?: number | null;
 };
@@ -106,8 +107,9 @@ export async function searchGeometriesByEntityName(
 type GeometryRow = {
     id: string;
     geo_type: number;
-    draw_geometry: unknown;
-    binding?: unknown;
+    draw_geometry: Geometry;
+    binding?: string[];
+
     time_start?: number;
     time_end?: number;
     bbox?: {

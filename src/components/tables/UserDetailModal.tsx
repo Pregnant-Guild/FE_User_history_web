@@ -2,6 +2,8 @@
 import { Modal } from "../ui/modal";
 import UserMetaCard from "@/components/user-profile/UserMetaCard";
 import UserInfoCard from "@/components/user-profile/UserInfoCard";
+import { UserMetaCardProps } from "@/interface/user";
+
 import { fullDataUser } from "@/interface/admin";
 import { useEffect, useState } from "react";
 import { MediaDto } from "@/interface/media";
@@ -28,7 +30,17 @@ export default function UserDetailModal({
   const [mediaData, setMediaData] = useState<MediaDto | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const formattedData = { data: user };
+  const formattedData: UserMetaCardProps = {
+    data: user
+      ? {
+          id: user.id,
+          email: user.email,
+          profile: user.profile,
+          roles: user.roles as any, // UserRole and Role are slightly different, need a better fix or small cast
+        }
+      : undefined,
+  };
+
 
   useEffect(() => {
     if (user?.id && isOpen) {
@@ -68,8 +80,9 @@ export default function UserDetailModal({
         </div>
 
         <div className="space-y-6 custom-scrollbar max-h-[65vh] overflow-y-auto pr-2">
-          <UserMetaCard data={formattedData as any} />
-          <UserInfoCard data={formattedData as any} />
+          <UserMetaCard data={formattedData} />
+          <UserInfoCard data={formattedData} />
+
 
           <div className="min-h-[150px] relative">
             {loading ? (

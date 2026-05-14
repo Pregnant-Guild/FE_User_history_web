@@ -1,15 +1,29 @@
 import api from "@/config/config";
 import { API } from "../../api";
 
-export const createHistorianCV = async (payload: any) => {
+export interface CreateHistorianCVPayload {
+  content: string;
+  media_ids: (string | number)[];
+  verify_type: string;
+}
+
+export interface GetUserApplicationsPayload {
+  page?: number;
+  limit?: number;
+  status?: string;
+  user_id?: string;
+}
+
+export const createHistorianCV = async (payload: CreateHistorianCVPayload) => {
   const response = await api.post(API.Historian.CREATE_CV, payload);
   return response?.data;
 };
 
-export const apiGetUserApplications = async (payload :any) => {
+export const apiGetUserApplications = async (payload : GetUserApplicationsPayload) => {
   const response = await api.get(API.Historian.APPLICATION, { params: payload });
   return response?.data;
 };
+
 
 export const apiDeleteHistorianCV = async (id: number | string) => {
   const response = await api.delete(API.Historian.DELETE_CV(id));

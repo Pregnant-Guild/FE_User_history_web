@@ -121,7 +121,16 @@ export const deleteMediaById = async (mediaId: string) => {
   return response?.data;
 }
 
-export const getMedia = async (payload: any) => {
+export interface GetMediaPayload {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  user_id?: string;
+}
+
+export const getMedia = async (payload: GetMediaPayload) => {
   const response = await api.get(API.Media.GET_MEDIA, {
     params: payload,
   });

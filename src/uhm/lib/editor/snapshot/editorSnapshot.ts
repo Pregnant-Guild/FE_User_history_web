@@ -3,7 +3,8 @@ import { normalizeGeoTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geo
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
-import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
+import type { Feature, FeatureCollection, Geometry, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
+
 import type { EditorSnapshot, Project } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
@@ -13,6 +14,56 @@ type UnknownRecord = Record<string, unknown>;
 function isRecord(value: unknown): value is UnknownRecord {
     return !!value && typeof value === "object" && !Array.isArray(value);
 }
+
+interface RawEntityRow extends UnknownRecord {
+    id?: string | number;
+    operation?: string;
+    source?: string;
+    ref?: { id?: string };
+    name?: string;
+    description?: string;
+    status?: number;
+}
+
+interface RawGeometryRow extends UnknownRecord {
+    id?: string | number;
+    operation?: string;
+    source?: string;
+    ref?: { id?: string };
+    type?: string | number;
+    geo_type?: string | number;
+    draw_geometry?: Geometry;
+    geometry?: Geometry;
+    binding?: string[];
+    time_start?: number;
+    time_end?: number;
+}
+
+interface RawWikiRow extends UnknownRecord {
+    id?: string;
+    operation?: string;
+    source?: string;
+    ref?: { id?: string };
+    title?: string;
+    slug?: string;
+    doc?: string;
+    updated_at?: string | number;
+}
+
+interface RawGeometryEntityRow extends UnknownRecord {
+    geometry_id?: string | number;
+    entity_id?: string | number;
+    operation?: string;
+    base_links_hash?: string;
+}
+
+interface RawEntityWikiRow extends UnknownRecord {
+    entity_id?: string;
+    wiki_id?: string;
+    operation?: string;
+    is_deleted?: boolean | number;
+}
+
 
 function sanitizeEntitySnapshotOperation(op: unknown): EntitySnapshotOperation {
     if (typeof op !== "string") return "reference";
@@ -132,10 +183,11 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         ? geometryEntityRaw
             .filter(isRecord)
             .map((r) => {
-                const geometry_id = getStringId(r.geometry_id);
-                const entity_id = typeof r.entity_id === "string" ? r.entity_id : "";
+                const row = r as RawGeometryEntityRow;
+                const geometry_id = getStringId(row.geometry_id);
+                const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
                 return {
-                    ...(r as unknown as Omit<GeometryEntitySnapshot, "geometry_id" | "entity_id">),
+                    ...(row as unknown as Omit<GeometryEntitySnapshot, "geometry_id" | "entity_id">),
                     geometry_id,
                     entity_id,
                 };
@@ -191,16 +243,17 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         const links = geometryEntity || migratedGeometryEntity || [];
         const byGeom = new Map<string, string[]>();
         for (const row of links) {
-            if ((row as any)?.operation === "delete") continue;
+            if ((row as RawGeometryEntityRow).operation === "delete") continue;
             const list = byGeom.get(row.geometry_id) || [];
             list.push(row.entity_id);
             byGeom.set(row.geometry_id, list);
         }
         const entityNameById = new Map<string, string>();
-        for (const row of entities || []) {
+        for (const r of entities || []) {
+            const row = r as RawEntityRow;
             const id = typeof row?.id === "string" ? row.id : "";
             if (!id) continue;
-            const name = typeof (row as any)?.name === "string" ? String((row as any).name).trim() : "";
+            const name = typeof row.name === "string" ? String(row.name).trim() : "";
             if (name) entityNameById.set(id, name);
         }
         const geometryById = new Map<string, GeometrySnapshot>();
@@ -327,7 +380,7 @@ export function buildEditorSnapshot(options: {
                 ? cloned.name.trim()
                 : id;
         const source: "inline" | "ref" = cloned.source === "inline" ? "inline" : "ref";
-        const opRaw = sanitizeEntitySnapshotOperation((cloned as any).operation);
+        const opRaw = sanitizeEntitySnapshotOperation((cloned as RawEntityRow).operation);
         // Editor state should delete objects by removing them from the list.
         // Keep this defensive guard to avoid emitting delete markers unexpectedly.
         if (opRaw === "delete") continue;
@@ -417,13 +470,14 @@ export function buildEditorSnapshot(options: {
     }
 
     const baselineGeometryEntity = new globalThis.Map<string, string | undefined>();
-    for (const row of options.previousSnapshot?.geometry_entity || []) {
+    for (const r of options.previousSnapshot?.geometry_entity || []) {
+        const row = r as RawGeometryEntityRow;
         if (!row) continue;
-        if ((row as any).operation === "delete") continue;
+        if (row.operation === "delete") continue;
         const geometry_id = typeof row.geometry_id === "string" || typeof row.geometry_id === "number" ? String(row.geometry_id).trim() : "";
         const entity_id = typeof row.entity_id === "string" || typeof row.entity_id === "number" ? String(row.entity_id).trim() : "";
         if (!geometry_id || !entity_id) continue;
-        baselineGeometryEntity.set(`${geometry_id}::${entity_id}`, (row as any).base_links_hash);
+        baselineGeometryEntity.set(`${geometry_id}::${entity_id}`, row.base_links_hash);
     }
 
     const currentGeometryEntityRows: GeometryEntitySnapshot[] = [];
@@ -474,7 +528,7 @@ export function buildEditorSnapshot(options: {
     const previousWikis = new globalThis.Map<string, WikiSnapshot>();
     for (const item of options.previousSnapshot?.wikis || []) {
         if (!item || typeof item !== "object") continue;
-        if ((item as any).operation === "delete") continue;
+        if ((item as RawWikiRow).operation === "delete") continue;
         const id = (item as WikiSnapshot).id;
         if (typeof id === "string" && id.length > 0) previousWikis.set(id, item as WikiSnapshot);
     }
@@ -537,24 +591,26 @@ export function buildEditorSnapshot(options: {
     for (const prev of previousWikis.values()) {
         if (!prev?.id) continue;
         if (currentWikiIds.has(prev.id)) continue;
+        const row = prev as RawWikiRow;
         deletedWikis.push({
             id: prev.id,
             source: prev.source === "inline" ? "inline" : "ref",
             operation: "delete",
             title: typeof prev.title === "string" ? prev.title : "Untitled wiki",
-            slug: (prev as any).slug ?? null,
-            doc: (prev as any).doc ?? null,
-            updated_at: (prev as any).updated_at ?? undefined,
+            slug: row.slug ?? null,
+            doc: row.doc ?? null,
+            updated_at: row.updated_at ?? undefined,
         } as WikiSnapshot);
     }
     const wikis = [...wikisCurrent, ...deletedWikis];
 
     const baselineEntityWiki = new Set<string>();
-    for (const row of options.previousSnapshot?.entity_wiki || []) {
-        if (!row || typeof (row as any).entity_id !== "string" || typeof (row as any).wiki_id !== "string") continue;
-        if ((row as any).operation === "delete") continue;
-        const entity_id = (row as any).entity_id.trim();
-        const wiki_id = (row as any).wiki_id.trim();
+    for (const r of options.previousSnapshot?.entity_wiki || []) {
+        const row = r as RawEntityWikiRow;
+        if (!row || typeof row.entity_id !== "string" || typeof row.wiki_id !== "string") continue;
+        if (row.operation === "delete") continue;
+        const entity_id = row.entity_id.trim();
+        const wiki_id = row.wiki_id.trim();
         if (!entity_id || !wiki_id) continue;
         baselineEntityWiki.add(`${entity_id}::${wiki_id}`);
     }
@@ -591,7 +647,7 @@ export function buildEditorSnapshot(options: {
                 source: e.source,
                 operation: e.operation,
                 name: typeof e.name === "string" ? e.name : undefined,
-                description: typeof (e as any).description === "string" ? (e as any).description : (e as any).description ?? null,
+                description: typeof (e as RawEntityRow).description === "string" ? (e as RawEntityRow).description : (e as RawEntityRow).description ?? null,
             }))
             .sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometries: geometries.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))),
@@ -602,8 +658,8 @@ export function buildEditorSnapshot(options: {
                 source: w.source,
                 operation: w.operation,
                 title: w.title,
-                slug: (w as any).slug ?? null,
-                doc: (w as any).doc ?? null,
+                slug: (w as RawWikiRow).slug ?? null,
+                doc: (w as RawWikiRow).doc ?? null,
             }))
             .sort((a, b) => a.id.localeCompare(b.id)),
         entity_wiki: entityWikis,
@@ -640,7 +696,7 @@ function dedupeAndSortGeometryEntity(rows: GeometryEntitySnapshot[]): GeometryEn
         const geometry_id = typeof row.geometry_id === "string" ? row.geometry_id : "";
         const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
         if (!geometry_id || !entity_id) continue;
-        const opRaw = (row as any).operation;
+        const opRaw = (row as RawGeometryEntityRow).operation;
         const operation: GeometryEntitySnapshot["operation"] =
             opRaw === "delete"
                 ? "delete"

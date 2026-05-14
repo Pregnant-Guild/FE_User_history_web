@@ -20,7 +20,10 @@ const formatFullDateTime = (dateString: string) => {
   return `${time} ${day}`;
 };
 
-const processMedia = (mediaArray: any[]) => {
+import { Application } from "@/interface/historian";
+import { MediaItem } from "../tables/MediaTable";
+
+const processMedia = (mediaArray: MediaItem[]) => {
   if (!mediaArray || mediaArray.length === 0) return { type: "empty" };
   const imageFiles = mediaArray.filter((file) => {
     const isImageMime = file.mime_type?.startsWith("image/");
@@ -49,15 +52,16 @@ const processMedia = (mediaArray: any[]) => {
 export default function ApplicationList({
   applications,
 }: {
-  applications: any[];
+  applications: Application[];
 }) {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const handleViewDetail = (app: any) => {
+  const handleViewDetail = (app: Application) => {
     dispatch(setSelectedApplication(app));
     router.push(`/user/account/applications`);
   };
+
   
   const StatusIcons: Record<string, React.ReactNode> = {
     APPROVED: (
