@@ -329,7 +329,7 @@ export default function ProjectsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center mt-4 md:mt-0 gap-3 w-[340px] justify-end shrink-0">
+                        <div className="flex flex-wrap items-center justify-start md:justify-end mt-4 md:mt-0 gap-3 shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
