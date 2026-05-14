@@ -125,11 +125,11 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
 
     const nextTokens = extractTokensFromResponsePayload(refreshRes?.data)
     if (nextTokens) setStoredTokens(nextTokens)
-    // Some backends may return only a new access token; keep refresh token.
+    // Some backends may return only a new access token.
     else {
       const maybeAccess = (refreshRes?.data?.data?.access_token ?? refreshRes?.data?.access_token) as unknown
       if (typeof maybeAccess === "string" && maybeAccess.trim()) {
-        if (refreshToken) setStoredTokens({ access_token: maybeAccess, refresh_token: refreshToken })
+        setStoredTokens({ access_token: maybeAccess })
       }
     }
 

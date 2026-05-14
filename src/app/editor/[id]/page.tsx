@@ -36,6 +36,7 @@ import {
 } from "@/uhm/lib/map/geo/geometryTypeOptions";
 import {
     EntityFormState,
+    EditorMode,
     GeometryMetaFormState,
     useEditorSessionState,
 } from "@/uhm/lib/editor/state/useEditorSessionState";

@@ -26,7 +26,7 @@ type UseMapInteractionProps = {
     allowGeometryEditing: boolean;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
-    onSetModeRef: React.MutableRefObject<((mode: EditorMode) => void) | undefined>;
+    onSetModeRef: React.MutableRefObject<((mode: EditorMode, featureId?: string | number) => void) | undefined>;
     onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
     onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
