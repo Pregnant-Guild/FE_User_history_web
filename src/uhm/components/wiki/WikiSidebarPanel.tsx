@@ -28,6 +28,7 @@ type QuillLike = {
 type QuillModule = {
   Quill?: {
     import?: (path: string) => unknown;
+    register?: (pathOrModule: unknown, moduleOrOverwrite?: unknown, overwrite?: boolean) => void;
   };
 };
 type QuillLinkFormat = {
@@ -109,6 +110,43 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
         const mod = await import("react-quill-new") as QuillModule;
         const Quill = mod?.Quill;
         if (!Quill) return;
+
+        try {
+          const BlotFormatterModule = await import("quill-blot-formatter");
+          const BlotFormatter = BlotFormatterModule.default;
+          // Only register if not already registered to avoid errors in dev/HMR
+          Quill.register?.("modules/blotFormatter", BlotFormatter, true);
+        } catch (err) {
+          console.error("Failed to load quill-blot-formatter", err);
+        }
+
+        const ImageFormat = Quill.import?.("formats/image") as any;
+        if (ImageFormat) {
+          class CustomImage extends ImageFormat {
+            static formats(domNode: Element) {
+              const formats = ImageFormat.formats(domNode) || {};
+              if (domNode.hasAttribute("style")) formats.style = domNode.getAttribute("style");
+              if (domNode.hasAttribute("width")) formats.width = domNode.getAttribute("width");
+              if (domNode.hasAttribute("height")) formats.height = domNode.getAttribute("height");
+              if (domNode.hasAttribute("class")) formats.class = domNode.getAttribute("class");
+              return formats;
+            }
+
+            format(name: string, value: string) {
+              if (["style", "width", "height", "class"].includes(name)) {
+                if (value) {
+                  this.domNode.setAttribute(name, value);
+                } else {
+                  this.domNode.removeAttribute(name);
+                }
+              } else {
+                super.format(name, value);
+              }
+            }
+          }
+          Quill.register?.(CustomImage, true);
+        }
+
         const Link = Quill.import?.("formats/link");
         if (!Link) return;
 
@@ -537,6 +575,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, autoOpen,
           },
         },
       },
+      blotFormatter: {},
     };
   }, []);
 

@@ -1,3 +1,4 @@
+import api from "@/config/config";
 import { API_ENDPOINTS } from "@/uhm/api/config";
 import { ApiError, requestJson } from "@/uhm/api/http";
 
@@ -10,6 +11,11 @@ export type Wiki = {
   is_deleted?: boolean;
   created_at?: string;
   updated_at?: string;
+  content_sample?:{
+    created_at?: string;
+    content?: string;
+    id?: string;
+  }[];
 };
 
 export async function searchWikisByTitle(title: string, options?: { limit?: number; cursor?: string; entityId?: string }): Promise<Wiki[]> {
@@ -60,3 +66,8 @@ export async function checkWikiSlugExists(slug: string): Promise<boolean> {
   // Be conservative: unknown payload shape, treat as "exists" to prevent creating conflicting slugs.
   return true;
 }
+
+export const getContentByVersionWikiId = async (id: string) => {
+  const response = await api.get(API_ENDPOINTS.wikiContent(id));
+  return response?.data;
+};

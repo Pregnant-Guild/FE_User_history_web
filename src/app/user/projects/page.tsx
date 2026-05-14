@@ -131,6 +131,7 @@ export default function ProjectsPage() {
       setFormData({ title: "", description: "", project_status: "PRIVATE" });
       setImportSnapshot(null);
       setImportSnapshotName(null);
+      if (importJsonInputRef.current) importJsonInputRef.current.value = "";
       fetchProjects();
       router.push(`/editor/${projectId}`);
     } catch (error) {
@@ -199,15 +200,17 @@ export default function ProjectsPage() {
     return 0;
   });
 
-  // Helper format ngày
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return `Updated on ${date.toLocaleDateString("vi-VN", {
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-    })}`;
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -228,16 +231,15 @@ export default function ProjectsPage() {
     return (
       <button
         onClick={() => handleSort(column)}
-        className={`w-20 text-sm font-medium text-left hover:text-blue-500 transition-colors ${
+        className={`flex items-center gap-1 text-sm font-medium hover:text-blue-500 transition-colors ${
           isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"
         }`}
       >
-        {label} {isActive && (sortOrder === "asc" ? "↑" : "↓")}
+        <span>{label}</span>
+        {isActive && <span>{sortOrder === "asc" ? "↑" : "↓"}</span>}
       </button>
     );
   };
-
-  console.log(projects);
 
   const importLabel = useMemo(() => {
     if (!importSnapshotName) return "Chưa chọn JSON snapshot";
@@ -266,135 +268,132 @@ export default function ProjectsPage() {
 
             {!isLoading && sortedProjects.length > 0 ? (
               <div className="max-w-full overflow-x-auto">
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#0d1117] min-w-[700px]">
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-[#161b22]">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 w-40"></span>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <span className="text-sm text-gray-500 dark:text-gray-400 w-20">Sắp xếp:</span>
-                      <SortButton column="title" label="Tên" />
-                      <SortButton column="created_at" label="Ngày tạo" />
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-[#0d1117] min-w-[800px]">
+                  <div className="flex items-center px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-[#161b22]">
+                    <div className="flex-1 pr-4">
+                      <SortButton column="title" label="Tên dự án" />
+                    </div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Trạng thái</div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Thành viên</div>
+                    <div className="w-32 px-4">
                       <SortButton column="updated_at" label="Cập nhật" />
                     </div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 text-right">Thao tác</div>
                   </div>
 
                   <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
                     {sortedProjects.map((project: any) => (
                       <div
                         key={project.id}
-                        className="group flex flex-col p-5 md:flex-row md:items-center justify-between hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors"
+                        className="group flex items-center p-5 hover:bg-gray-50 dark:hover:bg-[#161b22]/50 transition-colors"
                       >
-                        <div className="flex-1 pr-4 max-w-full md:max-w-[75%]">
-                          <div
-                            onClick={() => router.push(`/user/projects/${project.id}`)}
-                            className="flex items-center gap-2 mb-2 cursor-pointer hover:underline"
-                          >
-                            <div className="w-6 h-6 shrink-0 flex items-center justify-center">
+                        <div className="flex-1 pr-4 min-w-0">
+                          <div className="items-center gap-3 mb-1.5">
+                            <h3
+                              onClick={() => router.push(`/user/projects/${project.id}`)}
+                              className="font-semibold text-blue-600 dark:text-[#58a6ff] truncate cursor-pointer hover:underline"
+                            >
+                              {project.title}
+                            </h3>
+                            
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8b949e]">
+                            <div className="flex items-center gap-1.5">
                               {project.user?.avatar_url ? (
-                                <div className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 dark:border-gray-800">
-                                  <Image
-                                    src={project.user.avatar_url}
-                                    alt="avatar"
-                                    fill
-                                    className="object-cover rounded-full"
-                                  />
-                                </div>
+                                <Image src={project.user.avatar_url} alt="avatar" width={16} height={16} className="rounded-full object-cover" />
                               ) : (
-                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600">
-                                  <span className="text-[10px] font-bold text-gray-500 dark:text-gray-300 leading-none">
+                                <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                  <span className="text-[8px] font-bold text-gray-500 dark:text-gray-300">
                                     {project.user?.display_name?.charAt(0)?.toUpperCase() || "U"}
                                   </span>
                                 </div>
                               )}
+                              <span className="truncate max-w-[150px]">{project.user?.display_name || "Unknown"}</span>
                             </div>
-                            
-                            <div className="flex items-center max-w-[250px]">
-                              <span className="text-[14px] font-medium text-gray-700 dark:text-gray-300 truncate">
-                                {project.user?.display_name || "Unknown"}
-                              </span>
-                            </div>
-
-                            <span className="text-[14px] text-gray-400 dark:text-gray-600 shrink-0">/</span>
-
-                            <h3 className="text-[14px] font-semibold text-blue-600 dark:text-[#58a6ff] truncate max-w-[300px]">
-                              {project.title}
-                            </h3>
-
-                            <div className="shrink-0 w-20 flex justify-start">
-                              {getStatusBadge(project.project_status)}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-[#8b949e] h-5">
-                            <span>{formatDate(project.updated_at)}</span>
                           </div>
                         </div>
-
-                        <div className="flex items-center mt-4 md:mt-0 gap-3 w-[340px] justify-end shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/editor/${project.id}`)}
-                          >
-                            Editor
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isExportingProjectId === String(project.id)}
-                            onClick={() => handleExportHeadSnapshot(project)}
-                            // title="Export head commit snapshot_json"
-                          >
-                            ExportJSON
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => router.push(`/editor/${project.id}?only=wiki`)}
-                          >
-                            Editor only wiki
-                          </Button>
-
+                        
+                        <div className="w-48 px-4 shrink-0">
+                          {getStatusBadge(project.project_status)}
+                        </div>
+                        
+                        <div className="w-48 px-4 shrink-0">
                           <div className="flex -space-x-2 overflow-hidden">
                             {project.members && project.members.length > 0 ? (
                               <>
                                 {project.members.slice(0, 4).map((m: any, index: number) =>
                                   m.avatar_url ? (
-                                    <Image
-                                      key={index}
-                                      src={m.avatar_url}
-                                      alt={m.display_name}
-                                      width={32}
-                                      height={32}
-                                      title={m.display_name}
-                                      className="inline-block w-8 h-8 rounded-full object-cover ring-2 ring-white group-hover:ring-gray-50 dark:ring-[#0d1117] dark:group-hover:ring-[#161b22] transition-colors"
-                                    />
+                                    <Image key={index} src={m.avatar_url} alt={m.display_name} width={32} height={32} title={m.display_name} className="inline-block w-8 h-8 rounded-full object-cover ring-2 ring-white dark:ring-[#0d1117]" />
                                   ) : (
-                                    <div
-                                      key={index}
-                                      title={m.display_name}
-                                      className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 ring-2 ring-white group-hover:ring-gray-50 dark:ring-[#0d1117] dark:group-hover:ring-[#161b22] transition-colors"
-                                    >
-                                      <span className="text-xs font-medium text-gray-500 dark:text-gray-300">
-                                        {m.display_name?.charAt(0)?.toUpperCase() || "U"}
-                                      </span>
+                                    <div key={index} title={m.display_name} className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 ring-2 ring-white dark:ring-[#0d1117]">
+                                      <span className="text-xs font-medium text-gray-500 dark:text-gray-300">{m.display_name?.charAt(0)?.toUpperCase() || "U"}</span>
                                     </div>
                                   )
                                 )}
-
                                 {project.members.length > 4 && (
-                                  <div
-                                    title="Những người khác"
-                                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 ring-2 ring-white group-hover:ring-gray-50 dark:ring-[#0d1117] dark:group-hover:ring-[#161b22] transition-colors z-10"
-                                  >
-                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                      +{project.members.length - 4}
-                                    </span>
+                                  <div title="Những người khác" className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 ring-2 ring-white dark:ring-[#0d1117] z-10">
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">+{project.members.length - 4}</span>
                                   </div>
                                 )}
                               </>
                             ) : (
-                              <span className="text-sm text-gray-400 dark:text-gray-600 italic"></span>
+                              <span className="text-xs text-gray-400 dark:text-gray-600 italic"></span>
                             )}
+                          </div>
+                        </div>
+
+                        <div className="w-32 px-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                          {formatDate(project.updated_at)}
+                        </div>
+
+                       <div className="w-48 px-4 shrink-0 flex justify-end gap-2">
+                          <div className="relative group/btn1 inline-flex">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="!p-0 w-9 h-9 flex items-center justify-center"
+                              onClick={() => router.push(`/editor/${project.id}`)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                              </svg>
+                            </Button>
+                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn1:scale-100 group-hover/btn1:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
+                              Editor
+                            </span>
+                          </div>
+
+                          <div className="relative group/btn2 inline-flex">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="!p-0 w-9 h-9 flex items-center justify-center"
+                              disabled={isExportingProjectId === String(project.id)}
+                              onClick={() => handleExportHeadSnapshot(project)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                              </svg>
+                            </Button>
+                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn2:scale-100 group-hover/btn2:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
+                              Export JSON
+                            </span>
+                          </div>
+
+                          <div className="relative group/btn3 inline-flex">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="!p-0 w-9 h-9 flex items-center justify-center"
+                              onClick={() => router.push(`/editor/${project.id}?only=wiki`)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                              </svg>
+                            </Button>
+                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn3:scale-100 group-hover/btn3:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
+                              Wiki Editor
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -414,7 +413,6 @@ export default function ProjectsPage() {
         </ComponentCard>
       </div>
 
-      {/* Modal Tạo Dự án */}
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[500px] m-4">
         <div className="p-6 bg-white rounded-3xl dark:bg-gray-900">
           <h3 className="mb-5 text-xl font-bold text-gray-800 dark:text-white/90">Tạo dự án mới</h3>
@@ -484,7 +482,6 @@ export default function ProjectsPage() {
                 disabled={isSubmitting}
                 className="bg-gray-900 hover:bg-gray-800 text-white"
                 onClick={handleCreateProjectWithJson}
-                // title="Tạo dự án và tạo commit đầu tiên từ JSON snapshot"
               >
                 Tạo với JSON
               </Button>
