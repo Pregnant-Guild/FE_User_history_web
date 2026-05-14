@@ -113,7 +113,7 @@ Các file nên đọc trước:
 Các điểm dễ làm hỏng:
 
 - sanitize link của Quill
-- compatibility với doc dạng HTML/Tiptap JSON/plain text
+- compatibility với doc dạng HTML/plain text
 - slug links nội bộ
 - sentinel `__missing__`
 

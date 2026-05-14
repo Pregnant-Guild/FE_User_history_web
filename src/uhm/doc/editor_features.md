@@ -218,7 +218,6 @@ Các khả năng đang có:
 Storage thực tế của `doc`:
 
 - format mới: HTML string
-- format cũ tương thích: Tiptap JSON string
 - plaintext fallback
 
 ### Internal wiki link

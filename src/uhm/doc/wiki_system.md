@@ -8,18 +8,16 @@ Wiki trong UHM editor hiện chạy qua hai phần:
 ## 1. Storage format của wiki doc
 
 Field `doc` trong `WikiSnapshot` hiện là `string | null`.
-Frontend đang hỗ trợ ba dạng:
+Frontend hiện hỗ trợ hai dạng:
 
 - HTML string
-- JSON string kiểu Tiptap cũ
 - plain text fallback
 
 Quy ước hiện tại:
 
 - format ghi mới từ editor Quill là HTML
-- Tiptap JSON chỉ còn để tương thích dữ liệu cũ
 
-`normalizeWikiDocForQuill()` và `normalizeWikiContentToHtml()` là hai hàm quan trọng cho compatibility này.
+`normalizeWikiDocForQuill()` và `normalizeWikiContentToHtml()` hiện chỉ xử lý HTML hoặc plain text.
 
 ## 2. Editor hiện dùng Quill, không dùng Tiptap
 
@@ -41,8 +39,6 @@ Toolbar hiện có:
 - `link`
 - `image`
 - `clean`
-
-Trang `app/user/wikieditor/page.tsx` vẫn dùng Tiptap, nhưng đó là trang riêng và không phải wiki editor chính của project UHM.
 
 ## 3. Tạo, sửa và xóa wiki trong project editor
 
@@ -89,7 +85,6 @@ Export hiện chỉ là download text từ `wikiDocHtml`.
 Định dạng file được đoán từ nội dung hiện tại:
 
 - bắt đầu bằng `<` -> `html`
-- bắt đầu bằng `{` hoặc `[` -> `json`
 - còn lại -> `txt`
 
 Đây là export client-side, không có API export chuyên biệt.

@@ -1,5 +1,5 @@
 // BackEndGo snapshot expects wiki doc as a string (stored in DB as TEXT).
-// FE stores Tiptap JSON as a JSON-stringified payload.
+// FE wiki runtime now stores HTML or plain text in this string field.
 export type WikiDoc = string | null;
 
 export type WikiContentSample = {
@@ -20,4 +20,3 @@ export type WikiSnapshot = {
   content_sample?: WikiContentSample[];
   updated_at?: string;
 };
-

@@ -13,23 +13,13 @@ type TocItem = {
   text: string;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function tiptapJsonToPlainText(node: unknown): string {
-  if (node == null) return "";
-  if (typeof node === "string") return node;
-  if (Array.isArray(node)) return node.map(tiptapJsonToPlainText).join("");
-
-  if (isRecord(node)) {
-    if (node.type === "text" && typeof node.text === "string") return node.text;
-    if (node.type === "hardBreak") return "\n";
-    if ("content" in node) return tiptapJsonToPlainText(node.content);
-  }
-
-  return "";
-}
+type WikiVersionRow = {
+  id: string;
+  title?: string;
+  created_at?: string;
+  content?: string;
+  isCurrent: boolean;
+};
 
 function escapeHtml(input: string): string {
   return input
@@ -44,22 +34,7 @@ function normalizeWikiContentToHtml(raw: string | null | undefined): string {
   const value = String(raw || "").trim();
   if (!value.length) return "";
 
-  // New format: HTML string.
   if (value[0] === "<") return value;
-
-  // Legacy format: Tiptap JSON string.
-  if (value[0] === "{") {
-    try {
-      const json: unknown = JSON.parse(value);
-      const text = tiptapJsonToPlainText(json).trim();
-      if (!text.length) return "";
-      return `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
-    } catch {
-      // fall through
-    }
-  }
-
-  // Unknown plaintext: treat as plain text.
   return `<p>${escapeHtml(value).replace(/\n/g, "<br/>")}</p>`;
 }
 
@@ -191,15 +166,15 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
   const hidePreviewTimerRef = useRef<number | null>(null);
   const previewCacheRef = useRef<Map<string, { title: string; quote: string | null }>>(new Map());
 
-  const allVersions = useMemo(() => {
+  const allVersions = useMemo<WikiVersionRow[]>(() => {
     if (!wiki) return [];
-    const current = {
+    const current: WikiVersionRow = {
       id: wiki.id,
       created_at: wiki.updated_at,
       content: wiki.content,
       isCurrent: true,
     };
-    const history = (wiki.content_sample || []).map(s => ({ ...s, isCurrent: false }));
+    const history: WikiVersionRow[] = (wiki.content_sample || []).map((s) => ({ ...s, isCurrent: false }));
     const uniqueHistory = history.filter(h => h.id !== current.id);
     const combined = [current, ...uniqueHistory];
     return combined
@@ -497,8 +472,8 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
           createdAt: sample?.created_at || 'Unknown date',
           title: `Phiên bản lúc ${formatDate(sample?.created_at)}`
         };
-        if (sample && "content" in sample && (sample as any).isCurrent) {
-          return { ...versionInfo, content: (sample as any).content || "" };
+        if (sample?.isCurrent) {
+          return { ...versionInfo, content: sample.content || "" };
         }
 
 
@@ -563,7 +538,7 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
 
                 {viewMode === 'history' && (
                   <div className="p-4">
-                    <h2 className="text-xl mb-4 font-normal">Lịch sử phiên bản của "{wiki.title}"</h2>
+                    <h2 className="text-xl mb-4 font-normal">Lịch sử phiên bản của &quot;{wiki.title}&quot;</h2>
                     <div className="flex gap-4 items-center mb-4">
                       <button onClick={handleCompareVersions} disabled={isComparing || selectedVersionsForCompare.size === 0} className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
                         {isComparing ? 'Đang tải...' : `So sánh ${selectedVersionsForCompare.size} phiên bản đã chọn`}

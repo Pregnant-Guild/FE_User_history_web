@@ -36,6 +36,13 @@ type QuillLinkFormat = {
   __uhmAllowSlugHref?: boolean;
   __uhmOriginalSanitize?: unknown;
 };
+type QuillImageFormatCtor = {
+  new (): {
+    domNode: Element;
+    format: (name: string, value: string) => void;
+  };
+  formats: (domNode: Element) => Record<string, string>;
+};
 
 const ReactQuillEditor = dynamic<ReactQuillProps>(() => import("react-quill-new"), {
   ssr: false,
@@ -113,7 +120,7 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, requested
           console.error("Failed to load quill-blot-formatter", err);
         }
 
-        const ImageFormat = Quill.import?.("formats/image") as any;
+        const ImageFormat = Quill.import?.("formats/image") as QuillImageFormatCtor | undefined;
         if (ImageFormat) {
           class CustomImage extends ImageFormat {
             static formats(domNode: Element) {
@@ -1059,22 +1066,8 @@ function normalizeWikiDocForQuill(doc: string | null): string {
   const raw = (doc || "").trim();
   if (!raw.length) return "";
 
-  // New format (Quill): HTML string.
   if (raw[0] === "<") return raw;
 
-  // Legacy format (Tiptap): JSON string.
-  if (raw[0] === "{") {
-    try {
-      const json: unknown = JSON.parse(raw);
-      const text = tiptapJsonToPlainText(json).trim();
-      if (!text.length) return "";
-      return `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
-    } catch {
-      // fall through
-    }
-  }
-
-  // Unknown plaintext: treat as plain text.
   return `<p>${escapeHtml(raw).replace(/\n/g, "<br/>")}</p>`;
 }
 
@@ -1096,24 +1089,6 @@ function slugifyWikiTitle(raw: string): string {
     .slice(0, 80);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function tiptapJsonToPlainText(node: unknown): string {
-  if (node == null) return "";
-  if (typeof node === "string") return node;
-  if (Array.isArray(node)) return node.map(tiptapJsonToPlainText).join("");
-
-  if (isRecord(node)) {
-    if (node.type === "text" && typeof node.text === "string") return node.text;
-    if (node.type === "hardBreak") return "\n";
-    if ("content" in node) return tiptapJsonToPlainText(node.content);
-  }
-
-  return "";
-}
-
 function escapeHtml(input: string): string {
   return input
     .replaceAll("&", "&amp;")
@@ -1123,15 +1098,12 @@ function escapeHtml(input: string): string {
     .replaceAll("'", "&#39;");
 }
 
-type WikiDocStorageFormat = "html" | "json" | "text";
+type WikiDocStorageFormat = "html" | "text";
 
 function detectWikiDocStorageFormat(doc: string): WikiDocStorageFormat {
   const raw = String(doc || "").trim();
   if (!raw.length) return "html";
-  const first = raw[0];
-  if (first === "<") return "html";
-  if (first === "{" || first === "[") return "json";
-  return "text";
+  return raw[0] === "<" ? "html" : "text";
 }
 
 function downloadTextFile(filename: string, contents: string, mime: string): void {

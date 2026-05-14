@@ -20,24 +20,6 @@ type Props = {
     onWikiLinkRequest: (request: { slug: string; rect: DOMRect }) => void;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function tiptapJsonToPlainText(node: unknown): string {
-    if (node == null) return "";
-    if (typeof node === "string") return node;
-    if (Array.isArray(node)) return node.map(tiptapJsonToPlainText).join("");
-
-    if (isRecord(node)) {
-        if (node.type === "text" && typeof node.text === "string") return node.text;
-        if (node.type === "hardBreak") return "\n";
-        if ("content" in node) return tiptapJsonToPlainText(node.content);
-    }
-
-    return "";
-}
-
 function escapeHtml(input: string): string {
     return input
         .replaceAll("&", "&amp;")
@@ -52,17 +34,6 @@ function normalizeWikiContentToHtml(raw: string | null | undefined): string {
     if (!value.length) return "";
 
     if (value[0] === "<") return value;
-
-    if (value[0] === "{") {
-        try {
-            const json: unknown = JSON.parse(value);
-            const text = tiptapJsonToPlainText(json).trim();
-            if (!text.length) return "";
-            return `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
-        } catch {
-            // fall through
-        }
-    }
 
     return `<p>${escapeHtml(value).replace(/\n/g, "<br/>")}</p>`;
 }
