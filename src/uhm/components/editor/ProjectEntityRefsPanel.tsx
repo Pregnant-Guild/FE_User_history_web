@@ -2,34 +2,40 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import type { EntitySnapshot } from "@/uhm/types/entities";
-import type { EntityFormState } from "@/uhm/lib/editor/session/sessionTypes";
+import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
+import { useEditorStore } from "@/uhm/store/editorStore";
 
 type Props = {
-  entityRefs: EntitySnapshot[];
-  entityForm: EntityFormState;
-  onEntityFormChange: (key: keyof EntityFormState, value: string) => void;
-  isEntitySubmitting: boolean;
   onCreateEntityOnly: () => void;
   onUpdateEntity?: (entityId: string, payload: { name: string; description: string | null }) => void;
-  entityFormStatus: string | null;
-  selectedGeometryEntityIds?: string[];
   hasSelectedGeometry?: boolean;
   onToggleBindEntityForSelectedGeometry?: (entityId: string, nextChecked: boolean) => void;
 };
 
 export default function ProjectEntityRefsPanel({
-  entityRefs,
-  entityForm,
-  onEntityFormChange,
-  isEntitySubmitting,
   onCreateEntityOnly,
   onUpdateEntity,
-  entityFormStatus,
-  selectedGeometryEntityIds,
   hasSelectedGeometry,
   onToggleBindEntityForSelectedGeometry,
 }: Props) {
+  const {
+    snapshotEntities,
+    entityForm,
+    setEntityForm,
+    isEntitySubmitting,
+    entityFormStatus,
+    selectedGeometryEntityIds,
+  } = useEditorStore(
+    useShallow((state) => ({
+      snapshotEntities: state.snapshotEntities,
+      entityForm: state.entityForm,
+      setEntityForm: state.setEntityForm,
+      isEntitySubmitting: state.isEntitySubmitting,
+      entityFormStatus: state.entityFormStatus,
+      selectedGeometryEntityIds: state.selectedGeometryEntityIds,
+    }))
+  );
   const canBindToggle =
     Boolean(hasSelectedGeometry) &&
     Array.isArray(selectedGeometryEntityIds) &&
@@ -43,6 +49,16 @@ export default function ProjectEntityRefsPanel({
     () => new Set((selectedGeometryEntityIds || []).map(String)),
     [selectedGeometryEntityIds]
   );
+  const entityRefs = useMemo(() => {
+    const byId = new globalThis.Map<string, EntitySnapshot>();
+    for (const ref of snapshotEntities || []) {
+      const id = String(ref?.id || "").trim();
+      if (!id || byId.has(id)) continue;
+      if (ref.operation === "delete") continue;
+      byId.set(id, ref);
+    }
+    return Array.from(byId.values());
+  }, [snapshotEntities]);
   const sortedEntityRefs = useMemo(() => {
     const rows = [...(entityRefs || [])];
     rows.sort((a, b) => {
@@ -67,6 +83,9 @@ export default function ProjectEntityRefsPanel({
     setActiveEntityId(String(entity.id));
     setEditName(typeof entity.name === "string" ? entity.name : "");
     setEditDescription(entity.description == null ? "" : String(entity.description));
+  };
+  const handleEntityFormChange = (key: "name" | "description", value: string) => {
+    setEntityForm((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -325,14 +344,14 @@ export default function ProjectEntityRefsPanel({
           <>
             <input
               value={entityForm.name}
-              onChange={(event) => onEntityFormChange("name", event.target.value)}
+              onChange={(event) => handleEntityFormChange("name", event.target.value)}
               placeholder="Tên entity mới"
               disabled={isEntitySubmitting}
               style={entityInputStyle}
             />
             <input
               value={entityForm.description}
-              onChange={(event) => onEntityFormChange("description", event.target.value)}
+              onChange={(event) => handleEntityFormChange("description", event.target.value)}
               placeholder="Description"
               disabled={isEntitySubmitting}
               style={entityInputStyle}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useShallow } from "zustand/react/shallow";
 import Map from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/editor/BackgroundLayersPanel";
@@ -24,22 +25,7 @@ import {
     Geometry,
     useEditorState,
 } from "@/uhm/lib/editor/state/useEditorState";
-import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
-import {
-    BackgroundLayerId,
-    BackgroundLayerVisibility,
-    DEFAULT_BACKGROUND_LAYER_VISIBILITY,
-    HIDDEN_BACKGROUND_LAYER_VISIBILITY,
-} from "@/uhm/lib/map/styles/backgroundLayers";
-import {
-    GEOMETRY_TYPE_OPTIONS,
-} from "@/uhm/lib/map/geo/geometryTypeOptions";
-import {
-    EntityFormState,
-    EditorMode,
-    GeometryMetaFormState,
-    useEditorSessionState,
-} from "@/uhm/lib/editor/state/useEditorSessionState";
+import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 import {
     getDefaultTypeIdForFeature,
     normalizeFeatureBindingIds,
@@ -53,7 +39,6 @@ import {
 import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
 import {
     loadBackgroundLayerVisibilityFromStorage,
-    persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
 import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
@@ -62,69 +47,55 @@ import { useFeatureCommands } from "./featureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
-import UnifiedSearchBar, { type UnifiedSearchKind } from "@/uhm/components/ui/UnifiedSearchBar";
+import UnifiedSearchBar from "@/uhm/components/ui/UnifiedSearchBar";
+import {
+    EditorStoreProvider,
+    useEditorStore,
+    useEditorStoreApi,
+} from "@/uhm/store/editorStore";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
 
 export default function Page() {
+    return (
+        <EditorStoreProvider
+            options={{
+                emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
+                defaultEditorUserId: DEFAULT_EDITOR_USER_ID,
+                fallbackTimelineRange: FIXED_TIMELINE_RANGE,
+                currentYear: CURRENT_YEAR,
+            }}
+        >
+            <EditorPageContent />
+        </EditorStoreProvider>
+    );
+}
+
+function EditorPageContent() {
     const params = useParams();
     const router = useRouter();
+    const editorStoreApi = useEditorStoreApi();
     const projectId = String(params.id || "");
     const openedProjectIdRef = useRef<string | null>(null);
-    const [blockedPendingSubmissionId, setBlockedPendingSubmissionId] = useState<string | null>(null);
-    const [searchKind, setSearchKind] = useState<UnifiedSearchKind>("entity");
-    const [searchQuery, setSearchQuery] = useState("");
-    const [searchQueryDraft, setSearchQueryDraft] = useState("");
-    const [wikiSearchResults, setWikiSearchResults] = useState<Wiki[]>([]);
-    const [isWikiSearching, setIsWikiSearching] = useState(false);
-    const [geoSearchResults, setGeoSearchResults] = useState<EntityGeometriesSearchItem[]>([]);
-    const [isGeoSearching, setIsGeoSearching] = useState(false);
-    const [requestedActiveWikiId, setRequestedActiveWikiId] = useState<string | null>(null);
-    const [leftPanelWidth, setLeftPanelWidth] = useState(280);
-    const [rightPanelWidth, setRightPanelWidth] = useState(420);
-    const [timelineFilterEnabled, setTimelineFilterEnabled] = useState(true);
-    const [geometryBindingFilterEnabled, setGeometryBindingFilterEnabled] = useState(true);
     const entityFormStatusTimeoutRef = useRef<number | null>(null);
     const geoBindingStatusTimeoutRef = useRef<number | null>(null);
-    const [geoBindingStatus, setGeoBindingStatus] = useState<string | null>(null);
-    const [geometryFocusRequest, setGeometryFocusRequest] = useState<{
-        key: number;
-        collection: FeatureCollection;
-    } | null>(null);
     const localCreatedEntityIdsRef = useRef<Set<string>>(new Set());
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
-
-    const [replayFeatureId, setReplayFeatureId] = useState<string | number | null>(null);
-    const [hideOutside, setHideOutside] = useState(false);
-
     const {
         mode,
-        setMode: internalSetMode,
+        internalSetMode,
         initialData,
-        setInitialData,
         isSaving,
-        setIsSaving,
         isSubmitting,
-        setIsSubmitting,
         isOpeningSection,
         setIsOpeningSection,
-        setAvailableSections,
-        selectedProjectId,
-        setSelectedProjectId,
-        newSectionTitle,
-        setNewSectionTitle,
         commitTitle,
         setCommitTitle,
-        editorUserIdInput,
         activeSection,
-        setActiveSection,
         projectState,
-        setProjectState,
         sectionCommits,
-        setProjectCommits,
         baselineSnapshot,
-        setBaselineSnapshot,
         entityCatalog,
         setEntityCatalog,
         snapshotEntities,
@@ -139,9 +110,7 @@ export default function Page() {
         setSelectedGeometryEntityIds,
         geometryMetaForm,
         setGeometryMetaForm,
-        isEntitySubmitting,
         setIsEntitySubmitting,
-        entityFormStatus,
         setEntityFormStatus,
         entitySearchResults,
         setEntitySearchResults,
@@ -157,22 +126,121 @@ export default function Page() {
         setSnapshotWikis,
         snapshotEntityWikiLinks,
         setSnapshotEntityWikiLinks,
-    } = useEditorSessionState({
-        emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
-        defaultEditorUserId: DEFAULT_EDITOR_USER_ID,
-        fallbackTimelineRange: FIXED_TIMELINE_RANGE,
-        currentYear: CURRENT_YEAR,
-    });
+        blockedPendingSubmissionId,
+        setBlockedPendingSubmissionId,
+        searchKind,
+        setSearchKind,
+        searchQuery,
+        setSearchQuery,
+        searchQueryDraft,
+        setSearchQueryDraft,
+        wikiSearchResults,
+        setWikiSearchResults,
+        isWikiSearching,
+        setIsWikiSearching,
+        geoSearchResults,
+        setGeoSearchResults,
+        isGeoSearching,
+        setIsGeoSearching,
+        setRequestedActiveWikiId,
+        leftPanelWidth,
+        setLeftPanelWidth,
+        rightPanelWidth,
+        setRightPanelWidth,
+        timelineFilterEnabled,
+        setTimelineFilterEnabled,
+        geometryBindingFilterEnabled,
+        setGeoBindingStatus,
+        hoveredGeometryId,
+        geometryFocusRequest,
+        setGeometryFocusRequest,
+        replayFeatureId,
+        setReplayFeatureId,
+        hideOutside,
+        setHideOutside,
+        geometryVisibility,
+    } = useEditorStore(useShallow((state) => ({
+        mode: state.mode,
+        internalSetMode: state.setMode,
+        initialData: state.initialData,
+        isSaving: state.isSaving,
+        isSubmitting: state.isSubmitting,
+        isOpeningSection: state.isOpeningSection,
+        setIsOpeningSection: state.setIsOpeningSection,
+        commitTitle: state.commitTitle,
+        setCommitTitle: state.setCommitTitle,
+        activeSection: state.activeSection,
+        projectState: state.projectState,
+        sectionCommits: state.sectionCommits,
+        baselineSnapshot: state.baselineSnapshot,
+        entityCatalog: state.entityCatalog,
+        setEntityCatalog: state.setEntityCatalog,
+        snapshotEntities: state.snapshotEntities,
+        setSnapshotEntities: state.setSnapshotEntities,
+        entityStatus: state.entityStatus,
+        setEntityStatus: state.setEntityStatus,
+        selectedFeatureIds: state.selectedFeatureIds,
+        setSelectedFeatureIds: state.setSelectedFeatureIds,
+        entityForm: state.entityForm,
+        setEntityForm: state.setEntityForm,
+        selectedGeometryEntityIds: state.selectedGeometryEntityIds,
+        setSelectedGeometryEntityIds: state.setSelectedGeometryEntityIds,
+        geometryMetaForm: state.geometryMetaForm,
+        setGeometryMetaForm: state.setGeometryMetaForm,
+        setIsEntitySubmitting: state.setIsEntitySubmitting,
+        setEntityFormStatus: state.setEntityFormStatus,
+        entitySearchResults: state.entitySearchResults,
+        setEntitySearchResults: state.setEntitySearchResults,
+        isEntitySearchLoading: state.isEntitySearchLoading,
+        setIsEntitySearchLoading: state.setIsEntitySearchLoading,
+        timelineDraftYear: state.timelineDraftYear,
+        setTimelineDraftYear: state.setTimelineDraftYear,
+        backgroundVisibility: state.backgroundVisibility,
+        setBackgroundVisibility: state.setBackgroundVisibility,
+        isBackgroundVisibilityReady: state.isBackgroundVisibilityReady,
+        setIsBackgroundVisibilityReady: state.setIsBackgroundVisibilityReady,
+        snapshotWikis: state.snapshotWikis,
+        setSnapshotWikis: state.setSnapshotWikis,
+        snapshotEntityWikiLinks: state.snapshotEntityWikiLinks,
+        setSnapshotEntityWikiLinks: state.setSnapshotEntityWikiLinks,
+        blockedPendingSubmissionId: state.blockedPendingSubmissionId,
+        setBlockedPendingSubmissionId: state.setBlockedPendingSubmissionId,
+        searchKind: state.searchKind,
+        setSearchKind: state.setSearchKind,
+        searchQuery: state.searchQuery,
+        setSearchQuery: state.setSearchQuery,
+        searchQueryDraft: state.searchQueryDraft,
+        setSearchQueryDraft: state.setSearchQueryDraft,
+        wikiSearchResults: state.wikiSearchResults,
+        setWikiSearchResults: state.setWikiSearchResults,
+        isWikiSearching: state.isWikiSearching,
+        setIsWikiSearching: state.setIsWikiSearching,
+        geoSearchResults: state.geoSearchResults,
+        setGeoSearchResults: state.setGeoSearchResults,
+        isGeoSearching: state.isGeoSearching,
+        setIsGeoSearching: state.setIsGeoSearching,
+        setRequestedActiveWikiId: state.setRequestedActiveWikiId,
+        leftPanelWidth: state.leftPanelWidth,
+        setLeftPanelWidth: state.setLeftPanelWidth,
+        rightPanelWidth: state.rightPanelWidth,
+        setRightPanelWidth: state.setRightPanelWidth,
+        timelineFilterEnabled: state.timelineFilterEnabled,
+        setTimelineFilterEnabled: state.setTimelineFilterEnabled,
+        geometryBindingFilterEnabled: state.geometryBindingFilterEnabled,
+        setGeoBindingStatus: state.setGeoBindingStatus,
+        hoveredGeometryId: state.hoveredGeometryId,
+        geometryFocusRequest: state.geometryFocusRequest,
+        setGeometryFocusRequest: state.setGeometryFocusRequest,
+        replayFeatureId: state.replayFeatureId,
+        setReplayFeatureId: state.setReplayFeatureId,
+        hideOutside: state.hideOutside,
+        setHideOutside: state.setHideOutside,
+        geometryVisibility: state.geometryVisibility,
+    })));
     // Counter để bỏ qua response cũ khi user gõ search entity liên tục.
     const entitySearchRequestRef = useRef(0);
     const wikiSearchRequestRef = useRef(0);
     const geoSearchRequestRef = useRef(0);
-
-    const [geometryVisibility, setGeometryVisibility] = useState<Record<string, boolean>>(() => {
-        const init: Record<string, boolean> = {};
-        for (const key of GEO_TYPE_KEYS) init[key] = true;
-        return init;
-    });
 
     const snapshotEntitiesRef = useRef(snapshotEntities);
     const snapshotWikisRef = useRef(snapshotWikis);
@@ -211,7 +279,6 @@ export default function Page() {
         },
         [editor]
     );
-    const editorUserId = normalizeEditorUserId(editorUserIdInput);
     const snapshotEntitiesAsEntities = useMemo(() => {
         const rows = snapshotEntities || [];
         return rows
@@ -234,17 +301,6 @@ export default function Page() {
     useEffect(() => {
         entitiesRef.current = entities;
     }, [entities]);
-
-    const snapshotEntitiesVisible = useMemo(() => {
-        const byId = new globalThis.Map<string, EntitySnapshot>();
-        for (const ref of snapshotEntities || []) {
-            const id = String(ref?.id || "").trim();
-            if (!id || byId.has(id)) continue;
-            if (ref.operation === "delete") continue;
-            byId.set(id, ref);
-        }
-        return Array.from(byId.values());
-    }, [snapshotEntities]);
 
     useEffect(() => {
         const localCreatedIds = localCreatedEntityIdsRef.current;
@@ -284,21 +340,6 @@ export default function Page() {
         };
     }, [editor, mode, timelineDraftYear, timelineFilterEnabled]);
 
-    const projectEntityChoices = useMemo(() => {
-        const ids = new Set<string>();
-        for (const ref of snapshotEntitiesVisible) ids.add(String(ref.id));
-        const rows = Array.from(ids).map((id) => {
-            const ref = snapshotEntitiesVisible.find((entity) => String(entity.id) === id) || null;
-            const found = entities.find((e) => e.id === id) || null;
-            return {
-                id,
-                name: found?.name || id,
-                isNew: ref?.source === "inline" && ref?.operation === "create",
-            };
-        });
-        rows.sort((a, b) => a.name.localeCompare(b.name));
-        return rows;
-    }, [entities, snapshotEntitiesVisible]);
     const selectedFeatures = useMemo(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return [];
         return selectedFeatureIds
@@ -341,6 +382,18 @@ export default function Page() {
         return normalizeFeatureBindingIds(selectedFeature);
     }, [selectedFeature]);
 
+    const hoveredGeometryHighlight = useMemo(() => {
+        if (!hoveredGeometryId) return null;
+        const feature = editor.draft.features.find(
+            (item) => String(item.properties.id) === hoveredGeometryId
+        );
+        if (!feature) return null;
+        return {
+            type: "FeatureCollection",
+            features: [feature],
+        } as FeatureCollection;
+    }, [editor.draft.features, hoveredGeometryId]);
+
     const wikiDirty = useMemo(() => {
         const prev = normalizeWikisForCompare(baselineSnapshot?.wikis);
         const next = normalizeWikisForCompare(snapshotWikis);
@@ -379,36 +432,9 @@ export default function Page() {
 
     const sectionCommands = useProjectCommands({
         editor,
-        editorUserId,
+        store: editorStoreApi,
         emptyFeatureCollection: EMPTY_FEATURE_COLLECTION,
-        activeSection,
-        projectState,
-        selectedProjectId,
-        newSectionTitle,
         pendingSaveCount,
-        snapshotEntities,
-        snapshotWikis,
-        snapshotEntityWikiLinks,
-        baselineSnapshot,
-        commitTitle,
-        setActiveSection,
-        setSelectedProjectId,
-        setProjectState,
-        setBaselineSnapshot,
-        setInitialData,
-        setProjectCommits,
-        setSnapshotEntities,
-        setSnapshotWikis,
-        setSnapshotEntityWikiLinks,
-        setEntityFormStatus,
-        setSelectedFeatureIds,
-        setEntityStatus,
-        setIsSaving,
-        setIsSubmitting,
-        setIsOpeningSection,
-        setAvailableSections,
-        setNewSectionTitle,
-        setCommitTitle,
     });
     const {
         openSectionForEditing,
@@ -432,7 +458,7 @@ export default function Page() {
             setHideOutside(false);
         }
         internalSetMode(m);
-    }, [internalSetMode, mode, editor, selectedFeatureIds]);
+    }, [internalSetMode, mode, editor, selectedFeatureIds, setHideOutside, setReplayFeatureId, setSelectedFeatureIds]);
 
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
@@ -461,7 +487,7 @@ export default function Page() {
 
     const onToggleHideOutside = useCallback(() => {
         setHideOutside((prev) => !prev);
-    }, []);
+    }, [setHideOutside]);
 
     const openProject = useCallback(async () => {
         if (!projectId) return;
@@ -500,7 +526,7 @@ export default function Page() {
         } finally {
             setIsOpeningSection(false);
         }
-    }, [openSectionForEditing, projectId, router, setEntityStatus, setIsOpeningSection]);
+    }, [openSectionForEditing, projectId, router, setBlockedPendingSubmissionId, setEntityStatus, setIsOpeningSection]);
 
     const unlockByDeletingPendingSubmission = useCallback(async () => {
         if (!blockedPendingSubmissionId) return;
@@ -521,7 +547,7 @@ export default function Page() {
         } finally {
             setIsOpeningSection(false);
         }
-    }, [blockedPendingSubmissionId, openProject, setEntityStatus, setIsOpeningSection]);
+    }, [blockedPendingSubmissionId, openProject, setBlockedPendingSubmissionId, setEntityStatus, setIsOpeningSection]);
 
     useEffect(() => {
         let disposed = false;
@@ -704,7 +730,7 @@ export default function Page() {
             disposed = true;
             window.clearTimeout(timeoutId);
         };
-    }, [searchKind, searchQuery]);
+    }, [searchKind, searchQuery, setIsWikiSearching, setWikiSearchResults]);
 
     useEffect(() => {
         if (searchKind !== "geo") {
@@ -743,7 +769,7 @@ export default function Page() {
             disposed = true;
             window.clearTimeout(timeoutId);
         };
-    }, [geoSearchRequestRef, searchKind, searchQuery]);
+    }, [searchKind, searchQuery, setGeoSearchResults, setIsGeoSearching]);
 
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
@@ -831,41 +857,8 @@ export default function Page() {
         setIsBackgroundVisibilityReady(true);
     }, [setBackgroundVisibility, setIsBackgroundVisibilityReady]);
 
-    const updateBackgroundVisibility = (
-        updater: (prev: BackgroundLayerVisibility) => BackgroundLayerVisibility
-    ) => {
-        setBackgroundVisibility((prev) => {
-            const next = updater(prev);
-            persistBackgroundLayerVisibility(next);
-            return next;
-        });
-    };
-
-    const handleToggleBackgroundLayer = (id: BackgroundLayerId) => {
-        updateBackgroundVisibility((prev) => ({
-            ...prev,
-            [id]: !prev[id],
-        }));
-    };
-
-    const handleShowAllBackgroundLayers = () => {
-        updateBackgroundVisibility(() => ({ ...DEFAULT_BACKGROUND_LAYER_VISIBILITY }));
-    };
-
-    const handleHideAllBackgroundLayers = () => {
-        updateBackgroundVisibility(() => ({ ...HIDDEN_BACKGROUND_LAYER_VISIBILITY }));
-    };
-
     const handleTimelineYearChange = (nextYear: number) => {
         setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
-    };
-
-    const handleEntityFormChange = (key: keyof EntityFormState, value: string) => {
-        setEntityForm((prev) => ({ ...prev, [key]: value }));
-    };
-
-    const handleGeometryMetaFormChange = (key: keyof GeometryMetaFormState, value: string) => {
-        setGeometryMetaForm((prev) => ({ ...prev, [key]: value }));
     };
 
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
@@ -1073,6 +1066,7 @@ export default function Page() {
     }, [
         editor.draft.features,
         flashGeoBindingStatus,
+        setGeometryFocusRequest,
         setSelectedFeatureIds,
         setTimelineFilterEnabled,
         timelineFilterEnabled,
@@ -1380,6 +1374,7 @@ export default function Page() {
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={effectiveGeometryVisibility}
                             respectBindingFilter={geometryBindingFilterEnabled}
+                            highlightFeatures={hoveredGeometryHighlight}
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
                             focusPadding={96}
@@ -1414,14 +1409,6 @@ export default function Page() {
                     />
 
                     <BackgroundLayersPanel
-                        visibility={backgroundVisibility}
-                        onToggleLayer={handleToggleBackgroundLayer}
-                        onShowAll={handleShowAllBackgroundLayers}
-                        onHideAll={handleHideAllBackgroundLayers}
-                        geometryVisibility={geometryVisibility}
-                        onToggleGeometryType={(typeKey) => {
-                            setGeometryVisibility((prev) => ({ ...prev, [typeKey]: prev[typeKey] === false }));
-                        }}
                         width={rightPanelWidth}
                         topContent={
                             <div style={{ display: "grid", gap: "12px" }}>
@@ -1655,44 +1642,26 @@ export default function Page() {
                                     selectedGeometryBindingIds={selectedGeometryBindingIds}
                                     onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
                                     onFocusGeometry={handleFocusGeometryFromBindingPanel}
-                                    statusText={geoBindingStatus}
-                                    bindingFilterEnabled={geometryBindingFilterEnabled}
-                                    onBindingFilterEnabledChange={setGeometryBindingFilterEnabled}
                                 />
 
                                 <ProjectEntityRefsPanel
-                                    entityRefs={snapshotEntitiesVisible}
-                                    entityForm={entityForm}
-                                    onEntityFormChange={handleEntityFormChange}
-                                    isEntitySubmitting={isEntitySubmitting}
                                     onCreateEntityOnly={handleCreateEntityOnly}
                                     onUpdateEntity={handleUpdateEntityInProject}
-                                    entityFormStatus={entityFormStatus}
                                     hasSelectedGeometry={Boolean(selectedFeature)}
-                                    selectedGeometryEntityIds={selectedGeometryEntityIds}
                                     onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
                                 />
 
                                 <WikiSidebarPanel
                                     projectId={projectId}
-                                    wikis={snapshotWikis}
                                     setWikis={setSnapshotWikisUndoable}
-                                    requestedActiveId={requestedActiveWikiId}
                                 />
 
                                 <EntityWikiBindingsPanel
-                                    entities={projectEntityChoices}
-                                    wikis={snapshotWikis}
-                                    links={snapshotEntityWikiLinks}
                                     setLinks={setSnapshotEntityWikiLinksUndoable}
                                 />
                                 {selectedFeature ? (
                                     <SelectedGeometryPanel
                                         selectedFeatures={selectedFeatures}
-                                        entityTypeOptions={GEOMETRY_TYPE_OPTIONS}
-                                        geometryMetaForm={geometryMetaForm}
-                                        onGeometryMetaFormChange={handleGeometryMetaFormChange}
-                                        isEntitySubmitting={isEntitySubmitting}
                                         onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
                                         changeCount={editor.changeCount}
                                         onReplayEdit={(id) => setMode("replay", id)}
@@ -1768,11 +1737,6 @@ function clampNumber(value: number, min: number, max: number): number {
     if (value < min) return min;
     if (value > max) return max;
     return value;
-}
-
-function normalizeEditorUserId(value: string): string {
-    const normalized = value.trim();
-    return normalized || DEFAULT_EDITOR_USER_ID;
 }
 
 function formatCommitTitle(commit: ProjectCommit): string {

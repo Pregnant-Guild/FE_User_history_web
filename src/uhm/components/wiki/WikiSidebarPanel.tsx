@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
+import { useShallow } from "zustand/react/shallow";
 
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
@@ -13,6 +14,7 @@ import { newId } from "@/uhm/lib/utils/id";
 import type ReactQuill from "react-quill-new";
 import { checkWikiSlugExists, fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import NewBadge from "@/uhm/components/editor/NewBadge";
+import { useEditorStore } from "@/uhm/store/editorStore";
 
 type ReactQuillProps = ComponentProps<typeof ReactQuill>;
 type QuillRange = { index: number; length: number };
@@ -39,7 +41,7 @@ type QuillLinkFormat = {
 type QuillImageFormatCtor = {
   new (): {
     domNode: Element;
-    format: (name: string, value: string) => void;
+    format(name: string, value: string): void;
   };
   formats: (domNode: Element) => Record<string, string>;
 };
@@ -53,9 +55,7 @@ let quillLinkSanitizePatched = false;
 
 type Props = {
   projectId: string;
-  wikis: WikiSnapshot[];
   setWikis: React.Dispatch<React.SetStateAction<WikiSnapshot[]>>;
-  requestedActiveId?: string | null;
 };
 
 function clampTitle(title: string) {
@@ -63,7 +63,13 @@ function clampTitle(title: string) {
   return t.length ? t.slice(0, 120) : "Untitled wiki";
 }
 
-export default function WikiSidebarPanel({ projectId, wikis, setWikis, requestedActiveId }: Props) {
+export default function WikiSidebarPanel({ projectId, setWikis }: Props) {
+  const { wikis, requestedActiveId } = useEditorStore(
+    useShallow((state) => ({
+      wikis: state.snapshotWikis,
+      requestedActiveId: state.requestedActiveWikiId,
+    }))
+  );
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -122,13 +128,18 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, requested
 
         const ImageFormat = Quill.import?.("formats/image") as QuillImageFormatCtor | undefined;
         if (ImageFormat) {
-          class CustomImage extends ImageFormat {
+          const BaseImageFormat = ImageFormat;
+          class CustomImage extends BaseImageFormat {
             static formats(domNode: Element) {
-              const formats = ImageFormat.formats(domNode) || {};
-              if (domNode.hasAttribute("style")) formats.style = domNode.getAttribute("style");
-              if (domNode.hasAttribute("width")) formats.width = domNode.getAttribute("width");
-              if (domNode.hasAttribute("height")) formats.height = domNode.getAttribute("height");
-              if (domNode.hasAttribute("class")) formats.class = domNode.getAttribute("class");
+              const formats = BaseImageFormat.formats(domNode) || {};
+              const style = domNode.getAttribute("style");
+              const width = domNode.getAttribute("width");
+              const height = domNode.getAttribute("height");
+              const className = domNode.getAttribute("class");
+              if (style) formats.style = style;
+              if (width) formats.width = width;
+              if (height) formats.height = height;
+              if (className) formats.class = className;
               return formats;
             }
 
@@ -291,13 +302,10 @@ export default function WikiSidebarPanel({ projectId, wikis, setWikis, requested
     if (!activeId) return;
 
     const fmt = detectWikiDocStorageFormat(wikiDocHtml);
-    const label = fmt === "json" ? "json" : fmt === "text" ? "txt" : "html";
-    const mime =
-      fmt === "json"
-        ? "application/json;charset=utf-8"
-        : fmt === "text"
-          ? "text/plain;charset=utf-8"
-          : "text/html;charset=utf-8";
+    const label = fmt === "text" ? "txt" : "html";
+    const mime = fmt === "text"
+      ? "text/plain;charset=utf-8"
+      : "text/html;charset=utf-8";
 
     const base =
       normalizeWikiSlugInput(wikiSlug) ||

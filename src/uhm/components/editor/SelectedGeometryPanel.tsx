@@ -1,23 +1,20 @@
 "use client";
 
 import { type CSSProperties, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Feature } from "@/uhm/lib/editor/state/useEditorState";
 import {
+    GEOMETRY_TYPE_OPTIONS,
     GeometryPreset,
     GeometryTypeGroupId,
-    GeometryTypeOption,
     findGeometryTypeOption,
     groupGeometryTypeOptions,
 } from "@/uhm/lib/map/geo/geometryTypeOptions";
 import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
-import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
+import { useEditorStore } from "@/uhm/store/editorStore";
 
 type Props = {
     selectedFeatures: Feature[];
-    entityTypeOptions: GeometryTypeOption[];
-    geometryMetaForm: GeometryMetaFormState;
-    onGeometryMetaFormChange: (key: keyof GeometryMetaFormState, value: string) => void;
-    isEntitySubmitting: boolean;
     onApplyGeometryMetadata: () => Promise<{ ok: boolean; error?: string }>;
     changeCount: number;
     onReplayEdit?: (id: string | number) => void;
@@ -25,14 +22,21 @@ type Props = {
 
 export default function SelectedGeometryPanel({
     selectedFeatures,
-    entityTypeOptions,
-    geometryMetaForm,
-    onGeometryMetaFormChange,
-    isEntitySubmitting,
     onApplyGeometryMetadata,
     changeCount,
     onReplayEdit,
 }: Props) {
+    const {
+        geometryMetaForm,
+        setGeometryMetaForm,
+        isEntitySubmitting,
+    } = useEditorStore(
+        useShallow((state) => ({
+            geometryMetaForm: state.geometryMetaForm,
+            setGeometryMetaForm: state.setGeometryMetaForm,
+            isEntitySubmitting: state.isEntitySubmitting,
+        }))
+    );
     const [collapsed, setCollapsed] = useState(false);
     const [geoApplyFeedback, setGeoApplyFeedback] = useState<
         | {
@@ -73,7 +77,7 @@ export default function SelectedGeometryPanel({
     if (!selectedFeatures || selectedFeatures.length === 0) return null;
     const representativeFeature = selectedFeatures[0];
 
-    const groupedGeometryTypeOptions = groupGeometryTypeOptions(entityTypeOptions);
+    const groupedGeometryTypeOptions = groupGeometryTypeOptions(GEOMETRY_TYPE_OPTIONS);
     const featureGeometryPreset = resolveFeatureGeometryPreset(representativeFeature);
     const allowedGroupIds = getAllowedGroupIdsForPreset(featureGeometryPreset);
     const groupedGeoTypeOptions = groupedGeometryTypeOptions.filter((group) =>
@@ -143,7 +147,12 @@ export default function SelectedGeometryPanel({
                         </div>
                         <select
                             value={geometryMetaForm.type_key}
-                            onChange={(event) => onGeometryMetaFormChange("type_key", event.target.value)}
+                            onChange={(event) =>
+                                setGeometryMetaForm((prev) => ({
+                                    ...prev,
+                                    type_key: event.target.value,
+                                }))
+                            }
                             disabled={isEntitySubmitting}
                             style={entityInputStyle}
                         >
@@ -176,14 +185,24 @@ export default function SelectedGeometryPanel({
                         ) : null}
                         <input
                             value={geometryMetaForm.time_start}
-                            onChange={(event) => onGeometryMetaFormChange("time_start", event.target.value)}
+                            onChange={(event) =>
+                                setGeometryMetaForm((prev) => ({
+                                    ...prev,
+                                    time_start: event.target.value,
+                                }))
+                            }
                             placeholder="time_start"
                             disabled={isEntitySubmitting}
                             style={entityInputStyle}
                         />
                         <input
                             value={geometryMetaForm.time_end}
-                            onChange={(event) => onGeometryMetaFormChange("time_end", event.target.value)}
+                            onChange={(event) =>
+                                setGeometryMetaForm((prev) => ({
+                                    ...prev,
+                                    time_end: event.target.value,
+                                }))
+                            }
                             placeholder="time_end"
                             disabled={isEntitySubmitting}
                             style={entityInputStyle}

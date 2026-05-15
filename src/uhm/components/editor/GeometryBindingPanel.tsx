@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
+import { useEditorStore } from "@/uhm/store/editorStore";
 
 type GeometryChoice = {
   id: string;
@@ -11,13 +13,10 @@ type GeometryChoice = {
 
 type Props = {
   geometries: GeometryChoice[];
-  selectedGeometryId: string | null;
+  selectedGeometryId?: string | null;
   selectedGeometryBindingIds: string[];
   onToggleBindGeometryForSelectedGeometry?: (geometryId: string, nextChecked: boolean) => void;
   onFocusGeometry?: (geometryId: string) => void;
-  statusText?: string | null;
-  bindingFilterEnabled: boolean;
-  onBindingFilterEnabledChange: (next: boolean) => void;
 };
 
 export default function GeometryBindingPanel({
@@ -26,12 +25,29 @@ export default function GeometryBindingPanel({
   selectedGeometryBindingIds,
   onToggleBindGeometryForSelectedGeometry,
   onFocusGeometry,
-  statusText,
-  bindingFilterEnabled,
-  onBindingFilterEnabledChange,
 }: Props) {
+  const {
+    selectedFeatureIds,
+    statusText,
+    bindingFilterEnabled,
+    setGeometryBindingFilterEnabled,
+    hoveredGeometryId,
+    setHoveredGeometryId,
+  } = useEditorStore(
+    useShallow((state) => ({
+      selectedFeatureIds: state.selectedFeatureIds,
+      statusText: state.geoBindingStatus,
+      bindingFilterEnabled: state.geometryBindingFilterEnabled,
+      setGeometryBindingFilterEnabled: state.setGeometryBindingFilterEnabled,
+      hoveredGeometryId: state.hoveredGeometryId,
+      setHoveredGeometryId: state.setHoveredGeometryId,
+    }))
+  );
+  const effectiveSelectedGeometryId =
+    selectedGeometryId ??
+    (selectedFeatureIds.length > 0 ? String(selectedFeatureIds[0]) : null);
   const canBindToggle =
-    Boolean(selectedGeometryId) && typeof onToggleBindGeometryForSelectedGeometry === "function";
+    Boolean(effectiveSelectedGeometryId) && typeof onToggleBindGeometryForSelectedGeometry === "function";
   const canFocusGeometry = typeof onFocusGeometry === "function";
 
   const [collapsed, setCollapsed] = useState(false);
@@ -46,24 +62,30 @@ export default function GeometryBindingPanel({
 
   const bindingSet = useMemo(() => new Set(selectedGeometryBindingIds || []), [selectedGeometryBindingIds]);
   const selectedGeometry = useMemo(() => {
-    if (!selectedGeometryId) return null;
-    return rows.find((g) => g.id === selectedGeometryId) || null;
-  }, [rows, selectedGeometryId]);
+    if (!effectiveSelectedGeometryId) return null;
+    return rows.find((g) => g.id === effectiveSelectedGeometryId) || null;
+  }, [effectiveSelectedGeometryId, rows]);
   const visibleRows = useMemo(() => {
     return rows
-      .filter((g) => g.id !== selectedGeometryId)
+      .filter((g) => g.id !== effectiveSelectedGeometryId)
       .sort((a, b) => {
         const aBound = bindingSet.has(a.id);
         const bBound = bindingSet.has(b.id);
         if (aBound !== bBound) return aBound ? -1 : 1;
         return a.id.localeCompare(b.id);
       });
-  }, [bindingSet, rows, selectedGeometryId]);
+  }, [bindingSet, effectiveSelectedGeometryId, rows]);
 
   const handleFocusKeyDown = (event: KeyboardEvent<HTMLDivElement>, geometryId: string) => {
     if (!canFocusGeometry) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
+    setHoveredGeometryId((current) => (current === geometryId ? null : current));
+    onFocusGeometry?.(geometryId);
+  };
+
+  const handleFocusGeometry = (geometryId: string) => {
+    setHoveredGeometryId((current) => (current === geometryId ? null : current));
     onFocusGeometry?.(geometryId);
   };
 
@@ -75,6 +97,7 @@ export default function GeometryBindingPanel({
         borderRadius: "8px",
         border: "1px solid #1f2937",
       }}
+      onMouseLeave={() => setHoveredGeometryId(null)}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -92,7 +115,7 @@ export default function GeometryBindingPanel({
             <input
               type="checkbox"
               checked={bindingFilterEnabled}
-              onChange={(e) => onBindingFilterEnabledChange(e.target.checked)}
+              onChange={(e) => setGeometryBindingFilterEnabled(e.target.checked)}
               style={{ width: 14, height: 14 }}
             />
             <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>Filter</span>
@@ -130,15 +153,26 @@ export default function GeometryBindingPanel({
             marginTop: 10,
             padding: "8px",
             borderRadius: "6px",
-            border: "1px solid rgba(59, 130, 246, 0.45)",
-            background: "rgba(37, 99, 235, 0.12)",
+            border:
+              hoveredGeometryId === selectedGeometry.id
+                ? "1px solid rgba(245, 158, 11, 0.95)"
+                : "1px solid rgba(59, 130, 246, 0.45)",
+            background:
+              hoveredGeometryId === selectedGeometry.id
+                ? "rgba(245, 158, 11, 0.18)"
+                : "rgba(37, 99, 235, 0.12)",
             cursor: canFocusGeometry ? "pointer" : "default",
+            boxShadow:
+              hoveredGeometryId === selectedGeometry.id
+                ? "0 0 0 2px rgba(251, 191, 36, 0.18)"
+                : "none",
           }}
           title={selectedGeometry.id}
           role={canFocusGeometry ? "button" : undefined}
           tabIndex={canFocusGeometry ? 0 : undefined}
-          onClick={() => onFocusGeometry?.(selectedGeometry.id)}
+          onClick={() => handleFocusGeometry(selectedGeometry.id)}
           onKeyDown={(event) => handleFocusKeyDown(event, selectedGeometry.id)}
+          onMouseEnter={() => setHoveredGeometryId(selectedGeometry.id)}
         >
           <div
             style={{
@@ -187,25 +221,36 @@ export default function GeometryBindingPanel({
           {visibleRows
             .map((g) => {
               const isBound = bindingSet.has(g.id);
+              const isHovered = hoveredGeometryId === g.id;
               return (
                 <div
                   key={g.id}
                   style={{
                     padding: "8px",
                     borderRadius: "6px",
-                    border: isBound ? "1px solid rgba(20, 184, 166, 0.65)" : "1px solid #1f2937",
-                    background: isBound ? "rgba(20, 184, 166, 0.12)" : "transparent",
+                    border: isHovered
+                      ? "1px solid rgba(245, 158, 11, 0.95)"
+                      : isBound
+                        ? "1px solid rgba(20, 184, 166, 0.65)"
+                        : "1px solid #1f2937",
+                    background: isHovered
+                      ? "rgba(245, 158, 11, 0.18)"
+                      : isBound
+                        ? "rgba(20, 184, 166, 0.12)"
+                        : "transparent",
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
                     cursor: canFocusGeometry ? "pointer" : "default",
                     opacity: canBindToggle ? 1 : 0.75,
+                    boxShadow: isHovered ? "0 0 0 2px rgba(251, 191, 36, 0.18)" : "none",
                   }}
                   title={g.id}
                   role={canFocusGeometry ? "button" : undefined}
                   tabIndex={canFocusGeometry ? 0 : undefined}
-                  onClick={() => onFocusGeometry?.(g.id)}
+                  onClick={() => handleFocusGeometry(g.id)}
                   onKeyDown={(event) => handleFocusKeyDown(event, g.id)}
+                  onMouseEnter={() => setHoveredGeometryId(g.id)}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div

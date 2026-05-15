@@ -7,7 +7,7 @@ import { initLine } from "@/uhm/lib/map/engines/lineEngine";
 import { initPath } from "@/uhm/lib/map/engines/pathEngine";
 import { initCircle } from "@/uhm/lib/map/engines/circleEngine";
 import { createEditingEngine } from "@/uhm/lib/map/engines/editingEngine";
-import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
+import { FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 import { buildClientFeatureId, getSelectableLayers } from "./mapUtils";
 import { MapHoverPayload } from "../Map";
@@ -15,7 +15,7 @@ import { MapHoverPayload } from "../Map";
 type EngineBinding = {
     cleanup: () => void;
     cancel?: () => void;
-    clearSelection?: () => void;
+    clearSelection?: (skipNotify?: boolean) => void;
 };
 
 type UseMapInteractionProps = {
@@ -143,7 +143,9 @@ export function useMapInteraction({
                     const originalFeature = draftRef.current.features.find(
                         (item) => String(item.properties.id) === String(rawId)
                     );
-                    editingEngineRef.current?.beginEditing((originalFeature || feature) as any);
+                    editingEngineRef.current?.beginEditing(
+                        (originalFeature || feature) as unknown as maplibregl.MapGeoJSONFeature
+                    );
                 }
                 : undefined,
             (ids) => onSelectFeatureIdsRef.current?.(ids),

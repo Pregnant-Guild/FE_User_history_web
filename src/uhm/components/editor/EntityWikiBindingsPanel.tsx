@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import type { WikiSnapshot } from "@/uhm/types/wiki";
+import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
+import { useEditorStore } from "@/uhm/store/editorStore";
 
 type EntityChoice = { id: string; name: string; isNew?: boolean };
 type WikiChoice = { id: string; title: string; isNew?: boolean };
@@ -18,9 +20,6 @@ type BindingRow = {
 };
 
 type Props = {
-  entities: EntityChoice[];
-  wikis: WikiSnapshot[];
-  links: EntityWikiLinkSnapshot[];
   setLinks: React.Dispatch<React.SetStateAction<EntityWikiLinkSnapshot[]>>;
 };
 
@@ -29,7 +28,20 @@ function wikiTitle(w: WikiSnapshot): string {
   return t.length ? t : "Untitled wiki";
 }
 
-export default function EntityWikiBindingsPanel({ entities, wikis, links, setLinks }: Props) {
+export default function EntityWikiBindingsPanel({ setLinks }: Props) {
+  const {
+    entityCatalog,
+    snapshotEntities,
+    wikis,
+    links,
+  } = useEditorStore(
+    useShallow((state) => ({
+      entityCatalog: state.entityCatalog,
+      snapshotEntities: state.snapshotEntities,
+      wikis: state.snapshotWikis,
+      links: state.snapshotEntityWikiLinks,
+    }))
+  );
   const [activeEntityId, setActiveEntityId] = useState<string>("");
   const [activeWikiId, setActiveWikiId] = useState<string>("");
   const [collapsed, setCollapsed] = useState(false);
@@ -46,11 +58,29 @@ export default function EntityWikiBindingsPanel({ entities, wikis, links, setLin
     [wikis]
   );
 
-  const entityChoices = useMemo(() => {
-    const cleaned = (entities || []).filter((e) => e && typeof e.id === "string" && e.id.trim().length > 0);
-    cleaned.sort((a, b) => a.name.localeCompare(b.name));
-    return cleaned;
-  }, [entities]);
+  const entityChoices = useMemo<EntityChoice[]>(() => {
+    const visibleSnapshotEntities = new globalThis.Map<string, { id: string; name: string; isNew: boolean }>();
+    for (const ref of snapshotEntities || []) {
+      const id = String(ref?.id || "").trim();
+      if (!id || ref?.operation === "delete" || visibleSnapshotEntities.has(id)) continue;
+      visibleSnapshotEntities.set(id, {
+        id,
+        name: String(ref?.name || id),
+        isNew: ref?.source === "inline" && ref?.operation === "create",
+      });
+    }
+
+    const rows = Array.from(visibleSnapshotEntities.values()).map((entity) => {
+      const found = entityCatalog.find((item) => String(item.id) === entity.id) || null;
+      return {
+        id: entity.id,
+        name: String(found?.name || entity.name || entity.id),
+        isNew: entity.isNew,
+      };
+    });
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    return rows;
+  }, [entityCatalog, snapshotEntities]);
 
   const activeLinks = useMemo(() => {
     const set = new Set<string>();
