@@ -20,6 +20,7 @@ type Props = {
     isEntitySubmitting: boolean;
     onApplyGeometryMetadata: () => Promise<{ ok: boolean; error?: string }>;
     changeCount: number;
+    onReplayEdit?: (id: string | number) => void;
 };
 
 export default function SelectedGeometryPanel({
@@ -30,6 +31,7 @@ export default function SelectedGeometryPanel({
     isEntitySubmitting,
     onApplyGeometryMetadata,
     changeCount,
+    onReplayEdit,
 }: Props) {
     const [collapsed, setCollapsed] = useState(false);
     const [geoApplyFeedback, setGeoApplyFeedback] = useState<
@@ -201,6 +203,20 @@ export default function SelectedGeometryPanel({
                         >
                             Apply
                         </button>
+                        {onReplayEdit && selectedFeatures.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => onReplayEdit(selectedFeatures[0].properties.id)}
+                                style={{
+                                    ...primaryGeometryButtonStyle,
+                                    background: "#1e293b",
+                                    border: "1px solid #334155",
+                                    color: "#38bdf8",
+                                }}
+                            >
+                                Replay Edit
+                            </button>
+                        )}
                         {visibleGeoApplyFeedback ? (
                             <div
                                 style={{

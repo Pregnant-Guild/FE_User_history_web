@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
@@ -17,6 +17,16 @@ export type MapHoverPayload = {
     feature: Feature | null;
     point: { x: number; y: number };
     lngLat: { lng: number; lat: number };
+};
+
+export type MapHandle = {
+    getViewState: () => {
+        center: { lng: number; lat: number };
+        zoom: number;
+        pitch: number;
+        bearing: number;
+        projection: string;
+    } | null;
 };
 
 type MapProps = {
@@ -45,7 +55,7 @@ type MapProps = {
     onToggleHideOutside?: () => void;
 };
 
-export default function Map({
+const Map = forwardRef<MapHandle, MapProps>(function Map({
     mode,
     onSetMode,
     draft,
@@ -69,7 +79,7 @@ export default function Map({
     focusPadding,
     hideOutside = false,
     onToggleHideOutside,
-}: MapProps) {
+}, ref) {
     const modeRef = useRef<MapProps["mode"]>(mode);
     const draftRef = useRef<FeatureCollection>(draft);
     const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
@@ -100,7 +110,20 @@ export default function Map({
         geolocationCenteredRef,
         handleZoomByStep,
         handleZoomSliderChange,
+        getViewState,
     } = useMapInstance();
+
+    useImperativeHandle(ref, () => ({
+        getViewState,
+    }), [getViewState]);
+
+    const handleLogViewState = useCallback(() => {
+        const state = getViewState();
+        console.log("Current Map View State:", state);
+        if (state) {
+            alert(`Captured View State:\nCenter: ${state.center.lng.toFixed(4)}, ${state.center.lat.toFixed(4)}\nZoom: ${state.zoom.toFixed(2)}\nPitch: ${state.pitch.toFixed(1)}°\nBearing: ${state.bearing.toFixed(1)}°\nProjection: ${state.projection}`);
+        }
+    }, [getViewState]);
 
     const {
         editingEngineRef,
@@ -249,6 +272,27 @@ export default function Map({
                                 }}
                             >
                                 Thoát Replay Edit
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleLogViewState}
+                                title="Capture current map view state"
+                                style={{
+                                    ...zoomButtonStyle,
+                                    width: "auto",
+                                    padding: "0 12px",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    background: "#1e293b",
+                                    color: "#38bdf8",
+                                    border: "1px solid #334155",
+                                    borderRadius: "999px",
+                                    cursor: "pointer",
+                                    marginRight: "8px",
+                                }}
+                            >
+                                Capture View
                             </button>
 
                             <div
@@ -406,7 +450,9 @@ export default function Map({
             </div>
         </div>
     );
-}
+});
+
+export default Map;
 
 const zoomButtonStyle: React.CSSProperties = {
     width: "28px",

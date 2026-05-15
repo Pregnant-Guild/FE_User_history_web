@@ -220,10 +220,7 @@ export function initSelect(
             hasMenuItems = true;
         }
 
-        if (
-            selectedCount === 1 &&
-            onReplayEdit
-        ) {
+        if (onReplayEdit) {
             const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
             if (featureId) {
                 menu.appendChild(createItem("Replay Edit", () => onReplayEdit(featureId)));

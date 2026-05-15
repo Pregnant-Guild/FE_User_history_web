@@ -64,6 +64,8 @@ export function useMapInteraction({
     useEffect(() => {
         if (mode !== "select" || !selectedFeatureIds || selectedFeatureIds.length === 0) {
             editingEngineRef.current?.clearEditing();
+            // Clear the internal selection state of the select engine to stay in sync with React state
+            engineBindingsRef.current.select?.clearSelection?.(false);
         }
     }, [mode, selectedFeatureIds]);
 

@@ -5,7 +5,7 @@ import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, Geometry, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 
-import type { EditorSnapshot, Project } from "@/uhm/types/projects";
+import type { BattleReplay, EditorSnapshot, Project } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
@@ -312,6 +312,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         wikis,
         geometry_entity: geometryEntity || migratedGeometryEntity,
         entity_wiki: entityWikis,
+        replays: Array.isArray(snapshot.replays) ? (snapshot.replays as BattleReplay[]) : undefined,
     };
 }
 
@@ -322,6 +323,7 @@ export function buildEditorSnapshot(options: {
     snapshotEntities: EntitySnapshot[];
     snapshotWikis: WikiSnapshot[];
     snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
+    replays: BattleReplay[];
     previousSnapshot: EditorSnapshot | null;
     hasPersistedFeature: (id: Feature["properties"]["id"]) => boolean;
 }): EditorSnapshot {
@@ -663,6 +665,7 @@ export function buildEditorSnapshot(options: {
             }))
             .sort((a, b) => a.id.localeCompare(b.id)),
         entity_wiki: entityWikis,
+        replays: options.replays,
     };
 }
 
@@ -683,6 +686,14 @@ export function toApiEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
             }
 
             return row as unknown as GeometrySnapshot;
+        });
+    }
+
+    if (Array.isArray(cloned.replays)) {
+        cloned.replays = cloned.replays.map((replay) => {
+            // Strip local-only replay_features before sending to BE
+            const { replay_features: _, ...rest } = replay;
+            return rest;
         });
     }
 

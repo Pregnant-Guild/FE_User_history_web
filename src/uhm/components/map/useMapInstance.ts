@@ -125,6 +125,20 @@ export function useMapInstance() {
         setZoomLevel(next);
     }, [zoomBounds]);
 
+    const getViewState = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return null;
+        const center = map.getCenter();
+        const projection = map.getProjection();
+        return {
+            center: { lng: center.lng, lat: center.lat },
+            zoom: map.getZoom(),
+            pitch: map.getPitch(),
+            bearing: map.getBearing(),
+            projection: String(projection?.type || "mercator"),
+        };
+    }, []);
+
     return {
         mapRef,
         containerRef,
@@ -138,5 +152,6 @@ export function useMapInstance() {
         geolocationCenteredRef,
         handleZoomByStep,
         handleZoomSliderChange,
+        getViewState,
     };
 }

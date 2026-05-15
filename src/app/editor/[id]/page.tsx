@@ -188,12 +188,16 @@ export default function Page() {
     }, [snapshotEntityWikiLinks]);
 
     const editor = useEditorState(initialData, {
-        snapshotEntitiesRef,
-        setSnapshotEntities,
-        snapshotWikisRef,
-        setSnapshotWikis,
-        snapshotEntityWikiLinksRef,
-        setSnapshotEntityWikiLinks,
+        snapshotUndo: {
+            snapshotEntitiesRef,
+            setSnapshotEntities,
+            snapshotWikisRef,
+            setSnapshotWikis,
+            snapshotEntityWikiLinksRef,
+            setSnapshotEntityWikiLinks,
+        },
+        initialReplays: baselineSnapshot?.replays,
+        mode: mode,
     });
     const setSnapshotWikisUndoable = useCallback(
         (next: SetStateAction<WikiSnapshot[]>) => {
@@ -266,16 +270,19 @@ export default function Page() {
     // Timeline filter: only affects persisted snapshot features.
     // New features created in the current session remain visible regardless of time range.
     const timelineVisibleDraft = useMemo(() => {
-        if (!timelineFilterEnabled) return editor.draft;
+        // Nếu ở mode replay, sử dụng replayDraft thay vì main draft
+        const activeDraft = mode === "replay" ? editor.replayDraft : editor.mainDraft;
+
+        if (!timelineFilterEnabled) return activeDraft;
         const year = clampYearToFixedRange(Math.trunc(timelineDraftYear));
         return {
-            ...editor.draft,
-            features: editor.draft.features.filter((feature) => {
+            ...activeDraft,
+            features: activeDraft.features.filter((feature) => {
                 if (!editor.hasPersistedFeature(feature.properties.id)) return true;
                 return isFeatureVisibleAtYear(feature, year);
             }),
         };
-    }, [editor, timelineDraftYear, timelineFilterEnabled]);
+    }, [editor, mode, timelineDraftYear, timelineFilterEnabled]);
 
     const projectEntityChoices = useMemo(() => {
         const ids = new Set<string>();
@@ -412,36 +419,38 @@ export default function Page() {
 
     const setMode = useCallback((m: EditorMode, featureId?: string | number) => {
         if (m === "replay" && featureId) {
-            setReplayFeatureId(featureId);
+            // QUY TẮC: Geo chọn đầu tiên là geo main.
+            const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
+            setReplayFeatureId(triggerId);
+            editor.switchReplayContext(triggerId, selectedFeatureIds);
         } else if (m !== "replay") {
+            if (mode === "replay") {
+                editor.closeReplayContext();
+                setSelectedFeatureIds([]);
+            }
             setReplayFeatureId(null);
             setHideOutside(false);
         }
         internalSetMode(m);
-    }, [internalSetMode]);
+    }, [internalSetMode, mode, editor, selectedFeatureIds]);
 
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
 
         if (mode === "replay" && replayFeatureId) {
-            // Ẩn chính geo được chọn làm replay
+            // Ẩn chính geo được chọn làm replay (marker kịch bản)
             visibility[String(replayFeatureId)] = false;
 
             if (hideOutside) {
-                // Tìm feature đang replay để lấy danh sách binding
-                const replayFeature = editor.draft.features.find(
-                    (f) => String(f.properties.id) === String(replayFeatureId)
-                );
-                const boundIds = new Set<string>();
-                if (replayFeature?.properties?.binding) {
-                    replayFeature.properties.binding.forEach((id: string) => boundIds.add(String(id)));
-                }
-
-                // Ẩn tất cả các geo không nằm trong binding
-                editor.draft.features.forEach((f) => {
-                    const fid = String(f.properties.id);
-                    if (fid !== String(replayFeatureId) && !boundIds.has(fid)) {
+                // Trong mode replay, ta chỉ hiển thị những gì có trong draft của replay đó
+                const currentReplayFeatureIds = new Set(editor.draft.features.map(f => String(f.properties.id)));
+                
+                // Ẩn tất cả các geo KHÔNG nằm trong draft replay hiện tại
+                Object.keys(visibility).forEach(fid => {
+                    if (fid === String(replayFeatureId)) {
                         visibility[fid] = false;
+                    } else {
+                        visibility[fid] = currentReplayFeatureIds.has(fid);
                     }
                 });
             }
@@ -1686,6 +1695,7 @@ export default function Page() {
                                         isEntitySubmitting={isEntitySubmitting}
                                         onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
                                         changeCount={editor.changeCount}
+                                        onReplayEdit={(id) => setMode("replay", id)}
                                     />
                                 ) : null}
                             </div>

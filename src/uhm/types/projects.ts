@@ -84,7 +84,72 @@ export type EditorSnapshot = {
     geometry_entity?: GeometryEntitySnapshot[];
     wikis?: WikiSnapshot[];
     entity_wiki?: EntityWikiLinkSnapshot[];
+    replays?: BattleReplay[];
 };
+
+// ---- Replay / Scripting System ----
+
+export type UIFunctionName =
+    | "hide_timeline"            // Ẩn thanh timeline
+    | "hide_layer_panel"         // Ẩn panel lớp bản đồ
+    | "hide_wiki_panel"          // Ẩn panel wiki (bên phải)
+    | "hide_zoom_panel"          // Ẩn các nút điều khiển zoom
+    | "hide_all_UI"              // Ẩn toàn bộ giao diện điều khiển (cinematic mode)
+    | "open_wiki"                // Mở panel wiki
+    | "show_toast_message"       // Hiển thị thông báo ngắn (toast)
+    | "focus_wiki_header"        // Cuộn đến đề mục cụ thể trong Wiki
+    | "set_playback_speed";      // Thay đổi tốc độ phát replay
+
+export type MapFunctionName =
+    | "zoom_to_lnglat"           // Di chuyển camera đến tọa độ [lng, lat]
+    | "zoom_scale"               // Thay đổi mức zoom của bản đồ
+    | "zoom_geometries"          // Zoom bao quát danh sách các geometry
+    | "change_geometry_color"    // Thay đổi màu của một geometry
+    | "change_geometries_color"  // Thay đổi màu của danh sách geometry
+    | "change_geometry_texture"  // Thay đổi texture của một geometry
+    | "change_geometries_texture"// Thay đổi texture của danh sách geometry
+    | "hide_geometries"          // Ẩn danh sách các geometry
+    | "set_camera_view"          // Đặt trạng thái camera (center, zoom, pitch, bearing)
+    | "fly_to_geometry"          // Di chuyển mượt mà đến một geometry
+    | "rotate_around_point"      // Xoay camera quanh một điểm
+    | "pulse_geometry"           // Hiệu ứng nhấp nháy cho geometry
+    | "set_time_filter"          // Thay đổi bộ lọc thời gian trên bản đồ
+    | "toggle_labels";           // Bật/tắt hiển thị nhãn (labels) trên bản đồ
+
+export type NarrativeFunctionName =
+    | "set_title"                // Đặt tiêu đề cho bước replay
+    | "set_descriptions"         // Đặt mô tả/nội dung diễn giải
+    | "show_dialog_box"          // Hiển thị hộp thoại dẫn chuyện (có avatar)
+    | "display_historical_image" // Hiển thị hình ảnh tư liệu đè lên bản đồ
+    | "set_step_subtitle";       // Hiển thị phụ đề phía dưới màn hình
+
+export type ReplayAction<T> = {
+    function_name: T;
+    params: any[];
+};
+
+export type ReplayStep = {
+    duration: number; // Trọng số thời gian của step trong 1 stage
+    use_UI_function: ReplayAction<UIFunctionName>[];
+    use_map_function: ReplayAction<MapFunctionName>[];
+    use_narrow_function: ReplayAction<NarrativeFunctionName>[];
+};
+
+export type ReplayStage = {
+    id: number; // số đếm thứ tự từ 0
+    title?: string;
+    detail_time_start: string;
+    detail_time_stop: string;
+    steps: ReplayStep[];
+};
+
+export type BattleReplay = {
+    geometry_id: string; // geometry mà khi nhấn vào là có thể replay
+    detail: ReplayStage[];
+    // Local-only: separate draft for this specific replay
+    replay_features?: FeatureCollection;
+};
+
 
 // Alias for clearer naming at API boundary: commits.snapshot_json is this shape.
 export type CommitSnapshot = EditorSnapshot;

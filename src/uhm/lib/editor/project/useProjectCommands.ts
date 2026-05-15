@@ -12,12 +12,14 @@ import {
 import { buildEditorSnapshot, normalizeEditorSnapshot, toApiEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { Feature, FeatureCollection, FeatureId, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
-import type { EditorSnapshot, Project, ProjectCommit, ProjectState, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import type { BattleReplay, EditorSnapshot, Project, ProjectCommit, ProjectState, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 
 type EditorDraftApi = {
     draft: FeatureCollection;
+    mainDraft: FeatureCollection;
+    replays: BattleReplay[];
     buildPayload: () => Change[];
     clearChanges: () => void;
     hasPersistedFeature: (id: Feature["properties"]["id"]) => boolean;
@@ -96,11 +98,12 @@ export function useProjectCommands(options: Options) {
         try {
             const snapshot = buildEditorSnapshot({
                 project: options.activeSection,
-                draft: options.editor.draft,
+                draft: options.editor.mainDraft,
                 changes: geometryChanges,
                 snapshotEntities: options.snapshotEntities,
                 snapshotWikis: options.snapshotWikis,
                 snapshotEntityWikiLinks: options.snapshotEntityWikiLinks,
+                replays: options.editor.replays,
                 previousSnapshot: options.baselineSnapshot,
                 hasPersistedFeature: options.editor.hasPersistedFeature,
             });
