@@ -6,7 +6,7 @@ import type {
 } from "@/uhm/types/geo";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
 export type Change = GeometryChange;
 
@@ -15,6 +15,8 @@ export type UndoAction =
     | { type: "properties"; id: FeatureProperties["id"]; prevProperties: FeatureProperties }
     | { type: "delete"; feature: Feature }
     | { type: "create"; id: FeatureProperties["id"] }
+    | { type: "replay"; geometryId: string; label: string; prevReplay: BattleReplay | null }
+    | { type: "replay_session"; geometryId: string; label: string; prevReplay: BattleReplay | null }
     // Snapshot-scoped undo (affects commit snapshot but not GeoJSON draft directly)
     | { type: "snapshot_entities"; label: string; prev: EntitySnapshot[] }
     | { type: "snapshot_wikis"; label: string; prev: WikiSnapshot[] }

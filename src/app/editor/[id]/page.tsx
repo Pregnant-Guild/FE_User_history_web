@@ -46,7 +46,7 @@ import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/utils/tim
 import { useFeatureCommands } from "./featureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import UnifiedSearchBar from "@/uhm/components/ui/UnifiedSearchBar";
 import {
     EditorStoreProvider,
@@ -424,11 +424,22 @@ function EditorPageContent() {
         }
     }, [snapshotEntityWikiLinks, baselineSnapshot?.entity_wiki]);
 
+    const replayDirty = useMemo(() => {
+        const prev = normalizeReplaysForCompare(baselineSnapshot?.replays);
+        const next = normalizeReplaysForCompare(editor.effectiveReplays);
+        try {
+            return JSON.stringify(prev) !== JSON.stringify(next);
+        } catch {
+            return true;
+        }
+    }, [baselineSnapshot?.replays, editor.effectiveReplays]);
+
     const pendingSaveCount =
         editor.changeCount
         + (wikiDirty ? 1 : 0)
         + (entitiesDirty ? 1 : 0)
-        + (entityWikiDirty ? 1 : 0);
+        + (entityWikiDirty ? 1 : 0)
+        + (replayDirty ? 1 : 0);
 
     const sectionCommands = useProjectCommands({
         editor,
@@ -1380,6 +1391,8 @@ function EditorPageContent() {
                             focusPadding={96}
                             hideOutside={hideOutside}
                             onToggleHideOutside={onToggleHideOutside}
+                            onUndoReplay={editor.undo}
+                            canUndoReplay={editor.canUndoReplay}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -1800,6 +1813,36 @@ function normalizeEntityWikiLinksForCompare(input: Array<{ entity_id: string; wi
         }))
         .sort((a, b) => (a.entity_id + a.wiki_id).localeCompare(b.entity_id + b.wiki_id));
     return normalized;
+}
+
+function normalizeReplaysForCompare(input: BattleReplay[] | null | undefined) {
+    const list = Array.isArray(input) ? input : [];
+    return list
+        .filter((replay) => replay && typeof replay.geometry_id === "string" && replay.geometry_id.trim().length > 0)
+        .map((replay) => ({
+            geometry_id: replay.geometry_id,
+            detail: Array.isArray(replay.detail) ? replay.detail : [],
+            replay_features: normalizeReplayFeatureCollection(replay.replay_features),
+        }))
+        .sort((a, b) => a.geometry_id.localeCompare(b.geometry_id));
+}
+
+function normalizeReplayFeatureCollection(input: FeatureCollection | null | undefined) {
+    const features = Array.isArray(input?.features) ? input.features : [];
+    return {
+        type: "FeatureCollection" as const,
+        features: features
+            .filter((feature) => feature && feature.properties && (typeof feature.properties.id === "string" || typeof feature.properties.id === "number"))
+            .map((feature) => ({
+                type: "Feature" as const,
+                properties: {
+                    ...feature.properties,
+                    id: String(feature.properties.id),
+                },
+                geometry: feature.geometry,
+            }))
+            .sort((a, b) => String(a.properties.id).localeCompare(String(b.properties.id))),
+    };
 }
 
 function normalizeGeoSearchGeometry(value: unknown): Geometry | null {

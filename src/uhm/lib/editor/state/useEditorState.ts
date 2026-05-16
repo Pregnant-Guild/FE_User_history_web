@@ -11,7 +11,7 @@ import { useUndoStack } from "@/uhm/lib/editor/draft/useUndoStack";
 import type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
-import type { BattleReplay, EditorSnapshot, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
+import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
@@ -32,10 +32,14 @@ type FeaturePropertiesPatch = {
     patch: Partial<FeatureProperties>;
 };
 
+type DraftRef = { current: FeatureCollection };
+type DraftCommit = (next: FeatureCollection) => void;
+type ReplayDraftSyncMode = "none" | "reset";
+
 // State trung tâm của editor:
-// - draft: dữ liệu nguồn để render UI (chuyển đổi giữa main và replay)
-// - changes: map các thay đổi chờ lưu
-// - undoStack: lịch sử thao tác tối thiểu để hoàn tác
+// - main draft: dữ liệu section thông thường
+// - active replay draft: bản sao đầy đủ của toàn bộ BattleReplay đang chỉnh
+// - replay feature draft: FeatureCollection con để map/editor hiện tại thao tác
 export function useEditorState(
     initialData: FeatureCollection,
     options: {
@@ -47,27 +51,87 @@ export function useEditorState(
     const { snapshotUndo, initialReplays, mode } = options;
 
     const mainDraftState = useDraftState(initialData);
-    const replayDraftState = useDraftState(EMPTY_FEATURE_COLLECTION);
+    const replayFeatureDraftState = useDraftState(EMPTY_FEATURE_COLLECTION);
+    const {
+        draft: mainDraft,
+        draftRef: mainDraftRef,
+        commitDraft: commitMainDraft,
+        resetDraft: resetMainDraft,
+    } = mainDraftState;
+    const {
+        draft: replayDraft,
+        draftRef: replayDraftRef,
+        commitDraft: commitReplayDraft,
+        resetDraft: resetReplayDraft,
+    } = replayFeatureDraftState;
 
     const [replays, setReplays] = useState<BattleReplay[]>(initialReplays || []);
     const [activeReplayId, setActiveReplayId] = useState<string | number | null>(null);
+    const [activeReplayDraft, setActiveReplayDraft] = useState<BattleReplay | null>(null);
 
-    const activeDraftState = mode === "replay" ? replayDraftState : mainDraftState;
-    const { draft, draftRef, commitDraft, resetDraft } = activeDraftState;
+    const replaysRef = useRef<BattleReplay[]>(initialReplays || []);
+    const activeReplayDraftRef = useRef<BattleReplay | null>(null);
+    const activeReplayOriginRef = useRef<BattleReplay | null>(null);
+    const activeReplaySeedRef = useRef<BattleReplay | null>(null);
 
-    // Map baseline (id -> feature) để diff draft hiện tại ra changes.
+    const activeDraft = mode === "replay" ? replayDraft : mainDraft;
+    const activeDraftRef = mode === "replay" ? replayDraftRef : mainDraftRef;
+    const activeCommitDraft = mode === "replay" ? commitReplayDraft : commitMainDraft;
+
+    const updateReplaysState = useCallback((next: SetStateAction<BattleReplay[]>) => {
+        const resolved = resolveStateAction(next, replaysRef.current);
+        const cloned = deepClone(resolved || []);
+        replaysRef.current = cloned;
+        setReplays(cloned);
+        return cloned;
+    }, []);
+
+    const syncReplayFeatureDraft = useCallback((nextFeatures: FeatureCollection) => {
+        resetReplayDraft(deepClone(nextFeatures));
+    }, [resetReplayDraft]);
+
+    const setActiveReplayDraftState = useCallback((
+        next: SetStateAction<BattleReplay | null>,
+        syncMode: ReplayDraftSyncMode = "reset"
+    ) => {
+        const resolved = resolveStateAction(next, activeReplayDraftRef.current);
+        const cloned = resolved ? deepClone(resolved) : null;
+        activeReplayDraftRef.current = cloned;
+        setActiveReplayDraft(cloned);
+
+        if (syncMode === "reset") {
+            syncReplayFeatureDraft(cloned?.replay_features || EMPTY_FEATURE_COLLECTION);
+        }
+
+        return cloned;
+    }, [syncReplayFeatureDraft]);
+
+    useEffect(() => {
+        replaysRef.current = replays;
+    }, [replays]);
+
+    useEffect(() => {
+        activeReplayDraftRef.current = activeReplayDraft;
+    }, [activeReplayDraft]);
+
+    // Map baseline (id -> feature) để diff main draft ra changes.
     const initialMapRef = useRef<Map<FeatureProperties["id"], Feature>>(
         buildInitialMap(initialData)
     );
     // Version counter để ép diff recalculation sau khi reset/clear baseline.
     const [baselineVersion, setBaselineVersion] = useState(0);
 
-    const applyUndoAction = useCallback((action: UndoAction): boolean => {
+    const applyUndoActionToDraft = useCallback((
+        action: UndoAction,
+        targetDraftRef: DraftRef,
+        targetCommitDraft: DraftCommit,
+        allowSnapshotUndo: boolean
+    ): boolean => {
         switch (action.type) {
             case "create": {
-                commitDraft({
-                    ...draftRef.current,
-                    features: draftRef.current.features.filter((feature) =>
+                targetCommitDraft({
+                    ...targetDraftRef.current,
+                    features: targetDraftRef.current.features.filter((feature) =>
                         feature.properties.id !== action.id
                     ),
                 });
@@ -75,54 +139,54 @@ export function useEditorState(
             }
             case "delete": {
                 const feature = deepClone(action.feature);
-                commitDraft({
-                    ...draftRef.current,
-                    features: [...draftRef.current.features, feature],
+                targetCommitDraft({
+                    ...targetDraftRef.current,
+                    features: [...targetDraftRef.current.features, feature],
                 });
                 return true;
             }
             case "update": {
-                const idx = draftRef.current.features.findIndex((feature) =>
+                const idx = targetDraftRef.current.features.findIndex((feature) =>
                     feature.properties.id === action.id
                 );
                 if (idx === -1) return false;
-                const nextFeatures = [...draftRef.current.features];
+                const nextFeatures = [...targetDraftRef.current.features];
                 nextFeatures[idx] = {
                     ...nextFeatures[idx],
                     geometry: deepClone(action.prevGeometry),
                 };
-                commitDraft({ ...draftRef.current, features: nextFeatures });
+                targetCommitDraft({ ...targetDraftRef.current, features: nextFeatures });
                 return true;
             }
             case "properties": {
-                const idx = draftRef.current.features.findIndex((feature) =>
+                const idx = targetDraftRef.current.features.findIndex((feature) =>
                     feature.properties.id === action.id
                 );
                 if (idx === -1) return false;
-                const nextFeatures = [...draftRef.current.features];
+                const nextFeatures = [...targetDraftRef.current.features];
                 nextFeatures[idx] = {
                     ...nextFeatures[idx],
                     properties: deepClone(action.prevProperties),
                 };
-                commitDraft({ ...draftRef.current, features: nextFeatures });
+                targetCommitDraft({ ...targetDraftRef.current, features: nextFeatures });
                 return true;
             }
             case "snapshot_entities": {
-                if (!snapshotUndo) return false;
+                if (!allowSnapshotUndo || !snapshotUndo) return false;
                 const prev = deepClone(action.prev);
                 snapshotUndo.snapshotEntitiesRef.current = prev;
                 snapshotUndo.setSnapshotEntities(prev);
                 return true;
             }
             case "snapshot_wikis": {
-                if (!snapshotUndo) return false;
+                if (!allowSnapshotUndo || !snapshotUndo) return false;
                 const prev = deepClone(action.prev);
                 snapshotUndo.snapshotWikisRef.current = prev;
                 snapshotUndo.setSnapshotWikis(prev);
                 return true;
             }
             case "snapshot_entity_wiki": {
-                if (!snapshotUndo) return false;
+                if (!allowSnapshotUndo || !snapshotUndo) return false;
                 const prev = deepClone(action.prev);
                 snapshotUndo.snapshotEntityWikiLinksRef.current = prev;
                 snapshotUndo.setSnapshotEntityWikiLinks(prev);
@@ -131,41 +195,187 @@ export function useEditorState(
             case "group": {
                 let applied = true;
                 for (let i = action.actions.length - 1; i >= 0; i -= 1) {
-                    applied = applyUndoAction(action.actions[i]) && applied;
+                    applied = applyUndoActionToDraft(
+                        action.actions[i],
+                        targetDraftRef,
+                        targetCommitDraft,
+                        allowSnapshotUndo
+                    ) && applied;
                 }
                 return applied;
             }
+            case "replay":
+            case "replay_session":
             default:
                 return false;
         }
-    }, [commitDraft, draftRef, snapshotUndo]);
+    }, [snapshotUndo]);
 
-    const { undoStack, pushUndo, undo, clearUndo } = useUndoStack({ applyUndoAction });
+    const applyMainUndoAction = useCallback((action: UndoAction): boolean => {
+        if (action.type === "replay") {
+            const restoredReplay = action.prevReplay ? deepClone(action.prevReplay) : null;
+            updateReplaysState((prev) =>
+                replaceReplayByGeometryId(prev, action.geometryId, restoredReplay)
+            );
+
+            if (activeReplayId != null && String(activeReplayId) === action.geometryId) {
+                activeReplayOriginRef.current = restoredReplay ? deepClone(restoredReplay) : null;
+                activeReplaySeedRef.current = restoredReplay ? deepClone(restoredReplay) : null;
+                setActiveReplayDraftState(restoredReplay, "reset");
+            }
+            return true;
+        }
+
+        return applyUndoActionToDraft(
+            action,
+            mainDraftRef,
+            commitMainDraft,
+            true
+        );
+    }, [
+        activeReplayId,
+        applyUndoActionToDraft,
+        commitMainDraft,
+        mainDraftRef,
+        setActiveReplayDraftState,
+        updateReplaysState,
+    ]);
+
+    const applyReplayUndoAction = useCallback((action: UndoAction): boolean => {
+        if (action.type !== "replay_session") return false;
+        const restoredReplay = action.prevReplay ? deepClone(action.prevReplay) : null;
+        if (!restoredReplay) return false;
+
+        setActiveReplayDraftState(restoredReplay, "reset");
+        return true;
+    }, [setActiveReplayDraftState]);
+
+    const {
+        undoStack: mainUndoStack,
+        pushUndo: pushMainUndo,
+        undo: undoMain,
+        clearUndo: clearMainUndo,
+    } = useUndoStack({ applyUndoAction: applyMainUndoAction });
+    const {
+        undoStack: replayUndoStack,
+        pushUndo: pushReplayUndo,
+        undo: undoReplay,
+        clearUndo: clearReplayUndo,
+    } = useUndoStack({ applyUndoAction: applyReplayUndoAction });
 
     useEffect(() => {
-        mainDraftState.resetDraft(deepClone(initialData));
-        replayDraftState.resetDraft(EMPTY_FEATURE_COLLECTION);
-        setReplays(initialReplays || []);
+        resetMainDraft(deepClone(initialData));
+        resetReplayDraft(EMPTY_FEATURE_COLLECTION);
+        updateReplaysState(initialReplays || []);
         setActiveReplayId(null);
-        clearUndo();
+        setActiveReplayDraftState(null, "none");
+        activeReplayOriginRef.current = null;
+        activeReplaySeedRef.current = null;
+        clearMainUndo();
+        clearReplayUndo();
         initialMapRef.current = buildInitialMap(initialData);
         setBaselineVersion((version) => version + 1);
-    }, [clearUndo, initialData, initialReplays, mainDraftState.resetDraft, replayDraftState.resetDraft]);
+    }, [
+        clearMainUndo,
+        clearReplayUndo,
+        initialData,
+        initialReplays,
+        resetMainDraft,
+        resetReplayDraft,
+        setActiveReplayDraftState,
+        updateReplaysState,
+    ]);
 
     const changes = useMemo(() => {
         const baseline = initialMapRef.current;
-        return diffDraftToInitial(draft, baseline);
+        return diffDraftToInitial(mainDraft, baseline);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [draft, baselineVersion]);
+    }, [mainDraft, baselineVersion]);
     const changeCount = useMemo(() => changes.size, [changes]);
+
+    const applyReplaySessionMutation = useCallback((
+        label: string,
+        mutator: (draftReplay: BattleReplay) => void
+    ) => {
+        const currentReplay = activeReplayDraftRef.current;
+        if (!currentReplay) return false;
+
+        const prevReplay = deepClone(currentReplay);
+        const nextReplay = deepClone(currentReplay);
+        if (!nextReplay.replay_features) {
+            nextReplay.replay_features = deepClone(EMPTY_FEATURE_COLLECTION);
+        }
+        mutator(nextReplay);
+        if (replayEquals(prevReplay, nextReplay)) {
+            return false;
+        }
+
+        pushReplayUndo({
+            type: "replay_session",
+            geometryId: nextReplay.geometry_id,
+            label,
+            prevReplay,
+        });
+        setActiveReplayDraftState(nextReplay, "reset");
+        return true;
+    }, [pushReplayUndo, setActiveReplayDraftState]);
+
+    const finalizeActiveReplaySession = useCallback((recordMainUndo = true) => {
+        if (activeReplayId == null) return;
+
+        const geometryId = String(activeReplayId);
+        const currentReplay = activeReplayDraftRef.current
+            ? deepClone(activeReplayDraftRef.current)
+            : null;
+        const originReplay = activeReplayOriginRef.current
+            ? deepClone(activeReplayOriginRef.current)
+            : null;
+        const seedReplay = activeReplaySeedRef.current
+            ? deepClone(activeReplaySeedRef.current)
+            : null;
+
+        if (!currentReplay) return;
+        if (replayEquals(currentReplay, seedReplay)) return;
+
+        updateReplaysState((prev) =>
+            replaceReplayByGeometryId(prev, geometryId, currentReplay)
+        );
+
+        if (recordMainUndo && !replayEquals(currentReplay, originReplay)) {
+            pushMainUndo({
+                type: "replay",
+                geometryId,
+                label: `Replay #${geometryId}`,
+                prevReplay: originReplay ? deepClone(originReplay) : null,
+            });
+        }
+    }, [activeReplayId, pushMainUndo, updateReplaysState]);
+
+    const effectiveReplays = useMemo(() => {
+        if (activeReplayId == null || !activeReplayDraft) return replays;
+        const seedReplay = activeReplaySeedRef.current;
+        if (!seedReplay || replayEquals(activeReplayDraft, seedReplay)) {
+            return replays;
+        }
+        return replaceReplayByGeometryId(replays, String(activeReplayId), activeReplayDraft);
+    }, [activeReplayDraft, activeReplayId, replays]);
 
     function createFeature(feature: Feature) {
         const featureClone = deepClone(feature);
-        commitDraft({
-            ...draftRef.current,
-            features: [...draftRef.current.features, featureClone],
+
+        if (mode === "replay") {
+            applyReplaySessionMutation(`Replay: thêm #${featureClone.properties.id}`, (draftReplay) => {
+                const featureDraft = ensureReplayFeatureCollection(draftReplay);
+                featureDraft.features = [...featureDraft.features, featureClone];
+            });
+            return;
+        }
+
+        activeCommitDraft({
+            ...activeDraftRef.current,
+            features: [...activeDraftRef.current.features, featureClone],
         });
-        pushUndo({ type: "create", id: featureClone.properties.id });
+        pushMainUndo({ type: "create", id: featureClone.properties.id });
     }
 
     function createFeatureWithSnapshotEntities(
@@ -173,6 +383,11 @@ export function useEditorState(
         nextEntities: SetStateAction<EntitySnapshot[]>,
         label = "Import geometry"
     ) {
+        if (mode === "replay") {
+            createFeature(feature);
+            return;
+        }
+
         const featureClone = deepClone(feature);
         const undoActions: UndoAction[] = [];
 
@@ -202,14 +417,14 @@ export function useEditorState(
         }
 
         undoActions.push({ type: "create", id: featureClone.properties.id });
-        pushUndo(
+        pushMainUndo(
             undoActions.length === 1
                 ? undoActions[0]
                 : { type: "group", label, actions: undoActions }
         );
-        commitDraft({
-            ...draftRef.current,
-            features: [...draftRef.current.features, featureClone],
+        commitMainDraft({
+            ...mainDraftRef.current,
+            features: [...mainDraftRef.current.features, featureClone],
         });
     }
 
@@ -217,10 +432,26 @@ export function useEditorState(
         id: FeatureProperties["id"],
         patch: Partial<FeatureProperties>
     ) {
-        const idx = draftRef.current.features.findIndex((feature) => feature.properties.id === id);
+        if (mode === "replay") {
+            applyReplaySessionMutation(`Replay: cập nhật thuộc tính #${id}`, (draftReplay) => {
+                const featureDraft = ensureReplayFeatureCollection(draftReplay);
+                const idx = featureDraft.features.findIndex((feature) => feature.properties.id === id);
+                if (idx === -1) return;
+                featureDraft.features[idx] = {
+                    ...featureDraft.features[idx],
+                    properties: {
+                        ...featureDraft.features[idx].properties,
+                        ...deepClone(patch),
+                    },
+                };
+            });
+            return;
+        }
+
+        const idx = mainDraftRef.current.features.findIndex((feature) => feature.properties.id === id);
         if (idx === -1) return;
 
-        const nextFeatures = [...draftRef.current.features];
+        const nextFeatures = [...mainDraftRef.current.features];
         const prevProperties = deepClone(nextFeatures[idx].properties);
         nextFeatures[idx] = {
             ...nextFeatures[idx],
@@ -234,14 +465,42 @@ export function useEditorState(
             return;
         }
 
-        pushUndo({ type: "properties", id, prevProperties });
-        commitDraft({ ...draftRef.current, features: nextFeatures });
+        pushMainUndo({ type: "properties", id, prevProperties });
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
     function patchFeaturePropertiesBatch(
         patches: FeaturePropertiesPatch[],
         label = "Cập nhật nhiều geometry"
     ) {
+        if (mode === "replay") {
+            applyReplaySessionMutation(label, (draftReplay) => {
+                const featureDraft = ensureReplayFeatureCollection(draftReplay);
+                const mergedPatches = new Map<FeatureProperties["id"], Partial<FeatureProperties>>();
+                for (const item of patches || []) {
+                    if (!item) continue;
+                    const prev = mergedPatches.get(item.id) || {};
+                    mergedPatches.set(item.id, {
+                        ...prev,
+                        ...deepClone(item.patch),
+                    });
+                }
+
+                featureDraft.features = featureDraft.features.map((feature) => {
+                    const featurePatch = mergedPatches.get(feature.properties.id);
+                    if (!featurePatch) return feature;
+                    return {
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            ...deepClone(featurePatch),
+                        },
+                    };
+                });
+            });
+            return;
+        }
+
         const mergedPatches = new Map<FeatureProperties["id"], Partial<FeatureProperties>>();
         for (const item of patches || []) {
             if (!item) continue;
@@ -253,7 +512,7 @@ export function useEditorState(
         }
         if (!mergedPatches.size) return;
 
-        const nextFeatures = [...draftRef.current.features];
+        const nextFeatures = [...mainDraftRef.current.features];
         const undoActions: UndoAction[] = [];
 
         for (const [id, patch] of mergedPatches.entries()) {
@@ -278,43 +537,64 @@ export function useEditorState(
 
         if (!undoActions.length) return;
 
-        pushUndo(
+        pushMainUndo(
             undoActions.length === 1
                 ? undoActions[0]
                 : { type: "group", label, actions: undoActions }
         );
-        commitDraft({ ...draftRef.current, features: nextFeatures });
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
     function updateFeature(id: FeatureProperties["id"], newGeometry: Geometry) {
-        const idx = draftRef.current.features.findIndex((feature) => feature.properties.id === id);
+        if (mode === "replay") {
+            applyReplaySessionMutation(`Replay: chỉnh sửa #${id}`, (draftReplay) => {
+                const featureDraft = ensureReplayFeatureCollection(draftReplay);
+                const idx = featureDraft.features.findIndex((feature) => feature.properties.id === id);
+                if (idx === -1) return;
+                featureDraft.features[idx] = {
+                    ...featureDraft.features[idx],
+                    geometry: deepClone(newGeometry),
+                };
+            });
+            return;
+        }
+
+        const idx = mainDraftRef.current.features.findIndex((feature) => feature.properties.id === id);
         if (idx === -1) return;
 
-        const prevFeature = draftRef.current.features[idx];
+        const prevFeature = mainDraftRef.current.features[idx];
         const prevGeometry = deepClone(prevFeature.geometry);
         if (geometryEquals(prevGeometry, newGeometry)) {
             return;
         }
-        const nextFeatures = [...draftRef.current.features];
+        const nextFeatures = [...mainDraftRef.current.features];
         nextFeatures[idx] = {
             ...prevFeature,
             geometry: deepClone(newGeometry),
         };
 
-        pushUndo({ type: "update", id, prevGeometry });
-        commitDraft({ ...draftRef.current, features: nextFeatures });
+        pushMainUndo({ type: "update", id, prevGeometry });
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
     function deleteFeature(id: FeatureProperties["id"]) {
-        const idx = draftRef.current.features.findIndex((feature) => feature.properties.id === id);
+        if (mode === "replay") {
+            applyReplaySessionMutation(`Replay: xóa #${id}`, (draftReplay) => {
+                const featureDraft = ensureReplayFeatureCollection(draftReplay);
+                featureDraft.features = featureDraft.features.filter((feature) => feature.properties.id !== id);
+            });
+            return;
+        }
+
+        const idx = mainDraftRef.current.features.findIndex((feature) => feature.properties.id === id);
         if (idx === -1) return;
 
-        const feature = draftRef.current.features[idx];
-        const nextFeatures = [...draftRef.current.features];
+        const feature = mainDraftRef.current.features[idx];
+        const nextFeatures = [...mainDraftRef.current.features];
         nextFeatures.splice(idx, 1);
 
-        pushUndo({ type: "delete", feature: deepClone(feature) });
-        commitDraft({ ...draftRef.current, features: nextFeatures });
+        pushMainUndo({ type: "delete", feature: deepClone(feature) });
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
     function buildPayload(): Change[] {
@@ -322,8 +602,9 @@ export function useEditorState(
     }
 
     function clearChanges() {
-        clearUndo();
-        initialMapRef.current = buildInitialMap(mainDraftState.draftRef.current);
+        clearMainUndo();
+        clearReplayUndo();
+        initialMapRef.current = buildInitialMap(mainDraftRef.current);
         setBaselineVersion((version) => version + 1);
     }
 
@@ -332,75 +613,42 @@ export function useEditorState(
     }
 
     const switchReplayContext = useCallback((featureId: string | number, selectedIds: (string | number)[] = []) => {
-        const id = String(featureId);
-        // Lưu draft replay cũ nếu có (defensive)
-        if (activeReplayId && mode === "replay") {
-            const currentDraft = replayDraftState.draftRef.current;
-            setReplays(prev => prev.map(r =>
-                r.geometry_id === String(activeReplayId)
-                    ? { ...r, replay_features: deepClone(currentDraft) }
-                    : r
-            ));
+        const geometryId = String(featureId);
+
+        if (activeReplayId != null && String(activeReplayId) === geometryId) {
+            return;
         }
 
-        const existing = replays.find(r => r.geometry_id === id);
-
-        // Chuẩn bị data: bao gồm tất cả các geo đang chọn + binding của geo chính
-        const selectedIdsSet = new Set(selectedIds.map(String));
-        selectedIdsSet.add(id); // Luôn bao gồm geo chính
-
-        const triggerFeature = mainDraftState.draftRef.current.features.find(f => String(f.properties.id) === id);
-        const mainBoundIds = new Set(triggerFeature?.properties?.binding?.map(String) || []);
-        
-        // Quy tắc: targetIds bao gồm các geo được chọn và binding CHỈ của geo chính.
-        const targetIds = new Set([...selectedIdsSet, ...mainBoundIds]);
-
-        const gatheredFeatures = mainDraftState.draftRef.current.features
-            .filter(f => targetIds.has(String(f.properties.id)))
-            .map(deepClone);
-
-        if (existing) {
-            // Đồng bộ lại danh sách geometry theo lựa chọn mới nhất (Sync với Main Draft)
-            // Giúp "reset" danh sách geo theo multi-select và binding mới nhất, 
-            // nhưng vẫn giữ nguyên phần kịch bản (detail) đã dựng.
-            const nextFeatures: FeatureCollection = {
-                type: "FeatureCollection",
-                features: gatheredFeatures,
-            };
-            
-            replayDraftState.resetDraft(deepClone(nextFeatures));
-            // Cập nhật lại list replays để đồng bộ
-            setReplays(prev => prev.map(r => 
-                r.geometry_id === id ? { ...r, replay_features: nextFeatures } : r
-            ));
-        } else {
-            const initialFeatures: FeatureCollection = {
-                type: "FeatureCollection",
-                features: gatheredFeatures,
-            };
-            const newReplay: BattleReplay = {
-                geometry_id: id,
-                detail: [],
-                replay_features: initialFeatures,
-            };
-            setReplays(prev => [...prev, newReplay]);
-            replayDraftState.resetDraft(deepClone(initialFeatures));
+        if (activeReplayId != null) {
+            finalizeActiveReplaySession(true);
         }
-        setActiveReplayId(id);
-    }, [activeReplayId, mode, replayDraftState, replays, mainDraftState.draftRef]);
+
+        const existing = replaysRef.current.find((replay) => replay.geometry_id === geometryId) || null;
+        const seedReplay = existing
+            ? normalizeReplaySessionSeed(existing, mainDraftRef.current, geometryId, selectedIds)
+            : createReplaySessionSeed(mainDraftRef.current, geometryId, selectedIds);
+
+        activeReplayOriginRef.current = existing ? deepClone(existing) : null;
+        activeReplaySeedRef.current = deepClone(seedReplay);
+        clearReplayUndo();
+        setActiveReplayDraftState(seedReplay, "reset");
+        setActiveReplayId(geometryId);
+    }, [
+        activeReplayId,
+        clearReplayUndo,
+        finalizeActiveReplaySession,
+        mainDraftRef,
+        setActiveReplayDraftState,
+    ]);
 
     const closeReplayContext = useCallback(() => {
-        if (activeReplayId) {
-            const currentDraft = replayDraftState.draftRef.current;
-            setReplays(prev => prev.map(r =>
-                r.geometry_id === String(activeReplayId)
-                    ? { ...r, replay_features: deepClone(currentDraft) }
-                    : r
-            ));
-        }
+        finalizeActiveReplaySession(true);
         setActiveReplayId(null);
-        replayDraftState.resetDraft(EMPTY_FEATURE_COLLECTION);
-    }, [activeReplayId, replayDraftState]);
+        setActiveReplayDraftState(null, "reset");
+        activeReplayOriginRef.current = null;
+        activeReplaySeedRef.current = null;
+        clearReplayUndo();
+    }, [clearReplayUndo, finalizeActiveReplaySession, setActiveReplayDraftState]);
 
     const setSnapshotEntitiesUndoable = useCallback((
         next: SetStateAction<EntitySnapshot[]>,
@@ -419,10 +667,10 @@ export function useEditorState(
         if (!changed) return;
 
         const computedClone = deepClone(computed);
-        pushUndo({ type: "snapshot_entities", label, prev: prevClone });
+        pushMainUndo({ type: "snapshot_entities", label, prev: prevClone });
         snapshotUndo.snapshotEntitiesRef.current = computedClone;
         snapshotUndo.setSnapshotEntities(computedClone);
-    }, [pushUndo, snapshotUndo]);
+    }, [pushMainUndo, snapshotUndo]);
 
     const setSnapshotWikisUndoable = useCallback((
         next: SetStateAction<WikiSnapshot[]>,
@@ -441,10 +689,10 @@ export function useEditorState(
         if (!changed) return;
 
         const computedClone = deepClone(computed);
-        pushUndo({ type: "snapshot_wikis", label, prev: prevClone });
+        pushMainUndo({ type: "snapshot_wikis", label, prev: prevClone });
         snapshotUndo.snapshotWikisRef.current = computedClone;
         snapshotUndo.setSnapshotWikis(computedClone);
-    }, [pushUndo, snapshotUndo]);
+    }, [pushMainUndo, snapshotUndo]);
 
     const setSnapshotEntityWikiLinksUndoable = useCallback((
         next: SetStateAction<EntityWikiLinkSnapshot[]>,
@@ -465,24 +713,38 @@ export function useEditorState(
         if (!changed) return;
 
         const computedClone = deepClone(computed);
-        pushUndo({ type: "snapshot_entity_wiki", label, prev: prevClone });
+        pushMainUndo({ type: "snapshot_entity_wiki", label, prev: prevClone });
         snapshotUndo.snapshotEntityWikiLinksRef.current = computedClone;
         snapshotUndo.setSnapshotEntityWikiLinks(computedClone);
-    }, [pushUndo, snapshotUndo]);
+    }, [pushMainUndo, snapshotUndo]);
+
+    const undo = useCallback(() => {
+        if (mode === "replay") {
+            undoReplay();
+            return;
+        }
+        undoMain();
+    }, [mode, undoMain, undoReplay]);
+
+    const undoStack = mode === "replay" ? replayUndoStack : mainUndoStack;
 
     return {
-        draft,
-        draftRef,
-        mainDraft: mainDraftState.draft,
-        replayDraft: replayDraftState.draft,
+        draft: activeDraft,
+        draftRef: activeDraftRef,
+        mainDraft,
+        replayDraft,
         replays,
-        setReplays,
+        activeReplayDraft,
+        effectiveReplays,
+        setReplays: updateReplaysState,
         activeReplayId,
         switchReplayContext,
         closeReplayContext,
         changes,
         undoStack,
+        replayUndoStack,
         changeCount,
+        canUndoReplay: replayUndoStack.length > 0,
         createFeature,
         createFeatureWithSnapshotEntities,
         patchFeatureProperties,
@@ -498,4 +760,100 @@ export function useEditorState(
         setSnapshotWikis: setSnapshotWikisUndoable,
         setSnapshotEntityWikiLinks: setSnapshotEntityWikiLinksUndoable,
     };
+}
+
+function resolveStateAction<T>(next: SetStateAction<T>, prev: T): T {
+    return typeof next === "function" ? (next as (value: T) => T)(prev) : next;
+}
+
+function buildReplaySeedFeatures(
+    sourceDraft: FeatureCollection,
+    featureId: string,
+    selectedIds: (string | number)[]
+): FeatureCollection {
+    const selectedIdsSet = new Set(selectedIds.map(String));
+    selectedIdsSet.add(featureId);
+
+    const triggerFeature = sourceDraft.features.find(
+        (feature) => String(feature.properties.id) === featureId
+    );
+    const mainBoundIds = new Set(
+        Array.isArray(triggerFeature?.properties?.binding)
+            ? triggerFeature.properties.binding.map(String)
+            : []
+    );
+    const targetIds = new Set([...selectedIdsSet, ...mainBoundIds]);
+
+    return {
+        type: "FeatureCollection",
+        features: sourceDraft.features
+            .filter((feature) => targetIds.has(String(feature.properties.id)))
+            .map(deepClone),
+    };
+}
+
+function createReplaySessionSeed(
+    sourceDraft: FeatureCollection,
+    geometryId: string,
+    selectedIds: (string | number)[]
+): BattleReplay {
+    return {
+        geometry_id: geometryId,
+        detail: [],
+        replay_features: buildReplaySeedFeatures(sourceDraft, geometryId, selectedIds),
+    };
+}
+
+function normalizeReplaySessionSeed(
+    replay: BattleReplay,
+    sourceDraft: FeatureCollection,
+    geometryId: string,
+    selectedIds: (string | number)[]
+): BattleReplay {
+    const nextReplay = deepClone(replay);
+    if (!nextReplay.replay_features) {
+        nextReplay.replay_features = buildReplaySeedFeatures(sourceDraft, geometryId, selectedIds);
+    }
+    return nextReplay;
+}
+
+function ensureReplayFeatureCollection(replay: BattleReplay): FeatureCollection {
+    if (!replay.replay_features) {
+        replay.replay_features = deepClone(EMPTY_FEATURE_COLLECTION);
+    }
+    return replay.replay_features;
+}
+
+function replaceReplayByGeometryId(
+    replays: BattleReplay[],
+    geometryId: string,
+    nextReplay: BattleReplay | null
+) {
+    const next: BattleReplay[] = [];
+    let replaced = false;
+
+    for (const replay of replays || []) {
+        if (!replay || replay.geometry_id !== geometryId) {
+            next.push(replay);
+            continue;
+        }
+        if (nextReplay) {
+            next.push(deepClone(nextReplay));
+        }
+        replaced = true;
+    }
+
+    if (!replaced && nextReplay) {
+        next.push(deepClone(nextReplay));
+    }
+
+    return next;
+}
+
+function replayEquals(a: BattleReplay | null | undefined, b: BattleReplay | null | undefined) {
+    try {
+        return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    } catch {
+        return false;
+    }
 }

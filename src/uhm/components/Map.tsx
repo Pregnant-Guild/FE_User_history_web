@@ -53,6 +53,8 @@ type MapProps = {
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
     hideOutside?: boolean;
     onToggleHideOutside?: () => void;
+    onUndoReplay?: () => void;
+    canUndoReplay?: boolean;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -79,6 +81,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     focusPadding,
     hideOutside = false,
     onToggleHideOutside,
+    onUndoReplay,
+    canUndoReplay = false,
 }, ref) {
     const modeRef = useRef<MapProps["mode"]>(mode);
     const draftRef = useRef<FeatureCollection>(draft);
@@ -188,7 +192,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
             // Trigger resize after a short delay to allow layout to settle
             setTimeout(() => map.resize(), 100);
         }
-    }, [mode, isMapLoaded]);
+    }, [mode, isMapLoaded, mapRef]);
 
     return (
         <div style={{ width: "100%", height, position: "relative" }}>
@@ -293,6 +297,28 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                                 }}
                             >
                                 Capture View
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onUndoReplay}
+                                disabled={!onUndoReplay || !canUndoReplay}
+                                title="Undo thao tác replay gần nhất"
+                                style={{
+                                    ...zoomButtonStyle,
+                                    width: "auto",
+                                    padding: "0 12px",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    background: !onUndoReplay || !canUndoReplay ? "#0f172a" : "#1e293b",
+                                    color: !onUndoReplay || !canUndoReplay ? "#64748b" : "#f8fafc",
+                                    border: "1px solid #334155",
+                                    borderRadius: "999px",
+                                    cursor: !onUndoReplay || !canUndoReplay ? "not-allowed" : "pointer",
+                                    marginRight: "8px",
+                                }}
+                            >
+                                Undo Replay
                             </button>
 
                             <div

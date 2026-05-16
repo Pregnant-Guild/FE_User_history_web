@@ -20,6 +20,7 @@ type EditorDraftApi = {
     draft: FeatureCollection;
     mainDraft: FeatureCollection;
     replays: BattleReplay[];
+    effectiveReplays: BattleReplay[];
     buildPayload: () => Change[];
     clearChanges: () => void;
     hasPersistedFeature: (id: Feature["properties"]["id"]) => boolean;
@@ -78,7 +79,7 @@ export function useProjectCommands(options: Options) {
                 snapshotEntities: state.snapshotEntities,
                 snapshotWikis: state.snapshotWikis,
                 snapshotEntityWikiLinks: state.snapshotEntityWikiLinks,
-                replays: options.editor.replays,
+                replays: options.editor.effectiveReplays,
                 previousSnapshot: state.baselineSnapshot,
                 hasPersistedFeature: options.editor.hasPersistedFeature,
             });
@@ -113,7 +114,7 @@ export function useProjectCommands(options: Options) {
             state.setSnapshotEntities(sessionSnapshot.entities || []);
             state.setSnapshotWikis(sessionSnapshot.wikis || []);
             state.setSnapshotEntityWikiLinks(sessionSnapshot.entity_wiki || []);
-            state.setInitialData(options.editor.draft);
+            state.setInitialData(options.editor.mainDraft);
             options.editor.clearChanges();
             state.setCommitTitle("");
             state.setProjectCommits(await fetchProjectCommits(state.activeSection.id));

@@ -88,6 +88,22 @@ function isSameUndo(a: UndoAction | undefined, b: UndoAction) {
             const next = b as Extract<UndoAction, { type: "snapshot_entity_wiki" }>;
             return a.label === next.label && JSON.stringify(a.prev) === JSON.stringify(next.prev);
         }
+        case "replay": {
+            const next = b as Extract<UndoAction, { type: "replay" }>;
+            return (
+                a.geometryId === next.geometryId
+                && a.label === next.label
+                && JSON.stringify(a.prevReplay) === JSON.stringify(next.prevReplay)
+            );
+        }
+        case "replay_session": {
+            const next = b as Extract<UndoAction, { type: "replay_session" }>;
+            return (
+                a.geometryId === next.geometryId
+                && a.label === next.label
+                && JSON.stringify(a.prevReplay) === JSON.stringify(next.prevReplay)
+            );
+        }
         case "group": {
             const next = b as Extract<UndoAction, { type: "group" }>;
             return a.label === next.label && JSON.stringify(a.actions) === JSON.stringify(next.actions);
