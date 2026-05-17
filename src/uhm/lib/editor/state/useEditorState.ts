@@ -38,8 +38,8 @@ type ReplayDraftSyncMode = "none" | "reset";
 
 // State trung tâm của editor:
 // - main draft: dữ liệu section thông thường
-// - active replay draft: bản sao đầy đủ của toàn bộ BattleReplay đang chỉnh
-// - replay feature draft: FeatureCollection con để map/editor hiện tại thao tác
+// - active replay draft: bản sao BattleReplay đang chỉnh (script + target ids)
+// - replay feature draft: FeatureCollection local được hydrate từ mainDraft + target ids
 export function useEditorState(
     initialData: FeatureCollection,
     options: {
@@ -86,9 +86,9 @@ export function useEditorState(
         return cloned;
     }, []);
 
-    const syncReplayFeatureDraft = useCallback((nextFeatures: FeatureCollection) => {
-        resetReplayDraft(deepClone(nextFeatures));
-    }, [resetReplayDraft]);
+    const syncReplayFeatureDraft = useCallback((nextReplay: BattleReplay | null) => {
+        resetReplayDraft(buildReplayFeatureDraft(mainDraftRef.current, nextReplay));
+    }, [mainDraftRef, resetReplayDraft]);
 
     const setActiveReplayDraftState = useCallback((
         next: SetStateAction<BattleReplay | null>,
@@ -100,7 +100,7 @@ export function useEditorState(
         setActiveReplayDraft(cloned);
 
         if (syncMode === "reset") {
-            syncReplayFeatureDraft(cloned?.replay_features || EMPTY_FEATURE_COLLECTION);
+            syncReplayFeatureDraft(cloned);
         }
 
         return cloned;
@@ -302,9 +302,6 @@ export function useEditorState(
 
         const prevReplay = deepClone(currentReplay);
         const nextReplay = deepClone(currentReplay);
-        if (!nextReplay.replay_features) {
-            nextReplay.replay_features = deepClone(EMPTY_FEATURE_COLLECTION);
-        }
         mutator(nextReplay);
         if (replayEquals(prevReplay, nextReplay)) {
             return false;
@@ -364,10 +361,6 @@ export function useEditorState(
         const featureClone = deepClone(feature);
 
         if (mode === "replay") {
-            applyReplaySessionMutation(`Replay: thêm #${featureClone.properties.id}`, (draftReplay) => {
-                const featureDraft = ensureReplayFeatureCollection(draftReplay);
-                featureDraft.features = [...featureDraft.features, featureClone];
-            });
             return;
         }
 
@@ -384,7 +377,6 @@ export function useEditorState(
         label = "Import geometry"
     ) {
         if (mode === "replay") {
-            createFeature(feature);
             return;
         }
 
@@ -433,18 +425,6 @@ export function useEditorState(
         patch: Partial<FeatureProperties>
     ) {
         if (mode === "replay") {
-            applyReplaySessionMutation(`Replay: cập nhật thuộc tính #${id}`, (draftReplay) => {
-                const featureDraft = ensureReplayFeatureCollection(draftReplay);
-                const idx = featureDraft.features.findIndex((feature) => feature.properties.id === id);
-                if (idx === -1) return;
-                featureDraft.features[idx] = {
-                    ...featureDraft.features[idx],
-                    properties: {
-                        ...featureDraft.features[idx].properties,
-                        ...deepClone(patch),
-                    },
-                };
-            });
             return;
         }
 
@@ -474,30 +454,6 @@ export function useEditorState(
         label = "Cập nhật nhiều geometry"
     ) {
         if (mode === "replay") {
-            applyReplaySessionMutation(label, (draftReplay) => {
-                const featureDraft = ensureReplayFeatureCollection(draftReplay);
-                const mergedPatches = new Map<FeatureProperties["id"], Partial<FeatureProperties>>();
-                for (const item of patches || []) {
-                    if (!item) continue;
-                    const prev = mergedPatches.get(item.id) || {};
-                    mergedPatches.set(item.id, {
-                        ...prev,
-                        ...deepClone(item.patch),
-                    });
-                }
-
-                featureDraft.features = featureDraft.features.map((feature) => {
-                    const featurePatch = mergedPatches.get(feature.properties.id);
-                    if (!featurePatch) return feature;
-                    return {
-                        ...feature,
-                        properties: {
-                            ...feature.properties,
-                            ...deepClone(featurePatch),
-                        },
-                    };
-                });
-            });
             return;
         }
 
@@ -547,15 +503,6 @@ export function useEditorState(
 
     function updateFeature(id: FeatureProperties["id"], newGeometry: Geometry) {
         if (mode === "replay") {
-            applyReplaySessionMutation(`Replay: chỉnh sửa #${id}`, (draftReplay) => {
-                const featureDraft = ensureReplayFeatureCollection(draftReplay);
-                const idx = featureDraft.features.findIndex((feature) => feature.properties.id === id);
-                if (idx === -1) return;
-                featureDraft.features[idx] = {
-                    ...featureDraft.features[idx],
-                    geometry: deepClone(newGeometry),
-                };
-            });
             return;
         }
 
@@ -579,10 +526,6 @@ export function useEditorState(
 
     function deleteFeature(id: FeatureProperties["id"]) {
         if (mode === "replay") {
-            applyReplaySessionMutation(`Replay: xóa #${id}`, (draftReplay) => {
-                const featureDraft = ensureReplayFeatureCollection(draftReplay);
-                featureDraft.features = featureDraft.features.filter((feature) => feature.properties.id !== id);
-            });
             return;
         }
 
@@ -737,6 +680,7 @@ export function useEditorState(
         activeReplayDraft,
         effectiveReplays,
         setReplays: updateReplaysState,
+        mutateActiveReplay: applyReplaySessionMutation,
         activeReplayId,
         switchReplayContext,
         closeReplayContext,
@@ -766,32 +710,6 @@ function resolveStateAction<T>(next: SetStateAction<T>, prev: T): T {
     return typeof next === "function" ? (next as (value: T) => T)(prev) : next;
 }
 
-function buildReplaySeedFeatures(
-    sourceDraft: FeatureCollection,
-    featureId: string,
-    selectedIds: (string | number)[]
-): FeatureCollection {
-    const selectedIdsSet = new Set(selectedIds.map(String));
-    selectedIdsSet.add(featureId);
-
-    const triggerFeature = sourceDraft.features.find(
-        (feature) => String(feature.properties.id) === featureId
-    );
-    const mainBoundIds = new Set(
-        Array.isArray(triggerFeature?.properties?.binding)
-            ? triggerFeature.properties.binding.map(String)
-            : []
-    );
-    const targetIds = new Set([...selectedIdsSet, ...mainBoundIds]);
-
-    return {
-        type: "FeatureCollection",
-        features: sourceDraft.features
-            .filter((feature) => targetIds.has(String(feature.properties.id)))
-            .map(deepClone),
-    };
-}
-
 function createReplaySessionSeed(
     sourceDraft: FeatureCollection,
     geometryId: string,
@@ -799,8 +717,12 @@ function createReplaySessionSeed(
 ): BattleReplay {
     return {
         geometry_id: geometryId,
+        target_geometry_ids: buildReplaySeedTargetIds(
+            sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId),
+            geometryId,
+            selectedIds
+        ),
         detail: [],
-        replay_features: buildReplaySeedFeatures(sourceDraft, geometryId, selectedIds),
     };
 }
 
@@ -811,17 +733,103 @@ function normalizeReplaySessionSeed(
     selectedIds: (string | number)[]
 ): BattleReplay {
     const nextReplay = deepClone(replay);
-    if (!nextReplay.replay_features) {
-        nextReplay.replay_features = buildReplaySeedFeatures(sourceDraft, geometryId, selectedIds);
-    }
+    const triggerFeature = sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId);
+    const seedTargetIds = buildReplaySeedTargetIds(triggerFeature, geometryId, selectedIds);
+    nextReplay.target_geometry_ids = normalizeReplayTargetGeometryIds(
+        nextReplay.target_geometry_ids,
+        geometryId,
+        seedTargetIds
+    );
     return nextReplay;
 }
 
-function ensureReplayFeatureCollection(replay: BattleReplay): FeatureCollection {
-    if (!replay.replay_features) {
-        replay.replay_features = deepClone(EMPTY_FEATURE_COLLECTION);
+function buildReplaySeedTargetIds(
+    triggerFeature: Feature | undefined,
+    featureId: string,
+    selectedIds: (string | number)[]
+) {
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+
+    const pushId = (rawId: string | number | null | undefined) => {
+        if (rawId == null) return;
+        const id = String(rawId).trim();
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        orderedIds.push(id);
+    };
+
+    pushId(featureId);
+
+    for (const rawId of selectedIds || []) {
+        pushId(rawId);
     }
-    return replay.replay_features;
+
+    if (Array.isArray(triggerFeature?.properties?.binding)) {
+        for (const rawId of triggerFeature.properties.binding) {
+            pushId(rawId);
+        }
+    }
+
+    return orderedIds;
+}
+
+function buildReplayFeatureDraft(
+    sourceDraft: FeatureCollection,
+    replay: BattleReplay | null
+): FeatureCollection {
+    if (!replay) return deepClone(EMPTY_FEATURE_COLLECTION);
+    return buildReplayFeatureDraftFromTargetIds(
+        sourceDraft,
+        normalizeReplayTargetGeometryIds(replay.target_geometry_ids, replay.geometry_id)
+    );
+}
+
+function buildReplayFeatureDraftFromTargetIds(
+    sourceDraft: FeatureCollection,
+    targetGeometryIds: string[]
+): FeatureCollection {
+    return {
+        type: "FeatureCollection",
+        features: targetGeometryIds
+            .map((id) =>
+                sourceDraft.features.find((feature) => String(feature.properties.id) === id) || null
+            )
+            .filter(Boolean)
+            .map((feature) => sanitizeReplayFeature(deepClone(feature!))),
+    };
+}
+
+function normalizeReplayTargetGeometryIds(
+    targetGeometryIds: string[] | undefined,
+    geometryId: string,
+    extraIds: (string | number)[] = []
+): string[] {
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+
+    const pushId = (rawId: string | number | null | undefined) => {
+        if (rawId == null) return;
+        const id = String(rawId).trim();
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        orderedIds.push(id);
+    };
+
+    pushId(geometryId);
+    for (const rawId of targetGeometryIds || []) pushId(rawId);
+    for (const rawId of extraIds || []) pushId(rawId);
+    return orderedIds;
+}
+
+function sanitizeReplayFeature(feature: Feature): Feature {
+    return {
+        ...feature,
+        properties: {
+            ...feature.properties,
+            binding: [],
+        },
+    };
 }
 
 function replaceReplayByGeometryId(

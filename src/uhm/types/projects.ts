@@ -89,32 +89,41 @@ export type EditorSnapshot = {
 
 // ---- Replay / Scripting System ----
 
-export type UIFunctionName =
-    | "hide_timeline"            // Ẩn thanh timeline
-    | "hide_layer_panel"         // Ẩn panel lớp bản đồ
-    | "hide_wiki_panel"          // Ẩn panel wiki (bên phải)
-    | "hide_zoom_panel"          // Ẩn các nút điều khiển zoom
-    | "hide_all_UI"              // Ẩn toàn bộ giao diện điều khiển (cinematic mode)
-    | "open_wiki"                // Mở panel wiki
-    | "show_toast_message"       // Hiển thị thông báo ngắn (toast)
-    | "focus_wiki_header"        // Cuộn đến đề mục cụ thể trong Wiki
-    | "set_playback_speed";      // Thay đổi tốc độ phát replay
+export type UIOptionName =
+    | "timeline"                 // Ẩn/hiện timeline
+    | "layer_panel"              // Ẩn/hiện panel layer
+    | "wiki_panel"               // Ẩn/hiện panel wiki
+    | "zoom_panel"               // Ẩn/hiện nút zoom
+    | "wiki"                     // Mở/chọn wiki
+    | "toast"                    // Hiển thị toast
+    | "wiki_header"              // Focus header trong wiki
+    | "playback_speed";          // Thay đổi tốc độ phát replay
 
 export type MapFunctionName =
-    | "zoom_to_lnglat"           // Di chuyển camera đến tọa độ [lng, lat]
-    | "zoom_scale"               // Thay đổi mức zoom của bản đồ
-    | "zoom_geometries"          // Zoom bao quát danh sách các geometry
-    | "change_geometry_color"    // Thay đổi màu của một geometry
-    | "change_geometries_color"  // Thay đổi màu của danh sách geometry
-    | "change_geometry_texture"  // Thay đổi texture của một geometry
-    | "change_geometries_texture"// Thay đổi texture của danh sách geometry
-    | "hide_geometries"          // Ẩn danh sách các geometry
     | "set_camera_view"          // Đặt trạng thái camera (center, zoom, pitch, bearing)
-    | "fly_to_geometry"          // Di chuyển mượt mà đến một geometry
-    | "rotate_around_point"      // Xoay camera quanh một điểm
-    | "pulse_geometry"           // Hiệu ứng nhấp nháy cho geometry
     | "set_time_filter"          // Thay đổi bộ lọc thời gian trên bản đồ
-    | "toggle_labels";           // Bật/tắt hiển thị nhãn (labels) trên bản đồ
+    | "enable_timeline_filter"   // Bật timeline filter
+    | "disable_timeline_filter"  // Tắt timeline filter
+    | "toggle_labels"            // Legacy: bật/tắt hiển thị nhãn (labels) trên bản đồ
+    | "show_labels"              // Hiện labels
+    | "hide_labels"              // Ẩn labels
+    | "reset_camera_north";      // Đưa camera về hướng bắc
+
+export type GeoFunctionName =
+    | "fly_to_geometry"          // Legacy: di chuyển mượt mà đến một geometry
+    | "fly_to_geometries"        // Di chuyển mượt mà đến một hoặc nhiều geometry
+    | "set_geometry_visibility"  // Legacy: ẩn/hiện một hoặc nhiều geometry
+    | "show_geometries"          // Hiện một hoặc nhiều geometry
+    | "hide_geometries"          // Ẩn một hoặc nhiều geometry
+    | "fit_to_geometries"        // Legacy: fit camera theo nhiều geometry
+    | "orbit_camera_around_geometry" // Quay camera quanh một geometry
+    | "pulse_geometry"           // Hiệu ứng pulse/emphasis cho geometry
+    | "animate_dashed_border"    // Hiệu ứng border nét đứt chuyển động
+    | "set_geometry_style"       // Đổi style trực tiếp của geometry
+    | "show_geometry_label"      // Hiện label riêng cho geometry
+    | "follow_geometry_path"     // Legacy: cho camera bám theo một path geometry
+    | "follow_geometries_path"   // Cho camera bám theo chuỗi path geometry
+    | "dim_other_geometries";    // Làm mờ các geometry ngoài target set
 
 export type NarrativeFunctionName =
     | "set_title"                // Đặt tiêu đề cho bước replay
@@ -125,13 +134,14 @@ export type NarrativeFunctionName =
 
 export type ReplayAction<T> = {
     function_name: T;
-    params: any[];
+    params: unknown[];
 };
 
 export type ReplayStep = {
     duration: number; // Trọng số thời gian của step trong 1 stage
-    use_UI_function: ReplayAction<UIFunctionName>[];
+    use_UI_function: ReplayAction<UIOptionName>[];
     use_map_function: ReplayAction<MapFunctionName>[];
+    use_geo_function: ReplayAction<GeoFunctionName>[];
     use_narrow_function: ReplayAction<NarrativeFunctionName>[];
 };
 
@@ -145,9 +155,8 @@ export type ReplayStage = {
 
 export type BattleReplay = {
     geometry_id: string; // geometry mà khi nhấn vào là có thể replay
+    target_geometry_ids: string[]; // tập geometry được đưa vào replay, phần tử đầu nên là MAIN geo
     detail: ReplayStage[];
-    // Local-only: separate draft for this specific replay
-    replay_features?: FeatureCollection;
 };
 
 
@@ -175,4 +184,3 @@ export type CreateCommitInput = {
 export type RestoreCommitInput = {
     commit_id: string;
 };
-

@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useShallow } from "zustand/react/shallow";
-import Map from "@/uhm/components/Map";
+import Map, { type MapHandle } from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/editor/BackgroundLayersPanel";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import SelectedGeometryPanel from "@/uhm/components/editor/SelectedGeometryPanel";
+import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar";
+import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
@@ -82,6 +84,7 @@ function EditorPageContent() {
     const geoBindingStatusTimeoutRef = useRef<number | null>(null);
     const localCreatedEntityIdsRef = useRef<Set<string>>(new Set());
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
+    const mapHandleRef = useRef<MapHandle | null>(null);
     const {
         mode,
         internalSetMode,
@@ -151,7 +154,6 @@ function EditorPageContent() {
         setTimelineFilterEnabled,
         geometryBindingFilterEnabled,
         setGeoBindingStatus,
-        hoveredGeometryId,
         geometryFocusRequest,
         setGeometryFocusRequest,
         replayFeatureId,
@@ -228,7 +230,6 @@ function EditorPageContent() {
         setTimelineFilterEnabled: state.setTimelineFilterEnabled,
         geometryBindingFilterEnabled: state.geometryBindingFilterEnabled,
         setGeoBindingStatus: state.setGeoBindingStatus,
-        hoveredGeometryId: state.hoveredGeometryId,
         geometryFocusRequest: state.geometryFocusRequest,
         setGeometryFocusRequest: state.setGeometryFocusRequest,
         replayFeatureId: state.replayFeatureId,
@@ -287,7 +288,6 @@ function EditorPageContent() {
                 id: String(e.id || ""),
                 name: String(e.name || "").trim() || String(e.id || ""),
                 description: e.description ?? null,
-                status: typeof e.status === "number" ? e.status : 1,
                 geometry_count: 0,
             }))
             .filter((e) => e.id.length > 0 && e.name.length > 0);
@@ -297,6 +297,13 @@ function EditorPageContent() {
         () => mergeEntitySearchResults(entityCatalog, snapshotEntitiesAsEntities),
         [entityCatalog, snapshotEntitiesAsEntities]
     );
+    const [replaySelection, setReplaySelection] = useState<{
+        stageId: number | null;
+        stepIndex: number | null;
+    }>({
+        stageId: null,
+        stepIndex: null,
+    });
     const entitiesRef = useRef(entities);
     useEffect(() => {
         entitiesRef.current = entities;
@@ -382,17 +389,15 @@ function EditorPageContent() {
         return normalizeFeatureBindingIds(selectedFeature);
     }, [selectedFeature]);
 
-    const hoveredGeometryHighlight = useMemo(() => {
-        if (!hoveredGeometryId) return null;
-        const feature = editor.draft.features.find(
-            (item) => String(item.properties.id) === hoveredGeometryId
-        );
-        if (!feature) return null;
-        return {
-            type: "FeatureCollection",
-            features: [feature],
-        } as FeatureCollection;
-    }, [editor.draft.features, hoveredGeometryId]);
+    const wikiChoices = useMemo(() => {
+        return (snapshotWikis || [])
+            .filter((wiki) => wiki && wiki.operation !== "delete")
+            .map((wiki) => ({
+                id: String(wiki.id || ""),
+                label: `${(wiki.title || "").trim() || "Untitled wiki"} (${String(wiki.id || "")})`,
+            }))
+            .filter((wiki) => wiki.id.length > 0);
+    }, [snapshotWikis]);
 
     const wikiDirty = useMemo(() => {
         const prev = normalizeWikisForCompare(baselineSnapshot?.wikis);
@@ -440,6 +445,10 @@ function EditorPageContent() {
         + (entitiesDirty ? 1 : 0)
         + (entityWikiDirty ? 1 : 0)
         + (replayDirty ? 1 : 0);
+    const activeReplayStages = useMemo(
+        () => editor.activeReplayDraft?.detail || [],
+        [editor.activeReplayDraft?.detail]
+    );
 
     const sectionCommands = useProjectCommands({
         editor,
@@ -459,7 +468,9 @@ function EditorPageContent() {
             // QUY TẮC: Geo chọn đầu tiên là geo main.
             const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
             setReplayFeatureId(triggerId);
+            setReplaySelection({ stageId: null, stepIndex: null });
             editor.switchReplayContext(triggerId, selectedFeatureIds);
+            setSelectedFeatureIds([]);
         } else if (m !== "replay") {
             if (mode === "replay") {
                 editor.closeReplayContext();
@@ -467,9 +478,48 @@ function EditorPageContent() {
             }
             setReplayFeatureId(null);
             setHideOutside(false);
+            setReplaySelection({ stageId: null, stepIndex: null });
         }
         internalSetMode(m);
     }, [internalSetMode, mode, editor, selectedFeatureIds, setHideOutside, setReplayFeatureId, setSelectedFeatureIds]);
+
+    useEffect(() => {
+        if (!activeReplayStages.length) {
+            if (replaySelection.stageId != null || replaySelection.stepIndex != null) {
+                setReplaySelection({ stageId: null, stepIndex: null });
+            }
+            return;
+        }
+
+        const targetStage =
+            activeReplayStages.find((stage) => stage.id === replaySelection.stageId) ||
+            activeReplayStages[0];
+        const nextStageId = targetStage.id;
+        let nextStepIndex: number | null = null;
+
+        if (targetStage.steps.length > 0) {
+            if (
+                replaySelection.stageId === targetStage.id &&
+                replaySelection.stepIndex != null &&
+                replaySelection.stepIndex >= 0 &&
+                replaySelection.stepIndex < targetStage.steps.length
+            ) {
+                nextStepIndex = replaySelection.stepIndex;
+            } else {
+                nextStepIndex = 0;
+            }
+        }
+
+        if (
+            nextStageId !== replaySelection.stageId ||
+            nextStepIndex !== replaySelection.stepIndex
+        ) {
+            setReplaySelection({
+                stageId: nextStageId,
+                stepIndex: nextStepIndex,
+            });
+        }
+    }, [activeReplayStages, replaySelection.stageId, replaySelection.stepIndex]);
 
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
@@ -1097,7 +1147,6 @@ function EditorPageContent() {
                     operation: "reference",
                     title,
                     doc: null,
-                    updated_at: wiki.updated_at,
                 },
                 ...prev,
             ];
@@ -1119,7 +1168,6 @@ function EditorPageContent() {
             id: entityItem.entity_id,
             name: (entityItem.name || "").trim() || entityItem.entity_id,
             description: (entityItem.description || "").trim() || null,
-            status: 1,
             geometry_count: 0,
         };
 
@@ -1226,7 +1274,6 @@ function EditorPageContent() {
             id: entityId,
             name,
             description,
-            status: 1,
             geometry_count: 0,
         };
 
@@ -1241,9 +1288,7 @@ function EditorPageContent() {
                         source: "inline",
                         operation: "create",
                         name,
-                        slug: null,
                         description,
-                        status: 1,
                     },
                     ...prev,
                 ];
@@ -1317,7 +1362,19 @@ function EditorPageContent() {
                 </>
             ) : (
                 <>
-                    <div style={{ width: leftPanelWidth, height: "100vh", background: "#0b1220", borderRight: "1px solid #1f2937", flex: "0 0 auto" }} />
+                    <ReplayTimelineSidebar
+                        width={leftPanelWidth}
+                        replay={editor.activeReplayDraft}
+                        selectedStageId={replaySelection.stageId}
+                        selectedStepIndex={replaySelection.stepIndex}
+                        pendingSaveCount={pendingSaveCount}
+                        replayUndoStack={editor.replayUndoStack}
+                        canUndoReplay={editor.canUndoReplay}
+                        onSelectStep={(stageId, stepIndex) => setReplaySelection({ stageId, stepIndex })}
+                        onMutateReplay={editor.mutateActiveReplay}
+                        onUndoReplay={editor.undo}
+                        onExitReplay={() => setMode("select")}
+                    />
                     <ResizeHandle
                         title="Resize left panel"
                         onDrag={(deltaX) => {
@@ -1373,6 +1430,7 @@ function EditorPageContent() {
                 <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
                     {isBackgroundVisibilityReady ? (
                         <Map
+                            ref={mapHandleRef}
                             mode={mode}
                             onSetMode={setMode}
                             draft={timelineVisibleDraft}
@@ -1384,8 +1442,8 @@ function EditorPageContent() {
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={effectiveGeometryVisibility}
-                            respectBindingFilter={geometryBindingFilterEnabled}
-                            highlightFeatures={hoveredGeometryHighlight}
+                            respectBindingFilter={mode === "replay" ? false : geometryBindingFilterEnabled}
+                            highlightFeatures={null}
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
                             focusPadding={96}
@@ -1397,17 +1455,15 @@ function EditorPageContent() {
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
                     )}
-                    {mode !== "replay" && (
-                        <TimelineBar
-                            year={timelineDraftYear}
-                            onYearChange={handleTimelineYearChange}
-                            isLoading={false}
-                            disabled={false}
-                            statusText={null}
-                            filterEnabled={timelineFilterEnabled}
-                            onFilterEnabledChange={setTimelineFilterEnabled}
-                        />
-                    )}
+                    <TimelineBar
+                        year={timelineDraftYear}
+                        onYearChange={handleTimelineYearChange}
+                        isLoading={false}
+                        disabled={false}
+                        statusText={null}
+                        filterEnabled={timelineFilterEnabled}
+                        onFilterEnabledChange={setTimelineFilterEnabled}
+                    />
                 </div>
             ) : null}
 
@@ -1692,7 +1748,18 @@ function EditorPageContent() {
                             setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
                         }}
                     />
-                    <div style={{ width: rightPanelWidth, height: "100vh", background: "#111827", borderLeft: "1px solid #1f2937", flex: "0 0 auto" }} />
+                    <ReplayEffectsSidebar
+                        width={rightPanelWidth}
+                        replay={editor.activeReplayDraft}
+                        selectedStageId={replaySelection.stageId}
+                        selectedStepIndex={replaySelection.stepIndex}
+                        selectedFeatureIds={selectedFeatureIds.map((id) => String(id))}
+                        currentTimelineYear={timelineDraftYear}
+                        geometryChoices={geometryChoices}
+                        wikiChoices={wikiChoices}
+                        getCurrentMapViewState={() => mapHandleRef.current?.getViewState() ?? null}
+                        onMutateReplay={editor.mutateActiveReplay}
+                    />
                 </>
             )}
         </div>
@@ -1794,9 +1861,7 @@ function normalizeEntitiesForCompare(input: EntitySnapshot[] | null | undefined)
             id: String(e.id),
             source: e.source,
             name: typeof e.name === "string" ? e.name.trim() : "",
-            slug: typeof e.slug === "string" ? e.slug : null,
             description: e.description == null ? null : String(e.description),
-            status: typeof e.status === "number" ? e.status : null,
         }))
         .sort((a, b) => a.id.localeCompare(b.id));
     return normalized;
@@ -1821,28 +1886,33 @@ function normalizeReplaysForCompare(input: BattleReplay[] | null | undefined) {
         .filter((replay) => replay && typeof replay.geometry_id === "string" && replay.geometry_id.trim().length > 0)
         .map((replay) => ({
             geometry_id: replay.geometry_id,
+            target_geometry_ids: normalizeReplayTargetGeometryIdsForCompare(
+                replay.target_geometry_ids,
+                replay.geometry_id
+            ),
             detail: Array.isArray(replay.detail) ? replay.detail : [],
-            replay_features: normalizeReplayFeatureCollection(replay.replay_features),
         }))
         .sort((a, b) => a.geometry_id.localeCompare(b.geometry_id));
 }
 
-function normalizeReplayFeatureCollection(input: FeatureCollection | null | undefined) {
-    const features = Array.isArray(input?.features) ? input.features : [];
-    return {
-        type: "FeatureCollection" as const,
-        features: features
-            .filter((feature) => feature && feature.properties && (typeof feature.properties.id === "string" || typeof feature.properties.id === "number"))
-            .map((feature) => ({
-                type: "Feature" as const,
-                properties: {
-                    ...feature.properties,
-                    id: String(feature.properties.id),
-                },
-                geometry: feature.geometry,
-            }))
-            .sort((a, b) => String(a.properties.id).localeCompare(String(b.properties.id))),
+function normalizeReplayTargetGeometryIdsForCompare(
+    input: string[] | null | undefined,
+    geometryId: string
+) {
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+
+    const pushId = (rawId: string | number | null | undefined) => {
+        if (rawId == null) return;
+        const id = String(rawId).trim();
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        orderedIds.push(id);
     };
+
+    pushId(geometryId);
+    for (const rawId of input || []) pushId(rawId);
+    return orderedIds;
 }
 
 function normalizeGeoSearchGeometry(value: unknown): Geometry | null {

@@ -61,8 +61,6 @@ export type GeometrySnapshot = {
         max_lng: number;
         max_lat: number;
     } | null;
-    base_updated_at?: string;
-    base_hash?: string;
 };
 
 // Snapshot join table (geometry ↔ entity).
@@ -73,7 +71,6 @@ export type GeometryEntitySnapshot = {
     // - reference/binding: the link exists (assigned)
     // - delete: the link is removed
     operation?: "reference" | "binding" | "delete";
-    base_links_hash?: string;
 };
 
 export type GeometryChange =

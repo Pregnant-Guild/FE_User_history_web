@@ -7,32 +7,44 @@ import type { FeatureCollection } from "@/uhm/types/geo";
  */
 
 export const mapActions = {
-    // Di chuyển camera đến tọa độ [lng, lat]
-    zoom_to_lnglat: (map: maplibregl.Map, lng: number, lat: number, zoom?: number) => {
-        map.easeTo({
-            center: [lng, lat],
-            zoom: zoom ?? map.getZoom(),
-            duration: 2000,
-        });
-    },
-
-    // Thay đổi mức zoom của bản đồ
-    zoom_scale: (map: maplibregl.Map, zoom: number) => {
-        map.easeTo({
-            zoom,
-            duration: 1500,
-        });
-    },
-
     // Đặt trạng thái camera toàn diện (center, zoom, pitch, bearing)
-    set_camera_view: (map: maplibregl.Map, state: { center: { lng: number; lat: number }; zoom: number; pitch: number; bearing: number }) => {
-        map.easeTo({
-            center: [state.center.lng, state.center.lat],
-            zoom: state.zoom,
-            pitch: state.pitch,
-            bearing: state.bearing,
-            duration: 2500,
-        });
+    set_camera_view: (
+        map: maplibregl.Map,
+        state: {
+            center?: [number, number] | { lng: number; lat: number };
+            zoom?: number;
+            pitch?: number;
+            bearing?: number;
+            duration?: number;
+        }
+    ) => {
+        const center = normalizeReplayCenter(state.center);
+        const nextView: maplibregl.EaseToOptions = {
+            duration: Number.isFinite(state.duration) ? state.duration : 2500,
+        };
+
+        if (center) {
+            nextView.center = center;
+        }
+        if (Number.isFinite(state.zoom)) {
+            nextView.zoom = state.zoom;
+        }
+        if (Number.isFinite(state.pitch)) {
+            nextView.pitch = state.pitch;
+        }
+        if (Number.isFinite(state.bearing)) {
+            nextView.bearing = state.bearing;
+        }
+        if (
+            nextView.center == null &&
+            nextView.zoom == null &&
+            nextView.pitch == null &&
+            nextView.bearing == null
+        ) {
+            return;
+        }
+
+        map.easeTo(nextView);
     },
 
     // Di chuyển mượt mà đến một geometry dựa trên ID
@@ -54,31 +66,13 @@ export const mapActions = {
         }
     },
 
-    // Xoay camera quanh một điểm
-    rotate_around_point: (map: maplibregl.Map, duration: number = 5000) => {
-        const startBearing = map.getBearing();
-        map.easeTo({
-            bearing: startBearing + 180,
-            duration,
-            easing: (t) => t,
-        });
-    },
-
-    // Thay đổi màu của một geometry (thao tác trực tiếp trên layer map)
-    change_geometry_color: (map: maplibregl.Map, geometryId: string | number, color: string) => {
-        const layerId = `uhm-geo-${geometryId}`; // Giả định format ID layer
-        if (map.getLayer(layerId)) {
-            map.setPaintProperty(layerId, 'fill-color', color);
-            map.setPaintProperty(layerId, 'line-color', color);
-        }
-    },
-
     // Ẩn/hiện nhãn (labels) trên bản đồ
     toggle_labels: (map: maplibregl.Map, visible: boolean) => {
         const style = map.getStyle();
         if (!style) return;
         style.layers.forEach(layer => {
-            if (layer.type === 'symbol' && (layer as any).layout?.['text-field']) {
+            const layout = "layout" in layer ? layer.layout : undefined;
+            if (layer.type === 'symbol' && layout && typeof layout === "object" && "text-field" in layout) {
                 map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
             }
         });
@@ -89,3 +83,24 @@ export const mapActions = {
         onYearChange(year);
     }
 };
+
+function normalizeReplayCenter(
+    center: [number, number] | { lng: number; lat: number } | undefined
+): [number, number] | null {
+    if (Array.isArray(center) && center.length >= 2) {
+        const lng = Number(center[0]);
+        const lat = Number(center[1]);
+        return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null;
+    }
+    if (
+        center &&
+        typeof center === "object" &&
+        "lng" in center &&
+        "lat" in center
+    ) {
+        const lng = Number(center.lng);
+        const lat = Number(center.lat);
+        return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null;
+    }
+    return null;
+}

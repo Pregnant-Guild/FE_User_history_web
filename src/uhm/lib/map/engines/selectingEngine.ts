@@ -69,7 +69,7 @@ export function initSelect(
         }
 
         const additive = !!e.originalEvent?.altKey;
-        selectFeature(features[0], additive);
+        selectFeature(pickPreferredFeature(features), additive);
     }
 
     // Hiển thị menu ngữ cảnh (sửa/xóa) khi click chuột phải.
@@ -88,7 +88,7 @@ export function initSelect(
 
         if (!features.length) return;
 
-        const feature = features[0];
+        const feature = pickPreferredFeature(features);
         const id = feature.id ?? feature.properties?.id;
         if (id === undefined || id === null) return;
 
@@ -134,6 +134,22 @@ export function initSelect(
             if (!map.getSource(source)) continue;
             map.setFeatureState({ source, id }, { selected });
         }
+    }
+
+    function pickPreferredFeature(features: maplibregl.MapGeoJSONFeature[]) {
+        return [...features].sort((a, b) => featureSelectPriority(b) - featureSelectPriority(a))[0];
+    }
+
+    function featureSelectPriority(feature: maplibregl.MapGeoJSONFeature) {
+        const layerId = typeof feature.layer?.id === "string" ? feature.layer.id : "";
+        const geometryType = feature.geometry?.type;
+        const source = typeof feature.source === "string" ? feature.source : "";
+
+        if (layerId.endsWith("-hit")) return 400;
+        if (source === "path-arrow-shapes") return 300;
+        if (geometryType === "LineString" || geometryType === "MultiLineString") return 200;
+        if (geometryType === "Point" || geometryType === "MultiPoint") return 100;
+        return 0;
     }
 
     map.on("click", onClick);
@@ -223,7 +239,12 @@ export function initSelect(
         if (onReplayEdit) {
             const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
             if (featureId) {
-                menu.appendChild(createItem("Replay Edit", () => onReplayEdit(featureId)));
+                menu.appendChild(
+                    createItem(
+                        selectedCount > 1 ? `Vào replay (${selectedCount} geo)` : "Vào replay",
+                        () => onReplayEdit(featureId)
+                    )
+                );
                 hasMenuItems = true;
             }
         }

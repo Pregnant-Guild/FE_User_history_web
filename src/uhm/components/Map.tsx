@@ -332,9 +332,6 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                                     userSelect: "none",
                                 }}
                             >
-                                <span style={{ fontSize: "12px", fontWeight: 700, color: hideOutside ? "#fb7185" : "#94a3b8" }}>
-                                    Hide Outside
-                                </span>
                                 <div
                                     style={{
                                         width: "32px",

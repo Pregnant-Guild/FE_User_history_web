@@ -3,29 +3,47 @@
  */
 
 export const uiActions = {
-    // Ẩn thanh Timeline
-    hide_timeline: (setTimelineVisible: (v: boolean) => void) => {
-        setTimelineVisible(false);
+    // Ẩn/hiện thanh Timeline
+    timeline: (setTimelineVisible: (v: boolean) => void, visible: boolean) => {
+        setTimelineVisible(visible);
     },
 
-    // Ẩn toàn bộ UI để có trải nghiệm điện ảnh (Cinematic)
-    hide_all_UI: (setUIVisible: (v: boolean) => void) => {
-        setUIVisible(false);
+    // Ẩn/hiện panel layer. Runtime hiện chưa có controller riêng nên tạm no-op.
+    layer_panel: (visible: boolean) => {
+        void visible;
+        return;
+    },
+
+    // Ẩn/hiện panel wiki.
+    wiki_panel: (setSidebarOpen: (v: boolean) => void, visible: boolean) => {
+        setSidebarOpen(visible);
+    },
+
+    // Ẩn/hiện panel zoom. Runtime hiện chưa có controller riêng nên tạm no-op.
+    zoom_panel: (visible: boolean) => {
+        void visible;
+        return;
     },
 
     // Mở Wiki và tìm đến một ID cụ thể
-    open_wiki: (setSidebarOpen: (v: boolean) => void, onSelectWiki: (id: string) => void, wikiId: string) => {
+    wiki: (setSidebarOpen: (v: boolean) => void, onSelectWiki: (id: string) => void, wikiId: string) => {
         setSidebarOpen(true);
         onSelectWiki(wikiId);
     },
 
     // Hiển thị thông báo (toast)
-    show_toast_message: (addToast: (msg: string) => void, message: string) => {
+    toast: (addToast: (msg: string) => void, message: string) => {
         addToast(message);
     },
 
+    // Focus header trong wiki. Runtime hiện chưa có controller riêng nên tạm no-op.
+    wiki_header: (headerId: string) => {
+        void headerId;
+        return;
+    },
+
     // Thay đổi tốc độ phát Replay
-    set_playback_speed: (setSpeed: (s: number) => void, speed: number) => {
+    playback_speed: (setSpeed: (s: number) => void, speed: number) => {
         setSpeed(speed);
     }
 };

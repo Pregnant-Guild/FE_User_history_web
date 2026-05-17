@@ -164,7 +164,6 @@ Có thể do:
 - timeline filter
 - geometry visibility theo type
 - binding filter
-- replay hide outside
 
 Không phải lúc nào cũng là bug render layer.
 

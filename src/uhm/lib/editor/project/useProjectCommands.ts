@@ -306,10 +306,11 @@ function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnaps
             const id = String(e.id);
             const source: EntitySnapshot["source"] = e.source === "inline" ? "inline" : "ref";
             return {
-                ...e,
                 id,
                 source,
                 operation: "reference",
+                name: typeof e.name === "string" ? e.name : undefined,
+                description: typeof e.description === "string" ? e.description : e.description ?? null,
             };
         });
 }
@@ -323,10 +324,23 @@ function toEditorSessionGeometries(input: EditorSnapshot["geometries"]): Geometr
             const id = String(g.id);
             const source: GeometrySnapshot["source"] = g.source === "inline" ? "inline" : "ref";
             return {
-                ...g,
                 id,
                 source,
                 operation: "reference",
+                type: g.type ?? undefined,
+                draw_geometry: g.draw_geometry,
+                geometry: g.geometry,
+                binding: Array.isArray(g.binding) ? [...g.binding] : undefined,
+                time_start: typeof g.time_start === "number" ? g.time_start : g.time_start ?? undefined,
+                time_end: typeof g.time_end === "number" ? g.time_end : g.time_end ?? undefined,
+                bbox: g.bbox
+                    ? {
+                        min_lng: g.bbox.min_lng,
+                        min_lat: g.bbox.min_lat,
+                        max_lng: g.bbox.max_lng,
+                        max_lat: g.bbox.max_lat,
+                    }
+                    : g.bbox ?? undefined,
             };
         });
 }
@@ -350,7 +364,6 @@ function toEditorSessionGeometryEntity(input: EditorSnapshot["geometry_entity"])
             geometry_id,
             entity_id,
             operation: "reference",
-            base_links_hash: safeRow.base_links_hash,
         });
     }
     return Array.from(deduped.values()).sort((a, b) => {
@@ -368,9 +381,12 @@ function toEditorSessionWikis(input: EditorSnapshot["wikis"]): WikiSnapshot[] {
         .map((w) => {
             const source: WikiSnapshot["source"] = w.source === "inline" ? "inline" : "ref";
             return {
-                ...w,
+                id: w.id,
                 source,
                 operation: "reference",
+                title: typeof w.title === "string" ? w.title : "",
+                slug: w.slug ?? null,
+                doc: w.doc ?? null,
             };
         });
 }

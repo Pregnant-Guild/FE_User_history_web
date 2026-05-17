@@ -157,7 +157,6 @@ Binding hiện tại:
 Nó là mode hiển thị tập trung vào một geometry:
 
 - có nút thoát replay
-- có toggle `Hide Outside`
 - có thể ẩn geometry ngoài danh sách `binding`
 
 ## 8. Đồng bộ selection và feature state

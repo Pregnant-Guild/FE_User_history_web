@@ -5,7 +5,16 @@ import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 
-import type { BattleReplay, EditorSnapshot, Project } from "@/uhm/types/projects";
+import type {
+    BattleReplay,
+    EditorSnapshot,
+    GeoFunctionName,
+    MapFunctionName,
+    NarrativeFunctionName,
+    Project,
+    ReplayAction,
+    UIOptionName,
+} from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 
@@ -22,7 +31,6 @@ interface RawEntityRow extends UnknownRecord {
     ref?: { id?: string };
     name?: string;
     description?: string;
-    status?: number;
 }
 
 interface RawWikiRow extends UnknownRecord {
@@ -33,14 +41,27 @@ interface RawWikiRow extends UnknownRecord {
     title?: string;
     slug?: string;
     doc?: string;
-    updated_at?: string | number;
+}
+
+interface RawGeometryRow extends UnknownRecord {
+    id?: string | number;
+    operation?: string;
+    source?: string;
+    ref?: { id?: string };
+    type?: unknown;
+    geo_type?: unknown;
+    draw_geometry?: unknown;
+    geometry?: unknown;
+    binding?: unknown;
+    time_start?: unknown;
+    time_end?: unknown;
+    bbox?: unknown;
 }
 
 interface RawGeometryEntityRow extends UnknownRecord {
     geometry_id?: string | number;
     entity_id?: string | number;
     operation?: string;
-    base_links_hash?: string;
 }
 
 interface RawEntityWikiRow extends UnknownRecord {
@@ -96,14 +117,13 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const refId = getRefId(e.ref);
                 const source: "inline" | "ref" =
                     existingSource || (refId || opRaw === "reference" ? "ref" : "inline");
-                const rest: UnknownRecord = { ...e };
-                delete rest.ref;
 
                 return {
-                    ...(rest as unknown as Omit<EntitySnapshot, "id" | "source" | "operation">),
                     id,
                     source,
                     operation,
+                    name: typeof e.name === "string" ? e.name : undefined,
+                    description: typeof e.description === "string" ? e.description : e.description == null ? undefined : undefined,
                 };
             })
         : undefined;
@@ -113,25 +133,37 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         ? geometriesRaw
             .filter(isRecord)
             .map((g) => {
-                const id = getStringId(g.id);
-                const opRaw = typeof g.operation === "string" ? g.operation : undefined;
+                const row = g as RawGeometryRow;
+                const id = getStringId(row.id);
+                const opRaw = typeof row.operation === "string" ? row.operation : undefined;
                 const operation: GeometrySnapshot["operation"] =
                     opRaw === "delete" ? "delete" : "reference";
-                const existingSource = g.source === "inline" || g.source === "ref" ? g.source : undefined;
-                const refId = getRefId(g.ref);
-                const hasInlineGeometry = "draw_geometry" in g || "geometry" in g;
+                const existingSource = row.source === "inline" || row.source === "ref" ? row.source : undefined;
+                const refId = getRefId(row.ref);
+                const hasInlineGeometry = "draw_geometry" in row || "geometry" in row;
                 const source: "inline" | "ref" = existingSource || (refId || !hasInlineGeometry ? "ref" : "inline");
-                const rest: UnknownRecord = { ...g };
-                delete rest.ref;
-                const typeKey = normalizeGeoTypeKey(rest.type) || normalizeGeoTypeKey(rest.geo_type);
-                delete rest.geo_type;
+                const typeKey = normalizeGeoTypeKey(row.type) || normalizeGeoTypeKey(row.geo_type);
 
                 return {
-                    ...(rest as unknown as Omit<GeometrySnapshot, "id" | "source" | "operation">),
                     id,
                     source,
                     operation,
                     type: typeKey,
+                    draw_geometry: row.draw_geometry as GeometrySnapshot["draw_geometry"],
+                    geometry: row.geometry as GeometrySnapshot["geometry"],
+                    binding: Array.isArray(row.binding) ? row.binding as string[] : undefined,
+                    time_start: typeof row.time_start === "number" ? row.time_start : row.time_start == null ? undefined : undefined,
+                    time_end: typeof row.time_end === "number" ? row.time_end : row.time_end == null ? undefined : undefined,
+                    bbox: isRecord(row.bbox)
+                        ? {
+                            min_lng: Number(row.bbox.min_lng),
+                            min_lat: Number(row.bbox.min_lat),
+                            max_lng: Number(row.bbox.max_lng),
+                            max_lat: Number(row.bbox.max_lat),
+                        }
+                        : row.bbox == null
+                            ? undefined
+                            : undefined,
                 };
             })
         : undefined;
@@ -141,6 +173,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         ? wikisRaw
             .filter(isRecord)
             .map((w) => {
+                const row = w as RawWikiRow;
                 const id = typeof w.id === "string" ? w.id : "";
                 const opRaw = typeof w.operation === "string" ? w.operation : undefined;
                 const operation: WikiSnapshot["operation"] =
@@ -149,14 +182,13 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const refId = getRefId(w.ref);
                 const source: "inline" | "ref" =
                     existingSource || (refId || opRaw === "reference" ? "ref" : "inline");
-                const rest: UnknownRecord = { ...w };
-                delete rest.ref;
-
                 return {
-                    ...(rest as unknown as Omit<WikiSnapshot, "id" | "source" | "operation">),
                     id,
                     source,
                     operation,
+                    title: typeof row.title === "string" ? row.title : "",
+                    slug: row.slug ?? null,
+                    doc: typeof row.doc === "string" ? row.doc : null,
                 };
             })
         : undefined;
@@ -173,7 +205,6 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const geometry_id = getStringId(row.geometry_id);
                 const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
                 return {
-                    ...(row as unknown as Omit<GeometryEntitySnapshot, "geometry_id" | "entity_id">),
                     geometry_id,
                     entity_id,
                 };
@@ -298,7 +329,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         wikis,
         geometry_entity: geometryEntity || migratedGeometryEntity,
         entity_wiki: entityWikis,
-        replays: Array.isArray(snapshot.replays) ? (snapshot.replays as BattleReplay[]) : undefined,
+        replays: normalizeReplaySnapshots(snapshot.replays),
     };
 }
 
@@ -352,10 +383,11 @@ export function buildEditorSnapshot(options: {
         const cloned = JSON.parse(JSON.stringify(prev)) as EntitySnapshot;
         delete cloned.operation;
         entityRows.set(id, {
-            ...cloned,
             id,
             source: "inline",
             operation: "reference",
+            name: typeof cloned.name === "string" ? cloned.name : undefined,
+            description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
         });
     }
     for (const row of options.snapshotEntities || []) {
@@ -374,11 +406,11 @@ export function buildEditorSnapshot(options: {
         if (opRaw === "delete") continue;
         const operation: EntitySnapshot["operation"] = source === "ref" ? "reference" : opRaw;
         entityRows.set(id, {
-            ...cloned,
             id,
             source,
             name,
             operation,
+            description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
         });
     }
 
@@ -391,9 +423,7 @@ export function buildEditorSnapshot(options: {
             source: "ref",
             operation: "reference",
             name: id,
-            slug: null,
             description: null,
-            status: 1,
         });
     }
 
@@ -405,9 +435,7 @@ export function buildEditorSnapshot(options: {
                 source: "ref",
                 operation: "reference",
                 name: entityId,
-                slug: null,
                 description: null,
-                status: 1,
             });
         }
     }
@@ -457,7 +485,7 @@ export function buildEditorSnapshot(options: {
         });
     }
 
-    const baselineGeometryEntity = new globalThis.Map<string, string | undefined>();
+    const baselineGeometryEntity = new Set<string>();
     for (const r of options.previousSnapshot?.geometry_entity || []) {
         const row = r as RawGeometryEntityRow;
         if (!row) continue;
@@ -465,7 +493,7 @@ export function buildEditorSnapshot(options: {
         const geometry_id = typeof row.geometry_id === "string" || typeof row.geometry_id === "number" ? String(row.geometry_id).trim() : "";
         const entity_id = typeof row.entity_id === "string" || typeof row.entity_id === "number" ? String(row.entity_id).trim() : "";
         if (!geometry_id || !entity_id) continue;
-        baselineGeometryEntity.set(`${geometry_id}::${entity_id}`, row.base_links_hash);
+        baselineGeometryEntity.add(`${geometry_id}::${entity_id}`);
     }
 
     const currentGeometryEntityRows: GeometryEntitySnapshot[] = [];
@@ -481,18 +509,17 @@ export function buildEditorSnapshot(options: {
                 geometry_id,
                 entity_id,
                 operation: baselineGeometryEntity.has(key) ? "reference" : "binding",
-                base_links_hash: baselineGeometryEntity.get(key),
             });
         }
     }
 
     // Relations removed during this session are emitted as "delete" operations.
     // NOTE: The editor state itself should remove the relation row; the commit payload is the delta.
-    for (const [key, base_links_hash] of baselineGeometryEntity.entries()) {
+    for (const key of baselineGeometryEntity.values()) {
         if (currentGeometryEntityKeys.has(key)) continue;
         const [geometry_id, entity_id] = key.split("::");
         if (!geometry_id || !entity_id) continue;
-        currentGeometryEntityRows.push({ geometry_id, entity_id, operation: "delete", base_links_hash });
+        currentGeometryEntityRows.push({ geometry_id, entity_id, operation: "delete" });
     }
 
     const geometryEntity = dedupeAndSortGeometryEntity(currentGeometryEntityRows);
@@ -587,7 +614,6 @@ export function buildEditorSnapshot(options: {
             title: typeof prev.title === "string" ? prev.title : "Untitled wiki",
             slug: row.slug ?? null,
             doc: row.doc ?? null,
-            updated_at: row.updated_at ?? undefined,
         } as WikiSnapshot);
     }
     const wikis = [...wikisCurrent, ...deletedWikis];
@@ -675,7 +701,235 @@ export function toApiEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
         });
     }
 
+    if (Array.isArray(cloned.replays)) {
+        cloned.replays = cloned.replays.map((replay) => {
+            const geometryId = typeof replay?.geometry_id === "string" ? replay.geometry_id : "";
+            return {
+                geometry_id: geometryId,
+                target_geometry_ids: normalizeReplayTargetGeometryIds(replay as unknown, geometryId),
+                detail: Array.isArray(replay?.detail) ? replay.detail : [],
+            };
+        });
+    }
+
     return cloned;
+}
+
+function normalizeReplaySnapshots(value: unknown): BattleReplay[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    return value.map((replay) => normalizeReplaySnapshot(replay as BattleReplay));
+}
+
+function normalizeReplaySnapshot(replay: BattleReplay): BattleReplay {
+    const geometryId = typeof replay?.geometry_id === "string" ? replay.geometry_id : "";
+    return {
+        geometry_id: geometryId,
+        target_geometry_ids: normalizeReplayTargetGeometryIds(replay, geometryId),
+        detail: Array.isArray(replay.detail)
+            ? replay.detail.map((stage) => ({
+                ...stage,
+                steps: Array.isArray(stage.steps)
+                    ? stage.steps.map((step) => {
+                        const { mapActions, geoActions } = normalizeReplayMapAndGeoActions(
+                            isRecord(step) ? step.use_map_function : undefined,
+                            isRecord(step) ? step.use_geo_function : undefined
+                        );
+                        return {
+                            ...step,
+                            use_UI_function: normalizeReplayUiActions(isRecord(step) ? step.use_UI_function : undefined),
+                            use_map_function: mapActions,
+                            use_geo_function: geoActions,
+                            use_narrow_function: normalizeReplayNarrativeActions(
+                                isRecord(step) ? step.use_narrow_function : undefined
+                            ),
+                        };
+                    })
+                    : [],
+            }))
+            : [],
+    };
+}
+
+function normalizeReplayTargetGeometryIds(replay: unknown, geometryId: string): string[] {
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+
+    const pushId = (rawId: unknown) => {
+        if (typeof rawId !== "string" && typeof rawId !== "number") return;
+        const id = String(rawId).trim();
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        orderedIds.push(id);
+    };
+
+    pushId(geometryId);
+
+    if (isRecord(replay) && Array.isArray(replay.target_geometry_ids)) {
+        for (const rawId of replay.target_geometry_ids) pushId(rawId);
+    }
+
+    if (isRecord(replay) && isRecord(replay.replay_features) && Array.isArray(replay.replay_features.features)) {
+        for (const feature of replay.replay_features.features) {
+            if (!isRecord(feature) || !isRecord(feature.properties)) continue;
+            pushId(feature.properties.id);
+        }
+    }
+
+    return orderedIds;
+}
+
+function normalizeReplayUiActions(actions: unknown): ReplayAction<UIOptionName>[] {
+    if (!Array.isArray(actions)) return [];
+
+    return actions.flatMap((action) => {
+        if (!isRecord(action)) return [];
+
+        const functionName = action.function_name;
+        const params = Array.isArray(action.params) ? action.params : [];
+
+        if (functionName === "UI") {
+            const option = normalizeReplayUiOption(params[0]);
+            if (!option) return [];
+            return [{
+                function_name: option,
+                params: params.slice(1),
+            }];
+        }
+
+        const option = normalizeReplayUiOption(functionName);
+        if (!option) return [];
+        return [{
+            function_name: option,
+            params,
+        }];
+    });
+}
+
+function normalizeReplayUiOption(value: unknown): UIOptionName | null {
+    switch (value) {
+        case "timeline":
+        case "layer_panel":
+        case "wiki_panel":
+        case "zoom_panel":
+        case "wiki":
+        case "toast":
+        case "wiki_header":
+        case "playback_speed":
+            return value;
+        default:
+            return null;
+    }
+}
+
+function normalizeReplayMapAndGeoActions(
+    mapActions: unknown,
+    geoActions: unknown
+): {
+    mapActions: ReplayAction<MapFunctionName>[];
+    geoActions: ReplayAction<GeoFunctionName>[];
+} {
+    const combinedActions = [
+        ...(Array.isArray(mapActions) ? mapActions : []),
+        ...(Array.isArray(geoActions) ? geoActions : []),
+    ];
+
+    const normalizedMapActions: ReplayAction<MapFunctionName>[] = [];
+    const normalizedGeoActions: ReplayAction<GeoFunctionName>[] = [];
+
+    for (const action of combinedActions) {
+        if (!isRecord(action)) continue;
+
+        const functionName = action.function_name;
+        const params = Array.isArray(action.params) ? action.params : [];
+        const mapFunctionName = normalizeReplayMapFunctionName(functionName);
+        if (mapFunctionName) {
+            normalizedMapActions.push({
+                function_name: mapFunctionName,
+                params,
+            });
+            continue;
+        }
+
+        const geoFunctionName = normalizeReplayGeoFunctionName(functionName);
+        if (geoFunctionName) {
+            normalizedGeoActions.push({
+                function_name: geoFunctionName,
+                params,
+            });
+        }
+    }
+
+    return {
+        mapActions: normalizedMapActions,
+        geoActions: normalizedGeoActions,
+    };
+}
+
+function normalizeReplayMapFunctionName(value: unknown): MapFunctionName | null {
+    switch (value) {
+        case "set_camera_view":
+        case "set_time_filter":
+        case "enable_timeline_filter":
+        case "disable_timeline_filter":
+        case "toggle_labels":
+        case "show_labels":
+        case "hide_labels":
+        case "reset_camera_north":
+            return value;
+        default:
+            return null;
+    }
+}
+
+function normalizeReplayGeoFunctionName(value: unknown): GeoFunctionName | null {
+    switch (value) {
+        case "fly_to_geometry":
+        case "fly_to_geometries":
+        case "set_geometry_visibility":
+        case "show_geometries":
+        case "hide_geometries":
+        case "fit_to_geometries":
+        case "orbit_camera_around_geometry":
+        case "pulse_geometry":
+        case "animate_dashed_border":
+        case "set_geometry_style":
+        case "show_geometry_label":
+        case "follow_geometry_path":
+        case "follow_geometries_path":
+        case "dim_other_geometries":
+            return value;
+        default:
+            return null;
+    }
+}
+
+function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<NarrativeFunctionName>[] {
+    if (!Array.isArray(actions)) return [];
+
+    return actions.flatMap((action) => {
+        if (!isRecord(action)) return [];
+
+        const functionName = normalizeReplayNarrativeFunctionName(action.function_name);
+        if (!functionName) return [];
+
+        return [{
+            function_name: functionName,
+            params: Array.isArray(action.params) ? action.params : [],
+        }];
+    });
+}
+
+function normalizeReplayNarrativeFunctionName(value: unknown): NarrativeFunctionName | null {
+    switch (value) {
+        case "set_title":
+        case "set_descriptions":
+        case "show_dialog_box":
+        case "display_historical_image":
+        case "set_step_subtitle":
+            return value;
+        default:
+            return null;
+    }
 }
 
 function dedupeAndSortGeometryEntity(rows: GeometryEntitySnapshot[]): GeometryEntitySnapshot[] {

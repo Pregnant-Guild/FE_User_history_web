@@ -11,7 +11,6 @@ export type Entity = {
     // API cũ / snapshot editor (giữ optional để không phá flow editor snapshot)
     slug?: string | null;
     type_id?: string | null;
-    status?: number | null;
     geometry_count?: number;
 };
 
@@ -29,9 +28,5 @@ export type EntitySnapshot = {
     //   join tables (geometry_entity / entity_wiki), not here.
     operation?: EntitySnapshotOperation;
     name?: string;
-    slug?: string | null;
     description?: string | null;
-    status?: number | null;
-    base_updated_at?: string;
-    base_hash?: string;
 };

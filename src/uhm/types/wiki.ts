@@ -2,12 +2,6 @@
 // FE wiki runtime now stores HTML or plain text in this string field.
 export type WikiDoc = string | null;
 
-export type WikiContentSample = {
-  id: string;
-  title: string;
-  created_at: string;
-};
-
 export type WikiSnapshotOperation = "create" | "update" | "delete" | "reference";
 
 export type WikiSnapshot = {
@@ -17,6 +11,4 @@ export type WikiSnapshot = {
   title: string;
   slug?: string | null;
   doc: WikiDoc;
-  content_sample?: WikiContentSample[];
-  updated_at?: string;
 };

@@ -216,7 +216,6 @@ export default function WikiSidebarPanel({ projectId, setWikis }: Props) {
       title: seedTitle,
       slug: slug ?? null,
       doc: "",
-      updated_at: new Date().toISOString(),
     };
     setWikis((prev) => [seed, ...prev]);
     setActiveId(id);
@@ -291,7 +290,6 @@ export default function WikiSidebarPanel({ projectId, setWikis }: Props) {
                   title: nextTitle,
                   slug: nextSlug,
                   doc: payload,
-                  updated_at: new Date().toISOString(),
             }
       )
     );
