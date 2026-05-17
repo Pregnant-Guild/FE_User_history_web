@@ -716,6 +716,7 @@ function createReplaySessionSeed(
     selectedIds: (string | number)[]
 ): BattleReplay {
     return {
+        id: geometryId,
         geometry_id: geometryId,
         target_geometry_ids: buildReplaySeedTargetIds(
             sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId),
@@ -733,6 +734,7 @@ function normalizeReplaySessionSeed(
     selectedIds: (string | number)[]
 ): BattleReplay {
     const nextReplay = deepClone(replay);
+    nextReplay.id = geometryId;
     const triggerFeature = sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId);
     const seedTargetIds = buildReplaySeedTargetIds(triggerFeature, geometryId, selectedIds);
     nextReplay.target_geometry_ids = normalizeReplayTargetGeometryIds(

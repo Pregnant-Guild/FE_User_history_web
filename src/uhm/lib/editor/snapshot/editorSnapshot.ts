@@ -705,6 +705,7 @@ export function toApiEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
         cloned.replays = cloned.replays.map((replay) => {
             const geometryId = typeof replay?.geometry_id === "string" ? replay.geometry_id : "";
             return {
+                id: geometryId,
                 geometry_id: geometryId,
                 target_geometry_ids: normalizeReplayTargetGeometryIds(replay as unknown, geometryId),
                 detail: Array.isArray(replay?.detail) ? replay.detail : [],
@@ -721,8 +722,14 @@ function normalizeReplaySnapshots(value: unknown): BattleReplay[] | undefined {
 }
 
 function normalizeReplaySnapshot(replay: BattleReplay): BattleReplay {
-    const geometryId = typeof replay?.geometry_id === "string" ? replay.geometry_id : "";
+    const geometryId =
+        typeof replay?.geometry_id === "string" && replay.geometry_id.trim().length > 0
+            ? replay.geometry_id
+            : typeof (replay as unknown as { id?: unknown })?.id === "string"
+                ? (replay as unknown as { id: string }).id
+                : "";
     return {
+        id: geometryId,
         geometry_id: geometryId,
         target_geometry_ids: normalizeReplayTargetGeometryIds(replay, geometryId),
         detail: Array.isArray(replay.detail)

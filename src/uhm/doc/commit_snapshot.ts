@@ -203,6 +203,7 @@ export type ReplayStage = {
 };
 
 export type BattleReplay = {
+    id: string;
     geometry_id: string;
     target_geometry_ids: string[];
     detail: ReplayStage[];

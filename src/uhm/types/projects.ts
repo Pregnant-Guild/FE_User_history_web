@@ -154,6 +154,7 @@ export type ReplayStage = {
 };
 
 export type BattleReplay = {
+    id: string; // mirror của geometry_id để đồng bộ schema chung
     geometry_id: string; // geometry mà khi nhấn vào là có thể replay
     target_geometry_ids: string[]; // tập geometry được đưa vào replay, phần tử đầu nên là MAIN geo
     detail: ReplayStage[];

@@ -30,6 +30,7 @@ Replay mode hiện tại có 2 lớp state:
 
 ```ts
 type BattleReplay = {
+  id: string;
   geometry_id: string;
   target_geometry_ids: string[];
   detail: ReplayStage[];
@@ -41,6 +42,9 @@ type BattleReplay = {
 - `geometry_id`
   - MAIN geo của replay
   - cũng là key để tìm replay tương ứng
+- `id`
+  - hiện luôn bằng `geometry_id`
+  - thêm để schema replay có id riêng rõ ràng hơn
 - `target_geometry_ids`
   - toàn bộ geo được đưa vào replay
   - phần tử đầu nên luôn là MAIN geo
@@ -66,6 +70,7 @@ Replay seed mới có dạng:
 
 ```ts
 {
+  id: triggerId,
   geometry_id: triggerId,
   target_geometry_ids: [...],
   detail: []

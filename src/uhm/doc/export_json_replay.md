@@ -57,6 +57,7 @@ type ReplayExportPayload = {
 
 ```ts
 type BattleReplay = {
+  id: string;
   geometry_id: string;
   target_geometry_ids: string[];
   detail: ReplayStage[];
@@ -67,6 +68,8 @@ type BattleReplay = {
 
 - `geometry_id`
   - MAIN geo của replay
+- `id`
+  - hiện luôn bằng `geometry_id`
 - `target_geometry_ids`
   - toàn bộ geo thuộc replay
   - phần tử đầu nên luôn là MAIN geo
@@ -124,6 +127,7 @@ type ReplayStep = {
   "exported_at": "2026-05-17T12:34:56.000Z",
   "geometry_id": "019e13ab-4823-76c5-afde-2391c0cf311d",
   "current_replay": {
+    "id": "019e13ab-4823-76c5-afde-2391c0cf311d",
     "geometry_id": "019e13ab-4823-76c5-afde-2391c0cf311d",
     "target_geometry_ids": [
       "019e13ab-4823-76c5-afde-2391c0cf311d",
@@ -176,6 +180,7 @@ type ReplayStep = {
   "snapshot_fragment": {
     "replays": [
       {
+        "id": "019e13ab-4823-76c5-afde-2391c0cf311d",
         "geometry_id": "019e13ab-4823-76c5-afde-2391c0cf311d",
         "target_geometry_ids": [
           "019e13ab-4823-76c5-afde-2391c0cf311d",

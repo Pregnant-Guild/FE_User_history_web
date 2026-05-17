@@ -1885,6 +1885,7 @@ function normalizeReplaysForCompare(input: BattleReplay[] | null | undefined) {
     return list
         .filter((replay) => replay && typeof replay.geometry_id === "string" && replay.geometry_id.trim().length > 0)
         .map((replay) => ({
+            id: typeof replay.id === "string" ? replay.id : replay.geometry_id,
             geometry_id: replay.geometry_id,
             target_geometry_ids: normalizeReplayTargetGeometryIdsForCompare(
                 replay.target_geometry_ids,
