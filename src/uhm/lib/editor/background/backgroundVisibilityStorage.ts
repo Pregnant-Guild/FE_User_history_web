@@ -4,7 +4,7 @@ import {
     DEFAULT_BACKGROUND_LAYER_VISIBILITY,
 } from "@/uhm/lib/map/styles/backgroundLayers";
 
-const BACKGROUND_LAYER_VISIBILITY_STORAGE_KEY = "uhm.backgroundLayerVisibility.v1";
+const BACKGROUND_LAYER_VISIBILITY_STORAGE_KEY = "uhm.backgroundLayerVisibility.v2";
 
 export function loadBackgroundLayerVisibilityFromStorage(): BackgroundLayerVisibility {
     if (typeof window === "undefined") {
@@ -57,4 +57,3 @@ function normalizeBackgroundLayerVisibility(raw: unknown): BackgroundLayerVisibi
 
     return next;
 }
-

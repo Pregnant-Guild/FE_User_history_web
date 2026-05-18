@@ -7,7 +7,7 @@ import {
   setStoredTokens,
 } from "@/auth/tokenStore"
 
-const baseURL = API_URL_ROOT || "https://history-api.kain.id.vn"
+const baseURL = API_URL_ROOT
 
 const api = axios.create({
   baseURL,

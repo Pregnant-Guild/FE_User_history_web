@@ -1,4 +1,5 @@
 import maplibregl, { LayerSpecification } from "maplibre-gl";
+import { MAP_TEXT_FONT_STACK } from "./textFonts";
 
 const LINE_GEOMETRY_FILTER: maplibregl.ExpressionSpecification = [
     "any",
@@ -14,6 +15,7 @@ export function getLineLabelLayers(sourceId: string): LayerSpecification[] {
             source: sourceId,
             filter: ["all", LINE_GEOMETRY_FILTER, ["!=", ["coalesce", ["get", "line_label"], ""], ""]],
             layout: {
+                "text-font": [...MAP_TEXT_FONT_STACK],
                 "symbol-placement": "line",
                 "symbol-spacing": 280,
                 "text-field": ["coalesce", ["get", "line_label"], ""],

@@ -1,20 +1,11 @@
-import { useEffect } from "react";
 import maplibregl from "maplibre-gl";
-import { getVectorTileTemplateUrl } from "@/uhm/api/tiles";
-import {
-    COUNTRY_FILL_COLOR_EXPRESSION,
-    LINE_COLOR_BY_TYPE,
-    PATH_RENDER_BY_TYPE,
-    POLYGON_FILL_BY_TYPE,
-    POLYGON_OPACITY_BY_TYPE,
-    POLYGON_STROKE_BY_TYPE,
-} from "@/uhm/lib/map/styles/style";
+import { GOONG_GLYPHS_PROXY_URL } from "@/uhm/api/config";
+import { getGoongBackgroundOverlayBundle } from "@/uhm/api/tiles";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { PATH_ARROW_ICON_ID, PATH_ARROW_SOURCE_ID, POLYGON_LABEL_SOURCE_ID } from "@/uhm/lib/map/constants";
 import { ensurePointGeotypeIcons, getAllGeotypeLabelLayers, getAllGeotypeLayers } from "@/uhm/lib/map/styles/geotypeLayers";
 import {
     applyBackgroundLayerVisibility,
-    buildTypeMatchExpression,
     ensurePathArrowIcon,
 } from "./mapUtils";
 import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
@@ -23,172 +14,14 @@ import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
 export function getBaseMapStyle(): maplibregl.StyleSpecification {
     return {
         version: 8,
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-        sources: {
-            base: {
-                type: "vector",
-                tiles: [getVectorTileTemplateUrl()],
-                minzoom: 0,
-                maxzoom: 6,
-            },
-        },
+        glyphs: GOONG_GLYPHS_PROXY_URL,
+        sources: {},
         layers: [
             {
                 id: "background",
                 type: "background",
                 paint: {
                     "background-color": "#0b1220",
-                },
-            },
-            {
-                id: "graticules-line",
-                type: "line",
-                source: "base",
-                "source-layer": "ne_10m_graticules_10",
-                paint: {
-                    "line-color": "#334155",
-                    "line-width": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        0, 0.3,
-                        4, 0.6,
-                        6, 0.8,
-                    ],
-                    "line-opacity": 0.55,
-                },
-            },
-            {
-                id: "land",
-                type: "fill",
-                source: "base",
-                "source-layer": "ne_10m_land",
-                paint: {
-                    "fill-color": "#1e293b",
-                    "fill-opacity": 0.25,
-                },
-            },
-            {
-                id: "bg-countries-fill",
-                type: "fill",
-                source: "base",
-                "source-layer": "ne_10m_admin_0_countries",
-                paint: {
-                    "fill-color": COUNTRY_FILL_COLOR_EXPRESSION,
-                    "fill-opacity": 0.38,
-                },
-            },
-            {
-                id: "bg-country-borders-line",
-                type: "line",
-                source: "base",
-                "source-layer": "ne_10m_admin_0_boundary_lines_land",
-                paint: {
-                    "line-color": "#cbd5e1",
-                    "line-width": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        0, 0.2,
-                        4, 0.5,
-                        6, 1.1,
-                    ],
-                    "line-opacity": 0.85,
-                },
-            },
-            {
-                id: "country-labels",
-                type: "symbol",
-                source: "base",
-                "source-layer": "country_labels",
-                minzoom: 0,
-                layout: {
-                    "text-field": [
-                        "coalesce",
-                        ["get", "NAME_EN"],
-                        ["get", "NAME"],
-                        ["get", "ADMIN"],
-                        ["get", "name"],
-                        "",
-                    ],
-                    "text-size": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        0, 15,
-                        1, 16,
-                        2, 17,
-                        4, 19,
-                        6, 23,
-                    ],
-                    "text-padding": 0,
-                    "text-max-width": 10,
-                    "text-allow-overlap": true,
-                    "text-ignore-placement": true,
-                    "symbol-placement": "point",
-                },
-                paint: {
-                    "text-color": "#e2e8f0",
-                    "text-halo-color": "#0b1220",
-                    "text-halo-width": 1.2,
-                    "text-halo-blur": 0.5,
-                },
-            },
-            {
-                id: "regions-line",
-                type: "line",
-                source: "base",
-                "source-layer": "ne_10m_geography_regions_polys",
-                paint: {
-                    "line-color": "#475569",
-                    "line-width": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        0, 0.2,
-                        4, 0.6,
-                        6, 1,
-                    ],
-                    "line-opacity": 0.6,
-                },
-            },
-            {
-                id: "lakes-fill",
-                type: "fill",
-                source: "base",
-                "source-layer": "ne_10m_lakes",
-                paint: {
-                    "fill-color": "#1d4ed8",
-                    "fill-opacity": 0.45,
-                },
-            },
-            {
-                id: "rivers-line",
-                type: "line",
-                source: "base",
-                "source-layer": "ne_10m_rivers_lake_centerlines",
-                paint: {
-                    "line-color": "#38bdf8",
-                    "line-width": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        0, 0.25,
-                        4, 0.8,
-                        6, 1.5,
-                    ],
-                    "line-opacity": 0.85,
-                },
-            },
-            {
-                id: "geolines-line",
-                type: "line",
-                source: "base",
-                "source-layer": "ne_10m_geographic_lines",
-                paint: {
-                    "line-color": "#94a3b8",
-                    "line-width": 1.2,
-                    "line-opacity": 0.8,
                 },
             },
         ],
@@ -202,6 +35,9 @@ export function setupMapLayers(
     applyHighlightToMap: (fc: FeatureCollection) => void
 ) {
     applyBackgroundLayerVisibility(map, backgroundVisibility);
+    void replaceBackgroundLayersWithGoong(map, backgroundVisibility).catch((error) => {
+        console.error("Failed to load proxied background overlay bundle.", error);
+    });
     const hasPathArrowIcon = ensurePathArrowIcon(map);
 
     // preview (drawing)
@@ -431,4 +267,30 @@ export function setupMapLayers(
         },
     });
     applyHighlightToMap(highlightFeatures || EMPTY_FEATURE_COLLECTION);
+}
+
+async function replaceBackgroundLayersWithGoong(
+    map: maplibregl.Map,
+    backgroundVisibility: BackgroundLayerVisibility
+) {
+    const bundle = await getGoongBackgroundOverlayBundle();
+    if (!bundle || map.getLayer("goong-country-labels-0")) {
+        return;
+    }
+
+    for (const [sourceId, source] of Object.entries(bundle.sources)) {
+        if (!map.getSource(sourceId)) {
+            map.addSource(sourceId, source);
+        }
+    }
+
+    const insertBeforeId = map.getLayer("draw-preview-fill")
+        ? "draw-preview-fill"
+        : undefined;
+    for (const layer of bundle.layers) {
+        if (map.getLayer(layer.id)) continue;
+        map.addLayer(layer, insertBeforeId);
+    }
+
+    applyBackgroundLayerVisibility(map, backgroundVisibility);
 }

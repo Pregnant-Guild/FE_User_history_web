@@ -1,4 +1,5 @@
 import { LayerSpecification } from "maplibre-gl";
+import { MAP_TEXT_FONT_STACK } from "./textFonts";
 
 export function getPolygonLabelLayers(sourceId: string): LayerSpecification[] {
     return [
@@ -7,6 +8,7 @@ export function getPolygonLabelLayers(sourceId: string): LayerSpecification[] {
             type: "symbol",
             source: sourceId,
             layout: {
+                "text-font": [...MAP_TEXT_FONT_STACK],
                 "text-field": ["coalesce", ["get", "polygon_label"], ""],
                 "text-size": [
                     "interpolate",

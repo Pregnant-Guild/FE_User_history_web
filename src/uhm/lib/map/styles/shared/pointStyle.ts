@@ -1,4 +1,5 @@
 import maplibregl, { LayerSpecification } from "maplibre-gl";
+import { MAP_EMPHASIS_TEXT_FONT_STACK } from "./textFonts";
 
 export const POINT_GEOTYPE_IDS = [
     "person_birthplace",
@@ -168,6 +169,7 @@ export function buildPointGeotypeLayers(
                 "icon-allow-overlap": true,
                 "icon-ignore-placement": true,
                 "symbol-placement": "point",
+                "text-font": [...MAP_EMPHASIS_TEXT_FONT_STACK],
                 "text-field": ["coalesce", ["get", "point_label"], ""],
                 "text-size": [
                     "interpolate",

@@ -5,13 +5,12 @@ import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/use
 import {
     FEATURE_STATE_SOURCE_IDS,
     PATH_ARROW_ICON_ID,
-    RASTER_BASE_INSERT_BEFORE_LAYER_ID,
     RASTER_BASE_LAYER_ID,
     RASTER_BASE_SOURCE_ID,
     PATH_ARROW_SOURCE_ID
 } from "@/uhm/lib/map/constants";
 import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
-import { getRasterTileTemplateUrl } from "@/uhm/api/tiles";
+import { getBackgroundRasterSourceSpecification } from "@/uhm/api/tiles";
 import { newId } from "@/uhm/lib/utils/id";
 import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
 
@@ -30,33 +29,46 @@ export function applyBackgroundLayerVisibility(
 
     for (const layer of BACKGROUND_LAYER_OPTIONS) {
         if (layer.id === RASTER_BASE_LAYER_ID) continue;
-        if (!map.getLayer(layer.id)) continue;
-        map.setLayoutProperty(
-            layer.id,
-            "visibility",
-            visibility[layer.id] ? "visible" : "none"
-        );
+        const nextVisibility = visibility[layer.id] ? "visible" : "none";
+
+        if (map.getLayer(layer.id)) {
+            map.setLayoutProperty(layer.id, "visibility", nextVisibility);
+        }
+
+        const groupedLayerIds = getBackgroundGroupLayerIds(map, layer.id);
+        for (const groupedLayerId of groupedLayerIds) {
+            if (!map.getLayer(groupedLayerId)) continue;
+            map.setLayoutProperty(groupedLayerId, "visibility", nextVisibility);
+        }
     }
 }
 
 export function syncRasterBaseVisibility(map: maplibregl.Map, shouldShow: boolean) {
     if (shouldShow) {
-        ensureRasterBaseLayer(map);
+        void ensureRasterBaseLayer(map).catch((error) => {
+            console.error("Failed to load proxied raster background.", error);
+            removeRasterBaseLayer(map);
+        });
         return;
     }
     removeRasterBaseLayer(map);
 }
 
-export function ensureRasterBaseLayer(map: maplibregl.Map) {
+export async function ensureRasterBaseLayer(map: maplibregl.Map) {
     if (!map.getSource(RASTER_BASE_SOURCE_ID)) {
-        map.addSource(RASTER_BASE_SOURCE_ID, createRasterBaseSource());
+        const source = await createRasterBaseSource();
+        if (map.getSource(RASTER_BASE_SOURCE_ID)) {
+            // Another caller already added the source while we were waiting.
+        } else {
+            map.addSource(RASTER_BASE_SOURCE_ID, source);
+        }
     }
 
+    const beforeId = getRasterBaseInsertBeforeLayerId(map);
     if (!map.getLayer(RASTER_BASE_LAYER_ID)) {
-        const beforeId = map.getLayer(RASTER_BASE_INSERT_BEFORE_LAYER_ID)
-            ? RASTER_BASE_INSERT_BEFORE_LAYER_ID
-            : undefined;
         map.addLayer(createRasterBaseLayer(), beforeId);
+    } else if (beforeId && beforeId !== RASTER_BASE_LAYER_ID) {
+        map.moveLayer(RASTER_BASE_LAYER_ID, beforeId);
     }
 
     map.setLayoutProperty(RASTER_BASE_LAYER_ID, "visibility", "visible");
@@ -73,13 +85,7 @@ export function removeRasterBaseLayer(map: maplibregl.Map) {
 }
 
 export function createRasterBaseSource() {
-    return {
-        type: "raster" as const,
-        tiles: [getRasterTileTemplateUrl()],
-        tileSize: 256,
-        minzoom: 0,
-        maxzoom: 6,
-    };
+    return getBackgroundRasterSourceSpecification();
 }
 
 export function createRasterBaseLayer() {
@@ -92,6 +98,30 @@ export function createRasterBaseLayer() {
             "raster-resampling": "linear" as const,
         },
     };
+}
+
+function getRasterBaseInsertBeforeLayerId(map: maplibregl.Map): string | undefined {
+    const style = map.getStyle();
+    const layers = style?.layers || [];
+
+    return layers.find((layer) => {
+        return layer.id !== "background" && layer.id !== RASTER_BASE_LAYER_ID;
+    })?.id;
+}
+
+function getBackgroundGroupLayerIds(
+    map: maplibregl.Map,
+    groupId: string
+): string[] {
+    const style = map.getStyle();
+    if (!style?.layers?.length) return [];
+
+    return style.layers
+        .filter((layer) => {
+            const metadata = (layer as { metadata?: Record<string, unknown> }).metadata;
+            return metadata?.uhmBackgroundGroupId === groupId;
+        })
+        .map((layer) => layer.id);
 }
 
 export function getSelectableLayers(map: maplibregl.Map): string[] {
