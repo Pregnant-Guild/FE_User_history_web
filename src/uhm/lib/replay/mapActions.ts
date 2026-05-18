@@ -1,5 +1,6 @@
 import type maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "@/uhm/types/geo";
+import { fitMapToFeatureCollection, getFeatureCollectionBBox } from "@/uhm/components/map/mapUtils";
 
 /**
  * Các hàm xử lý tương tác bản đồ cho hệ thống Replay.
@@ -49,21 +50,73 @@ export const mapActions = {
 
     // Di chuyển mượt mà đến một geometry dựa trên ID
     fly_to_geometry: (map: maplibregl.Map, geometryId: string | number, draft: FeatureCollection) => {
-        const feature = draft.features.find(f => String(f.properties.id) === String(geometryId));
+        mapActions.fly_to_geometries(map, [geometryId], draft);
+    },
+
+    // Di chuyển mượt mà đến một hoặc nhiều geometry dựa trên ID.
+    fly_to_geometries: (
+        map: maplibregl.Map,
+        geometryIds: Array<string | number>,
+        draft: FeatureCollection,
+        duration = 2200
+    ) => {
+        const ids = new Set(
+            geometryIds
+                .map((id) => String(id).trim())
+                .filter((id) => id.length > 0)
+        );
+        if (!ids.size) return;
+
+        const targetFeatures = draft.features.filter((feature) =>
+            ids.has(String(feature.properties.id))
+        );
+        if (!targetFeatures.length) return;
+
+        fitMapToFeatureCollection(
+            map,
+            {
+                type: "FeatureCollection",
+                features: targetFeatures,
+            },
+            64,
+            {
+                duration,
+                maxZoom: 8.5,
+                pointZoom: 8,
+            }
+        );
+    },
+
+    orbit_camera_around_geometry: (
+        map: maplibregl.Map,
+        geometryId: string | number,
+        draft: FeatureCollection,
+        zoom = 8,
+        pitch = 45,
+        turns = 1,
+        duration = 5000
+    ) => {
+        const feature = draft.features.find(
+            (item) => String(item.properties.id) === String(geometryId)
+        );
         if (!feature) return;
 
-        // Tính toán bounds từ geometry (giả định có helper hoặc dùng bbox của feature)
-        // Ở đây tạm dùng center đơn giản nếu là Point, hoặc bounds nếu là đa giác
-        if (feature.geometry.type === "Point") {
-            map.flyTo({
-                center: feature.geometry.coordinates as [number, number],
-                zoom: Math.max(map.getZoom(), 10),
-                duration: 3000,
-            });
-        } else {
-            // Thực tế cần tính bbox, ở đây giả định map có hàm fitBounds hoặc tương đương
-            // map.fitBounds(calculateBBox(feature.geometry), { padding: 50 });
-        }
+        const bbox = getFeatureCollectionBBox({
+            type: "FeatureCollection",
+            features: [feature],
+        });
+        if (!bbox) return;
+
+        map.easeTo({
+            center: [
+                (bbox.minLng + bbox.maxLng) / 2,
+                (bbox.minLat + bbox.maxLat) / 2,
+            ],
+            zoom,
+            pitch,
+            bearing: map.getBearing() + (Number.isFinite(turns) ? turns * 360 : 360),
+            duration,
+        });
     },
 
     // Ẩn/hiện nhãn (labels) trên bản đồ

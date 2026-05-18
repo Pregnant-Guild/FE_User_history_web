@@ -138,6 +138,7 @@ export type UIOptionName =
     | "timeline"
     | "layer_panel"
     | "wiki_panel"
+    | "close_wiki_panel"
     | "zoom_panel"
     | "wiki"
     | "toast"
@@ -152,6 +153,7 @@ export type MapFunctionName =
     | "toggle_labels"
     | "show_labels"
     | "hide_labels"
+    | "show_all_geometries"
     | "reset_camera_north";
 
 export type GeoFunctionName =
@@ -172,10 +174,15 @@ export type GeoFunctionName =
 
 export type NarrativeFunctionName =
     | "set_title"
+    | "clear_title"
     | "set_descriptions"
+    | "clear_descriptions"
     | "show_dialog_box"
+    | "clear_dialog_box"
     | "display_historical_image"
-    | "set_step_subtitle";
+    | "clear_historical_image"
+    | "set_step_subtitle"
+    | "clear_step_subtitle";
 
 /**
  * Runtime thật hiện dùng positional array cho params.
@@ -228,6 +235,7 @@ export type ReplayUiParamTupleDocs = {
     timeline: [visible: boolean];
     layer_panel: [visible: boolean];
     wiki_panel: [visible: boolean];
+    close_wiki_panel: [];
     zoom_panel: [visible: boolean];
     wiki: [wiki_id: string];
     toast: [message: string];
@@ -248,6 +256,7 @@ export type ReplayMapFunctionParamTupleDocs = {
     toggle_labels: [visible: boolean];
     show_labels: [];
     hide_labels: [];
+    show_all_geometries: [];
     reset_camera_north: [];
 };
 
@@ -314,24 +323,28 @@ export type ReplayGeoFunctionParamTupleDocs = {
     ];
     dim_other_geometries: [
         geometry_ids: string[],
-        opacity?: number,
     ];
 };
 
 export type ReplayNarrativeParamTupleDocs = {
     set_title: [title: string];
+    clear_title: [];
     set_descriptions: [text: string];
+    clear_descriptions: [];
     show_dialog_box: [
         avatar: string,
         text: string,
         side?: "left" | "right",
         speaker?: string,
     ];
+    clear_dialog_box: [];
     display_historical_image: [
         url: string,
         caption?: string,
     ];
+    clear_historical_image: [];
     set_step_subtitle: [subtitle: string | null];
+    clear_step_subtitle: [];
 };
 
 export type ReplayParamTupleDocs =

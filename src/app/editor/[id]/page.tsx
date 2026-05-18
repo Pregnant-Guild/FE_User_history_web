@@ -10,6 +10,8 @@ import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import SelectedGeometryPanel from "@/uhm/components/editor/SelectedGeometryPanel";
 import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar";
 import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
+import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
+import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
@@ -18,7 +20,7 @@ import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities"
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
 import { ProjectCommit } from "@/uhm/api/projects";
-import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import { fetchWikiById, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import {
@@ -42,7 +44,9 @@ import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
 import {
     loadBackgroundLayerVisibilityFromStorage,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
+import { deepClone } from "@/uhm/lib/editor/draft/draftDiff";
 import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
+import { useReplayPreview } from "@/uhm/lib/replay/useReplayPreview";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/utils/timeline";
 import { useFeatureCommands } from "./featureCommands";
@@ -58,6 +62,17 @@ import {
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
+
+type ReplayPreviewSession = {
+    replay: BattleReplay;
+    draft: FeatureCollection;
+    wikis: WikiSnapshot[];
+    selectedStageId: number | null;
+    selectedStepIndex: number | null;
+    timelineYear: number;
+    timelineFilterEnabled: boolean;
+    mapViewState: ReturnType<MapHandle["getViewState"]>;
+};
 
 export default function Page() {
     return (
@@ -304,6 +319,18 @@ function EditorPageContent() {
         stageId: null,
         stepIndex: null,
     });
+    const [previewSession, setPreviewSession] = useState<ReplayPreviewSession | null>(null);
+    const [previewAutoplayMode, setPreviewAutoplayMode] = useState<"start" | "selection" | null>(null);
+    const [previewWikiCache, setPreviewWikiCache] = useState<Record<string, Wiki>>({});
+    const [previewWikiError, setPreviewWikiError] = useState<string | null>(null);
+    const [isPreviewWikiLoading, setIsPreviewWikiLoading] = useState(false);
+    const handleReplaySelectionChange = useCallback((stageId: number | null, stepIndex: number | null) => {
+        setReplaySelection({ stageId, stepIndex });
+    }, []);
+    const getCurrentMapInstance = useCallback(() => mapHandleRef.current?.getMap() ?? null, []);
+    const getCurrentMapViewState = useCallback(() => mapHandleRef.current?.getViewState() ?? null, []);
+    const isReplayEditMode = mode === "replay";
+    const isReplayPreviewMode = mode === "replay_preview";
     const entitiesRef = useRef(entities);
     useEffect(() => {
         entitiesRef.current = entities;
@@ -330,14 +357,54 @@ function EditorPageContent() {
         });
     }, [snapshotEntities, setEntityCatalog]);
 
+    const handleTimelineYearChange = useCallback((nextYear: number) => {
+        setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
+    }, [setTimelineDraftYear]);
+
+    const replayPreview = useReplayPreview({
+        replay: previewSession?.replay || null,
+        draft: previewSession?.draft || EMPTY_FEATURE_COLLECTION,
+        getMapInstance: getCurrentMapInstance,
+        initialTimelineYear: previewSession?.timelineYear ?? timelineDraftYear,
+        initialTimelineFilterEnabled: previewSession?.timelineFilterEnabled ?? timelineFilterEnabled,
+        initialMapViewState: previewSession?.mapViewState ?? null,
+        selectedStageId: previewSession?.selectedStageId ?? replaySelection.stageId,
+        selectedStepIndex: previewSession?.selectedStepIndex ?? replaySelection.stepIndex,
+        onSelectStep: () => {},
+    });
+
+    const replayPreviewDraft = useMemo(() => {
+        const sourceDraft = previewSession?.draft || EMPTY_FEATURE_COLLECTION;
+        if (!isReplayPreviewMode || replayPreview.hiddenGeometryIds.length === 0) {
+            return sourceDraft;
+        }
+        const hiddenIds = new Set(replayPreview.hiddenGeometryIds);
+        return {
+            ...sourceDraft,
+            features: sourceDraft.features.filter(
+                (feature) => !hiddenIds.has(String(feature.properties.id))
+            ),
+        };
+    }, [isReplayPreviewMode, previewSession?.draft, replayPreview.hiddenGeometryIds]);
+
+    const activeTimelineYear = isReplayPreviewMode
+        ? replayPreview.timelineYear
+        : timelineDraftYear;
+    const activeTimelineFilterEnabled = isReplayPreviewMode
+        ? replayPreview.timelineFilterEnabled
+        : timelineFilterEnabled;
+
     // Timeline filter: only affects persisted snapshot features.
     // New features created in the current session remain visible regardless of time range.
     const timelineVisibleDraft = useMemo(() => {
-        // Nếu ở mode replay, sử dụng replayDraft thay vì main draft
-        const activeDraft = mode === "replay" ? editor.replayDraft : editor.mainDraft;
+        const activeDraft = isReplayPreviewMode
+            ? replayPreviewDraft
+            : isReplayEditMode
+                ? editor.replayDraft
+                : editor.mainDraft;
 
-        if (!timelineFilterEnabled) return activeDraft;
-        const year = clampYearToFixedRange(Math.trunc(timelineDraftYear));
+        if (!activeTimelineFilterEnabled) return activeDraft;
+        const year = clampYearToFixedRange(Math.trunc(activeTimelineYear));
         return {
             ...activeDraft,
             features: activeDraft.features.filter((feature) => {
@@ -345,7 +412,14 @@ function EditorPageContent() {
                 return isFeatureVisibleAtYear(feature, year);
             }),
         };
-    }, [editor, mode, timelineDraftYear, timelineFilterEnabled]);
+    }, [
+        activeTimelineFilterEnabled,
+        activeTimelineYear,
+        editor,
+        isReplayEditMode,
+        isReplayPreviewMode,
+        replayPreviewDraft,
+    ]);
 
     const selectedFeatures = useMemo(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return [];
@@ -463,7 +537,66 @@ function EditorPageContent() {
         restoreCommit,
     } = sectionCommands;
 
+    const exitReplayPreview = useCallback(() => {
+        replayPreview.resetPreview();
+        setPreviewAutoplayMode(null);
+        setPreviewSession(null);
+        internalSetMode("replay");
+    }, [internalSetMode, replayPreview.resetPreview]);
+
+    const openReplayPreview = useCallback((autoplayMode: "start" | "selection") => {
+        if (!editor.activeReplayDraft) return;
+
+        setPreviewSession({
+            replay: deepClone(editor.activeReplayDraft),
+            draft: deepClone(editor.replayDraft),
+            wikis: deepClone(snapshotWikis),
+            selectedStageId: replaySelection.stageId,
+            selectedStepIndex: replaySelection.stepIndex,
+            timelineYear: timelineDraftYear,
+            timelineFilterEnabled,
+            mapViewState: getCurrentMapViewState(),
+        });
+        setPreviewAutoplayMode(autoplayMode);
+        setSelectedFeatureIds([]);
+        internalSetMode("replay_preview");
+    }, [
+        editor.activeReplayDraft,
+        editor.replayDraft,
+        getCurrentMapViewState,
+        internalSetMode,
+        replaySelection.stageId,
+        replaySelection.stepIndex,
+        setSelectedFeatureIds,
+        snapshotWikis,
+        timelineDraftYear,
+        timelineFilterEnabled,
+    ]);
+
     const setMode = useCallback((m: EditorMode, featureId?: string | number) => {
+        if (m === "replay_preview") {
+            return;
+        }
+
+        if (mode === "replay_preview") {
+            replayPreview.resetPreview();
+            setPreviewAutoplayMode(null);
+            setPreviewSession(null);
+
+            if (m === "replay") {
+                internalSetMode("replay");
+                return;
+            }
+
+            editor.closeReplayContext();
+            setSelectedFeatureIds([]);
+            setReplayFeatureId(null);
+            setHideOutside(false);
+            setReplaySelection({ stageId: null, stepIndex: null });
+            internalSetMode(m);
+            return;
+        }
+
         if (m === "replay" && featureId) {
             // QUY TẮC: Geo chọn đầu tiên là geo main.
             const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
@@ -481,7 +614,16 @@ function EditorPageContent() {
             setReplaySelection({ stageId: null, stepIndex: null });
         }
         internalSetMode(m);
-    }, [internalSetMode, mode, editor, selectedFeatureIds, setHideOutside, setReplayFeatureId, setSelectedFeatureIds]);
+    }, [
+        editor,
+        internalSetMode,
+        mode,
+        replayPreview.resetPreview,
+        selectedFeatureIds,
+        setHideOutside,
+        setReplayFeatureId,
+        setSelectedFeatureIds,
+    ]);
 
     useEffect(() => {
         if (!activeReplayStages.length) {
@@ -521,14 +663,141 @@ function EditorPageContent() {
         }
     }, [activeReplayStages, replaySelection.stageId, replaySelection.stepIndex]);
 
+    useEffect(() => {
+        if (!isReplayPreviewMode || !previewSession || !previewAutoplayMode) return;
+        if (previewAutoplayMode === "selection") {
+            replayPreview.playFromSelection();
+        } else {
+            replayPreview.playFromStart();
+        }
+        setPreviewAutoplayMode(null);
+    }, [
+        isReplayPreviewMode,
+        previewAutoplayMode,
+        previewSession,
+        replayPreview.playFromSelection,
+        replayPreview.playFromStart,
+    ]);
+
+    useEffect(() => {
+        setPreviewWikiCache({});
+        setPreviewWikiError(null);
+        setIsPreviewWikiLoading(false);
+    }, [previewSession]);
+
+    const replayPreviewActiveStepLabel = useMemo(() => {
+        if (
+            replayPreview.activeCursor.stageId == null ||
+            replayPreview.activeCursor.stepIndex == null
+        ) {
+            return null;
+        }
+        return `Stage #${replayPreview.activeCursor.stageId} · Step ${replayPreview.activeCursor.stepIndex + 1}`;
+    }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
+
+    const replayPreviewWikiRows = previewSession?.wikis || [];
+    const replayPreviewActiveWikiSnapshot = useMemo(() => {
+        if (!replayPreview.activeWikiId) return null;
+        return replayPreviewWikiRows.find((item) => item.id === replayPreview.activeWikiId) || null;
+    }, [replayPreview.activeWikiId, replayPreviewWikiRows]);
+
+    useEffect(() => {
+        if (!isReplayPreviewMode || !replayPreview.sidebarOpen) {
+            setPreviewWikiError(null);
+            setIsPreviewWikiLoading(false);
+            return;
+        }
+
+        const activeWikiId = String(replayPreview.activeWikiId || "").trim();
+        if (!activeWikiId.length) {
+            setPreviewWikiError(null);
+            setIsPreviewWikiLoading(false);
+            return;
+        }
+
+        const localWiki = replayPreviewWikiRows.find((item) => item.id === activeWikiId) || null;
+        if (!localWiki) {
+            setPreviewWikiError("Không tìm thấy wiki trong snapshot preview.");
+            setIsPreviewWikiLoading(false);
+            return;
+        }
+
+        if (typeof localWiki.doc === "string") {
+            setPreviewWikiError(null);
+            setIsPreviewWikiLoading(false);
+            return;
+        }
+
+        if (previewWikiCache[activeWikiId]) {
+            setPreviewWikiError(null);
+            setIsPreviewWikiLoading(false);
+            return;
+        }
+
+        let disposed = false;
+        setPreviewWikiError(null);
+        setIsPreviewWikiLoading(true);
+        void fetchWikiById(activeWikiId)
+            .then((row) => {
+                if (disposed) return;
+                setPreviewWikiCache((prev) => ({ ...prev, [activeWikiId]: row }));
+            })
+            .catch((err) => {
+                if (disposed) return;
+                setPreviewWikiError(err instanceof Error ? err.message : "Không tải được wiki preview.");
+            })
+            .finally(() => {
+                if (!disposed) {
+                    setIsPreviewWikiLoading(false);
+                }
+            });
+
+        return () => {
+            disposed = true;
+        };
+    }, [
+        isReplayPreviewMode,
+        previewWikiCache,
+        replayPreview.activeWikiId,
+        replayPreview.sidebarOpen,
+        replayPreviewWikiRows,
+    ]);
+
+    const replayPreviewActiveWiki = useMemo<Wiki | null>(() => {
+        const snapshotWiki = replayPreviewActiveWikiSnapshot;
+        if (!snapshotWiki) return null;
+        if (typeof snapshotWiki.doc === "string") {
+            return {
+                id: snapshotWiki.id,
+                project_id: projectId,
+                title: snapshotWiki.title,
+                slug: snapshotWiki.slug ?? null,
+                content: snapshotWiki.doc || "",
+            };
+        }
+        return previewWikiCache[snapshotWiki.id] || null;
+    }, [previewWikiCache, projectId, replayPreviewActiveWikiSnapshot]);
+
+    const handleReplayPreviewWikiLinkRequest = useCallback(({ slug }: { slug: string; rect: DOMRect }) => {
+        const nextSlug = String(slug || "").trim();
+        if (!nextSlug.length) return;
+        const match = replayPreviewWikiRows.find((item) => String(item.slug || "").trim() === nextSlug) || null;
+        if (!match) {
+            setPreviewWikiError(`Wiki /wiki/${nextSlug} không có trong snapshot preview.`);
+            return;
+        }
+        setPreviewWikiError(null);
+        replayPreview.openWikiPanelById(match.id);
+    }, [replayPreview.openWikiPanelById, replayPreviewWikiRows]);
+
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
 
-        if (mode === "replay" && replayFeatureId) {
+        if ((isReplayEditMode || isReplayPreviewMode) && replayFeatureId) {
             // Ẩn chính geo được chọn làm replay (marker kịch bản)
             visibility[String(replayFeatureId)] = false;
 
-            if (hideOutside) {
+            if (isReplayEditMode && hideOutside) {
                 // Trong mode replay, ta chỉ hiển thị những gì có trong draft của replay đó
                 const currentReplayFeatureIds = new Set(editor.draft.features.map(f => String(f.properties.id)));
                 
@@ -544,11 +813,14 @@ function EditorPageContent() {
         }
 
         return visibility;
-    }, [geometryVisibility, mode, replayFeatureId, hideOutside, editor.draft.features]);
-
-    const onToggleHideOutside = useCallback(() => {
-        setHideOutside((prev) => !prev);
-    }, [setHideOutside]);
+    }, [
+        editor.draft.features,
+        geometryVisibility,
+        hideOutside,
+        isReplayEditMode,
+        isReplayPreviewMode,
+        replayFeatureId,
+    ]);
 
     const openProject = useCallback(async () => {
         if (!projectId) return;
@@ -917,10 +1189,6 @@ function EditorPageContent() {
         setBackgroundVisibility(loadBackgroundLayerVisibilityFromStorage());
         setIsBackgroundVisibilityReady(true);
     }, [setBackgroundVisibility, setIsBackgroundVisibilityReady]);
-
-    const handleTimelineYearChange = (nextYear: number) => {
-        setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
-    };
 
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
         const id = String(entity.id || "").trim();
@@ -1325,9 +1593,13 @@ function EditorPageContent() {
         setSelectedFeatureIds([feature.properties.id]);
     };
 
+    const mapLabelContextDraft = isReplayPreviewMode
+        ? previewSession?.draft || EMPTY_FEATURE_COLLECTION
+        : editor.draft;
+
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
-            {mode !== "replay" ? (
+            {!isReplayEditMode && !isReplayPreviewMode ? (
                 <>
                     <Editor
                         mode={mode}
@@ -1360,7 +1632,7 @@ function EditorPageContent() {
                         }}
                     />
                 </>
-            ) : (
+            ) : isReplayEditMode ? (
                 <>
                     <ReplayTimelineSidebar
                         width={leftPanelWidth}
@@ -1370,10 +1642,16 @@ function EditorPageContent() {
                         pendingSaveCount={pendingSaveCount}
                         replayUndoStack={editor.replayUndoStack}
                         canUndoReplay={editor.canUndoReplay}
-                        onSelectStep={(stageId, stepIndex) => setReplaySelection({ stageId, stepIndex })}
+                        onSelectStep={handleReplaySelectionChange}
                         onMutateReplay={editor.mutateActiveReplay}
                         onUndoReplay={editor.undo}
                         onExitReplay={() => setMode("select")}
+                        isPreviewPlaying={false}
+                        previewPlaybackSpeed={1}
+                        onPlayPreviewFromStart={() => openReplayPreview("start")}
+                        onPlayPreviewFromSelection={() => openReplayPreview("selection")}
+                        onStopPreview={() => {}}
+                        onResetPreview={() => {}}
                     />
                     <ResizeHandle
                         title="Resize left panel"
@@ -1382,7 +1660,7 @@ function EditorPageContent() {
                         }}
                     />
                 </>
-            )}
+            ) : null}
 
             {blockedPendingSubmissionId ? (
                 <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220", color: "white", padding: "24px" }}>
@@ -1434,7 +1712,7 @@ function EditorPageContent() {
                             mode={mode}
                             onSetMode={setMode}
                             draft={timelineVisibleDraft}
-                            labelContextDraft={editor.draft}
+                            labelContextDraft={mapLabelContextDraft}
                             selectedFeatureIds={selectedFeatureIds}
                             onSelectFeatureIds={setSelectedFeatureIds}
                             onCreateFeature={handleCreateFeature}
@@ -1442,32 +1720,84 @@ function EditorPageContent() {
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={effectiveGeometryVisibility}
-                            respectBindingFilter={mode === "replay" ? false : geometryBindingFilterEnabled}
+                            respectBindingFilter={isReplayEditMode || isReplayPreviewMode ? false : geometryBindingFilterEnabled}
                             highlightFeatures={null}
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
                             focusPadding={96}
-                            hideOutside={hideOutside}
-                            onToggleHideOutside={onToggleHideOutside}
-                            onUndoReplay={editor.undo}
-                            canUndoReplay={editor.canUndoReplay}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
                     )}
-                    <TimelineBar
-                        year={timelineDraftYear}
-                        onYearChange={handleTimelineYearChange}
-                        isLoading={false}
-                        disabled={false}
-                        statusText={null}
-                        filterEnabled={timelineFilterEnabled}
-                        onFilterEnabledChange={setTimelineFilterEnabled}
-                    />
+                    {isReplayPreviewMode ? (
+                        <ReplayPreviewOverlay
+                            isPreviewMode={true}
+                            isPlaying={replayPreview.isPlaying}
+                            title={replayPreview.title}
+                            descriptions={replayPreview.descriptions}
+                            subtitle={replayPreview.subtitle}
+                            dialog={replayPreview.dialog}
+                            image={replayPreview.image}
+                            toasts={replayPreview.toasts}
+                            sidebarOpen={replayPreview.sidebarOpen}
+                            playbackSpeed={replayPreview.playbackSpeed}
+                            activeStepLabel={replayPreviewActiveStepLabel}
+                            activeStepNumber={replayPreview.activeStepNumber}
+                            totalSteps={replayPreview.totalSteps}
+                            onPlayPreview={replayPreview.playFromStart}
+                            onStopPreview={replayPreview.stopPreview}
+                            onResetPreview={replayPreview.resetPreview}
+                            onExitPreview={exitReplayPreview}
+                        />
+                    ) : null}
+                    {isReplayPreviewMode && replayPreview.sidebarOpen ? (
+                        <aside
+                            style={{
+                                position: "absolute",
+                                top: 16,
+                                right: 16,
+                                bottom: 16,
+                                width: 420,
+                                maxWidth: "calc(100vw - 2rem)",
+                                zIndex: 16,
+                            }}
+                        >
+                            <PublicWikiSidebar
+                                entity={null}
+                                wiki={replayPreviewActiveWiki}
+                                isLoading={isPreviewWikiLoading}
+                                error={replayPreview.activeWikiId ? previewWikiError : "Chưa có wiki được chọn trong step này."}
+                                onClose={() => {
+                                    setPreviewWikiError(null);
+                                    replayPreview.closeWikiPanel();
+                                }}
+                                onWikiLinkRequest={handleReplayPreviewWikiLinkRequest}
+                            />
+                        </aside>
+                    ) : null}
+                    {!isReplayPreviewMode || replayPreview.timelineVisible ? (
+                        <TimelineBar
+                            year={activeTimelineYear}
+                            onYearChange={
+                                isReplayPreviewMode
+                                    ? replayPreview.setTimelineYear
+                                    : handleTimelineYearChange
+                            }
+                            isLoading={false}
+                            disabled={false}
+                            statusText={null}
+                            filterEnabled={activeTimelineFilterEnabled}
+                            onFilterEnabledChange={
+                                isReplayPreviewMode
+                                    ? replayPreview.setTimelineFilterEnabled
+                                    : setTimelineFilterEnabled
+                            }
+                        />
+                    ) : null}
                 </div>
             ) : null}
 
-            {mode !== "replay" ? (
+            {!isReplayEditMode && !isReplayPreviewMode ? (
                 <>
                     <ResizeHandle
                         title="Resize right panel"
@@ -1740,7 +2070,7 @@ function EditorPageContent() {
                         }
                     />
                 </>
-            ) : (
+            ) : isReplayEditMode ? (
                 <>
                     <ResizeHandle
                         title="Resize right panel"
@@ -1757,11 +2087,11 @@ function EditorPageContent() {
                         currentTimelineYear={timelineDraftYear}
                         geometryChoices={geometryChoices}
                         wikiChoices={wikiChoices}
-                        getCurrentMapViewState={() => mapHandleRef.current?.getViewState() ?? null}
+                        getCurrentMapViewState={getCurrentMapViewState}
                         onMutateReplay={editor.mutateActiveReplay}
                     />
                 </>
-            )}
+            ) : null}
         </div>
     );
 }

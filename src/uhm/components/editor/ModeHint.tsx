@@ -43,5 +43,12 @@ export function ModeHint({ mode }: { mode: EditorMode }) {
             </div>
         )
     }
+    if (mode === "replay_preview") {
+        return (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
+                Đang xem preview replay trên session tách biệt.
+            </div>
+        )
+    }
     return null;
 }

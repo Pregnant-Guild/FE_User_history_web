@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
@@ -27,6 +27,7 @@ export type MapHandle = {
         bearing: number;
         projection: string;
     } | null;
+    getMap: () => import("maplibre-gl").Map | null;
 };
 
 type MapProps = {
@@ -51,10 +52,6 @@ type MapProps = {
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
-    hideOutside?: boolean;
-    onToggleHideOutside?: () => void;
-    onUndoReplay?: () => void;
-    canUndoReplay?: boolean;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -79,10 +76,6 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     focusFeatureCollection = null,
     focusRequestKey = null,
     focusPadding,
-    hideOutside = false,
-    onToggleHideOutside,
-    onUndoReplay,
-    canUndoReplay = false,
 }, ref) {
     const modeRef = useRef<MapProps["mode"]>(mode);
     const draftRef = useRef<FeatureCollection>(draft);
@@ -119,15 +112,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
 
     useImperativeHandle(ref, () => ({
         getViewState,
-    }), [getViewState]);
-
-    const handleLogViewState = useCallback(() => {
-        const state = getViewState();
-        console.log("Current Map View State:", state);
-        if (state) {
-            alert(`Captured View State:\nCenter: ${state.center.lng.toFixed(4)}, ${state.center.lat.toFixed(4)}\nZoom: ${state.zoom.toFixed(2)}\nPitch: ${state.pitch.toFixed(1)}°\nBearing: ${state.bearing.toFixed(1)}°\nProjection: ${state.projection}`);
-        }
-    }, [getViewState]);
+        getMap: () => mapRef.current,
+    }), [getViewState, mapRef]);
 
     const {
         editingEngineRef,
@@ -256,112 +242,6 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                         pointerEvents: "auto",
                     }}
                 >
-                    {mode === "replay" && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => onSetMode?.("select")}
-                                style={{
-                                    ...zoomButtonStyle,
-                                    width: "auto",
-                                    padding: "0 12px",
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    background: "#7f1d1d",
-                                    color: "white",
-                                    border: "1px solid #991b1b",
-                                    borderRadius: "999px",
-                                    cursor: "pointer",
-                                    marginRight: "4px",
-                                }}
-                            >
-                                Thoát Replay Edit
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleLogViewState}
-                                title="Capture current map view state"
-                                style={{
-                                    ...zoomButtonStyle,
-                                    width: "auto",
-                                    padding: "0 12px",
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    background: "#1e293b",
-                                    color: "#38bdf8",
-                                    border: "1px solid #334155",
-                                    borderRadius: "999px",
-                                    cursor: "pointer",
-                                    marginRight: "8px",
-                                }}
-                            >
-                                Capture View
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={onUndoReplay}
-                                disabled={!onUndoReplay || !canUndoReplay}
-                                title="Undo thao tác replay gần nhất"
-                                style={{
-                                    ...zoomButtonStyle,
-                                    width: "auto",
-                                    padding: "0 12px",
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    background: !onUndoReplay || !canUndoReplay ? "#0f172a" : "#1e293b",
-                                    color: !onUndoReplay || !canUndoReplay ? "#64748b" : "#f8fafc",
-                                    border: "1px solid #334155",
-                                    borderRadius: "999px",
-                                    cursor: !onUndoReplay || !canUndoReplay ? "not-allowed" : "pointer",
-                                    marginRight: "8px",
-                                }}
-                            >
-                                Undo Replay
-                            </button>
-
-                            <div
-                                onClick={onToggleHideOutside}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    cursor: "pointer",
-                                    marginRight: "8px",
-                                    userSelect: "none",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        width: "32px",
-                                        height: "18px",
-                                        borderRadius: "10px",
-                                        background: hideOutside ? "#e11d48" : "#334155",
-                                        position: "relative",
-                                        transition: "background 0.2s",
-                                        border: "1px solid rgba(255,255,255,0.1)",
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            position: "absolute",
-                                            top: "2px",
-                                            left: hideOutside ? "16px" : "2px",
-                                            width: "12px",
-                                            height: "12px",
-                                            borderRadius: "50%",
-                                            background: "white",
-                                            transition: "left 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                                            boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                            <div style={{ width: "1px", height: "20px", background: "rgba(148, 163, 184, 0.3)", marginRight: "4px" }} />
-                        </>
-                    )}
-
                     <label
                         title={
                             isGlobeProjection

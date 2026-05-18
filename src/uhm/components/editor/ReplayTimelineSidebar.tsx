@@ -27,6 +27,12 @@ type Props = {
     onMutateReplay: (label: string, mutator: (draftReplay: BattleReplay) => void) => boolean;
     onUndoReplay: () => void;
     onExitReplay: () => void;
+    isPreviewPlaying: boolean;
+    previewPlaybackSpeed: number;
+    onPlayPreviewFromStart: () => void;
+    onPlayPreviewFromSelection: () => void;
+    onStopPreview: () => void;
+    onResetPreview: () => void;
 };
 
 type ActionGroupKey = "use_UI_function" | "use_map_function" | "use_geo_function" | "use_narrow_function";
@@ -72,6 +78,12 @@ export default function ReplayTimelineSidebar({
     onMutateReplay,
     onUndoReplay,
     onExitReplay,
+    isPreviewPlaying,
+    previewPlaybackSpeed,
+    onPlayPreviewFromStart,
+    onPlayPreviewFromSelection,
+    onStopPreview,
+    onResetPreview,
 }: Props) {
     const stages = useMemo(() => replay?.detail || [], [replay?.detail]);
     const selectedStage =
@@ -367,6 +379,80 @@ export default function ReplayTimelineSidebar({
                             >
                                 Thoát replay
                             </button>
+                        </div>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: isPreviewPlaying ? "1fr 1fr" : "1fr 1fr",
+                                gap: 8,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={onPlayPreviewFromStart}
+                                disabled={!replay || totalSteps === 0}
+                                style={{
+                                    ...buttonStyle,
+                                    background: !replay || totalSteps === 0 ? "#1e293b" : "#166534",
+                                    border: "none",
+                                    cursor: !replay || totalSteps === 0 ? "not-allowed" : "pointer",
+                                    opacity: !replay || totalSteps === 0 ? 0.7 : 1,
+                                }}
+                            >
+                                Play từ đầu
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onPlayPreviewFromSelection}
+                                disabled={!replay || selectedStage == null || selectedStepIndex == null}
+                                style={{
+                                    ...buttonStyle,
+                                    background:
+                                        !replay || selectedStage == null || selectedStepIndex == null
+                                            ? "#1e293b"
+                                            : "#0f766e",
+                                    border: "none",
+                                    cursor:
+                                        !replay || selectedStage == null || selectedStepIndex == null
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    opacity:
+                                        !replay || selectedStage == null || selectedStepIndex == null
+                                            ? 0.7
+                                            : 1,
+                                }}
+                            >
+                                Play từ step
+                            </button>
+                            {isPreviewPlaying ? (
+                                <button
+                                    type="button"
+                                    onClick={onStopPreview}
+                                    style={{
+                                        ...buttonStyle,
+                                        background: "#7f1d1d",
+                                        border: "none",
+                                    }}
+                                >
+                                    Dừng
+                                </button>
+                            ) : null}
+                            {isPreviewPlaying ? (
+                                <button
+                                    type="button"
+                                    onClick={onResetPreview}
+                                    style={{
+                                        ...buttonStyle,
+                                        background: "#1e3a8a",
+                                        border: "none",
+                                    }}
+                                >
+                                    Reset preview
+                                </button>
+                            ) : null}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                            Preview sẽ mở trong mode riêng với snapshot replay tại thời điểm bấm play.
                         </div>
                     </div>
                 </Panel>
@@ -999,6 +1085,7 @@ const uiOptionLabels: Record<UIOptionName, string> = {
     timeline: "Timeline",
     layer_panel: "Layer Panel",
     wiki_panel: "Wiki Panel",
+    close_wiki_panel: "Đóng Wiki Panel",
     zoom_panel: "Zoom Panel",
     wiki: "Wiki",
     toast: "Toast",
@@ -1008,10 +1095,15 @@ const uiOptionLabels: Record<UIOptionName, string> = {
 
 const narrativeFunctionLabels: Record<NarrativeFunctionName, string> = {
     set_title: "Tiêu đề step",
+    clear_title: "Xóa tiêu đề",
     set_descriptions: "Mô tả",
+    clear_descriptions: "Xóa mô tả",
     show_dialog_box: "Dialog box",
+    clear_dialog_box: "Đóng dialog box",
     display_historical_image: "Ảnh lịch sử",
+    clear_historical_image: "Xóa ảnh lịch sử",
     set_step_subtitle: "Phụ đề",
+    clear_step_subtitle: "Xóa phụ đề",
 };
 
 const mapFunctionLabels: Record<MapFunctionName, string> = {
@@ -1022,6 +1114,7 @@ const mapFunctionLabels: Record<MapFunctionName, string> = {
     toggle_labels: "Bật/tắt labels",
     show_labels: "Hiện labels",
     hide_labels: "Ẩn labels",
+    show_all_geometries: "Hiện tất cả geo",
     reset_camera_north: "North up",
 };
 
@@ -1039,7 +1132,7 @@ const geoFunctionLabels: Record<GeoFunctionName, string> = {
     show_geometry_label: "Label geometry",
     follow_geometry_path: "Follow path",
     follow_geometries_path: "Follow path",
-    dim_other_geometries: "Làm mờ geo khác",
+    dim_other_geometries: "Ẩn geo khác",
 };
 
 function buildStepActionEntries(step: ReplayStep): StepActionEntry[] {
@@ -1070,8 +1163,14 @@ function buildNarrativeActionEntry(
         case "set_title":
             summary = summarizeValue(params[0], "Tiêu đề trống");
             break;
+        case "clear_title":
+            summary = "title=null";
+            break;
         case "set_descriptions":
             summary = summarizeValue(params[0], "Mô tả trống");
+            break;
+        case "clear_descriptions":
+            summary = "descriptions=null";
             break;
         case "show_dialog_box":
             summary = [
@@ -1080,14 +1179,23 @@ function buildNarrativeActionEntry(
                 `text=${summarizeValue(params[1], "trống")}`,
             ].join(" | ");
             break;
+        case "clear_dialog_box":
+            summary = "dialog=null";
+            break;
         case "display_historical_image":
             summary = [
                 `url=${summarizeValue(params[0], "trống")}`,
                 `caption=${summarizeValue(params[1], "trống")}`,
             ].join(" | ");
             break;
+        case "clear_historical_image":
+            summary = "image=null";
+            break;
         case "set_step_subtitle":
             summary = summarizeValue(params[0], "Ẩn subtitle");
+            break;
+        case "clear_step_subtitle":
+            summary = "subtitle=null";
             break;
     }
 
@@ -1128,6 +1236,9 @@ function buildMapActionEntry(
             break;
         case "hide_labels":
             summary = "visible=false";
+            break;
+        case "show_all_geometries":
+            summary = "hidden_ids=[]";
             break;
         case "set_camera_view":
             summary = summarizeCameraViewValue(params[0]);
@@ -1248,8 +1359,7 @@ function buildGeoActionEntry(
             break;
         case "dim_other_geometries":
             summary = [
-                `focus=${summarizeGeometryIdsValue(params[0])}`,
-                `other_opacity=${summarizeValue(params[1], "mặc định")}`,
+                `keep=${summarizeGeometryIdsValue(params[0])}`,
             ].join(" | ");
             break;
     }
@@ -1278,6 +1388,8 @@ function buildUiActionEntry(
 
     if (option === "timeline" || option === "layer_panel" || option === "wiki_panel" || option === "zoom_panel") {
         summary = `visible=${Boolean(params[0]) ? "true" : "false"}`;
+    } else if (option === "close_wiki_panel") {
+        summary = "visible=false | active_wiki=null";
     } else if (option === "wiki") {
         summary = `wiki_id=${summarizeValue(params[0], "trống")}`;
     } else if (option === "toast") {
@@ -1342,6 +1454,7 @@ function normalizeUiOptionValue(value: unknown): UIOptionName | null {
         case "timeline":
         case "layer_panel":
         case "wiki_panel":
+        case "close_wiki_panel":
         case "zoom_panel":
         case "wiki":
         case "toast":

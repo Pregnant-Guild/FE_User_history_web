@@ -93,6 +93,7 @@ export type UIOptionName =
     | "timeline"                 // Ẩn/hiện timeline
     | "layer_panel"              // Ẩn/hiện panel layer
     | "wiki_panel"               // Ẩn/hiện panel wiki
+    | "close_wiki_panel"         // Đóng panel wiki và xóa wiki đang active
     | "zoom_panel"               // Ẩn/hiện nút zoom
     | "wiki"                     // Mở/chọn wiki
     | "toast"                    // Hiển thị toast
@@ -107,6 +108,7 @@ export type MapFunctionName =
     | "toggle_labels"            // Legacy: bật/tắt hiển thị nhãn (labels) trên bản đồ
     | "show_labels"              // Hiện labels
     | "hide_labels"              // Ẩn labels
+    | "show_all_geometries"      // Hiện lại toàn bộ geometry đang có trong replay draft
     | "reset_camera_north";      // Đưa camera về hướng bắc
 
 export type GeoFunctionName =
@@ -123,14 +125,19 @@ export type GeoFunctionName =
     | "show_geometry_label"      // Hiện label riêng cho geometry
     | "follow_geometry_path"     // Legacy: cho camera bám theo một path geometry
     | "follow_geometries_path"   // Cho camera bám theo chuỗi path geometry
-    | "dim_other_geometries";    // Làm mờ các geometry ngoài target set
+    | "dim_other_geometries";    // Ẩn các geometry ngoài target set, chỉ giữ geo focus
 
 export type NarrativeFunctionName =
     | "set_title"                // Đặt tiêu đề cho bước replay
+    | "clear_title"              // Xóa tiêu đề hiện tại
     | "set_descriptions"         // Đặt mô tả/nội dung diễn giải
+    | "clear_descriptions"       // Xóa mô tả hiện tại
     | "show_dialog_box"          // Hiển thị hộp thoại dẫn chuyện (có avatar)
+    | "clear_dialog_box"         // Đóng/xóa dialog hiện tại
     | "display_historical_image" // Hiển thị hình ảnh tư liệu đè lên bản đồ
-    | "set_step_subtitle";       // Hiển thị phụ đề phía dưới màn hình
+    | "clear_historical_image"   // Xóa ảnh lịch sử hiện tại
+    | "set_step_subtitle"        // Hiển thị phụ đề phía dưới màn hình
+    | "clear_step_subtitle";     // Xóa phụ đề hiện tại
 
 export type ReplayAction<T> = {
     function_name: T;

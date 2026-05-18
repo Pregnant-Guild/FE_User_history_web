@@ -85,6 +85,7 @@ const uiOptionChoices: Array<{ label: string; value: UIOptionName }> = [
     { label: "Timeline", value: "timeline" },
     { label: "Layer Panel", value: "layer_panel" },
     { label: "Wiki Panel", value: "wiki_panel" },
+    { label: "Close Wiki Panel", value: "close_wiki_panel" },
     { label: "Zoom Panel", value: "zoom_panel" },
     { label: "Wiki", value: "wiki" },
     { label: "Toast", value: "toast" },
@@ -96,6 +97,7 @@ const uiSimpleOptionValues: UIOptionName[] = [
     "timeline",
     "layer_panel",
     "wiki_panel",
+    "close_wiki_panel",
     "zoom_panel",
 ];
 
@@ -153,12 +155,26 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
         deserialize: (params) => ({ title: asString(params[0]) }),
         serialize: (values) => [asString(values.title)],
     },
+    clear_title: {
+        label: "Xóa tiêu đề",
+        fields: [],
+        create: () => ({ function_name: "clear_title", params: [] }),
+        deserialize: () => ({}),
+        serialize: () => [],
+    },
     set_descriptions: {
         label: "Mô tả",
         fields: [{ name: "text", label: "Text", kind: "textarea", placeholder: "Nội dung diễn giải" }],
         create: () => ({ function_name: "set_descriptions", params: [""] }),
         deserialize: (params) => ({ text: asString(params[0]) }),
         serialize: (values) => [asString(values.text)],
+    },
+    clear_descriptions: {
+        label: "Xóa mô tả",
+        fields: [],
+        create: () => ({ function_name: "clear_descriptions", params: [] }),
+        deserialize: () => ({}),
+        serialize: () => [],
     },
     show_dialog_box: {
         label: "Dialog box",
@@ -190,6 +206,13 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
             asString(values.speaker),
         ],
     },
+    clear_dialog_box: {
+        label: "Đóng dialog box",
+        fields: [],
+        create: () => ({ function_name: "clear_dialog_box", params: [] }),
+        deserialize: () => ({}),
+        serialize: () => [],
+    },
     display_historical_image: {
         label: "Ảnh lịch sử",
         fields: [
@@ -206,12 +229,26 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
             emptyToUndefined(asString(values.caption)),
         ]),
     },
+    clear_historical_image: {
+        label: "Xóa ảnh lịch sử",
+        fields: [],
+        create: () => ({ function_name: "clear_historical_image", params: [] }),
+        deserialize: () => ({}),
+        serialize: () => [],
+    },
     set_step_subtitle: {
         label: "Phụ đề",
         fields: [{ name: "subtitle", label: "Subtitle", kind: "textarea", placeholder: "Để trống để ẩn subtitle" }],
         create: () => ({ function_name: "set_step_subtitle", params: [""] }),
         deserialize: (params) => ({ subtitle: params[0] == null ? "" : asString(params[0]) }),
         serialize: (values) => [emptyToNull(asString(values.subtitle))],
+    },
+    clear_step_subtitle: {
+        label: "Xóa phụ đề",
+        fields: [],
+        create: () => ({ function_name: "clear_step_subtitle", params: [] }),
+        deserialize: () => ({}),
+        serialize: () => [],
     },
 };
 
@@ -451,6 +488,16 @@ function MapFunctionShortcutPanel({
                             )
                         }
                     />
+                    <ShortcutButton
+                        label="Show All Geo"
+                        tone="green"
+                        onClick={() =>
+                            onAppendActions(
+                                [{ function_name: "show_all_geometries", params: [] }],
+                                "Map: show all geometries"
+                            )
+                        }
+                    />
                 </div>
             </div>
         </Panel>
@@ -576,13 +623,13 @@ function GeoFunctionShortcutPanel({
                         }
                     />
                     <ShortcutButton
-                        label="Dim Others"
+                        label="Hide Others"
                         tone="slate"
                         disabled={!hasSelection}
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "dim_other_geometries", params: [selectedIds, 0.18] }],
-                                `Geo: dim others ngoài ${selectedCount} geo`
+                                [{ function_name: "dim_other_geometries", params: [selectedIds] }],
+                                `Geo: hide others ngoài ${selectedCount} geo`
                             )
                         }
                     />
@@ -1402,6 +1449,7 @@ function buildEmptyUiOptionSelection(): Record<UIOptionName, boolean> {
         timeline: false,
         layer_panel: false,
         wiki_panel: false,
+        close_wiki_panel: false,
         zoom_panel: false,
         wiki: false,
         toast: false,
@@ -1523,6 +1571,11 @@ function buildUiOptionAction(
                 function_name: option,
                 params: [false],
             };
+        case "close_wiki_panel":
+            return {
+                function_name: option,
+                params: [],
+            };
         case "wiki":
             return {
                 function_name: option,
@@ -1574,6 +1627,7 @@ function normalizeUiOptionValue(value: unknown): UIOptionName | null {
         case "timeline":
         case "layer_panel":
         case "wiki_panel":
+        case "close_wiki_panel":
         case "zoom_panel":
         case "wiki":
         case "toast":

@@ -19,6 +19,14 @@ export const uiActions = {
         setSidebarOpen(visible);
     },
 
+    close_wiki_panel: (
+        setSidebarOpen: (v: boolean) => void,
+        onSelectWiki: (id: string) => void,
+    ) => {
+        setSidebarOpen(false);
+        onSelectWiki("");
+    },
+
     // Ẩn/hiện panel zoom. Runtime hiện chưa có controller riêng nên tạm no-op.
     zoom_panel: (visible: boolean) => {
         void visible;
