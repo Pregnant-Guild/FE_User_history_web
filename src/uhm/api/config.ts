@@ -28,20 +28,12 @@ export function stripGoongApiKeyFromUrl(rawUrl: string): string {
 
 export function buildGoongProxyUrl(rawUrl: string): string {
     const sanitizedUrl = stripGoongApiKeyFromUrl(rawUrl);
-    const templateTokens: string[] = [];
-    const tokenizedUrl = sanitizedUrl.replace(/\{[^}]+\}/g, (match) => {
-        const tokenId = `__UHM_GOONG_URL_TOKEN_${templateTokens.length}__`;
-        templateTokens.push(match);
-        return tokenId;
-    });
+    const proxyTarget = sanitizedUrl
+        .trim()
+        .replace(/^https?:\/\//i, "")
+        .replace(/^\/+/, "");
 
-    let encodedUrl = encodeURIComponent(tokenizedUrl);
-    templateTokens.forEach((token, index) => {
-        const encodedTokenId = encodeURIComponent(`__UHM_GOONG_URL_TOKEN_${index}__`);
-        encodedUrl = encodedUrl.replace(encodedTokenId, token);
-    });
-
-    return `${GOONG_PROXY_BASE_PATH}/${encodedUrl}`;
+    return `${GOONG_PROXY_BASE_PATH}/${proxyTarget}`;
 }
 
 export const GOONG_GLYPHS_PROXY_URL = buildGoongProxyUrl(GOONG_GLYPHS_UPSTREAM_URL);

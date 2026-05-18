@@ -24,6 +24,10 @@ const refreshApi = axios.create({
 let isRefreshing = false
 let queue: any[] = []
 
+function shouldRedirectToSigninOnRefreshFailure(status?: number): boolean {
+  return status === 401 || status === 404
+}
+
 const processQueue = (error?: any) => {
   queue.forEach((p) => {
     if (error) p.reject(error)
@@ -121,7 +125,7 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
       return refreshApi.post("/auth/refresh", {})
     }
 
-    let refreshRes: any = await tryCookieRefresh()
+    const refreshRes: any = await tryCookieRefresh()
 
     const nextTokens = extractTokensFromResponsePayload(refreshRes?.data)
     if (nextTokens) setStoredTokens(nextTokens)
@@ -137,9 +141,8 @@ async function performRefreshAndRetry(originalRequest: any): Promise<AxiosRespon
     return api(originalRequest)
   } catch (refreshErr: any) {
     processQueue(refreshErr)
-    // Only force logout when refresh token/session is truly invalid (401).
-    // CRITICAL: We only redirect if it's a 401, which means the HttpOnly cookie is missing or invalid.
-    if (refreshErr?.response?.status === 401) {
+    // Treat missing/invalid refresh endpoints or sessions as logged-out state.
+    if (shouldRedirectToSigninOnRefreshFailure(refreshErr?.response?.status)) {
       clearStoredTokens()
       if (typeof window !== "undefined") {
         window.location.href = "/signin"
