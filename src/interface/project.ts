@@ -72,7 +72,7 @@ export interface RestoreCommitPayload {
 export interface CreateProjectPayload
 {
   description: string,
-  project_status: "PRIVATE" | "PUBLIC" | "ARCHIVE",
+  status: "PRIVATE" | "PUBLIC" | "ARCHIVE",
   title: string
 }
 

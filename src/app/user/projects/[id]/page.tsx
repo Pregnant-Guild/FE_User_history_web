@@ -11,6 +11,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { apiAddProjectMember, apiChangeProjectOwner, apiDeleteProject, apiGetProjectDetail, apiRemoveProjectMember, apiUpdateProject, apiUpdateProjectMemberRole } from "@/service/projectService";
 import Loading from "@/app/loading";
 import Button from "@/components/ui/button/Button";
+import StickyHeader from "@/components/ui/StickyHeader";
+import { PencilIcon } from "@/icons";
 
 type TabType = "overview" | "members" | "settings";
 
@@ -216,12 +218,12 @@ export default function ProjectDetailsPage() {
     );
 
   // console.log(project)
+  const path =[
+    {name: "Quản lý dự án", href:"/user/projects/"}
+  ]
   return (
     <div className="min-h-screen  dark:bg-[#0d1117] text-gray-900 dark:text-[#c9d1d9] font-sans">
-      <PageBreadcrumb 
-        pageTitle="Chi tiết dự án" 
-        paths={[{ name: "Quản lý dự án", href: "/user/projects" }]} 
-      />
+      <StickyHeader header={`Chi tiết dự án`} paths={path} />
       <div className="pt-8 border-b border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117]">
         <div className="px-6">
           <div className="flex items-center gap-2 text-xl mb-6">
@@ -308,8 +310,9 @@ export default function ProjectDetailsPage() {
             ))}
 
             <div className="flex-1" />
-            <Button size="sm" variant="outline" onClick={() => router.push(`/editor/${id}`)}>
-              Mo editor
+            <Button size="sm" variant="primary" className="rounded-4xl!" onClick={() => router.push(`/editor/${id}`)}>
+              <PencilIcon />
+              Editor
             </Button>
           </div>
         </div>

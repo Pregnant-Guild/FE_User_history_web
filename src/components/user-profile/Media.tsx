@@ -13,7 +13,6 @@ import { deleteMedia } from "@/service/mediaService";
 import { INITIAL_LIMIT } from "../../../constant";
 import { MediaItem } from "../tables/MediaTable";
 
-
 export default function MediaLibrary({
   data,
   onRefresh,
@@ -256,7 +255,6 @@ export default function MediaLibrary({
     );
   };
 
-
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6  dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -271,7 +269,7 @@ export default function MediaLibrary({
           {selectedIds.length > 0 && (
             <button
               onClick={handleDeleteSelected}
-              className="flex items-center gap-1 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20"
+              className="flex items-center gap-1 h-10 rounded-4xl bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20"
             >
               <svg
                 className="h-4 w-4"
@@ -286,13 +284,13 @@ export default function MediaLibrary({
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
-              Xóa ({selectedIds.length})
+              Xóa {selectedIds.length}
             </button>
           )}
 
           <button
             onClick={toggleSelectionMode}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all w-17.5 h-10 ${
+            className={`rounded-4xl px-4 py-2 text-sm font-medium transition-all w-17.5 h-10 ${
               isSelectionMode
                 ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
                 : "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
@@ -319,7 +317,7 @@ export default function MediaLibrary({
               <div className="mt-6 flex justify-center">
                 <button
                   onClick={() => setShowAllImages(!showAllImages)}
-                  className="rounded-lg border border-gray-200 bg-gray-50 px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300"
+                  className="rounded-4xl border border-gray-200 bg-gray-50 px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300"
                 >
                   {showAllImages
                     ? "Thu gọn"
@@ -336,7 +334,6 @@ export default function MediaLibrary({
               Tài liệu ({documentFiles.length})
             </h4>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
-             
               {displayedDocs.map((item, idx) =>
                 renderItemCard(item, false, idx),
               )}
@@ -345,7 +342,7 @@ export default function MediaLibrary({
               <div className="mt-6 flex justify-center">
                 <button
                   onClick={() => setShowAllDocs(!showAllDocs)}
-                  className="rounded-lg border border-gray-200 bg-gray-50 px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300"
+                  className="rounded-4xl border border-gray-200 bg-gray-50 px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300"
                 >
                   {showAllDocs
                     ? "Thu gọn"

@@ -7,7 +7,7 @@ import Input from "../form/input/InputField";
 import Label from "../form/Label";
 import { UserMetaCardProps } from "@/interface/user";
 import { useRouter } from "next/navigation";
-import { EyeCloseIcon, EyeIcon } from "@/icons";
+import { EyeCloseIcon, EyeIcon, LockIcon, MailIcon } from "@/icons";
 import { apiChangePassword } from "@/service/auth";
 import { toast } from "sonner";
 
@@ -89,26 +89,19 @@ export default function AccountDetails({ data }: { data: UserMetaCardProps }) {
     formValues.new_password !== formValues.confirm_password;
   return (
     <>
-      <div className="p-5 border border-red-200 rounded-2xl dark:border-gray-800 lg:p-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <div className="border-t border-red-200 py-6">
+        <div className="flex flex-col gap-6">
           <div>
-            <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 lg:mb-6">
-              Account Details
-            </h4>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7 2xl:gap-x-32">
-              <div>
-                <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                  Email Address
-                </p>
-                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+            <div className="">
+              <div className="flex items-center gap-2">
+                <MailIcon className="leading-normal text-gray-500"/>
+                <p className="text-sm font-medium text-gray-600 dark:text-white/90">
                   {data?.data?.email || "example@mail.com"}
                 </p>
               </div>
-              <div>
-                <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                  Password
-                </p>
-                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+              <div className="flex items-center gap-3 mt-2">
+               <LockIcon className="leading-normal text-gray-500"/>
+                <p className="text-sm font-medium text-gray-600 dark:text-white/90">
                   ••••••••
                 </p>
               </div>

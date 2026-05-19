@@ -17,6 +17,7 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import Image from "next/image";
 import { URL_MEDIA } from "../../../../../api";
 import { MediaItem } from "@/components/tables/MediaTable";
+import StickyHeader from "@/components/ui/StickyHeader";
 
 export default function ApplicationDetailPage() {
   const application = useSelector(
@@ -132,26 +133,14 @@ export default function ApplicationDetailPage() {
     });
   };
 
-  // console.log("Application Detail:", application);
+  const path =[
+    {name: "Thư viện", href:"/user/library/"}
+  ]
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border dark:border-zinc-800">
-      <div className="flex justify-between items-center mb-8 border-b dark:border-zinc-800 pb-6">
-        <div>
-          <h2 className="text-xl font-semibold dark:text-zinc-50 tracking-tight">
-            Chi tiết đơn đăng ký
-          </h2>
-        </div>
-
-        <div
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-md backdrop-blur-md border ${config.container}`}
-        >
-          <span className={`text-[12px] font-bold uppercase tracking-wider`}>
-            {application.status}
-          </span>
-        </div>
-      </div>
-
+    <>
+    <StickyHeader header={`Chi tiết đơn đăng ký`} paths={path} />
+    <div className="max-w-5xl mx-auto mb-8 p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border dark:border-zinc-800">
       <div className="space-y-10">
         <section>
           <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest mb-4 block">
@@ -219,7 +208,7 @@ export default function ApplicationDetailPage() {
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="group flex items-center gap-2 px-8 py-3 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white dark:bg-red-950/20 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white text-sm font-black rounded-xl transition-all duration-300 disabled:opacity-50"
+                  className="group flex items-center gap-2 px-8 py-3 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white text-sm font-black rounded-4xl transition-all duration-300 disabled:opacity-50"
                 >
                   {isDeleting ? "ĐANG XỬ LÝ..." : "XÓA"}
                 </button>
@@ -291,6 +280,7 @@ export default function ApplicationDetailPage() {
           },
         }}
       />
-    </div>
+    </div></>
+    
   );
 }

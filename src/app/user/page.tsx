@@ -9,7 +9,7 @@ import DemographicCard from "@/components/ecommerce/DemographicCard";
 
 export const metadata: Metadata = {
   title:
-    "Admin Dashboard",
+    "Home Page",
   description: "This is Dashboard Home for History Web",
 };
 

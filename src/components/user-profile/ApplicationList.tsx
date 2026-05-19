@@ -117,15 +117,12 @@ export default function ApplicationList({
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6  dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-5 dark:border-zinc-800">
-        <h3 className="text-xl font-bold text-gray-800 dark:text-white/90">
-          Hồ sơ{" "}
+        <h3 className="text-xl font-bold text-gray-800 dark:text-white/90 items-center flex">
+          Hồ sơ
           <span className="ml-2 text-sm font-normal text-gray-500">
             ({applications.length} tệp)
           </span>
         </h3>
-        {/* <div className="text-sm text-gray-500">
-          Cập nhật lần cuối: {new Date().toLocaleDateString("vi-VN")}
-        </div> */}
       </div>
 
       {/* CHỈ SỬA DÒNG NÀY: Tăng số lượng cột (grid-cols) để các thẻ nhỏ lại */}

@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { newId } from "@/uhm/lib/utils/id";
 import Swal from "sweetalert2";
 import { PresignedUrlResponse } from "@/interface/media";
+import StickyHeader from "@/components/ui/StickyHeader";
 
 type PendingFile = {
   id: string;
@@ -197,42 +198,41 @@ export default function RoleUpgrade() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
-      <PageBreadcrumb pageTitle="Đăng ký trở thành Nhà sử học" />
-
-      <div className="flex items-center justify-between bg-white dark:bg-gray-900 p-2 rounded-xl border border-gray-200 dark:border-gray-800 mb-6">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPreview(false)}
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${!showPreview ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}
-          >
-            Soạn thảo
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPreview(true)}
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${showPreview ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}
-          >
-            Xem trước giao diện
-          </button>
+    <div className="mx-auto">
+      <StickyHeader header="Đăng ký trở thành Nhà sử học" />
+      <div className="max-w-4xl mx-auto pb-20">
+        <div className="flex items-center justify-between bg-white dark:bg-gray-900 p-2 rounded-xl border border-gray-200 dark:border-gray-800 mb-6">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreview(false)}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${!showPreview ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+            >
+              Soạn thảo
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${showPreview ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+            >
+              Xem trước giao diện
+            </button>
+          </div>
+          <span className="text-[10px] font-black uppercase text-gray-400 mr-2 tracking-widest">
+            {showPreview ? "Preview Mode" : "Edit Mode"}
+          </span>
         </div>
-        <span className="text-[10px] font-black uppercase text-gray-400 mr-2 tracking-widest">
-          {showPreview ? "Preview Mode" : "Edit Mode"}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-6">
-        <div className="relative min-h-[400px]">
-          {!showPreview ? (
-            <RichTextEditor value={content} onChange={handleContentChange} />
-          ) : (
-            <div className="bg-white border border-zinc-200 rounded-xl shadow-inner overflow-hidden min-h-[400px]">
-              {content ? (
-                <iframe
-                  ref={iframeRef}
-                  onLoad={handleIframeLoad}
-                  srcDoc={`
+        <div className="flex flex-col gap-6">
+          <div className="relative min-h-[400px]">
+            {!showPreview ? (
+              <RichTextEditor value={content} onChange={handleContentChange} />
+            ) : (
+              <div className="bg-white border border-zinc-200 rounded-xl shadow-inner overflow-hidden min-h-[400px]">
+                {content ? (
+                  <iframe
+                    ref={iframeRef}
+                    onLoad={handleIframeLoad}
+                    srcDoc={`
                       <!DOCTYPE html>
                       <html>
                         <head>
@@ -253,115 +253,118 @@ export default function RoleUpgrade() {
                         </body>
                       </html>
                     `}
-                  title="Preview"
-                  className="w-full border-none flex-1 transition-all duration-300"
-                  sandbox="allow-same-origin"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[400px] text-zinc-400 italic bg-gray-50 dark:bg-gray-900">
-                  <p>Chưa có nội dung để xem trước</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="p-5 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900">
-          <label className="block mb-3 text-sm font-semibold text-gray-700 dark:text-white">
-            Loại hồ sơ xác minh <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={verifyType}
-            onChange={(e) => setVerifyType(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700"
-          >
-            <option value="OTHER">Tài liệu khác (Other)</option>
-            <option value="ID_CARD">Thẻ nhận dạng (ID Card)</option>
-            <option value="EDUCATION">Bằng cấp giáo dục (Education)</option>
-            <option value="EXPERT">Chứng nhận chuyên gia (Expert)</option>
-          </select>
-        </div>
-
-        {/* Upload Files */}
-        <div className="p-5 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Tài liệu đính kèm</h3>
-            <label className="cursor-pointer px-4 py-2 rounded-lg border border-dashed border-blue-500 text-blue-500 hover:bg-blue-50 transition">
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                accept="image/*,.pdf,.doc,.docx"
-                onChange={handleFileChange}
-              />
-              <span>+ Thêm tệp</span>
-            </label>
+                    title="Preview"
+                    className="w-full border-none flex-1 transition-all duration-300"
+                    sandbox="allow-same-origin"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[400px] text-zinc-400 italic bg-gray-50 dark:bg-gray-900">
+                    <p>Chưa có nội dung để xem trước</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {pendingFiles.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-              {pendingFiles.map((item) => {
-                const docStyle = getDocumentStyle(item.extension);
-                return (
-                  <div
-                    key={item.id}
-                    className="relative group aspect-square border rounded-xl overflow-hidden bg-gray-50"
-                  >
-                    {item.type === "image" ? (
-                      <Image
-                        src={item.previewUrl}
-                        alt="preview"
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div
-                        className={`flex flex-col items-center justify-center h-full ${docStyle.bg} p-2`}
-                      >
-                        <span className={`text-xs font-bold ${docStyle.color}`}>
-                          {item.extension.toUpperCase()}
-                        </span>
-                        <span className="text-[10px] truncate w-full text-center mt-1">
-                          {item.name}
-                        </span>
-                      </div>
-                    )}
-                    <button
-                      onClick={(e) => removePendingFile(item.id, e)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
+          <div className="p-5 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900">
+            <label className="block mb-3 text-sm font-semibold text-gray-700 dark:text-white">
+              Loại hồ sơ xác minh <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={verifyType}
+              onChange={(e) => setVerifyType(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700"
+            >
+              <option value="OTHER">Tài liệu khác (Other)</option>
+              <option value="ID_CARD">Thẻ nhận dạng (ID Card)</option>
+              <option value="EDUCATION">Bằng cấp giáo dục (Education)</option>
+              <option value="EXPERT">Chứng nhận chuyên gia (Expert)</option>
+            </select>
+          </div>
+
+          {/* Upload Files */}
+          <div className="p-5 bg-white border border-gray-200 rounded-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Tài liệu đính kèm</h3>
+              <label className="cursor-pointer px-4 py-2 rounded-lg border border-dashed border-blue-500 text-blue-500 hover:bg-blue-50 transition">
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                />
+                <span>+ Thêm tệp</span>
+              </label>
             </div>
-          )}
+
+            {pendingFiles.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                {pendingFiles.map((item) => {
+                  const docStyle = getDocumentStyle(item.extension);
+                  return (
+                    <div
+                      key={item.id}
+                      className="relative group aspect-square border rounded-xl overflow-hidden bg-gray-50"
+                    >
+                      {item.type === "image" ? (
+                        <Image
+                          src={item.previewUrl}
+                          alt="preview"
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`flex flex-col items-center justify-center h-full ${docStyle.bg} p-2`}
+                        >
+                          <span
+                            className={`text-xs font-bold ${docStyle.color}`}
+                          >
+                            {item.extension.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] truncate w-full text-center mt-1">
+                            {item.name}
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        onClick={(e) => removePendingFile(item.id, e)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || isPreparingFiles}
+            className={`w-full py-4 text-white font-bold rounded-2xl shadow-lg transition-all ${isSubmitting || isPreparingFiles ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+          >
+            {isSubmitting ? "Đang xử lý..." : "Gửi yêu cầu nâng cấp"}
+          </button>
         </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || isPreparingFiles}
-          className={`w-full py-4 text-white font-bold rounded-2xl shadow-lg transition-all ${isSubmitting || isPreparingFiles ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
-        >
-          {isSubmitting ? "Đang xử lý..." : "Gửi yêu cầu nâng cấp"}
-        </button>
+        <Lightbox
+          index={lightboxIndex}
+          open={lightboxIndex >= 0}
+          close={() => setLightboxIndex(-1)}
+          slides={slides}
+          plugins={[Zoom, Captions]}
+        />
       </div>
-
-      <Lightbox
-        index={lightboxIndex}
-        open={lightboxIndex >= 0}
-        close={() => setLightboxIndex(-1)}
-        slides={slides}
-        plugins={[Zoom, Captions]}
-      />
     </div>
   );
 }

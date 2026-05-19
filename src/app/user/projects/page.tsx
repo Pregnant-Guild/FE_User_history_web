@@ -12,9 +12,15 @@ import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Badge from "@/components/ui/badge/Badge";
 import { CreateProjectPayload, Project } from "@/interface/project";
-import { apiCreateProject, apiCreateProjectCommit, apiGetProjectCommits, getCurrentProject } from "@/service/projectService";
+import {
+  apiCreateProject,
+  apiCreateProjectCommit,
+  apiGetProjectCommits,
+  getCurrentProject,
+} from "@/service/projectService";
 import { normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { EditorSnapshot } from "@/uhm/types/projects";
+import StickyHeader from "@/components/ui/StickyHeader";
 
 export type ProjectSortColumn = "created_at" | "updated_at" | "title";
 
@@ -23,16 +29,26 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isExportingProjectId, setIsExportingProjectId] = useState<string | null>(null);
+  const [isExportingProjectId, setIsExportingProjectId] = useState<
+    string | null
+  >(null);
 
   const [sortBy, setSortBy] = useState<ProjectSortColumn>("updated_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const { isOpen, openModal, closeModal } = useModal();
-  const [formData, setFormData] = useState<CreateProjectPayload>({ title: "", description: "", project_status: "PRIVATE" });
+  const [formData, setFormData] = useState<CreateProjectPayload>({
+    title: "",
+    description: "",
+    status: "PRIVATE",
+  });
   const importJsonInputRef = useRef<HTMLInputElement | null>(null);
-  const [importSnapshot, setImportSnapshot] = useState<EditorSnapshot | null>(null);
-  const [importSnapshotName, setImportSnapshotName] = useState<string | null>(null);
+  const [importSnapshot, setImportSnapshot] = useState<EditorSnapshot | null>(
+    null,
+  );
+  const [importSnapshotName, setImportSnapshotName] = useState<string | null>(
+    null,
+  );
 
   const fetchProjects = async () => {
     try {
@@ -51,9 +67,17 @@ export default function ProjectsPage() {
     fetchProjects();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  // 1. Cập nhật lại hàm handleChange để đảm bảo bắt giá trị chính xác từ thẻ select
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value, // Đảm bảo value từ select được gán chính xác vào key status
+    }));
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -62,22 +86,85 @@ export default function ProjectsPage() {
       toast.warning("Vui lòng nhập tên dự án!");
       return;
     }
+
     try {
       setIsSubmitting(true);
+      // Bước 1: Luôn tạo project trước
       const created = await apiCreateProject(formData);
       const projectId = created?.data?.id;
-      toast.success("Tạo dự án mới thành công!");
+
+      if (!projectId) {
+        toast.error("Tạo dự án thất bại: không nhận được ID dự án.");
+        setIsSubmitting(false); // Dừng sớm nếu không có ID
+        return;
+      }
+
+      // Bước 2: Nếu có snapshot, tạo commit ban đầu từ JSON
+      if (importSnapshot) {
+        await apiCreateProjectCommit(projectId, {
+          edit_summary: `Init project from ${importSnapshotName || "JSON"}`,
+          snapshot_json: importSnapshot as any,
+        } as any);
+        toast.success("Tạo dự án từ JSON thành công!");
+      } else {
+        toast.success("Tạo dự án mới thành công!");
+      }
+
+      // Bước 3: Dọn dẹp state và chuyển hướng
       closeModal();
-      setFormData({ title: "", description: "", project_status: "PRIVATE" });
+      setFormData({ title: "", description: "", status: "PRIVATE" });
       setImportSnapshot(null);
       setImportSnapshotName(null);
-      fetchProjects(); 
-      if (projectId) router.push(`/editor/${projectId}`);
+      if (importJsonInputRef.current) importJsonInputRef.current.value = "";
+      fetchProjects();
+      router.push(`/editor/${projectId}`);
     } catch (error) {
       console.error("Lỗi tạo dự án:", error);
       toast.error("Có lỗi xảy ra khi tạo dự án.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleExportHeadSnapshot = async (project: Project) => {
+    const projectId = String(project.id || "").trim();
+    if (!projectId) return;
+    const headCommitId = project.latest_commit_id
+      ? String(project.latest_commit_id)
+      : "";
+    if (!headCommitId) {
+      toast.warning("Dự án chưa có head commit để export.");
+      return;
+    }
+    setIsExportingProjectId(projectId);
+    try {
+      const res: any = await apiGetProjectCommits(projectId);
+      const rawList = res?.data?.items ?? res?.data ?? res?.items ?? [];
+      const commits = Array.isArray(rawList) ? rawList : [];
+      const head =
+        commits.find((c: any) => String(c?.id || "") === headCommitId) || null;
+      const snapshot = head?.snapshot_json ?? null;
+      if (!snapshot) {
+        toast.error("Không tìm thấy snapshot_json của head commit.");
+        return;
+      }
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `project-${projectId}-head-${headCommitId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Đã export JSON snapshot.");
+    } catch (err) {
+      console.error("Export snapshot failed", err);
+      toast.error("Export thất bại.");
+    } finally {
+      setIsExportingProjectId(null);
     }
   };
 
@@ -97,85 +184,10 @@ export default function ProjectsPage() {
       }
       setImportSnapshot(normalized);
       setImportSnapshotName(file.name);
-      toast.success("Đã nạp JSON snapshot. Bấm 'Tạo với JSON' để khởi tạo dự án.");
+      toast.success("Đã nạp JSON snapshot. Bấm 'Tạo dự án' để hoàn tất.");
     } catch (err) {
       console.error("Import JSON failed", err);
       toast.error("Không đọc được file JSON.");
-    }
-  };
-
-  const handleCreateProjectWithJson = async () => {
-    if (!formData.title.trim()) {
-      toast.warning("Vui lòng nhập tên dự án!");
-      return;
-    }
-    if (!importSnapshot) {
-      toast.warning("Chưa chọn JSON snapshot.");
-      handlePickImportJson();
-      return;
-    }
-    try {
-      setIsSubmitting(true);
-      const created = await apiCreateProject(formData);
-      const projectId = created?.data?.id;
-      if (!projectId) {
-        toast.error("Tạo dự án thất bại: thiếu project id.");
-        return;
-      }
-      await apiCreateProjectCommit(projectId, {
-        edit_summary: "Init project from JSON",
-        snapshot_json: importSnapshot as any,
-      } as any);
-      toast.success("Tạo dự án (kèm JSON) thành công!");
-      closeModal();
-      setFormData({ title: "", description: "", project_status: "PRIVATE" });
-      setImportSnapshot(null);
-      setImportSnapshotName(null);
-      if (importJsonInputRef.current) importJsonInputRef.current.value = "";
-      fetchProjects();
-      router.push(`/editor/${projectId}`);
-    } catch (error) {
-      console.error("Lỗi tạo dự án với JSON:", error);
-      toast.error("Có lỗi xảy ra khi tạo dự án với JSON.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleExportHeadSnapshot = async (project: Project) => {
-    const projectId = String(project.id || "").trim();
-    if (!projectId) return;
-    const headCommitId = project.latest_commit_id ? String(project.latest_commit_id) : "";
-    if (!headCommitId) {
-      toast.warning("Dự án chưa có head commit để export.");
-      return;
-    }
-    setIsExportingProjectId(projectId);
-    try {
-      const res: any = await apiGetProjectCommits(projectId);
-      const rawList = res?.data?.items ?? res?.data ?? res?.items ?? [];
-      const commits = Array.isArray(rawList) ? rawList : [];
-      const head = commits.find((c: any) => String(c?.id || "") === headCommitId) || null;
-      const snapshot = head?.snapshot_json ?? null;
-      if (!snapshot) {
-        toast.error("Không tìm thấy snapshot_json của head commit.");
-        return;
-      }
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `project-${projectId}-head-${headCommitId}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast.success("Đã export JSON snapshot.");
-    } catch (err) {
-      console.error("Export snapshot failed", err);
-      toast.error("Export thất bại.");
-    } finally {
-      setIsExportingProjectId(null);
     }
   };
 
@@ -191,7 +203,7 @@ export default function ProjectsPage() {
   const sortedProjects = [...projects].sort((a: any, b: any) => {
     let valA = a[sortBy];
     let valB = b[sortBy];
-    
+
     if (!valA) valA = "";
     if (!valB) valB = "";
 
@@ -216,23 +228,47 @@ export default function ProjectsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PUBLIC":
-        return <Badge size="sm" variant="light" color="success">PUBLIC</Badge>;
+        return (
+          <Badge size="sm" variant="light" color="success">
+            PUBLIC
+          </Badge>
+        );
       case "PRIVATE":
-        return <Badge size="sm" variant="light" color="warning">PRIVATE</Badge>;
+        return (
+          <Badge size="sm" variant="light" color="warning">
+            PRIVATE
+          </Badge>
+        );
       case "ARCHIVE":
-        return <Badge size="sm" variant="light" color="light">ARCHIVE</Badge>;
+        return (
+          <Badge size="sm" variant="light" color="light">
+            ARCHIVE
+          </Badge>
+        );
       default:
-        return <Badge size="sm" variant="light" color="dark">{status}</Badge>;
+        return (
+          <Badge size="sm" variant="light" color="dark">
+            {status}
+          </Badge>
+        );
     }
   };
 
-  const SortButton = ({ column, label }: { column: ProjectSortColumn; label: string }) => {
+  const SortButton = ({
+    column,
+    label,
+  }: {
+    column: ProjectSortColumn;
+    label: string;
+  }) => {
     const isActive = sortBy === column;
     return (
       <button
         onClick={() => handleSort(column)}
         className={`flex items-center gap-1 text-sm font-medium hover:text-blue-500 transition-colors ${
-          isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"
+          isActive
+            ? "text-blue-600 dark:text-blue-400"
+            : "text-gray-500 dark:text-gray-400"
         }`}
       >
         <span>{label}</span>
@@ -246,15 +282,22 @@ export default function ProjectsPage() {
     return `JSON: ${importSnapshotName}`;
   }, [importSnapshotName]);
 
+  // const path =[
+  //   {name: "Thư viện", href:"/user/library/"}
+  // ]
   return (
-    <div className="max-w-7xl mx-auto pb-10">
-      <PageBreadcrumb pageTitle="Quản lý dự án" />
-
+    <div className="mx-auto pb-10">
+      {/* <PageBreadcrumb pageTitle="Quản lý dự án" /> */}
+      <StickyHeader header={`Quản lý dự án`} />
       <div className="mt-6">
         <ComponentCard
           title="Danh sách dự án"
           headerAction={
-            <Button size="sm" onClick={openModal} className="bg-brand-500 hover:bg-brand-600 text-white">
+            <Button
+              size="sm"
+              onClick={openModal}
+              className="bg-brand-500 hover:bg-brand-600 text-white rounded-4xl! "
+            >
               + Tạo dự án mới
             </Button>
           }
@@ -273,12 +316,18 @@ export default function ProjectsPage() {
                     <div className="flex-1 pr-4">
                       <SortButton column="title" label="Tên dự án" />
                     </div>
-                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Trạng thái</div>
-                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Thành viên</div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Trạng thái
+                    </div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Thành viên
+                    </div>
                     <div className="w-32 px-4">
                       <SortButton column="updated_at" label="Cập nhật" />
                     </div>
-                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 text-right">Thao tác</div>
+                    <div className="w-48 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
+                      Thao tác
+                    </div>
                   </div>
 
                   <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -290,49 +339,83 @@ export default function ProjectsPage() {
                         <div className="flex-1 pr-4 min-w-0">
                           <div className="items-center gap-3 mb-1.5">
                             <h3
-                              onClick={() => router.push(`/user/projects/${project.id}`)}
+                              onClick={() =>
+                                router.push(`/user/projects/${project.id}`)
+                              }
                               className="font-semibold text-blue-600 dark:text-[#58a6ff] truncate cursor-pointer hover:underline"
                             >
                               {project.title}
                             </h3>
-                            
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8b949e]">
                             <div className="flex items-center gap-1.5">
                               {project.user?.avatar_url ? (
-                                <Image src={project.user.avatar_url} alt="avatar" width={16} height={16} className="rounded-full object-cover" />
+                                <Image
+                                  src={project.user.avatar_url}
+                                  alt="avatar"
+                                  width={16}
+                                  height={16}
+                                  className="rounded-full object-cover"
+                                />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                                   <span className="text-[8px] font-bold text-gray-500 dark:text-gray-300">
-                                    {project.user?.display_name?.charAt(0)?.toUpperCase() || "U"}
+                                    {project.user?.display_name
+                                      ?.charAt(0)
+                                      ?.toUpperCase() || "U"}
                                   </span>
                                 </div>
                               )}
-                              <span className="truncate max-w-[150px]">{project.user?.display_name || "Unknown"}</span>
+                              <span className="truncate max-w-[150px]">
+                                {project.user?.display_name || "Unknown"}
+                              </span>
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="w-48 px-4 shrink-0">
                           {getStatusBadge(project.project_status)}
                         </div>
-                        
+
                         <div className="w-48 px-4 shrink-0">
                           <div className="flex -space-x-2 overflow-hidden">
                             {project.members && project.members.length > 0 ? (
                               <>
-                                {project.members.slice(0, 4).map((m: any, index: number) =>
-                                  m.avatar_url ? (
-                                    <Image key={index} src={m.avatar_url} alt={m.display_name} width={32} height={32} title={m.display_name} className="inline-block w-8 h-8 rounded-full object-cover ring-2 ring-white dark:ring-[#0d1117]" />
-                                  ) : (
-                                    <div key={index} title={m.display_name} className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 ring-2 ring-white dark:ring-[#0d1117]">
-                                      <span className="text-xs font-medium text-gray-500 dark:text-gray-300">{m.display_name?.charAt(0)?.toUpperCase() || "U"}</span>
-                                    </div>
-                                  )
-                                )}
+                                {project.members
+                                  .slice(0, 4)
+                                  .map((m: any, index: number) =>
+                                    m.avatar_url ? (
+                                      <Image
+                                        key={index}
+                                        src={m.avatar_url}
+                                        alt={m.display_name}
+                                        width={32}
+                                        height={32}
+                                        title={m.display_name}
+                                        className="inline-block w-8 h-8 rounded-full object-cover ring-2 ring-white dark:ring-[#0d1117]"
+                                      />
+                                    ) : (
+                                      <div
+                                        key={index}
+                                        title={m.display_name}
+                                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 ring-2 ring-white dark:ring-[#0d1117]"
+                                      >
+                                        <span className="text-xs font-medium text-gray-500 dark:text-gray-300">
+                                          {m.display_name
+                                            ?.charAt(0)
+                                            ?.toUpperCase() || "U"}
+                                        </span>
+                                      </div>
+                                    ),
+                                  )}
                                 {project.members.length > 4 && (
-                                  <div title="Những người khác" className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 ring-2 ring-white dark:ring-[#0d1117] z-10">
-                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">+{project.members.length - 4}</span>
+                                  <div
+                                    title="Những người khác"
+                                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 ring-2 ring-white dark:ring-[#0d1117] z-10"
+                                  >
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                      +{project.members.length - 4}
+                                    </span>
                                   </div>
                                 )}
                               </>
@@ -346,16 +429,29 @@ export default function ProjectsPage() {
                           {formatDate(project.updated_at)}
                         </div>
 
-                       <div className="w-48 px-4 shrink-0 flex justify-end gap-2">
+                        <div className="w-48 px-4 shrink-0 flex justify-end gap-2">
                           <div className="relative group/btn1 inline-flex">
                             <Button
                               size="sm"
                               variant="outline"
                               className="!p-0 w-9 h-9 flex items-center justify-center"
-                              onClick={() => router.push(`/editor/${project.id}`)}
+                              onClick={() =>
+                                router.push(`/editor/${project.id}`)
+                              }
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.5}
+                                stroke="currentColor"
+                                className="w-4 h-4"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                                />
                               </svg>
                             </Button>
                             <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn1:scale-100 group-hover/btn1:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
@@ -368,31 +464,51 @@ export default function ProjectsPage() {
                               size="sm"
                               variant="outline"
                               className="!p-0 w-9 h-9 flex items-center justify-center"
-                              disabled={isExportingProjectId === String(project.id)}
+                              disabled={
+                                isExportingProjectId === String(project.id)
+                              }
                               onClick={() => handleExportHeadSnapshot(project)}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.5}
+                                stroke="currentColor"
+                                className="w-4 h-4"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                />
                               </svg>
                             </Button>
                             <span className="absolute -top-8 left-1/2 -translate-x-1/2 scale-0 rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-all group-hover/btn2:scale-100 group-hover/btn2:opacity-100 z-50 pointer-events-none whitespace-nowrap shadow-sm dark:bg-gray-700">
                               Export JSON
                             </span>
                           </div>
-
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            ) : !isLoading && (
-              <div className="py-20 text-center">
-                <p className="text-gray-500 dark:text-gray-400">Bạn chưa có dự án nào.</p>
-                <Button size="sm" onClick={openModal} className="mt-4 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200">
-                  Tạo dự án đầu tiên
-                </Button>
-              </div>
+            ) : (
+              !isLoading && (
+                <div className="py-20 text-center">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Bạn chưa có dự án nào.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={openModal}
+                    className="mt-4 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200"
+                  >
+                    Tạo dự án đầu tiên
+                  </Button>
+                </div>
+              )
             )}
           </div>
         </ComponentCard>
@@ -400,10 +516,14 @@ export default function ProjectsPage() {
 
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[500px] m-4">
         <div className="p-6 bg-white rounded-3xl dark:bg-gray-900">
-          <h3 className="mb-5 text-xl font-bold text-gray-800 dark:text-white/90">Tạo dự án mới</h3>
+          <h3 className="mb-5 text-xl font-bold text-gray-800 dark:text-white/90">
+            Tạo dự án mới
+          </h3>
           <form onSubmit={handleCreateProject} className="flex flex-col gap-5">
             <div>
-              <Label>Tên dự án <span className="text-red-500">*</span></Label>
+              <Label>
+                Tên dự án <span className="text-red-500">*</span>
+              </Label>
               <input
                 type="text"
                 name="title"
@@ -417,14 +537,29 @@ export default function ProjectsPage() {
             <div>
               <Label>Trạng thái</Label>
               <select
-                name="project_status"
-                value={formData.project_status}
+                name="status"
+                value={formData.status || "PRIVATE"} // Fallback về PRIVATE nếu undefined
                 onChange={handleChange}
-                className="h-11 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:focus:border-brand-800"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:bg-gray-900 dark:focus:border-brand-800"
               >
-                <option value="PRIVATE">Riêng tư (Private)</option>
-                <option value="PUBLIC">Công khai (Public)</option>
-                <option value="ARCHIVE">Lưu trữ (Archive)</option>
+                <option
+                  value="PRIVATE"
+                  className="text-gray-800 dark:text-white bg-white dark:bg-gray-900"
+                >
+                  Riêng tư (Private)
+                </option>
+                <option
+                  value="PUBLIC"
+                  className="text-gray-800 dark:text-white bg-white dark:bg-gray-900"
+                >
+                  Công khai (Public)
+                </option>
+                <option
+                  value="ARCHIVE"
+                  className="text-gray-800 dark:text-white bg-white dark:bg-gray-900"
+                >
+                  Lưu trữ (Archive)
+                </option>
               </select>
             </div>
             <div>
@@ -441,7 +576,12 @@ export default function ProjectsPage() {
             <div>
               <Label>Khởi tạo từ JSON</Label>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" type="button" onClick={handlePickImportJson}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onClick={handlePickImportJson}
+                >
                   Chọn JSON
                 </Button>
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -453,22 +593,31 @@ export default function ProjectsPage() {
                 type="file"
                 accept="application/json"
                 className="hidden"
-                onChange={(e) => handleImportJsonFile(e.target.files?.[0] || null)}
+                onChange={(e) =>
+                  handleImportJsonFile(e.target.files?.[0] || null)
+                }
               />
             </div>
             <div className="flex items-center justify-end gap-3 mt-4">
-              <Button size="sm" variant="outline" type="button" onClick={closeModal}>Hủy</Button>
-              <Button size="sm" type="submit" disabled={isSubmitting} className="bg-brand-500 hover:bg-brand-600 text-white">
-                {isSubmitting ? "Đang tạo..." : "Khởi tạo"}
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={closeModal}
+              >
+                Hủy
               </Button>
               <Button
                 size="sm"
-                type="button"
+                type="submit"
                 disabled={isSubmitting}
-                className="bg-gray-900 hover:bg-gray-800 text-white"
-                onClick={handleCreateProjectWithJson}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
-                Tạo với JSON
+                {isSubmitting
+                  ? "Đang xử lý..."
+                  : importSnapshot
+                    ? "Tạo với JSON"
+                    : "Tạo dự án"}
               </Button>
             </div>
           </form>
