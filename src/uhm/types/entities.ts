@@ -12,6 +12,8 @@ export type Entity = {
     slug?: string | null;
     type_id?: string | null;
     geometry_count?: number;
+    time_start?: number | null;
+    time_end?: number | null;
 };
 
 export type EntitySnapshotOperation = "create" | "update" | "delete" | "reference";
@@ -29,4 +31,6 @@ export type EntitySnapshot = {
     operation?: EntitySnapshotOperation;
     name?: string;
     description?: string | null;
+    time_start?: number | null;
+    time_end?: number | null;
 };

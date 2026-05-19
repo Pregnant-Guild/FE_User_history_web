@@ -11,6 +11,7 @@ import { useMapInstance } from "./map/useMapInstance";
 import { setupMapLayers } from "./map/useMapLayers";
 import { useMapInteraction } from "./map/useMapInteraction";
 import { useMapSync } from "./map/useMapSync";
+import { bindImageOverlayInteractions, type MapImageOverlay } from "./map/imageOverlay";
 
 export type MapHoverPayload = {
     featureId: string | number;
@@ -39,8 +40,10 @@ type MapProps = {
     onSelectFeatureIds: (ids: (string | number)[]) => void;
     onSetMode?: (mode: EditorMode, featureId?: string | number) => void;
     labelContextDraft?: FeatureCollection;
+    labelTimelineYear?: number | null;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
     onDeleteFeature?: (id: string | number) => void;
+    onHideFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
     allowGeometryEditing?: boolean;
     respectBindingFilter?: boolean;
@@ -52,6 +55,8 @@ type MapProps = {
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
+    imageOverlay?: MapImageOverlay | null;
+    onImageOverlayChange?: (overlay: MapImageOverlay) => void;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -63,8 +68,10 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     selectedFeatureIds,
     onSelectFeatureIds,
     labelContextDraft,
+    labelTimelineYear,
     onCreateFeature,
     onDeleteFeature,
+    onHideFeature,
     onUpdateFeature,
     allowGeometryEditing = true,
     respectBindingFilter = true,
@@ -76,15 +83,31 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     focusFeatureCollection = null,
     focusRequestKey = null,
     focusPadding,
+    imageOverlay = null,
+    onImageOverlayChange,
 }, ref) {
+    // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
+    // Ref giữ draft mới nhất để engine đọc không bị stale closure.
     const draftRef = useRef<FeatureCollection>(draft);
+    // Ref callback select feature mới nhất cho event click trên map.
     const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
+    // Ref callback đổi mode mới nhất, dùng khi map interaction chuyển sang replay/select.
     const onSetModeRef = useRef(onSetMode);
+    // Ref callback hover mới nhất cho tooltip/panel ngoài map.
     const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
+    // Ref callback create mới nhất khi drawing engine tạo feature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
+    // Ref callback delete mới nhất khi editing engine xóa feature.
     const onDeleteRef = useRef<MapProps["onDeleteFeature"]>(onDeleteFeature);
+    // Ref callback hide local mới nhất khi context menu select ẩn feature khỏi map.
+    const onHideRef = useRef<MapProps["onHideFeature"]>(onHideFeature);
+    // Ref callback update mới nhất khi editing engine đổi geometry.
     const onUpdateRef = useRef<MapProps["onUpdateFeature"]>(onUpdateFeature);
+    // Ref giữ overlay mới nhất cho right-drag controls.
+    const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay);
+    // Ref callback update overlay mới nhất để interaction không stale.
+    const onImageOverlayChangeRef = useRef<MapProps["onImageOverlayChange"]>(onImageOverlayChange);
 
     useEffect(() => { modeRef.current = mode; }, [mode]);
     useEffect(() => { draftRef.current = draft; }, [draft]);
@@ -93,8 +116,12 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     useEffect(() => { onHoverFeatureChangeRef.current = onHoverFeatureChange; }, [onHoverFeatureChange]);
     useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
     useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
+    useEffect(() => { onHideRef.current = onHideFeature; }, [onHideFeature]);
     useEffect(() => { onUpdateRef.current = onUpdateFeature; }, [onUpdateFeature]);
+    useEffect(() => { imageOverlayRef.current = imageOverlay; }, [imageOverlay]);
+    useEffect(() => { onImageOverlayChangeRef.current = onImageOverlayChange; }, [onImageOverlayChange]);
 
+    // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {
         mapRef,
         containerRef,
@@ -107,14 +134,18 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         geolocationCenteredRef,
         handleZoomByStep,
         handleZoomSliderChange,
+        beginZoomSliderDrag,
+        endZoomSliderDrag,
         getViewState,
     } = useMapInstance();
 
+    // Public API cho parent đọc map instance/view state mà không expose implementation nội bộ.
     useImperativeHandle(ref, () => ({
         getViewState,
         getMap: () => mapRef.current,
     }), [getViewState, mapRef]);
 
+    // Hook gắn/dọn các interaction vẽ, chọn, sửa geometry.
     const {
         editingEngineRef,
         setupMapInteractions,
@@ -130,18 +161,22 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         onSetModeRef,
         onCreateRef,
         onDeleteRef,
+        onHideRef,
         onUpdateRef,
         onHoverFeatureChangeRef,
     });
 
+    // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.
     const {
         applyDraftToMap,
         applyHighlightToMap,
+        applyImageOverlayToMap,
         tryCenterToUserLocation,
     } = useMapSync({
         mapRef,
         draft,
         labelContextDraft,
+        labelTimelineYear,
         backgroundVisibility,
         geometryVisibility,
         selectedFeatureIds,
@@ -152,6 +187,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         focusFeatureCollection,
         focusRequestKey,
         focusPadding,
+        imageOverlay,
         allowGeometryEditing,
         editingEngineRef,
         geolocationCenteredRef,
@@ -162,6 +198,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         if (!map || !isMapLoaded) return;
 
         setupMapLayers(map, backgroundVisibility, highlightFeatures, applyHighlightToMap);
+        applyImageOverlayToMap();
         setupMapInteractions(map);
         applyDraftToMap(draftRef.current);
         tryCenterToUserLocation();
@@ -179,6 +216,17 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
             setTimeout(() => map.resize(), 100);
         }
     }, [mode, isMapLoaded, mapRef]);
+
+    const hasImageOverlay = Boolean(imageOverlay);
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !isMapLoaded || !hasImageOverlay) return;
+        return bindImageOverlayInteractions(
+            map,
+            () => imageOverlayRef.current,
+            (nextOverlay) => onImageOverlayChangeRef.current?.(nextOverlay)
+        );
+    }, [hasImageOverlay, isMapLoaded, mapRef]);
 
     return (
         <div style={{ width: "100%", height, position: "relative" }}>
@@ -320,6 +368,26 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                         max={zoomBounds.max}
                         step={0.1}
                         value={zoomLevel}
+                        onPointerDown={(event) => {
+                            event.stopPropagation();
+                            try {
+                                event.currentTarget.setPointerCapture(event.pointerId);
+                            } catch {
+                                // Browser may reject capture for non-primary pointers; drag lock still works.
+                            }
+                            beginZoomSliderDrag();
+                        }}
+                        onPointerUp={(event) => {
+                            event.stopPropagation();
+                            try {
+                                event.currentTarget.releasePointerCapture(event.pointerId);
+                            } catch {
+                                // Ignore if capture was already released.
+                            }
+                            endZoomSliderDrag();
+                        }}
+                        onPointerCancel={endZoomSliderDrag}
+                        onBlur={endZoomSliderDrag}
                         onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
                         style={{
                             flex: 1,

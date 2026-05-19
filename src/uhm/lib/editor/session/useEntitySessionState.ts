@@ -20,6 +20,8 @@ export function useEntitySessionState() {
     const [entityForm, setEntityForm] = useState<EntityFormState>({
         name: "",
         description: "",
+        time_start: "",
+        time_end: "",
     });
     // Danh sách entity IDs đang chọn để bind vào geometry hiện tại.
     const [selectedGeometryEntityIds, setSelectedGeometryEntityIds] = useState<string[]>([]);

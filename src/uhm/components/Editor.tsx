@@ -63,19 +63,24 @@ export default function Editor({
     undoStack,
     width = 280,
 }: Props) {
+    // State đóng/mở modal submit project.
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+    // State nội dung submit gửi lên backend khi user xác nhận.
     const [submitContent, setSubmitContent] = useState("");
 
+    // Mở modal submit với nội dung sạch cho lần submit mới.
     const handleOpenSubmitModal = () => {
         setSubmitContent("");
         setIsSubmitModalOpen(true);
     };
 
+    // Xác nhận submit: đóng modal trước rồi chuyển content cho command cha.
     const handleConfirmSubmit = () => {
         setIsSubmitModalOpen(false);
         onSubmit(submitContent);
     };
 
+    // Hủy submit mà không thay đổi draft/commit.
     const handleCancelSubmit = () => {
         setIsSubmitModalOpen(false);
     };

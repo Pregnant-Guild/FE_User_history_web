@@ -43,15 +43,10 @@ export function useFeatureCommands(options: Options) {
         setEntityFormStatus,
     } = options;
 
+    // Áp metadata GEO (type/time/binding) cho toàn bộ selectedFeatures.
     const applyGeometryMetadata = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             const msg = "Hãy chọn ít nhất một geometry trước.";
-            setEntityFormStatus(msg);
-            return { ok: false, error: msg };
-        }
-
-        if (!geometryMetaForm.time_start.trim() || !geometryMetaForm.time_end.trim()) {
-            const msg = "time_start và time_end là bắt buộc.";
             setEntityFormStatus(msg);
             return { ok: false, error: msg };
         }
@@ -90,6 +85,7 @@ export function useFeatureCommands(options: Options) {
         setIsEntitySubmitting,
     ]);
 
+    // Áp danh sách entity đã chọn vào toàn bộ selectedFeatures.
     const applyEntitiesToSelectedGeometry = useCallback(async () => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             setEntityFormStatus("Hãy chọn ít nhất một geometry trước.");

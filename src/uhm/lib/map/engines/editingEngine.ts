@@ -1,6 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { buildCircleRing, destinationPoint, distanceMeters } from "@/uhm/lib/map/geo/geoMath";
+import { snapToNearestGeometry } from "@/uhm/lib/map/engines/snapUtils";
 
 export type EditingHandle = {
     id: string | number;
@@ -25,12 +26,16 @@ export function createEditingEngine(options: {
     const { mapRef, onUpdate } = options;
     const editingRef = { current: null as EditingHandle | null };
     const dragStateRef = { current: null as { idx: number } | null };
-    const modifierRef = { current: { ctrl: false, meta: false } };
+    const deleteVertexModeRef = { current: false };
+    let contextMenu: HTMLDivElement | null = null;
+    let docClickHandler: ((ev: MouseEvent) => void) | null = null;
 
     // Hủy trạng thái chỉnh sửa hiện tại và dọn hai source edit.
     const clearEditing = () => {
         editingRef.current = null;
         dragStateRef.current = null;
+        setDeleteVertexMode(false);
+        hideContextMenu();
         const map = mapRef.current;
         if (!map) return;
         const empty: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -135,6 +140,14 @@ export function createEditingEngine(options: {
         clearEditing();
     };
 
+    const setDeleteVertexMode = (enabled: boolean) => {
+        deleteVertexModeRef.current = enabled;
+        const map = mapRef.current;
+        if (!map?.getLayer("edit-handles-circle")) return;
+        map.setPaintProperty("edit-handles-circle", "circle-color", enabled ? "#ef4444" : "#f97316");
+        map.setPaintProperty("edit-handles-circle", "circle-stroke-color", enabled ? "#7f1d1d" : "#0f172a");
+    };
+
     // Bắt đầu chỉnh sửa từ feature polygon được chọn.
     const beginEditing = (feature: maplibregl.MapGeoJSONFeature) => {
         if (feature.geometry.type !== "Polygon") return;
@@ -154,18 +167,19 @@ export function createEditingEngine(options: {
             circleCenter: geom.circle_center,
             circleRadius: geom.circle_radius,
         };
+        setDeleteVertexMode(false);
         updateEditSources();
     };
 
-    // Kiểm tra trạng thái nhấn phím modifier để bật thao tác chèn đỉnh.
-    const isModifierPressed = (e?: maplibregl.MapLayerMouseEvent | maplibregl.MapMouseEvent) => {
-        const oe = e?.originalEvent as MouseEvent | undefined;
-        return (
-            modifierRef.current.ctrl ||
-            modifierRef.current.meta ||
-            !!oe?.ctrlKey ||
-            !!oe?.metaKey
-        );
+    const hideContextMenu = () => {
+        if (contextMenu) {
+            contextMenu.remove();
+            contextMenu = null;
+        }
+        if (docClickHandler) {
+            document.removeEventListener("click", docClickHandler);
+            docClickHandler = null;
+        }
     };
 
     // Gắn toàn bộ sự kiện phục vụ chỉnh sửa hình.
@@ -173,10 +187,16 @@ export function createEditingEngine(options: {
         // Bắt đầu kéo một handle point.
         const onHandleDown = (e: maplibregl.MapLayerMouseEvent) => {
             if (!editingRef.current) return;
+            if (e.originalEvent.button === 2) return;
             const feature = e.features?.[0];
-            const idx = feature?.properties?.idx;
-            if (idx === undefined) return;
+            const idx = Number(feature?.properties?.idx);
+            if (!Number.isInteger(idx)) return;
             e.preventDefault();
+            if (deleteVertexModeRef.current) {
+                e.originalEvent.stopPropagation();
+                deleteVertex(idx);
+                return;
+            }
             dragStateRef.current = { idx };
             map.getCanvas().style.cursor = "grabbing";
             map.dragPan.disable();
@@ -188,19 +208,21 @@ export function createEditingEngine(options: {
             const editing = editingRef.current;
             if (!drag || !editing) return;
 
+            const lngLat = e.originalEvent.shiftKey
+                ? snapToNearestGeometry(map, e.lngLat, e.point)
+                : e.lngLat;
+            const nextCoordinate: [number, number] = [lngLat.lng, lngLat.lat];
+
             if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
                 if (drag.idx === 0) {
                     // Move center
-                    editing.circleCenter = [e.lngLat.lng, e.lngLat.lat];
+                    editing.circleCenter = nextCoordinate;
                 } else if (drag.idx === 1) {
                     // Change radius
-                    editing.circleRadius = distanceMeters(editing.circleCenter, [
-                        e.lngLat.lng,
-                        e.lngLat.lat,
-                    ]);
+                    editing.circleRadius = distanceMeters(editing.circleCenter, nextCoordinate);
                 }
             } else {
-                editing.ring[drag.idx] = [e.lngLat.lng, e.lngLat.lat];
+                editing.ring[drag.idx] = nextCoordinate;
             }
             updateEditSources();
         };
@@ -212,55 +234,39 @@ export function createEditingEngine(options: {
             map.dragPan.enable();
         };
 
-        // Bắt phím điều khiển phiên chỉnh sửa (Enter/Escape + modifier flags).
+        // Bắt phím điều khiển phiên chỉnh sửa.
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Control") {
-                modifierRef.current.ctrl = true;
-            } else if (e.key === "Meta") {
-                modifierRef.current.meta = true;
-            }
-            if (!editingRef.current) return;
+            const editing = editingRef.current;
+            if (!editing) return;
             if (e.key === "Enter") {
                 finishEditing();
+            } else if (e.key === "Delete" && !editing.isCircle) {
+                e.preventDefault();
+                setDeleteVertexMode(!deleteVertexModeRef.current);
             } else if (e.key === "Escape") {
+                if (deleteVertexModeRef.current) {
+                    e.preventDefault();
+                    setDeleteVertexMode(false);
+                    return;
+                }
                 cancelEditing();
             }
         };
 
-        // Hạ cờ modifier khi nhả phím.
-        const onKeyUp = (e: KeyboardEvent) => {
-            if (e.key === "Control") {
-                modifierRef.current.ctrl = false;
-            } else if (e.key === "Meta") {
-                modifierRef.current.meta = false;
-            }
-        };
-
-        // Chèn thêm một đỉnh mới vào ring tại vị trí gần điểm click nhất.
-        const onInsertHandle = (e: maplibregl.MapLayerMouseEvent) => {
-            if (!editingRef.current || editingRef.current.isCircle) return;
-            if (!isModifierPressed(e)) return;
-            e.preventDefault();
+        // Chuột phải vào handle để mở menu xóa/thêm đỉnh.
+        const onHandleContextMenu = (e: maplibregl.MapLayerMouseEvent) => {
             const editing = editingRef.current;
-            const ring = editing.ring;
-            const click = [e.lngLat.lng, e.lngLat.lat] as [number, number];
-            let nearestIdx = 0;
-            let bestDist = Number.POSITIVE_INFINITY;
-            ring.forEach((pt, idx) => {
-                const dx = pt[0] - click[0];
-                const dy = pt[1] - click[1];
-                const d = dx * dx + dy * dy; // Dùng khoảng cách Euclid bình phương để so sánh nhanh, không cần sqrt.
-                if (d < bestDist) {
-                    bestDist = d;
-                    nearestIdx = idx;
-                }
-            });
-            const insertIdx = nearestIdx + 1;
-            ring.splice(insertIdx, 0, click);
-            dragStateRef.current = { idx: insertIdx };
-            map.getCanvas().style.cursor = "grabbing";
-            map.dragPan.disable();
-            updateEditSources();
+            if (!editing || editing.isCircle) return;
+            e.preventDefault();
+            e.originalEvent.stopPropagation();
+            const feature = e.features?.[0];
+            const idx = Number(feature?.properties?.idx);
+            if (!Number.isInteger(idx)) return;
+            showHandleContextMenu(
+                e.originalEvent.clientX,
+                e.originalEvent.clientY,
+                idx
+            );
         };
 
         // Ngắt kéo nếu con trỏ rời canvas.
@@ -269,22 +275,95 @@ export function createEditingEngine(options: {
         };
 
         map.on("mousedown", "edit-handles-circle", onHandleDown);
-        map.on("mousedown", "edit-shape-line", onInsertHandle);
+        map.on("contextmenu", "edit-handles-circle", onHandleContextMenu);
         map.on("mousemove", onHandleMove);
         map.on("mouseup", stopDragging);
         document.addEventListener("keydown", onKeyDown);
-        document.addEventListener("keyup", onKeyUp);
         map.getCanvas().addEventListener("mouseleave", onCanvasLeave);
 
         map.on("remove", () => {
             map.off("mousedown", "edit-handles-circle", onHandleDown);
-            map.off("mousedown", "edit-shape-line", onInsertHandle);
+            map.off("contextmenu", "edit-handles-circle", onHandleContextMenu);
             map.off("mousemove", onHandleMove);
             map.off("mouseup", stopDragging);
             document.removeEventListener("keydown", onKeyDown);
-            document.removeEventListener("keyup", onKeyUp);
             map.getCanvas().removeEventListener("mouseleave", onCanvasLeave);
+            hideContextMenu();
         });
+    };
+
+    const showHandleContextMenu = (x: number, y: number, idx: number) => {
+        hideContextMenu();
+
+        const menu = document.createElement("div");
+        menu.style.position = "fixed";
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.background = "#0f172a";
+        menu.style.color = "white";
+        menu.style.border = "1px solid #1f2937";
+        menu.style.borderRadius = "6px";
+        menu.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+        menu.style.zIndex = "9999";
+        menu.style.minWidth = "120px";
+        menu.style.fontSize = "14px";
+        menu.style.padding = "4px 0";
+
+        const createItem = (label: string, onClick: () => void, disabled = false) => {
+            const item = document.createElement("div");
+            item.textContent = label;
+            item.style.padding = "8px 12px";
+            item.style.cursor = disabled ? "not-allowed" : "pointer";
+            item.style.opacity = disabled ? "0.45" : "1";
+            item.onmouseenter = () => {
+                if (!disabled) item.style.background = "#1f2937";
+            };
+            item.onmouseleave = () => (item.style.background = "transparent");
+            item.onclick = () => {
+                if (disabled) return;
+                onClick();
+                hideContextMenu();
+            };
+            return item;
+        };
+
+        const editing = editingRef.current;
+        const canDelete = Boolean(editing && !editing.isCircle && editing.ring.length > 3);
+        menu.appendChild(createItem("Xóa đỉnh", () => deleteVertex(idx), !canDelete));
+        menu.appendChild(createItem("Thêm đỉnh", () => insertVertexAfter(idx)));
+
+        document.body.appendChild(menu);
+        contextMenu = menu;
+
+        const onDocClick = (ev: MouseEvent) => {
+            if (!menu.contains(ev.target as Node)) {
+                hideContextMenu();
+            }
+        };
+        docClickHandler = onDocClick;
+        setTimeout(() => document.addEventListener("click", onDocClick), 0);
+    };
+
+    const deleteVertex = (idx: number) => {
+        const editing = editingRef.current;
+        if (!editing || editing.isCircle || editing.ring.length <= 3) return;
+        if (idx < 0 || idx >= editing.ring.length) return;
+        editing.ring.splice(idx, 1);
+        updateEditSources();
+    };
+
+    const insertVertexAfter = (idx: number) => {
+        const editing = editingRef.current;
+        if (!editing || editing.isCircle || editing.ring.length < 2) return;
+        if (idx < 0 || idx >= editing.ring.length) return;
+        const current = editing.ring[idx];
+        const next = editing.ring[(idx + 1) % editing.ring.length];
+        const midpoint: [number, number] = [
+            (current[0] + next[0]) / 2,
+            (current[1] + next[1]) / 2,
+        ];
+        editing.ring.splice(idx + 1, 0, midpoint);
+        updateEditSources();
     };
 
     return {

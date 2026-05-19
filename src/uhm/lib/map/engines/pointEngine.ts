@@ -1,6 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
+import { snapToNearestGeometry } from "@/uhm/lib/map/engines/snapUtils";
 
 // Khởi tạo engine thêm point bằng click đơn.
 export function initPoint(
@@ -12,9 +13,13 @@ export function initPoint(
     function onClick(e: maplibregl.MapLayerMouseEvent) {
         if (getMode() !== "add-point") return;
 
+        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+            ? snapToNearestGeometry(map, e.lngLat, e.point)
+            : e.lngLat;
+
         const geometry: Geometry = {
             type: "Point",
-            coordinates: [e.lngLat.lng, e.lngLat.lat],
+            coordinates: [lngLat.lng, lngLat.lat],
         };
 
         onComplete?.(geometry);

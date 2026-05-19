@@ -8,6 +8,9 @@ import { useEditorStore } from "@/uhm/store/editorStore";
 type GeometryChoice = {
   id: string;
   label?: string;
+  time_start?: number | null;
+  time_end?: number | null;
+  isTimelineVisible?: boolean;
   isNew?: boolean;
 };
 
@@ -31,16 +34,16 @@ export default function GeometryBindingPanel({
     statusText,
     bindingFilterEnabled,
     setGeometryBindingFilterEnabled,
-    hoveredGeometryId,
-    setHoveredGeometryId,
+    geometryVisibility,
+    setGeometryVisibility,
   } = useEditorStore(
     useShallow((state) => ({
       selectedFeatureIds: state.selectedFeatureIds,
       statusText: state.geoBindingStatus,
       bindingFilterEnabled: state.geometryBindingFilterEnabled,
       setGeometryBindingFilterEnabled: state.setGeometryBindingFilterEnabled,
-      hoveredGeometryId: state.hoveredGeometryId,
-      setHoveredGeometryId: state.setHoveredGeometryId,
+      geometryVisibility: state.geometryVisibility,
+      setGeometryVisibility: state.setGeometryVisibility,
     }))
   );
   const effectiveSelectedGeometryId =
@@ -55,7 +58,14 @@ export default function GeometryBindingPanel({
   const rows = useMemo(() => {
     const cleaned = (geometries || [])
       .filter((g) => g && typeof g.id === "string" && g.id.trim().length > 0)
-      .map((g) => ({ id: g.id.trim(), label: (g.label || "").trim(), isNew: Boolean(g.isNew) }));
+      .map((g) => ({
+        id: g.id.trim(),
+        label: (g.label || "").trim(),
+        time_start: typeof g.time_start === "number" ? g.time_start : null,
+        time_end: typeof g.time_end === "number" ? g.time_end : null,
+        isTimelineVisible: Boolean(g.isTimelineVisible),
+        isNew: Boolean(g.isNew),
+      }));
     cleaned.sort((a, b) => a.id.localeCompare(b.id));
     return cleaned;
   }, [geometries]);
@@ -80,13 +90,18 @@ export default function GeometryBindingPanel({
     if (!canFocusGeometry) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    setHoveredGeometryId((current) => (current === geometryId ? null : current));
     onFocusGeometry?.(geometryId);
   };
 
   const handleFocusGeometry = (geometryId: string) => {
-    setHoveredGeometryId((current) => (current === geometryId ? null : current));
     onFocusGeometry?.(geometryId);
+  };
+
+  const toggleGeometryVisibility = (geometryId: string) => {
+    setGeometryVisibility((prev) => ({
+      ...prev,
+      [geometryId]: prev[geometryId] === false,
+    }));
   };
 
   return (
@@ -97,7 +112,6 @@ export default function GeometryBindingPanel({
         borderRadius: "8px",
         border: "1px solid #1f2937",
       }}
-      onMouseLeave={() => setHoveredGeometryId(null)}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -148,31 +162,28 @@ export default function GeometryBindingPanel({
       </div>
 
       {collapsed ? null : selectedGeometry ? (
+        (() => {
+          const isHidden = geometryVisibility[selectedGeometry.id] === false;
+          const idColor = getGeometryIdColor(selectedGeometry);
+          const labelColor = selectedGeometry.isTimelineVisible ? "#22c55e" : "#e5e7eb";
+          return (
         <div
           style={{
             marginTop: 10,
             padding: "8px",
             borderRadius: "6px",
             border:
-              hoveredGeometryId === selectedGeometry.id
-                ? "1px solid rgba(245, 158, 11, 0.95)"
-                : "1px solid rgba(59, 130, 246, 0.45)",
-            background:
-              hoveredGeometryId === selectedGeometry.id
-                ? "rgba(245, 158, 11, 0.18)"
-                : "rgba(37, 99, 235, 0.12)",
+              "1px solid rgba(59, 130, 246, 0.45)",
+            background: "rgba(37, 99, 235, 0.12)",
             cursor: canFocusGeometry ? "pointer" : "default",
-            boxShadow:
-              hoveredGeometryId === selectedGeometry.id
-                ? "0 0 0 2px rgba(251, 191, 36, 0.18)"
-                : "none",
+            opacity: isHidden ? 0.58 : 1,
+            boxShadow: "none",
           }}
           title={selectedGeometry.id}
           role={canFocusGeometry ? "button" : undefined}
           tabIndex={canFocusGeometry ? 0 : undefined}
           onClick={() => handleFocusGeometry(selectedGeometry.id)}
           onKeyDown={(event) => handleFocusKeyDown(event, selectedGeometry.id)}
-          onMouseEnter={() => setHoveredGeometryId(selectedGeometry.id)}
         >
           <div
             style={{
@@ -190,7 +201,7 @@ export default function GeometryBindingPanel({
             <span
               style={{
                 fontSize: "12px",
-                color: "#e5e7eb",
+                color: labelColor,
                 fontWeight: 700,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -199,13 +210,26 @@ export default function GeometryBindingPanel({
             >
               {selectedGeometry.label || selectedGeometry.id}
             </span>
+            {isHidden ? <span style={hiddenBadgeStyle}>hidden</span> : null}
             {selectedGeometry.isNew ? <NewBadge /> : null}
+            <button
+              type="button"
+              title={isHidden ? "Show geometry on map" : "Hide geometry on map"}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleGeometryVisibility(selectedGeometry.id);
+              }}
+              style={iconButtonStyle}
+              aria-label={isHidden ? `Show geometry ${selectedGeometry.id}` : `Hide geometry ${selectedGeometry.id}`}
+            >
+              {isHidden ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
           </div>
           <div
             style={{
               marginTop: 3,
               fontSize: "11px",
-              color: "#94a3b8",
+              color: idColor,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -214,6 +238,8 @@ export default function GeometryBindingPanel({
             {selectedGeometry.id}
           </div>
         </div>
+          );
+        })()
       ) : null}
 
       {collapsed ? null : rows.length ? (
@@ -221,36 +247,33 @@ export default function GeometryBindingPanel({
           {visibleRows
             .map((g) => {
               const isBound = bindingSet.has(g.id);
-              const isHovered = hoveredGeometryId === g.id;
+              const isHidden = geometryVisibility[g.id] === false;
+              const idColor = getGeometryIdColor(g);
+              const labelColor = g.isTimelineVisible ? "#22c55e" : "#e5e7eb";
               return (
                 <div
                   key={g.id}
                   style={{
                     padding: "8px",
                     borderRadius: "6px",
-                    border: isHovered
-                      ? "1px solid rgba(245, 158, 11, 0.95)"
-                      : isBound
+                    border: isBound
                         ? "1px solid rgba(20, 184, 166, 0.65)"
                         : "1px solid #1f2937",
-                    background: isHovered
-                      ? "rgba(245, 158, 11, 0.18)"
-                      : isBound
+                    background: isBound
                         ? "rgba(20, 184, 166, 0.12)"
                         : "transparent",
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
                     cursor: canFocusGeometry ? "pointer" : "default",
-                    opacity: canBindToggle ? 1 : 0.75,
-                    boxShadow: isHovered ? "0 0 0 2px rgba(251, 191, 36, 0.18)" : "none",
+                    opacity: isHidden ? 0.55 : canBindToggle ? 1 : 0.75,
+                    boxShadow: "none",
                   }}
                   title={g.id}
                   role={canFocusGeometry ? "button" : undefined}
                   tabIndex={canFocusGeometry ? 0 : undefined}
                   onClick={() => handleFocusGeometry(g.id)}
                   onKeyDown={(event) => handleFocusKeyDown(event, g.id)}
-                  onMouseEnter={() => setHoveredGeometryId(g.id)}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -264,7 +287,7 @@ export default function GeometryBindingPanel({
                       <span
                         style={{
                           fontSize: "12px",
-                          color: "#e5e7eb",
+                          color: labelColor,
                           fontWeight: 700,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -273,13 +296,14 @@ export default function GeometryBindingPanel({
                       >
                         {g.label || g.id}
                       </span>
+                      {isHidden ? <span style={hiddenBadgeStyle}>hidden</span> : null}
                       {isBound ? <span style={boundBadgeStyle}>bound</span> : null}
                       {g.isNew ? <NewBadge /> : null}
                     </div>
                     <div
                       style={{
                         fontSize: "11px",
-                        color: "#94a3b8",
+                        color: idColor,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -288,6 +312,19 @@ export default function GeometryBindingPanel({
                       {g.id}
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    title={isHidden ? "Show geometry on map" : "Hide geometry on map"}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleGeometryVisibility(g.id);
+                    }}
+                    style={iconButtonStyle}
+                    aria-label={isHidden ? `Show geometry ${g.id}` : `Hide geometry ${g.id}`}
+                  >
+                    {isHidden ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
 
                   {canBindToggle ? (
                     <button
@@ -355,6 +392,74 @@ const boundBadgeStyle: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: 0,
 };
+
+const hiddenBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "0 0 auto",
+  height: 17,
+  padding: "0 6px",
+  borderRadius: 999,
+  border: "1px solid rgba(148, 163, 184, 0.45)",
+  background: "rgba(71, 85, 105, 0.32)",
+  color: "#cbd5e1",
+  fontSize: 10,
+  fontWeight: 900,
+  lineHeight: 1,
+  textTransform: "uppercase",
+  letterSpacing: 0,
+};
+
+const iconButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 22,
+  height: 22,
+  borderRadius: 6,
+  border: "1px solid #334155",
+  background: "#0b1220",
+  cursor: "pointer",
+  flex: "0 0 auto",
+};
+
+function getGeometryIdColor(geometry: GeometryChoice): string {
+  const hasStart = typeof geometry.time_start === "number";
+  const hasEnd = typeof geometry.time_end === "number";
+  if (!hasStart && !hasEnd) return "#f87171";
+  if (!hasStart || !hasEnd) return "#facc15";
+  return "#94a3b8";
+}
+
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
+        stroke="#cbd5e1"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="#cbd5e1" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 3l18 18" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M10.6 6.2A10.5 10.5 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.1 2.8M6.2 8.1A17 17 0 0 0 2.5 12s3.5 6 9.5 6c1.3 0 2.5-.3 3.5-.7"
+        stroke="#fca5a5"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function LockIcon() {
   return (

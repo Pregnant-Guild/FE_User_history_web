@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useShallow } from "zustand/react/shallow";
 import Map, { type MapHandle } from "@/uhm/components/Map";
@@ -16,17 +16,15 @@ import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
 import GeometryBindingPanel from "@/uhm/components/editor/GeometryBindingPanel";
+import ImageOverlayPanel from "@/uhm/components/editor/ImageOverlayPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
-import { ProjectCommit } from "@/uhm/api/projects";
 import { fetchWikiById, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
-import type { EntitySnapshot } from "@/uhm/types/entities";
 import {
     Feature,
     FeatureCollection,
-    Geometry,
     useEditorState,
 } from "@/uhm/lib/editor/state/useEditorState";
 import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
@@ -48,17 +46,35 @@ import { deepClone } from "@/uhm/lib/editor/draft/draftDiff";
 import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
 import { useReplayPreview } from "@/uhm/lib/replay/useReplayPreview";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
+import {
+    getViewportImageCoordinates,
+    moveImageOverlayCoordinatesByPixels,
+    scaleImageOverlayCoordinatesByFactor,
+    type MapImageOverlay,
+} from "@/uhm/components/map/imageOverlay";
 import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/utils/timeline";
 import { useFeatureCommands } from "./featureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
-import UnifiedSearchBar from "@/uhm/components/ui/UnifiedSearchBar";
 import {
     EditorStoreProvider,
     useEditorStore,
     useEditorStoreApi,
 } from "@/uhm/store/editorStore";
+import { EditorSearchResults } from "./EditorSearchResults";
+import { ResizeHandle } from "./ResizeHandle";
+import {
+    clampNumber,
+    formatCommitTitle,
+    isFeatureVisibleAtYear,
+    normalizeEntitiesForCompare,
+    normalizeEntityWikiLinksForCompare,
+    normalizeGeoSearchBindingIds,
+    normalizeGeoSearchGeometry,
+    normalizeReplaysForCompare,
+    normalizeWikisForCompare,
+} from "./editorPageUtils";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
@@ -94,12 +110,19 @@ function EditorPageContent() {
     const router = useRouter();
     const editorStoreApi = useEditorStoreApi();
     const projectId = String(params.id || "");
+    // Ref chặn auto-open lặp lại cùng project khi component re-render.
     const openedProjectIdRef = useRef<string | null>(null);
+    // Ref giữ timeout flash message của form entity để clear đúng timer cũ.
     const entityFormStatusTimeoutRef = useRef<number | null>(null);
+    // Ref giữ timeout flash message của panel geometry binding.
     const geoBindingStatusTimeoutRef = useRef<number | null>(null);
+    // Ref tracking entity tạo local để cleanup khỏi catalog nếu undo/xóa khỏi snapshot.
     const localCreatedEntityIdsRef = useRef<Set<string>>(new Set());
+    // Ref nhớ geometry vừa chọn để không xóa status khi chỉ patch metadata cùng geometry.
     const lastSelectedFeatureIdRef = useRef<string | null>(null);
+    // Ref bridge sang Map imperative API (getMap/getViewState) cho replay preview.
     const mapHandleRef = useRef<MapHandle | null>(null);
+    // State chính của editor nằm trong zustand store để các panel con đọc cùng source-of-truth.
     const {
         mode,
         internalSetMode,
@@ -176,6 +199,7 @@ function EditorPageContent() {
         hideOutside,
         setHideOutside,
         geometryVisibility,
+        setGeometryVisibility,
     } = useEditorStore(useShallow((state) => ({
         mode: state.mode,
         internalSetMode: state.setMode,
@@ -252,12 +276,14 @@ function EditorPageContent() {
         hideOutside: state.hideOutside,
         setHideOutside: state.setHideOutside,
         geometryVisibility: state.geometryVisibility,
+        setGeometryVisibility: state.setGeometryVisibility,
     })));
-    // Counter để bỏ qua response cũ khi user gõ search entity liên tục.
+    // Counter để bỏ qua response cũ khi user gõ search liên tục.
     const entitySearchRequestRef = useRef(0);
     const wikiSearchRequestRef = useRef(0);
     const geoSearchRequestRef = useRef(0);
 
+    // Refs mirror snapshot arrays để undo callbacks luôn đọc state mới nhất.
     const snapshotEntitiesRef = useRef(snapshotEntities);
     const snapshotWikisRef = useRef(snapshotWikis);
     const snapshotEntityWikiLinksRef = useRef(snapshotEntityWikiLinks);
@@ -271,6 +297,7 @@ function EditorPageContent() {
         snapshotEntityWikiLinksRef.current = snapshotEntityWikiLinks;
     }, [snapshotEntityWikiLinks]);
 
+    // Hook quản lý draft/changes/undo cho main editor và replay editor.
     const editor = useEditorState(initialData, {
         snapshotUndo: {
             snapshotEntitiesRef,
@@ -283,18 +310,21 @@ function EditorPageContent() {
         initialReplays: baselineSnapshot?.replays,
         mode: mode,
     });
+    // Setter bọc undo cho thao tác cập nhật wiki snapshot.
     const setSnapshotWikisUndoable = useCallback(
         (next: SetStateAction<WikiSnapshot[]>) => {
             editor.setSnapshotWikis(next, "Cập nhật wiki");
         },
         [editor]
     );
+    // Setter bọc undo cho thao tác cập nhật binding entity-wiki.
     const setSnapshotEntityWikiLinksUndoable = useCallback(
         (next: SetStateAction<EntityWikiLinkSnapshot[]>) => {
             editor.setSnapshotEntityWikiLinks(next, "Cập nhật entity-wiki");
         },
         [editor]
     );
+    // Chuyển entity snapshot local thành entity catalog row để search/binding dùng chung.
     const snapshotEntitiesAsEntities = useMemo(() => {
         const rows = snapshotEntities || [];
         return rows
@@ -303,15 +333,19 @@ function EditorPageContent() {
                 id: String(e.id || ""),
                 name: String(e.name || "").trim() || String(e.id || ""),
                 description: e.description ?? null,
+                time_start: e.time_start ?? null,
+                time_end: e.time_end ?? null,
                 geometry_count: 0,
             }))
             .filter((e) => e.id.length > 0 && e.name.length > 0);
     }, [snapshotEntities]);
 
+    // Entity list hợp nhất giữa backend catalog và snapshot local.
     const entities = useMemo(
         () => mergeEntitySearchResults(entityCatalog, snapshotEntitiesAsEntities),
         [entityCatalog, snapshotEntitiesAsEntities]
     );
+    // State vị trí stage/step đang chọn trong replay editor.
     const [replaySelection, setReplaySelection] = useState<{
         stageId: number | null;
         stepIndex: number | null;
@@ -319,22 +353,98 @@ function EditorPageContent() {
         stageId: null,
         stepIndex: null,
     });
+    // State snapshot đóng băng của replay preview, tách khỏi draft đang edit.
     const [previewSession, setPreviewSession] = useState<ReplayPreviewSession | null>(null);
+    // State yêu cầu autoplay sau khi chuyển vào preview mode.
     const [previewAutoplayMode, setPreviewAutoplayMode] = useState<"start" | "selection" | null>(null);
+    // Cache wiki đã fetch trong preview để không gọi API lặp lại.
     const [previewWikiCache, setPreviewWikiCache] = useState<Record<string, Wiki>>({});
+    // State lỗi riêng cho wiki preview sidebar.
     const [previewWikiError, setPreviewWikiError] = useState<string | null>(null);
+    // State loading riêng cho wiki preview sidebar.
     const [isPreviewWikiLoading, setIsPreviewWikiLoading] = useState(false);
+    // State ảnh overlay local-only để vẽ trace theo ảnh mẫu.
+    const [imageOverlay, setImageOverlay] = useState<MapImageOverlay | null>(null);
+    // Bật/tắt điều khiển ảnh overlay bằng phím mũi tên và W/S.
+    const [imageOverlayKeyboardEnabled, setImageOverlayKeyboardEnabled] = useState(false);
+    // Ref giữ object URL hiện tại để revoke khi đổi/xóa ảnh, tránh leak bộ nhớ.
+    const imageOverlayObjectUrlRef = useRef<string | null>(null);
+    // Cập nhật stage/step được chọn trong sidebar replay.
     const handleReplaySelectionChange = useCallback((stageId: number | null, stepIndex: number | null) => {
         setReplaySelection({ stageId, stepIndex });
     }, []);
+    // Helper đọc MapLibre instance hiện tại cho replay dispatcher.
     const getCurrentMapInstance = useCallback(() => mapHandleRef.current?.getMap() ?? null, []);
+    // Helper đọc camera/view hiện tại để lưu vào replay preview.
     const getCurrentMapViewState = useCallback(() => mapHandleRef.current?.getViewState() ?? null, []);
     const isReplayEditMode = mode === "replay";
     const isReplayPreviewMode = mode === "replay_preview";
+    // Ref mirror entity list cho debounce search không phụ thuộc closure cũ.
     const entitiesRef = useRef(entities);
     useEffect(() => {
         entitiesRef.current = entities;
     }, [entities]);
+
+    useEffect(() => {
+        return () => {
+            if (imageOverlayObjectUrlRef.current) {
+                URL.revokeObjectURL(imageOverlayObjectUrlRef.current);
+                imageOverlayObjectUrlRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!imageOverlayKeyboardEnabled) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isTypingTarget(event.target)) return;
+
+            const key = event.key.toLowerCase();
+            const step = event.shiftKey ? 9.6 : 2.8;
+            let handled = true;
+            setImageOverlay((prev) => {
+                if (!prev) return prev;
+                const map = getCurrentMapInstance();
+                if (!map) return prev;
+
+                if (key === "w") {
+                    return { ...prev, coordinates: moveImageOverlayCoordinatesByPixels(map, prev.coordinates, 0, -step) };
+                }
+                if (key === "s") {
+                    return { ...prev, coordinates: moveImageOverlayCoordinatesByPixels(map, prev.coordinates, 0, step) };
+                }
+                if (key === "a") {
+                    return { ...prev, coordinates: moveImageOverlayCoordinatesByPixels(map, prev.coordinates, -step, 0) };
+                }
+                if (key === "d") {
+                    return { ...prev, coordinates: moveImageOverlayCoordinatesByPixels(map, prev.coordinates, step, 0) };
+                }
+                if (key === "q") {
+                    return {
+                        ...prev,
+                        coordinates: scaleImageOverlayCoordinatesByFactor(map, prev.coordinates, 1.012, prev.aspectRatio),
+                    };
+                }
+                if (key === "e") {
+                    return {
+                        ...prev,
+                        coordinates: scaleImageOverlayCoordinatesByFactor(map, prev.coordinates, 0.988, prev.aspectRatio),
+                    };
+                }
+
+                handled = false;
+                return prev;
+            });
+
+            if (handled) {
+                event.preventDefault();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [getCurrentMapInstance, imageOverlayKeyboardEnabled]);
 
     useEffect(() => {
         const localCreatedIds = localCreatedEntityIdsRef.current;
@@ -357,10 +467,12 @@ function EditorPageContent() {
         });
     }, [snapshotEntities, setEntityCatalog]);
 
+    // Clamp năm timeline vào range cố định trước khi đưa vào store.
     const handleTimelineYearChange = useCallback((nextYear: number) => {
         setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
     }, [setTimelineDraftYear]);
 
+    // Hook điều phối phát replay preview và các side effect lên map/UI.
     const replayPreview = useReplayPreview({
         replay: previewSession?.replay || null,
         draft: previewSession?.draft || EMPTY_FEATURE_COLLECTION,
@@ -373,6 +485,7 @@ function EditorPageContent() {
         onSelectStep: () => {},
     });
 
+    // Draft hiển thị trong preview có thể ẩn bớt geometry theo action replay.
     const replayPreviewDraft = useMemo(() => {
         const sourceDraft = previewSession?.draft || EMPTY_FEATURE_COLLECTION;
         if (!isReplayPreviewMode || replayPreview.hiddenGeometryIds.length === 0) {
@@ -396,6 +509,7 @@ function EditorPageContent() {
 
     // Timeline filter: only affects persisted snapshot features.
     // New features created in the current session remain visible regardless of time range.
+    // Draft cuối cùng đưa vào map sau khi áp filter timeline.
     const timelineVisibleDraft = useMemo(() => {
         const activeDraft = isReplayPreviewMode
             ? replayPreviewDraft
@@ -421,6 +535,7 @@ function EditorPageContent() {
         replayPreviewDraft,
     ]);
 
+    // Danh sách feature đang chọn, map từ selectedFeatureIds sang draft hiện tại.
     const selectedFeatures = useMemo(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return [];
         return selectedFeatureIds
@@ -428,19 +543,32 @@ function EditorPageContent() {
             .filter(Boolean) as Feature[];
     }, [selectedFeatureIds, editor.draft.features]);
 
+    // Multi-edit chỉ hợp lệ khi các geometry được chọn cùng shape type.
     const isMultiEditValid = useMemo(() => {
         if (selectedFeatures.length <= 1) return true;
         const firstShape = selectedFeatures[0].geometry.type;
         return selectedFeatures.every(f => f.geometry.type === firstShape);
     }, [selectedFeatures]);
 
+    // Feature đại diện cho panel phải; null khi multi-edit không cùng loại.
     const selectedFeature = selectedFeatures.length > 0 && isMultiEditValid ? selectedFeatures[0] : null;
+    const selectedGeometryTime = useMemo(() => {
+        if (!selectedFeature) return null;
+        return {
+            time_start: selectedFeature.properties.time_start ?? null,
+            time_end: selectedFeature.properties.time_end ?? null,
+        };
+    }, [selectedFeature]);
 
+    // Choices cho panel bind geometry, gồm cả marker geometry mới tạo local.
     const geometryChoices = useMemo(() => {
         const createdGeometryIds = new Set<string>();
         for (const [id, change] of editor.changes.entries()) {
             if (change.action === "create") createdGeometryIds.add(String(id));
         }
+        const timelineVisibleGeometryIds = new Set(
+            timelineVisibleDraft.features.map((feature) => String(feature.properties.id))
+        );
 
         const rows = (editor.draft.features || [])
             .filter((f) => f && f.properties && (typeof f.properties.id === "string" || typeof f.properties.id === "number"))
@@ -451,18 +579,23 @@ function EditorPageContent() {
                 return {
                     id,
                     label,
+                    time_start: f.properties.time_start ?? null,
+                    time_end: f.properties.time_end ?? null,
+                    isTimelineVisible: timelineVisibleGeometryIds.has(id),
                     isNew: createdGeometryIds.has(id) || !editor.hasPersistedFeature(f.properties.id),
                 };
             });
         rows.sort((a, b) => a.id.localeCompare(b.id));
         return rows;
-    }, [editor]);
+    }, [editor, timelineVisibleDraft.features]);
 
+    // Binding ids của geometry đại diện đang chọn.
     const selectedGeometryBindingIds = useMemo(() => {
         if (!selectedFeature) return [];
         return normalizeFeatureBindingIds(selectedFeature);
     }, [selectedFeature]);
 
+    // Choices wiki dùng trong replay actions và binding panel.
     const wikiChoices = useMemo(() => {
         return (snapshotWikis || [])
             .filter((wiki) => wiki && wiki.operation !== "delete")
@@ -473,6 +606,7 @@ function EditorPageContent() {
             .filter((wiki) => wiki.id.length > 0);
     }, [snapshotWikis]);
 
+    // Dirty flag cho wiki snapshot so với baseline commit.
     const wikiDirty = useMemo(() => {
         const prev = normalizeWikisForCompare(baselineSnapshot?.wikis);
         const next = normalizeWikisForCompare(snapshotWikis);
@@ -483,6 +617,7 @@ function EditorPageContent() {
         }
     }, [baselineSnapshot?.wikis, snapshotWikis]);
 
+    // Dirty flag cho entity snapshot so với baseline commit.
     const entitiesDirty = useMemo(() => {
         const prev = normalizeEntitiesForCompare(baselineSnapshot?.entities);
         const next = normalizeEntitiesForCompare(snapshotEntities);
@@ -493,6 +628,7 @@ function EditorPageContent() {
         }
     }, [baselineSnapshot?.entities, snapshotEntities]);
 
+    // Dirty flag cho binding entity-wiki so với baseline commit.
     const entityWikiDirty = useMemo(() => {
         const prev = normalizeEntityWikiLinksForCompare(baselineSnapshot?.entity_wiki);
         const next = normalizeEntityWikiLinksForCompare(snapshotEntityWikiLinks);
@@ -503,6 +639,7 @@ function EditorPageContent() {
         }
     }, [snapshotEntityWikiLinks, baselineSnapshot?.entity_wiki]);
 
+    // Dirty flag cho replay scripts so với baseline commit.
     const replayDirty = useMemo(() => {
         const prev = normalizeReplaysForCompare(baselineSnapshot?.replays);
         const next = normalizeReplaysForCompare(editor.effectiveReplays);
@@ -513,17 +650,20 @@ function EditorPageContent() {
         }
     }, [baselineSnapshot?.replays, editor.effectiveReplays]);
 
+    // Tổng số nhóm thay đổi chưa commit, dùng để enable/disable commit UI.
     const pendingSaveCount =
         editor.changeCount
         + (wikiDirty ? 1 : 0)
         + (entitiesDirty ? 1 : 0)
         + (entityWikiDirty ? 1 : 0)
         + (replayDirty ? 1 : 0);
+    // Stages của replay đang active, fallback [] để sidebar an toàn.
     const activeReplayStages = useMemo(
         () => editor.activeReplayDraft?.detail || [],
         [editor.activeReplayDraft?.detail]
     );
 
+    // Commands thao tác project/commit/submission dựa trên draft + store hiện tại.
     const sectionCommands = useProjectCommands({
         editor,
         store: editorStoreApi,
@@ -537,6 +677,7 @@ function EditorPageContent() {
         restoreCommit,
     } = sectionCommands;
 
+    // Thoát preview và quay về replay edit mode.
     const exitReplayPreview = useCallback(() => {
         replayPreview.resetPreview();
         setPreviewAutoplayMode(null);
@@ -544,6 +685,7 @@ function EditorPageContent() {
         internalSetMode("replay");
     }, [internalSetMode, replayPreview.resetPreview]);
 
+    // Đóng băng draft/replay hiện tại thành session preview để phát thử.
     const openReplayPreview = useCallback((autoplayMode: "start" | "selection") => {
         if (!editor.activeReplayDraft) return;
 
@@ -573,6 +715,7 @@ function EditorPageContent() {
         timelineFilterEnabled,
     ]);
 
+    // State machine chuyển mode editor, xử lý riêng replay/replay_preview để không mất draft.
     const setMode = useCallback((m: EditorMode, featureId?: string | number) => {
         if (m === "replay_preview") {
             return;
@@ -685,6 +828,7 @@ function EditorPageContent() {
         setIsPreviewWikiLoading(false);
     }, [previewSession]);
 
+    // Label ngắn cho overlay preview tại step đang phát.
     const replayPreviewActiveStepLabel = useMemo(() => {
         if (
             replayPreview.activeCursor.stageId == null ||
@@ -696,6 +840,7 @@ function EditorPageContent() {
     }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
 
     const replayPreviewWikiRows = previewSession?.wikis || [];
+    // Wiki snapshot đang được step preview yêu cầu mở.
     const replayPreviewActiveWikiSnapshot = useMemo(() => {
         if (!replayPreview.activeWikiId) return null;
         return replayPreviewWikiRows.find((item) => item.id === replayPreview.activeWikiId) || null;
@@ -763,6 +908,7 @@ function EditorPageContent() {
         replayPreviewWikiRows,
     ]);
 
+    // Wiki đầy đủ cho sidebar preview, ưu tiên doc có sẵn trong snapshot rồi mới dùng cache API.
     const replayPreviewActiveWiki = useMemo<Wiki | null>(() => {
         const snapshotWiki = replayPreviewActiveWikiSnapshot;
         if (!snapshotWiki) return null;
@@ -778,6 +924,7 @@ function EditorPageContent() {
         return previewWikiCache[snapshotWiki.id] || null;
     }, [previewWikiCache, projectId, replayPreviewActiveWikiSnapshot]);
 
+    // Điều hướng link wiki nội bộ trong preview nhưng chỉ trong phạm vi snapshot preview.
     const handleReplayPreviewWikiLinkRequest = useCallback(({ slug }: { slug: string; rect: DOMRect }) => {
         const nextSlug = String(slug || "").trim();
         if (!nextSlug.length) return;
@@ -790,6 +937,7 @@ function EditorPageContent() {
         replayPreview.openWikiPanelById(match.id);
     }, [replayPreview.openWikiPanelById, replayPreviewWikiRows]);
 
+    // Visibility cuối cùng theo type/layer, có override riêng cho replay edit/preview.
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
 
@@ -822,6 +970,7 @@ function EditorPageContent() {
         replayFeatureId,
     ]);
 
+    // Load project editor payload, xử lý auth và pending-submission lock.
     const openProject = useCallback(async () => {
         if (!projectId) return;
         try {
@@ -861,6 +1010,7 @@ function EditorPageContent() {
         }
     }, [openSectionForEditing, projectId, router, setBlockedPendingSubmissionId, setEntityStatus, setIsOpeningSection]);
 
+    // Xóa pending submission để backend cho phép mở editor lại.
     const unlockByDeletingPendingSubmission = useCallback(async () => {
         if (!blockedPendingSubmissionId) return;
         const confirmed = window.confirm("Xoa submission PENDING de unlock editor? Hanh dong nay khong the hoan tac.");
@@ -1157,6 +1307,7 @@ function EditorPageContent() {
         setSelectedGeometryEntityIds,
     ]);
 
+    // Hiển thị status form entity trong thời gian ngắn, tự clear timer cũ.
     const flashEntityFormStatus = useCallback((msg: string | null, timeoutMs = 3000) => {
         if (entityFormStatusTimeoutRef.current) {
             window.clearTimeout(entityFormStatusTimeoutRef.current);
@@ -1171,6 +1322,7 @@ function EditorPageContent() {
         }
     }, [setEntityFormStatus]);
 
+    // Hiển thị status binding geometry trong thời gian ngắn, tự clear timer cũ.
     const flashGeoBindingStatus = useCallback((msg: string | null, timeoutMs = 3000) => {
         if (geoBindingStatusTimeoutRef.current) {
             window.clearTimeout(geoBindingStatusTimeoutRef.current);
@@ -1190,6 +1342,7 @@ function EditorPageContent() {
         setIsBackgroundVisibilityReady(true);
     }, [setBackgroundVisibility, setIsBackgroundVisibilityReady]);
 
+    // Thêm entity backend vào snapshot project dưới dạng reference.
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
         const id = String(entity.id || "").trim();
         if (!id) return;
@@ -1202,6 +1355,8 @@ function EditorPageContent() {
                     operation: "reference",
                     name: entity.name,
                     description: entity.description ?? null,
+                    time_start: entity.time_start ?? null,
+                    time_end: entity.time_end ?? null,
                 },
                 ...prev,
             ];
@@ -1218,7 +1373,8 @@ function EditorPageContent() {
         });
     }, [editor, setEntityCatalog]);
 
-    const handleUpdateEntityInProject = useCallback((entityId: string, payload: { name: string; description: string | null }) => {
+    // Cập nhật metadata entity trong snapshot project, có undo qua editor state.
+    const handleUpdateEntityInProject = useCallback((entityId: string, payload: { name: string; description: string | null; time_start: string; time_end: string }) => {
         const id = String(entityId || "").trim();
         if (!id) return;
         const nextName = String(payload?.name || "").trim();
@@ -1227,6 +1383,19 @@ function EditorPageContent() {
             return;
         }
         const nextDescription = payload?.description == null ? null : String(payload.description);
+        let nextTimeStart: number | undefined;
+        let nextTimeEnd: number | undefined;
+        try {
+            nextTimeStart = parseOptionalEntityYearInput(payload.time_start, "time_start");
+            nextTimeEnd = parseOptionalEntityYearInput(payload.time_end, "time_end");
+            if (nextTimeStart != null && nextTimeEnd != null && nextTimeStart > nextTimeEnd) {
+                flashEntityFormStatus("time_start phải <= time_end.");
+                return;
+            }
+        } catch (err) {
+            flashEntityFormStatus(err instanceof Error ? err.message : "Năm entity không hợp lệ.");
+            return;
+        }
 
         editor.setSnapshotEntities((prev) => prev.map((e) => {
             if (!e || String(e.id) !== id) return e;
@@ -1244,11 +1413,14 @@ function EditorPageContent() {
                 operation,
                 name: nextName,
                 description: nextDescription,
+                time_start: nextTimeStart,
+                time_end: nextTimeEnd,
             };
         }), `Cap nhat entity #${id}`);
         flashEntityFormStatus("Da cap nhat entity. Commit khi san sang.", 3000);
     }, [editor, flashEntityFormStatus]);
 
+    // Bind/unbind entity vào toàn bộ selected geometry hợp lệ.
     const handleToggleBindEntityForSelectedGeometry = useCallback((entityId: string, nextChecked: boolean) => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             flashEntityFormStatus("Chưa chọn geometry để bind entity.");
@@ -1302,6 +1474,7 @@ function EditorPageContent() {
         setSelectedGeometryEntityIds,
     ]);
 
+    // Bind/unbind geometry id vào trường binding của selected geometry.
     const handleToggleBindGeometryForSelectedGeometry = useCallback((geoId: string, nextChecked: boolean) => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             flashGeoBindingStatus("Chưa chọn geometry để bind.");
@@ -1367,6 +1540,7 @@ function EditorPageContent() {
         setIsEntitySubmitting,
     ]);
 
+    // Focus/zoom tới geometry từ binding panel; nếu geo có time_start thì kéo year filter về năm đó.
     const handleFocusGeometryFromBindingPanel = useCallback((geoId: string) => {
         const id = String(geoId || "").trim();
         if (!id) return;
@@ -1377,11 +1551,9 @@ function EditorPageContent() {
             return;
         }
 
-        const visibleInCurrentTimeline = timelineVisibleDraft.features.some(
-            (item) => String(item.properties.id) === id
-        );
-        if (timelineFilterEnabled && !visibleInCurrentTimeline) {
-            setTimelineFilterEnabled(false);
+        const geoTimeStart = feature.properties.time_start;
+        if (typeof geoTimeStart === "number" && Number.isFinite(geoTimeStart)) {
+            setTimelineDraftYear(clampYearToFixedRange(Math.trunc(geoTimeStart)));
         }
 
         setSelectedFeatureIds([feature.properties.id]);
@@ -1397,11 +1569,20 @@ function EditorPageContent() {
         flashGeoBindingStatus,
         setGeometryFocusRequest,
         setSelectedFeatureIds,
-        setTimelineFilterEnabled,
-        timelineFilterEnabled,
-        timelineVisibleDraft.features,
+        setTimelineDraftYear,
     ]);
 
+    const handleHideGeometryLocal = useCallback((geoId: string | number) => {
+        const id = String(geoId || "").trim();
+        if (!id) return;
+        setGeometryVisibility((prev) => ({
+            ...prev,
+            [id]: false,
+        }));
+        setSelectedFeatureIds((prev) => prev.filter((item) => String(item) !== id));
+    }, [setGeometryVisibility, setSelectedFeatureIds]);
+
+    // Thêm wiki backend vào snapshot project dưới dạng reference.
     const handleAddWikiRefToProject = useCallback((wiki: Wiki) => {
         const id = String(wiki.id || "").trim();
         if (!id) return;
@@ -1422,6 +1603,87 @@ function EditorPageContent() {
         setRequestedActiveWikiId(id);
     }, [editor, setRequestedActiveWikiId]);
 
+    // Tạo image overlay từ file local, mặc định phủ theo viewport map hiện tại.
+    const handlePickImageOverlay = useCallback((file: File | null) => {
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            setEntityStatus("File overlay phải là ảnh.");
+            return;
+        }
+
+        const map = getCurrentMapInstance();
+        if (!map) {
+            setEntityStatus("Map chưa sẵn sàng để thêm ảnh overlay.");
+            return;
+        }
+
+        const nextUrl = URL.createObjectURL(file);
+        void readImageAspectRatio(nextUrl)
+            .then((aspectRatio) => {
+                const previousUrl = imageOverlayObjectUrlRef.current;
+                imageOverlayObjectUrlRef.current = nextUrl;
+                setImageOverlay((prev) => ({
+                    url: nextUrl,
+                    name: file.name || "Trace image",
+                    opacity: prev?.opacity ?? 0.55,
+                    aspectRatio,
+                    coordinates: getViewportImageCoordinates(map, aspectRatio),
+                }));
+                if (previousUrl) {
+                    URL.revokeObjectURL(previousUrl);
+                }
+            })
+            .catch((err) => {
+                console.error("Read image size failed", err);
+                URL.revokeObjectURL(nextUrl);
+                setEntityStatus("Không đọc được kích thước ảnh overlay.");
+            });
+    }, [getCurrentMapInstance, setEntityStatus]);
+
+    // Đọc ảnh trực tiếp từ clipboard và dùng làm overlay trace.
+    const handlePasteImageOverlay = useCallback(async () => {
+        if (typeof navigator === "undefined" || !navigator.clipboard?.read) {
+            setEntityStatus("Trình duyệt không hỗ trợ paste ảnh từ clipboard.");
+            return;
+        }
+
+        try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+                const imageType = item.types.find((type) => type.startsWith("image/"));
+                if (!imageType) continue;
+                const blob = await item.getType(imageType);
+                const extension = imageType.split("/")[1] || "png";
+                const file = new File([blob], `clipboard-image.${extension}`, { type: imageType });
+                handlePickImageOverlay(file);
+                return;
+            }
+            setEntityStatus("Clipboard không có ảnh để paste.");
+        } catch (err) {
+            console.error("Paste image overlay failed", err);
+            setEntityStatus("Không paste được ảnh. Hãy cấp quyền clipboard hoặc dùng nút Thêm ảnh.");
+        }
+    }, [handlePickImageOverlay, setEntityStatus]);
+
+    // Chỉnh opacity của image overlay mà không đổi vị trí/ảnh.
+    const handleImageOverlayOpacityChange = useCallback((opacity: number) => {
+        const nextOpacity = Number.isFinite(opacity)
+            ? Math.max(0, Math.min(1, opacity))
+            : 0.55;
+        setImageOverlay((prev) => prev ? { ...prev, opacity: nextOpacity } : prev);
+    }, []);
+
+    // Xóa image overlay khỏi map và revoke object URL local.
+    const handleRemoveImageOverlay = useCallback(() => {
+        if (imageOverlayObjectUrlRef.current) {
+            URL.revokeObjectURL(imageOverlayObjectUrlRef.current);
+            imageOverlayObjectUrlRef.current = null;
+        }
+        setImageOverlay(null);
+        setImageOverlayKeyboardEnabled(false);
+    }, []);
+
+    // Import geometry từ kết quả search GEO vào draft hiện tại và bind entity liên quan.
     const handleImportGeoFromSearch = useCallback((
         entityItem: EntityGeometriesSearchItem,
         geo: EntityGeometrySearchGeo
@@ -1510,6 +1772,7 @@ function EditorPageContent() {
         setTimelineFilterEnabled,
     ]);
 
+    // Commands thao tác metadata/entity binding cho feature đang chọn.
     const featureCommands = useFeatureCommands({
         editor,
         selectedFeatures,
@@ -1522,6 +1785,7 @@ function EditorPageContent() {
         setEntityFormStatus,
     });
 
+    // Tạo entity inline chỉ trong snapshot local, chưa gọi backend cho tới khi commit.
     const handleCreateEntityOnly = async () => {
         const name = entityForm.name.trim();
         if (!name) {
@@ -1530,6 +1794,19 @@ function EditorPageContent() {
         }
 
         const description = entityForm.description.trim() || null;
+        let timeStart: number | undefined;
+        let timeEnd: number | undefined;
+        try {
+            timeStart = parseOptionalEntityYearInput(entityForm.time_start, "time_start");
+            timeEnd = parseOptionalEntityYearInput(entityForm.time_end, "time_end");
+            if (timeStart != null && timeEnd != null && timeStart > timeEnd) {
+                setEntityFormStatus("time_start phải <= time_end.");
+                return;
+            }
+        } catch (err) {
+            setEntityFormStatus(err instanceof Error ? err.message : "Năm entity không hợp lệ.");
+            return;
+        }
         const normalizedName = name.toLowerCase();
         const duplicatedName = entities.some((entity) => entity.name.trim().toLowerCase() === normalizedName);
         if (duplicatedName) {
@@ -1542,6 +1819,8 @@ function EditorPageContent() {
             id: entityId,
             name,
             description,
+            time_start: timeStart ?? null,
+            time_end: timeEnd ?? null,
             geometry_count: 0,
         };
 
@@ -1557,6 +1836,8 @@ function EditorPageContent() {
                         operation: "create",
                         name,
                         description,
+                        time_start: timeStart,
+                        time_end: timeEnd,
                     },
                     ...prev,
                 ];
@@ -1576,6 +1857,8 @@ function EditorPageContent() {
                 ...prev,
                 name: "",
                 description: "",
+                time_start: "",
+                time_end: "",
             }));
             setEntityStatus(null);
             setEntityFormStatus("Đã tạo entity mới (local). Commit khi sẵn sàng.");
@@ -1584,18 +1867,25 @@ function EditorPageContent() {
         }
     };
 
+    // Commit head hiện tại để hiển thị label lịch sử.
     const headCommit = projectState?.head_commit_id
         ? sectionCommits.find((commit) => commit.id === projectState.head_commit_id) || null
         : null;
 
+    // Tạo geometry từ map engine rồi select ngay geometry mới.
     const handleCreateFeature = (feature: Feature) => {
         editor.createFeature(feature);
         setSelectedFeatureIds([feature.properties.id]);
     };
 
-    const mapLabelContextDraft = isReplayPreviewMode
+    // Draft nguồn dùng để render label trong map khi preview đang dùng draft đóng băng.
+    const mapLabelSourceDraft = isReplayPreviewMode
         ? previewSession?.draft || EMPTY_FEATURE_COLLECTION
         : editor.draft;
+    const mapLabelContextDraft = useMemo(
+        () => buildEntityLabelContextDraft(mapLabelSourceDraft, entities),
+        [entities, mapLabelSourceDraft]
+    );
 
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -1713,10 +2003,12 @@ function EditorPageContent() {
                             onSetMode={setMode}
                             draft={timelineVisibleDraft}
                             labelContextDraft={mapLabelContextDraft}
+                            labelTimelineYear={activeTimelineFilterEnabled ? activeTimelineYear : null}
                             selectedFeatureIds={selectedFeatureIds}
                             onSelectFeatureIds={setSelectedFeatureIds}
                             onCreateFeature={handleCreateFeature}
                             onDeleteFeature={editor.deleteFeature}
+                            onHideFeature={handleHideGeometryLocal}
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={effectiveGeometryVisibility}
@@ -1725,6 +2017,8 @@ function EditorPageContent() {
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
                             focusPadding={96}
+                            imageOverlay={imageOverlay}
+                            onImageOverlayChange={setImageOverlay}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -1811,230 +2105,36 @@ function EditorPageContent() {
                         width={rightPanelWidth}
                         topContent={
                             <div style={{ display: "grid", gap: "12px" }}>
-                                <UnifiedSearchBar
-                                    kind={searchKind}
-                                    onKindChange={(next) => {
+                                <EditorSearchResults
+                                    searchKind={searchKind}
+                                    onSearchKindChange={(next) => {
                                         setSearchKind(next);
                                         setSearchQuery("");
                                         setSearchQueryDraft("");
                                     }}
-                                    query={searchQuery}
-                                    onQueryChange={setSearchQuery}
-                                    onLocalQueryChange={setSearchQueryDraft}
+                                    searchQuery={searchQuery}
+                                    onSearchQueryChange={setSearchQuery}
+                                    onLocalSearchQueryChange={setSearchQueryDraft}
+                                    searchQueryDraft={searchQueryDraft}
+                                    entitySearchResults={entitySearchResults}
+                                    isEntitySearchLoading={isEntitySearchLoading}
+                                    onAddEntityRefToProject={handleAddEntityRefToProject}
+                                    wikiSearchResults={wikiSearchResults}
+                                    isWikiSearching={isWikiSearching}
+                                    onAddWikiRefToProject={handleAddWikiRefToProject}
+                                    geoSearchResults={geoSearchResults}
+                                    isGeoSearching={isGeoSearching}
+                                    onImportGeoFromSearch={handleImportGeoFromSearch}
                                 />
-
-                                {searchKind === "entity" && searchQueryDraft.trim().length > 0 ? (
-                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Entity Results</div>
-                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                {isEntitySearchLoading ? "Searching…" : `${entitySearchResults.length} results`}
-                                            </div>
-                                        </div>
-                                        <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                                            {entitySearchResults.slice(0, 8).map((e) => (
-                                                <div
-                                                    key={e.id}
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: 8,
-                                                        padding: 8,
-                                                        borderRadius: 6,
-                                                        border: "1px solid #1f2937",
-                                                        background: "transparent",
-                                                    }}
-                                                >
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                            {e.name}
-                                                        </div>
-                                                        <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                            {e.id}
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleAddEntityRefToProject(e)}
-                                                        style={{
-                                                            border: "none",
-                                                            background: "#111827",
-                                                            color: "#93c5fd",
-                                                            cursor: "pointer",
-                                                            borderRadius: 6,
-                                                            padding: "6px 8px",
-                                                            fontSize: 12,
-                                                            fontWeight: 700,
-                                                        }}
-                                                        title="Add entity ref to project snapshot"
-                                                    >
-                                                        Add
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {!isEntitySearchLoading && entitySearchResults.length === 0 ? (
-                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ) : null}
-
-                                {searchKind === "wiki" && searchQueryDraft.trim().length > 0 ? (
-                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Wiki Results</div>
-                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                {isWikiSearching ? "Searching…" : `${wikiSearchResults.length} results`}
-                                            </div>
-                                        </div>
-                                        <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                                            {wikiSearchResults.slice(0, 8).map((w) => (
-                                                <div
-                                                    key={w.id}
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: 8,
-                                                        padding: 8,
-                                                        borderRadius: 6,
-                                                        border: "1px solid #1f2937",
-                                                        background: "transparent",
-                                                    }}
-                                                >
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                            {(w.title || "").trim() || "Untitled wiki"}
-                                                        </div>
-                                                        <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                            {w.id}
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleAddWikiRefToProject(w)}
-                                                        style={{
-                                                            border: "none",
-                                                            background: "#111827",
-                                                            color: "#93c5fd",
-                                                            cursor: "pointer",
-                                                            borderRadius: 6,
-                                                            padding: "6px 8px",
-                                                            fontSize: 12,
-                                                            fontWeight: 700,
-                                                        }}
-                                                        title="Add wiki ref to project snapshot"
-                                                    >
-                                                        Add
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {!isWikiSearching && wikiSearchResults.length === 0 ? (
-                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ) : null}
-
-                                {searchKind === "geo" && searchQueryDraft.trim().length > 0 ? (
-                                    <div style={{ padding: 10, background: "#0b1220", borderRadius: 8, border: "1px solid #1f2937" }}>
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: "white" }}>Geo Results</div>
-                                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                {isGeoSearching ? "Searching…" : `${geoSearchResults.length} entities`}
-                                            </div>
-                                        </div>
-                                        <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
-                                            {geoSearchResults.slice(0, 6).map((item) => (
-                                                <div
-                                                    key={item.entity_id}
-                                                    style={{
-                                                        padding: 8,
-                                                        borderRadius: 6,
-                                                        border: "1px solid #1f2937",
-                                                        background: "transparent",
-                                                        display: "grid",
-                                                        gap: 6,
-                                                    }}
-                                                >
-                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ minWidth: 0 }}>
-                                                            <div style={{ color: "#e5e7eb", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                                {item.name?.trim() || item.entity_id}
-                                                            </div>
-                                                            <div style={{ color: "#94a3b8", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                                {item.entity_id}
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ fontSize: 12, color: "#94a3b8", flex: "0 0 auto" }}>
-                                                            {Array.isArray(item.geometries) ? item.geometries.length : 0} geos
-                                                        </div>
-                                                    </div>
-                                                    {item.description?.trim() ? (
-                                                        <div style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 1.35 }}>
-                                                            {item.description.trim()}
-                                                        </div>
-                                                    ) : null}
-                                                    {Array.isArray(item.geometries) && item.geometries.length ? (
-                                                        <div style={{ display: "grid", gap: 6, maxHeight: 200, overflowY: "auto", paddingRight: 4 }}>
-                                                            {item.geometries.map((geo) => (
-                                                                <div
-                                                                    key={geo.id}
-                                                                    style={{
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        justifyContent: "space-between",
-                                                                        gap: 8,
-                                                                        padding: 8,
-                                                                        borderRadius: 6,
-                                                                        border: "1px solid #243244",
-                                                                        background: "#0f172a",
-                                                                    }}
-                                                                >
-                                                                    <div style={{ minWidth: 0 }}>
-                                                                        <div style={{ color: "#e5e7eb", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                                            #{geo.id}
-                                                                        </div>
-                                                                        <div style={{ color: "#94a3b8", fontSize: 11 }}>
-                                                                            type: {geo.type || "unknown"}{" "}
-                                                                            {geo.time_start != null || geo.time_end != null
-                                                                                ? `| time: ${geo.time_start ?? "?"} → ${geo.time_end ?? "?"}`
-                                                                                : ""}
-                                                                        </div>
-                                                                    </div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleImportGeoFromSearch(item, geo)}
-                                                                        style={{
-                                                                            border: "none",
-                                                                            background: "#111827",
-                                                                            color: "#93c5fd",
-                                                                            cursor: "pointer",
-                                                                            borderRadius: 6,
-                                                                            padding: "6px 8px",
-                                                                            fontSize: 12,
-                                                                            fontWeight: 700,
-                                                                            flex: "0 0 auto",
-                                                                        }}
-                                                                        title="Import geometry into current editor draft"
-                                                                    >
-                                                                        Import
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                                                            No geometry linked.
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            {!isGeoSearching && geoSearchResults.length === 0 ? (
-                                                <div style={{ fontSize: 12, color: "#94a3b8" }}>No results.</div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ) : null}
+                                <ImageOverlayPanel
+                                    overlay={imageOverlay}
+                                    onPickImage={handlePickImageOverlay}
+                                    onPasteImage={handlePasteImageOverlay}
+                                    keyboardEnabled={imageOverlayKeyboardEnabled}
+                                    onKeyboardEnabledChange={setImageOverlayKeyboardEnabled}
+                                    onOpacityChange={handleImageOverlayOpacityChange}
+                                    onRemove={handleRemoveImageOverlay}
+                                />
                                 <GeometryBindingPanel
                                     geometries={geometryChoices}
                                     selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
@@ -2047,6 +2147,7 @@ function EditorPageContent() {
                                     onCreateEntityOnly={handleCreateEntityOnly}
                                     onUpdateEntity={handleUpdateEntityInProject}
                                     hasSelectedGeometry={Boolean(selectedFeature)}
+                                    selectedGeometryTime={selectedGeometryTime}
                                     onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
                                 />
 
@@ -2096,174 +2197,76 @@ function EditorPageContent() {
     );
 }
 
-function ResizeHandle({
-    onDrag,
-    title,
-}: {
-    onDrag: (deltaX: number) => void;
-    title: string;
-}) {
-    const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-        // Only horizontal resize
-        event.preventDefault();
-        const startX = event.clientX;
-        let lastX = startX;
-
-        const onMove = (e: PointerEvent) => {
-            const dx = e.clientX - lastX;
-            if (dx !== 0) {
-                onDrag(dx);
-                lastX = e.clientX;
+function readImageAspectRatio(url: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            const width = image.naturalWidth || image.width;
+            const height = image.naturalHeight || image.height;
+            if (!width || !height) {
+                reject(new Error("Image has invalid dimensions."));
+                return;
             }
+            resolve(width / height);
         };
-        const onUp = () => {
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
-        };
-
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-    };
-
-    return (
-        <div
-            role="separator"
-            aria-orientation="vertical"
-            title={title}
-            onPointerDown={handlePointerDown}
-            style={{
-                width: 6,
-                cursor: "col-resize",
-                background: "rgba(148, 163, 184, 0.08)",
-                borderLeft: "1px solid rgba(148, 163, 184, 0.18)",
-                borderRight: "1px solid rgba(148, 163, 184, 0.18)",
-                flex: "0 0 auto",
-            }}
-        />
-    );
+        image.onerror = () => reject(new Error("Image load failed."));
+        image.src = url;
+    });
 }
 
-function clampNumber(value: number, min: number, max: number): number {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
+function isTypingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tagName = target.tagName.toLowerCase();
+    return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
 }
 
-function formatCommitTitle(commit: ProjectCommit): string {
-    return commit.edit_summary?.trim() || `Commit ${commit.id.slice(0, 8)}`;
-}
+function buildEntityLabelContextDraft(draft: FeatureCollection, entities: Entity[]): FeatureCollection {
+    if (!draft.features.length) return draft;
 
-function isFeatureVisibleAtYear(feature: Feature, year: number): boolean {
-    const start = feature.properties.time_start;
-    const end = feature.properties.time_end;
-    if (typeof start === "number" && Number.isFinite(start) && year < start) return false;
-    if (typeof end === "number" && Number.isFinite(end) && year > end) return false;
-    return true;
-}
-
-function normalizeWikisForCompare(input: WikiSnapshot[] | null | undefined) {
-    const list = Array.isArray(input) ? input : [];
-    const normalized = list
-        .filter((w) => w && typeof w.id === "string" && w.id.trim().length > 0)
-        .filter((w) => {
-            if (w.source === "ref") return true;
-            if (w.operation === "create" || w.operation === "update" || w.operation === "delete") return true;
-            const title = typeof w.title === "string" ? w.title.trim() : "";
-            const doc = typeof w.doc === "string" ? w.doc.trim() : "";
-            return title.length > 0 || (w.doc !== null && doc.length > 0);
-        })
-        .map((w) => ({
-            id: w.id,
-            source: w.source,
-            title: typeof w.title === "string" ? w.title.trim() : "",
-            slug: typeof w.slug === "string" ? w.slug : null,
-            doc: w.doc === null ? null : typeof w.doc === "string" ? w.doc.trim() : null,
-        }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    return normalized;
-}
-
-function normalizeEntitiesForCompare(input: EntitySnapshot[] | null | undefined) {
-    const list = Array.isArray(input) ? input : [];
-    const normalized = list
-        .filter((e) => e && (typeof e.id === "string" || typeof e.id === "number"))
-        .map((e) => ({
-            id: String(e.id),
-            source: e.source,
-            name: typeof e.name === "string" ? e.name.trim() : "",
-            description: e.description == null ? null : String(e.description),
-        }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    return normalized;
-}
-
-function normalizeEntityWikiLinksForCompare(input: Array<{ entity_id: string; wiki_id: string; operation?: string }> | null | undefined) {
-    const list = Array.isArray(input) ? input : [];
-    const normalized = list
-        .filter((l) => l && typeof l.entity_id === "string" && typeof l.wiki_id === "string")
-        .map((l) => ({
-            entity_id: l.entity_id,
-            wiki_id: l.wiki_id,
-            operation: l.operation === "delete" ? "delete" : "binding",
-        }))
-        .sort((a, b) => (a.entity_id + a.wiki_id).localeCompare(b.entity_id + b.wiki_id));
-    return normalized;
-}
-
-function normalizeReplaysForCompare(input: BattleReplay[] | null | undefined) {
-    const list = Array.isArray(input) ? input : [];
-    return list
-        .filter((replay) => replay && typeof replay.geometry_id === "string" && replay.geometry_id.trim().length > 0)
-        .map((replay) => ({
-            id: typeof replay.id === "string" ? replay.id : replay.geometry_id,
-            geometry_id: replay.geometry_id,
-            target_geometry_ids: normalizeReplayTargetGeometryIdsForCompare(
-                replay.target_geometry_ids,
-                replay.geometry_id
-            ),
-            detail: Array.isArray(replay.detail) ? replay.detail : [],
-        }))
-        .sort((a, b) => a.geometry_id.localeCompare(b.geometry_id));
-}
-
-function normalizeReplayTargetGeometryIdsForCompare(
-    input: string[] | null | undefined,
-    geometryId: string
-) {
-    const orderedIds: string[] = [];
-    const seen = new Set<string>();
-
-    const pushId = (rawId: string | number | null | undefined) => {
-        if (rawId == null) return;
-        const id = String(rawId).trim();
-        if (!id || seen.has(id)) return;
-        seen.add(id);
-        orderedIds.push(id);
-    };
-
-    pushId(geometryId);
-    for (const rawId of input || []) pushId(rawId);
-    return orderedIds;
-}
-
-function normalizeGeoSearchGeometry(value: unknown): Geometry | null {
-    if (!value || typeof value !== "object") return null;
-    const g = value as Record<string, unknown>;
-    if (typeof g.type !== "string") return null;
-    if (!("coordinates" in g)) return null;
-    return value as Geometry;
-}
-
-function normalizeGeoSearchBindingIds(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    const deduped: string[] = [];
-    const seen = new Set<string>();
-    for (const rawId of value) {
-        if (typeof rawId !== "string" && typeof rawId !== "number") continue;
-        const id = String(rawId).trim();
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        deduped.push(id);
+    const entityById = new globalThis.Map<string, Entity>();
+    for (const entity of entities || []) {
+        const id = String(entity?.id || "").trim();
+        if (!id) continue;
+        entityById.set(id, entity);
     }
-    return deduped;
+
+    return {
+        ...draft,
+        features: draft.features.map((feature) => {
+            const entityIds = normalizeFeatureEntityIds(feature);
+            if (!entityIds.length) return feature;
+
+            const candidates = entityIds.map((id) => {
+                const entity = entityById.get(id) || null;
+                const name = String(entity?.name || id).trim();
+                if (!name) return null;
+                return {
+                    id,
+                    name,
+                    time_start: entity?.time_start ?? null,
+                    time_end: entity?.time_end ?? null,
+                };
+            }).filter((candidate) => candidate !== null);
+
+            return {
+                ...feature,
+                properties: {
+                    ...feature.properties,
+                    entity_name: candidates[0]?.name || null,
+                    entity_names: candidates.map((candidate) => candidate.name),
+                    entity_label_candidates: candidates,
+                },
+            };
+        }),
+    };
+}
+
+function parseOptionalEntityYearInput(value: string, fieldName: string): number | undefined {
+    const trimmed = String(value || "").trim();
+    if (!trimmed.length) return undefined;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+        throw new Error(`${fieldName} phải là số nguyên.`);
+    }
+    return parsed;
 }

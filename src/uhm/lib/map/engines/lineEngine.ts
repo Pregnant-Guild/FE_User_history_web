@@ -1,6 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
+import { snapToNearestGeometry } from "@/uhm/lib/map/engines/snapUtils";
 
 const EMPTY_PREVIEW: GeoJSON.FeatureCollection = {
     type: "FeatureCollection",
@@ -74,7 +75,11 @@ export function initLine(
     const onClick = (e: maplibregl.MapLayerMouseEvent) => {
         if (getMode() !== "add-line") return;
 
-        coords.push([e.lngLat.lng, e.lngLat.lat]);
+        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+            ? snapToNearestGeometry(map, e.lngLat, e.point)
+            : e.lngLat;
+
+        coords.push([lngLat.lng, lngLat.lat]);
         updatePreview(coords);
     };
 
@@ -94,7 +99,11 @@ export function initLine(
 
         canvas.style.cursor = "crosshair";
         if (coords.length === 0) return;
-        updatePreview([...coords, [e.lngLat.lng, e.lngLat.lat]]);
+
+        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+            ? snapToNearestGeometry(map, e.lngLat, e.point)
+            : e.lngLat;
+        updatePreview([...coords, [lngLat.lng, lngLat.lat]]);
     };
 
     // Xử lý phím nóng Enter/Escape/Backspace cho chế độ vẽ line.

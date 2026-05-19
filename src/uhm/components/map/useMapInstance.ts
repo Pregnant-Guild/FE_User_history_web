@@ -29,6 +29,8 @@ export function useMapInstance() {
 
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const geolocationCenteredRef = useRef(false);
+    // Ref khóa sync zoom từ MapLibre trong lúc user kéo slider để tránh value bị animate ghi ngược.
+    const isZoomSliderDraggingRef = useRef(false);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -60,6 +62,7 @@ export function useMapInstance() {
             mapRef.current = map;
 
             const syncZoomLevel = () => {
+                if (isZoomSliderDraggingRef.current) return;
                 setZoomLevel(roundZoom(map.getZoom()));
             };
 
@@ -80,7 +83,8 @@ export function useMapInstance() {
             };
         } catch (err) {
             console.error("Map initialization failed", err);
-            setFatalInitError(err instanceof Error ? err.message : "Map initialization failed.");
+            const message = err instanceof Error ? err.message : "Map initialization failed.";
+            window.setTimeout(() => setFatalInitError(message), 0);
         }
     }, []);
 
@@ -121,9 +125,21 @@ export function useMapInstance() {
         const map = mapRef.current;
         if (!map || !Number.isFinite(nextRaw)) return;
         const next = clampNumber(nextRaw, zoomBounds.min, zoomBounds.max);
-        map.easeTo({ zoom: next, duration: 80 });
+        // Slider cần phản hồi trực tiếp theo pointer; easeTo liên tục sẽ làm thumb bị nhảy ngược.
+        map.jumpTo({ zoom: next });
         setZoomLevel(next);
     }, [zoomBounds]);
+
+    const beginZoomSliderDrag = useCallback(() => {
+        isZoomSliderDraggingRef.current = true;
+    }, []);
+
+    const endZoomSliderDrag = useCallback(() => {
+        const map = mapRef.current;
+        isZoomSliderDraggingRef.current = false;
+        if (!map) return;
+        setZoomLevel(roundZoom(map.getZoom()));
+    }, []);
 
     const getViewState = useCallback(() => {
         const map = mapRef.current;
@@ -152,6 +168,8 @@ export function useMapInstance() {
         geolocationCenteredRef,
         handleZoomByStep,
         handleZoomSliderChange,
+        beginZoomSliderDrag,
+        endZoomSliderDrag,
         getViewState,
     };
 }

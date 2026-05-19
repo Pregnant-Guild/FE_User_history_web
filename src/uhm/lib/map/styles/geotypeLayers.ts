@@ -14,6 +14,7 @@ import { getCountryLayers } from "./geotypes/country";
 import { getStateLayers } from "./geotypes/state";
 import { getEmpireLayers } from "./geotypes/empire";
 import { getKingdomLayers } from "./geotypes/kingdom";
+import { getFactionLayers } from "./geotypes/faction";
 import { getWarLayers } from "./geotypes/war";
 import { getBattleLayers } from "./geotypes/battle";
 import { getCivilizationLayers } from "./geotypes/civilization";
@@ -40,6 +41,7 @@ export function getAllGeotypeLayers(sourceId: string, pathArrowSourceId?: string
         ...getStateLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getEmpireLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getKingdomLayers(sourceId, pathArrowSourceId, pointSourceId),
+        ...getFactionLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getWarLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getBattleLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getCivilizationLayers(sourceId, pathArrowSourceId, pointSourceId),

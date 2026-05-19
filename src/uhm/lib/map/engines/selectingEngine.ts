@@ -7,8 +7,11 @@ export function initSelect(
     getMode: ModeGetter,
     onDelete?: (id: string | number) => void,
     onEdit?: (feature: maplibregl.MapGeoJSONFeature) => void,
+    onDuplicate?: (id: string | number) => void,
+    onHide?: (id: string | number) => void,
     onSelectIds?: (ids: (string | number)[]) => void,
-    onReplayEdit?: (id: string | number) => void
+    onReplayEdit?: (id: string | number) => void,
+    isEditSessionActive?: () => boolean
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -17,7 +20,7 @@ export function initSelect(
         "path-arrow-shapes",
     ] as const;
     const selectedIds = new Set<number | string>();
-    const hasContextActions = Boolean(onDelete || onEdit || onReplayEdit);
+    const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit);
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
 
@@ -56,6 +59,7 @@ export function initSelect(
     // Chọn feature theo click trái, hỗ trợ additive bằng Alt.
     function onClick(e: maplibregl.MapLayerMouseEvent) {
         if (getMode() !== "select" && getMode() !== "replay") return;
+        if (isEditSessionActive?.()) return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) return;
 
@@ -81,6 +85,7 @@ export function initSelect(
 
         e.preventDefault(); // block browser menu
         if (getMode() === "replay") return;
+        if (isEditSessionActive?.()) return;
 
         const features = map.queryRenderedFeatures(e.point, {
             layers: selectableLayers,
@@ -125,7 +130,11 @@ export function initSelect(
         const style = map.getStyle();
         if (!style || !style.layers) return [];
         return style.layers
-            .filter((layer) => "source" in layer && FEATURE_STATE_SOURCES.includes(layer.source as any))
+            .filter((layer) =>
+                "source" in layer &&
+                typeof layer.source === "string" &&
+                FEATURE_STATE_SOURCES.includes(layer.source as (typeof FEATURE_STATE_SOURCES)[number])
+            )
             .map((layer) => layer.id);
     }
 
@@ -234,6 +243,22 @@ export function initSelect(
             const single = clickedFeature;
             menu.appendChild(createItem("Chỉnh sửa", () => onEdit(single)));
             hasMenuItems = true;
+        }
+
+        if (selectedCount === 1 && onDuplicate) {
+            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+            if (featureId !== undefined && featureId !== null) {
+                menu.appendChild(createItem("Duplicate", () => onDuplicate(featureId)));
+                hasMenuItems = true;
+            }
+        }
+
+        if (selectedCount === 1 && onHide) {
+            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+            if (featureId !== undefined && featureId !== null) {
+                menu.appendChild(createItem("Hide", () => onHide(featureId)));
+                hasMenuItems = true;
+            }
         }
 
         if (onReplayEdit) {

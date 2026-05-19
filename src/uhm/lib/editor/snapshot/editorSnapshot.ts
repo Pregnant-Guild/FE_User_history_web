@@ -31,6 +31,8 @@ interface RawEntityRow extends UnknownRecord {
     ref?: { id?: string };
     name?: string;
     description?: string;
+    time_start?: unknown;
+    time_end?: unknown;
 }
 
 interface RawWikiRow extends UnknownRecord {
@@ -124,6 +126,8 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     operation,
                     name: typeof e.name === "string" ? e.name : undefined,
                     description: typeof e.description === "string" ? e.description : e.description == null ? undefined : undefined,
+                    time_start: typeof e.time_start === "number" ? e.time_start : e.time_start == null ? undefined : undefined,
+                    time_end: typeof e.time_end === "number" ? e.time_end : e.time_end == null ? undefined : undefined,
                 };
             })
         : undefined;
@@ -266,12 +270,17 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             byGeom.set(row.geometry_id, list);
         }
         const entityNameById = new Map<string, string>();
+        const entityTimeById = new Map<string, { time_start: number | null; time_end: number | null }>();
         for (const r of entities || []) {
             const row = r as RawEntityRow;
             const id = typeof row?.id === "string" ? row.id : "";
             if (!id) continue;
             const name = typeof row.name === "string" ? String(row.name).trim() : "";
             if (name) entityNameById.set(id, name);
+            entityTimeById.set(id, {
+                time_start: typeof row.time_start === "number" ? row.time_start : null,
+                time_end: typeof row.time_end === "number" ? row.time_end : null,
+            });
         }
         const geometryById = new Map<string, GeometrySnapshot>();
         for (const row of geometries || []) {
@@ -299,6 +308,19 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const names = entity_ids.map((id) => entityNameById.get(id) || "").filter((n) => n.length > 0);
                 p.entity_name = primaryName || null;
                 p.entity_names = names;
+                p.entity_label_candidates = entity_ids
+                    .map((id) => {
+                        const name = entityNameById.get(id) || "";
+                        if (!name) return null;
+                        const time = entityTimeById.get(id) || { time_start: null, time_end: null };
+                        return {
+                            id,
+                            name,
+                            time_start: time.time_start,
+                            time_end: time.time_end,
+                        };
+                    })
+                    .filter((candidate) => candidate !== null);
             }
 
             // Generate geometry metadata onto feature properties (optional in persisted snapshot).
@@ -388,6 +410,8 @@ export function buildEditorSnapshot(options: {
             operation: "reference",
             name: typeof cloned.name === "string" ? cloned.name : undefined,
             description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
+            time_start: typeof cloned.time_start === "number" ? cloned.time_start : cloned.time_start ?? undefined,
+            time_end: typeof cloned.time_end === "number" ? cloned.time_end : cloned.time_end ?? undefined,
         });
     }
     for (const row of options.snapshotEntities || []) {
@@ -411,6 +435,8 @@ export function buildEditorSnapshot(options: {
             name,
             operation,
             description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
+            time_start: typeof cloned.time_start === "number" ? cloned.time_start : cloned.time_start ?? undefined,
+            time_end: typeof cloned.time_end === "number" ? cloned.time_end : cloned.time_end ?? undefined,
         });
     }
 
@@ -537,6 +563,7 @@ export function buildEditorSnapshot(options: {
         delete p.entity_ids;
         delete p.entity_name;
         delete p.entity_names;
+        delete p.entity_label_candidates;
         delete p.entity_type_id;
     }
 
@@ -662,6 +689,8 @@ export function buildEditorSnapshot(options: {
                 operation: e.operation,
                 name: typeof e.name === "string" ? e.name : undefined,
                 description: typeof (e as RawEntityRow).description === "string" ? (e as RawEntityRow).description : (e as RawEntityRow).description ?? null,
+                time_start: typeof e.time_start === "number" ? e.time_start : e.time_start ?? undefined,
+                time_end: typeof e.time_end === "number" ? e.time_end : e.time_end ?? undefined,
             }))
             .sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometries: geometries.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))),

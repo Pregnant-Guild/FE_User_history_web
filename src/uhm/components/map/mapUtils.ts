@@ -13,12 +13,14 @@ import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getBackgroundRasterSourceSpecification } from "@/uhm/api/tiles";
 import { newId } from "@/uhm/lib/utils/id";
 import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
+import type { EntityLabelCandidate } from "@/uhm/types/geo";
 
 type Coordinate = [number, number];
 type PolygonCoordinates = Coordinate[][];
 type FeatureLabelInfo = {
     entityId: string;
     label: string;
+    timeEnd: number | null;
 };
 
 export function applyBackgroundLayerVisibility(
@@ -230,8 +232,12 @@ export function splitDraftFeatures(fc: FeatureCollection) {
     return { polygons, points };
 }
 
-export function decoratePointFeaturesWithLabels(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext);
+export function decoratePointFeaturesWithLabels(
+    fc: FeatureCollection,
+    labelContext: FeatureCollection = fc,
+    timelineYear?: number | null
+): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
     return {
         ...fc,
         features: fc.features.map((feature) => ({
@@ -244,8 +250,12 @@ export function decoratePointFeaturesWithLabels(fc: FeatureCollection, labelCont
     };
 }
 
-export function decorateLineFeaturesWithLabels(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext);
+export function decorateLineFeaturesWithLabels(
+    fc: FeatureCollection,
+    labelContext: FeatureCollection = fc,
+    timelineYear?: number | null
+): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
     return {
         ...fc,
         features: fc.features.map((feature) => ({
@@ -258,8 +268,12 @@ export function decorateLineFeaturesWithLabels(fc: FeatureCollection, labelConte
     };
 }
 
-export function buildPolygonLabelFeatureCollection(fc: FeatureCollection, labelContext: FeatureCollection = fc): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext);
+export function buildPolygonLabelFeatureCollection(
+    fc: FeatureCollection,
+    labelContext: FeatureCollection = fc,
+    timelineYear?: number | null
+): FeatureCollection {
+    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
     const features: Feature[] = [];
 
     for (const feature of fc.features) {
@@ -655,12 +669,15 @@ export function roundZoom(value: number): number {
     return Math.round(value * 10) / 10;
 }
 
-function createFeatureLabelResolver(fc: FeatureCollection): (feature: Feature) => string | null {
+function createFeatureLabelResolver(
+    fc: FeatureCollection,
+    timelineYear?: number | null
+): (feature: Feature) => string | null {
     const directLabelsByFeatureId = new Map<string, FeatureLabelInfo>();
     const inheritedLabelsByChildId = new Map<string, FeatureLabelInfo | null>();
 
     for (const feature of fc.features) {
-        const labelInfo = getSingleEntityFeatureLabelInfo(feature);
+        const labelInfo = getSingleEntityFeatureLabelInfo(feature, timelineYear);
         if (!labelInfo) continue;
         directLabelsByFeatureId.set(String(feature.properties.id), labelInfo);
     }
@@ -710,14 +727,97 @@ function mergeInheritedFeatureLabel(
     }
 }
 
-function getSingleEntityFeatureLabelInfo(feature: Feature): FeatureLabelInfo | null {
+function getSingleEntityFeatureLabelInfo(
+    feature: Feature,
+    timelineYear?: number | null
+): FeatureLabelInfo | null {
+    const candidates = getFeatureEntityLabelCandidates(feature);
+    if (candidates.length > 0) {
+        const timelineCandidate = getLatestTimelineEntityCandidate(candidates, timelineYear);
+        if (!timelineCandidate) return null;
+        return {
+            entityId: timelineCandidate.id,
+            label: timelineCandidate.name,
+            timeEnd: normalizeLabelYear(timelineCandidate.time_end),
+        };
+    }
+
     const entityIds = getFeatureEntityIds(feature);
     if (entityIds.length !== 1) return null;
 
     const label = getSingleEntityName(feature);
     if (!label) return null;
 
-    return { entityId: entityIds[0], label };
+    return { entityId: entityIds[0], label, timeEnd: null };
+}
+
+function getLatestTimelineEntityCandidate(
+    candidates: EntityLabelCandidate[],
+    timelineYear?: number | null
+): EntityLabelCandidate | null {
+    if (!candidates.length) return null;
+
+    const activeCandidates = candidates.filter((candidate) =>
+        isEntityCandidateVisibleAtYear(candidate, timelineYear)
+    );
+    if (!activeCandidates.length) return null;
+
+    return activeCandidates.sort(compareEntityLabelCandidates)[0] || null;
+}
+
+function getFeatureEntityLabelCandidates(feature: Feature): EntityLabelCandidate[] {
+    const rawCandidates = feature.properties.entity_label_candidates;
+    if (!Array.isArray(rawCandidates)) return [];
+
+    const byId = new Map<string, EntityLabelCandidate>();
+    for (const raw of rawCandidates) {
+        if (!raw || typeof raw !== "object") continue;
+        const candidate = raw as EntityLabelCandidate;
+        const id = String(candidate.id || "").trim();
+        const name = String(candidate.name || "").trim();
+        if (!id || !name) continue;
+        byId.set(id, {
+            id,
+            name,
+            time_start: normalizeLabelYear(candidate.time_start),
+            time_end: normalizeLabelYear(candidate.time_end),
+        });
+    }
+
+    return Array.from(byId.values());
+}
+
+function isEntityCandidateVisibleAtYear(
+    candidate: EntityLabelCandidate,
+    timelineYear?: number | null
+): boolean {
+    if (typeof timelineYear !== "number" || !Number.isFinite(timelineYear)) return true;
+
+    const start = normalizeLabelYear(candidate.time_start);
+    const end = normalizeLabelYear(candidate.time_end);
+    if (start != null && timelineYear < start) return false;
+    if (end != null && timelineYear > end) return false;
+    return true;
+}
+
+function compareEntityLabelCandidates(a: EntityLabelCandidate, b: EntityLabelCandidate): number {
+    const endA = normalizeLabelYear(a.time_end);
+    const endB = normalizeLabelYear(b.time_end);
+    const endScoreA = endA == null ? Number.NEGATIVE_INFINITY : endA;
+    const endScoreB = endB == null ? Number.NEGATIVE_INFINITY : endB;
+    if (endScoreA !== endScoreB) return endScoreB - endScoreA;
+
+    const startA = normalizeLabelYear(a.time_start);
+    const startB = normalizeLabelYear(b.time_start);
+    const startScoreA = startA == null ? Number.NEGATIVE_INFINITY : startA;
+    const startScoreB = startB == null ? Number.NEGATIVE_INFINITY : startB;
+    if (startScoreA !== startScoreB) return startScoreB - startScoreA;
+
+    return a.name.localeCompare(b.name);
+}
+
+function normalizeLabelYear(value: unknown): number | null {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function getFeatureEntityIds(feature: Feature): string[] {

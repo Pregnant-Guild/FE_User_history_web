@@ -60,6 +60,7 @@ Các type đang được register:
 - `state`
 - `empire`
 - `kingdom`
+- `faction`
 - `war`
 - `battle`
 - `civilization`

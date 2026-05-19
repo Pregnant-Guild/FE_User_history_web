@@ -311,6 +311,8 @@ function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnaps
                 operation: "reference",
                 name: typeof e.name === "string" ? e.name : undefined,
                 description: typeof e.description === "string" ? e.description : e.description ?? null,
+                time_start: typeof e.time_start === "number" ? e.time_start : e.time_start ?? undefined,
+                time_end: typeof e.time_end === "number" ? e.time_end : e.time_end ?? undefined,
             };
         });
 }

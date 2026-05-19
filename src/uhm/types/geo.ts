@@ -26,10 +26,18 @@ export type FeatureProperties = {
     entity_ids?: string[];
     entity_name?: string | null;
     entity_names?: string[];
+    entity_label_candidates?: EntityLabelCandidate[];
     entity_type_id?: string | null;
     point_label?: string | null;
     line_label?: string | null;
     polygon_label?: string | null;
+};
+
+export type EntityLabelCandidate = {
+    id: string;
+    name: string;
+    time_start?: number | null;
+    time_end?: number | null;
 };
 
 export type Feature = {

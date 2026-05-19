@@ -29,6 +29,7 @@ type UseMapInteractionProps = {
     onSetModeRef: React.MutableRefObject<((mode: EditorMode, featureId?: string | number) => void) | undefined>;
     onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
     onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
+    onHideRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
     onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
 };
@@ -44,6 +45,7 @@ export function useMapInteraction({
     onSetModeRef,
     onCreateRef,
     onDeleteRef,
+    onHideRef,
     onUpdateRef,
     onHoverFeatureChangeRef,
 }: UseMapInteractionProps) {
@@ -149,8 +151,26 @@ export function useMapInteraction({
                     );
                 }
                 : undefined,
+            allowGeometryEditing
+                ? (id: string | number) => {
+                    const originalFeature = draftRef.current.features.find(
+                        (item) => String(item.properties.id) === String(id)
+                    );
+                    if (!originalFeature) return;
+
+                    const nextFeature = buildDuplicatedFeatureShapeOnly(originalFeature);
+                    onCreateRef.current?.(nextFeature);
+                }
+                : undefined,
+            allowGeometryEditing
+                ? (id: string | number) => {
+                    onHideRef.current?.(id);
+                    onSelectFeatureIdsRef.current?.([]);
+                }
+                : undefined,
             (ids) => onSelectFeatureIdsRef.current?.(ids),
-            (id: string | number) => onSetModeRef.current?.("replay", id)
+            (id: string | number) => onSetModeRef.current?.("replay", id),
+            () => Boolean(editingEngineRef.current?.editingRef.current)
         );
 
         const cleanupPoint = initPoint(
@@ -323,4 +343,31 @@ export function useMapInteraction({
         setupMapInteractions,
         cleanupMapInteractions,
     };
+}
+
+function buildDuplicatedFeatureShapeOnly(
+    feature: FeatureCollection["features"][number]
+): FeatureCollection["features"][number] {
+    const geometry = cloneGeometry(feature.geometry);
+    return {
+        type: "Feature",
+        properties: {
+            id: buildClientFeatureId(),
+            type: feature.properties.type ?? null,
+            geometry_preset: feature.properties.geometry_preset ?? null,
+            entity_id: null,
+            entity_ids: [],
+            entity_name: null,
+            entity_names: [],
+            binding: [],
+        },
+        geometry,
+    };
+}
+
+function cloneGeometry(geometry: Geometry): Geometry {
+    if (typeof structuredClone === "function") {
+        return structuredClone(geometry);
+    }
+    return JSON.parse(JSON.stringify(geometry)) as Geometry;
 }

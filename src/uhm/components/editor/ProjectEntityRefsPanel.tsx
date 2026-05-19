@@ -8,8 +8,9 @@ import { useEditorStore } from "@/uhm/store/editorStore";
 
 type Props = {
   onCreateEntityOnly: () => void;
-  onUpdateEntity?: (entityId: string, payload: { name: string; description: string | null }) => void;
+  onUpdateEntity?: (entityId: string, payload: { name: string; description: string | null; time_start: string; time_end: string }) => void;
   hasSelectedGeometry?: boolean;
+  selectedGeometryTime?: { time_start: number | null; time_end: number | null } | null;
   onToggleBindEntityForSelectedGeometry?: (entityId: string, nextChecked: boolean) => void;
 };
 
@@ -17,6 +18,7 @@ export default function ProjectEntityRefsPanel({
   onCreateEntityOnly,
   onUpdateEntity,
   hasSelectedGeometry,
+  selectedGeometryTime,
   onToggleBindEntityForSelectedGeometry,
 }: Props) {
   const {
@@ -78,14 +80,34 @@ export default function ProjectEntityRefsPanel({
   );
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editTimeStart, setEditTimeStart] = useState("");
+  const [editTimeEnd, setEditTimeEnd] = useState("");
+  const canCopySelectedGeometryTime =
+    selectedGeometryTime != null &&
+    (selectedGeometryTime.time_start != null || selectedGeometryTime.time_end != null);
 
   const openEntityEditor = (entity: EntitySnapshot) => {
     setActiveEntityId(String(entity.id));
     setEditName(typeof entity.name === "string" ? entity.name : "");
     setEditDescription(entity.description == null ? "" : String(entity.description));
+    setEditTimeStart(entity.time_start != null ? String(entity.time_start) : "");
+    setEditTimeEnd(entity.time_end != null ? String(entity.time_end) : "");
   };
-  const handleEntityFormChange = (key: "name" | "description", value: string) => {
+  const handleEntityFormChange = (key: "name" | "description" | "time_start" | "time_end", value: string) => {
     setEntityForm((prev) => ({ ...prev, [key]: value }));
+  };
+  const copySelectedGeometryTimeToCreateForm = () => {
+    if (!canCopySelectedGeometryTime || !selectedGeometryTime) return;
+    setEntityForm((prev) => ({
+      ...prev,
+      time_start: selectedGeometryTime.time_start != null ? String(selectedGeometryTime.time_start) : "",
+      time_end: selectedGeometryTime.time_end != null ? String(selectedGeometryTime.time_end) : "",
+    }));
+  };
+  const copySelectedGeometryTimeToEditForm = () => {
+    if (!canCopySelectedGeometryTime || !selectedGeometryTime) return;
+    setEditTimeStart(selectedGeometryTime.time_start != null ? String(selectedGeometryTime.time_start) : "");
+    setEditTimeEnd(selectedGeometryTime.time_end != null ? String(selectedGeometryTime.time_end) : "");
   };
 
   return (
@@ -237,27 +259,27 @@ export default function ProjectEntityRefsPanel({
               </span>
               {isNewEntityRef(activeEntity) ? <NewBadge /> : null}
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveEntityId(null)}
-              title="Dong"
-              aria-label="Dong sua entity"
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: 6,
-                border: "1px solid #334155",
-                background: "#0b1220",
-                color: "#e2e8f0",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: "0 0 auto",
-              }}
-            >
-              <CloseIcon />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                onClick={copySelectedGeometryTimeToEditForm}
+                disabled={!canCopySelectedGeometryTime || isEntitySubmitting}
+                title="Lay nam cua GEO dang chon"
+                aria-label="Lay nam cua GEO dang chon cho entity dang sua"
+                style={iconButtonStyle(!canCopySelectedGeometryTime || isEntitySubmitting)}
+              >
+                <ClockIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveEntityId(null)}
+                title="Dong"
+                aria-label="Dong sua entity"
+                style={iconButtonStyle(false)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
           </div>
 
           <div style={{ fontSize: 11, color: "#94a3b8", overflowWrap: "anywhere" }}>
@@ -277,10 +299,31 @@ export default function ProjectEntityRefsPanel({
             disabled={isEntitySubmitting}
             style={entityInputStyle}
           />
+          <div style={timeInputGridStyle}>
+            <input
+              value={editTimeStart}
+              onChange={(event) => setEditTimeStart(event.target.value)}
+              placeholder="time_start"
+              disabled={isEntitySubmitting}
+              style={entityInputStyle}
+            />
+            <input
+              value={editTimeEnd}
+              onChange={(event) => setEditTimeEnd(event.target.value)}
+              placeholder="time_end"
+              disabled={isEntitySubmitting}
+              style={entityInputStyle}
+            />
+          </div>
 
           <button
             type="button"
-            onClick={() => onUpdateEntity!(String(activeEntity.id), { name: editName, description: editDescription.trim().length ? editDescription : null })}
+            onClick={() => onUpdateEntity!(String(activeEntity.id), {
+              name: editName,
+              description: editDescription.trim().length ? editDescription : null,
+              time_start: editTimeStart,
+              time_end: editTimeEnd,
+            })}
             disabled={isEntitySubmitting}
             style={{
               border: "none",
@@ -315,29 +358,30 @@ export default function ProjectEntityRefsPanel({
           <div style={{ color: "#bfdbfe", fontWeight: 700, fontSize: "12px" }}>
             Tạo entity mới
           </div>
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen((v) => !v)}
-            disabled={isEntitySubmitting}
-            title={isCreateOpen ? "Dong" : "Mo"}
-            aria-label={isCreateOpen ? "Dong tao entity" : "Mo tao entity"}
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 6,
-              border: "1px solid #334155",
-              background: "#0b1220",
-              color: "#e2e8f0",
-              cursor: isEntitySubmitting ? "not-allowed" : "pointer",
-              opacity: isEntitySubmitting ? 0.6 : 1,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flex: "0 0 auto",
-            }}
-          >
-            {isCreateOpen ? <CloseIcon /> : <PlusIcon />}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {isCreateOpen ? (
+              <button
+                type="button"
+                onClick={copySelectedGeometryTimeToCreateForm}
+                disabled={!canCopySelectedGeometryTime || isEntitySubmitting}
+                title="Lay nam cua GEO dang chon"
+                aria-label="Lay nam cua GEO dang chon cho entity moi"
+                style={iconButtonStyle(!canCopySelectedGeometryTime || isEntitySubmitting)}
+              >
+                <ClockIcon />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen((v) => !v)}
+              disabled={isEntitySubmitting}
+              title={isCreateOpen ? "Dong" : "Mo"}
+              aria-label={isCreateOpen ? "Dong tao entity" : "Mo tao entity"}
+              style={iconButtonStyle(isEntitySubmitting)}
+            >
+              {isCreateOpen ? <CloseIcon /> : <PlusIcon />}
+            </button>
+          </div>
         </div>
 
         {isCreateOpen ? (
@@ -356,6 +400,22 @@ export default function ProjectEntityRefsPanel({
               disabled={isEntitySubmitting}
               style={entityInputStyle}
             />
+            <div style={timeInputGridStyle}>
+              <input
+                value={entityForm.time_start}
+                onChange={(event) => handleEntityFormChange("time_start", event.target.value)}
+                placeholder="time_start"
+                disabled={isEntitySubmitting}
+                style={entityInputStyle}
+              />
+              <input
+                value={entityForm.time_end}
+                onChange={(event) => handleEntityFormChange("time_end", event.target.value)}
+                placeholder="time_end"
+                disabled={isEntitySubmitting}
+                style={entityInputStyle}
+              />
+            </div>
 
             <button
               type="button"
@@ -402,6 +462,29 @@ const entityInputStyle: CSSProperties = {
   padding: "6px 8px",
   fontSize: "13px",
 };
+
+const timeInputGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+};
+
+function iconButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    border: "1px solid #334155",
+    background: "#0b1220",
+    color: "#e2e8f0",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.55 : 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: "0 0 auto",
+  };
+}
 
 const boundBadgeStyle: CSSProperties = {
   display: "inline-flex",
@@ -485,6 +568,15 @@ function CloseIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke="#fbbf24" strokeWidth="2" />
+      <path d="M12 7v5l3 2" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

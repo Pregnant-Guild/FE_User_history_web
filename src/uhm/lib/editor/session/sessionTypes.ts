@@ -19,6 +19,8 @@ export type TimelineRange = {
 export type EntityFormState = {
     name: string;
     description: string;
+    time_start: string;
+    time_end: string;
 };
 
 export type GeometryMetaFormState = {

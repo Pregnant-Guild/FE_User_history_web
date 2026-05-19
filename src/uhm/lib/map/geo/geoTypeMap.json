@@ -8,10 +8,11 @@
   { "type_key": "trade_route", "geo_type_code": 7 },
   { "type_key": "shipping_route", "geo_type_code": 8 },
 
-  { "type_key": "country", "geo_type_code": 9 },
+  { "type_key": "country", "geo_type_code": 9, "fixed": true },
   { "type_key": "state", "geo_type_code": 10 },
   { "type_key": "empire", "geo_type_code": 11 },
   { "type_key": "kingdom", "geo_type_code": 12 },
+  { "type_key": "faction", "geo_type_code": 28 },
 
   { "type_key": "war", "geo_type_code": 13 },
   { "type_key": "battle", "geo_type_code": 14 },
@@ -30,4 +31,3 @@
   { "type_key": "port", "geo_type_code": 26 },
   { "type_key": "bridge", "geo_type_code": 27 }
 ]
-

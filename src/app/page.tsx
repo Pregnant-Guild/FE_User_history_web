@@ -249,6 +249,10 @@ export default function Page() {
     const activeEntityGeometries = activeEntityId
         ? relations.entityGeometriesById[activeEntityId] || EMPTY_FEATURE_COLLECTION
         : EMPTY_FEATURE_COLLECTION;
+    const mapLabelContextDraft = useMemo(
+        () => buildEntityLabelContextDraft(data, relations.geometryEntityIds, relations.entitiesById),
+        [data, relations.entitiesById, relations.geometryEntityIds]
+    );
 
     const activeWiki = useMemo(() => {
         if (!activeWikiSlug) return null;
@@ -466,6 +470,8 @@ export default function Page() {
                     <Map
                         mode="select"
                         draft={data}
+                        labelContextDraft={mapLabelContextDraft}
+                        labelTimelineYear={timelineDraftYear}
                         selectedFeatureIds={selectedFeatureIds}
                         onSelectFeatureIds={setSelectedFeatureIds}
                         backgroundVisibility={backgroundVisibility}
@@ -766,6 +772,46 @@ function normalizeRelationArrays(target: Record<string, string[]>) {
     for (const key of Object.keys(target)) {
         target[key] = Array.from(new Set(target[key]));
     }
+}
+
+function buildEntityLabelContextDraft(
+    draft: FeatureCollection,
+    geometryEntityIds: Record<string, string[]>,
+    entitiesById: Record<string, Entity>
+): FeatureCollection {
+    if (!draft.features.length) return draft;
+
+    return {
+        ...draft,
+        features: draft.features.map((feature) => {
+            const entityIds = geometryEntityIds[String(feature.properties.id)] || [];
+            if (!entityIds.length) return feature;
+
+            const candidates = entityIds.map((id) => {
+                const entity = entitiesById[id] || null;
+                const name = String(entity?.name || id).trim();
+                if (!name) return null;
+                return {
+                    id,
+                    name,
+                    time_start: entity?.time_start ?? null,
+                    time_end: entity?.time_end ?? null,
+                };
+            }).filter((candidate) => candidate !== null);
+
+            return {
+                ...feature,
+                properties: {
+                    ...feature.properties,
+                    entity_id: entityIds[0] || null,
+                    entity_ids: entityIds,
+                    entity_name: candidates[0]?.name || null,
+                    entity_names: candidates.map((candidate) => candidate.name),
+                    entity_label_candidates: candidates,
+                },
+            };
+        }),
+    };
 }
 
 function clampNumber(value: number, min: number, max: number): number {

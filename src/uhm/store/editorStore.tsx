@@ -35,11 +35,14 @@ export type GeometryFocusRequest = {
 };
 
 type EditorStoreValues = {
+    // Editor mode + draft seed.
     mode: EditorMode;
     initialData: FeatureCollection;
+    // Task flags; setTaskFlag ensures only one blocking task is active at a time.
     isSaving: boolean;
     isSubmitting: boolean;
     isOpeningSection: boolean;
+    // Project/commit state loaded from backend.
     availableSections: Project[];
     selectedProjectId: string;
     newSectionTitle: string;
@@ -49,6 +52,7 @@ type EditorStoreValues = {
     projectState: ProjectState | null;
     sectionCommits: ProjectCommit[];
     baselineSnapshot: EditorSnapshot | null;
+    // Entity state: backend catalog plus snapshot-local rows and form/search status.
     entityCatalog: Entity[];
     snapshotEntities: EntitySnapshot[];
     entityStatus: string | null;
@@ -60,12 +64,15 @@ type EditorStoreValues = {
     entityFormStatus: string | null;
     entitySearchResults: Entity[];
     isEntitySearchLoading: boolean;
+    // Timeline + background layer state for map filtering/rendering.
     timelineDraftYear: number;
     backgroundVisibility: BackgroundLayerVisibility;
     isBackgroundVisibilityReady: boolean;
+    // Wiki state and entity-wiki relationship snapshot.
     snapshotWikis: WikiSnapshot[];
     snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
     blockedPendingSubmissionId: string | null;
+    // Unified search state shared by entity/wiki/geo search UI.
     searchKind: UnifiedSearchKind;
     searchQuery: string;
     searchQueryDraft: string;
@@ -74,12 +81,14 @@ type EditorStoreValues = {
     geoSearchResults: EntityGeometriesSearchItem[];
     isGeoSearching: boolean;
     requestedActiveWikiId: string | null;
+    // Layout sizing and panel filter state.
     leftPanelWidth: number;
     rightPanelWidth: number;
     timelineFilterEnabled: boolean;
     geometryBindingFilterEnabled: boolean;
     geoBindingStatus: string | null;
     hoveredGeometryId: string | null;
+    // Map focus/replay visibility state.
     geometryFocusRequest: GeometryFocusRequest | null;
     replayFeatureId: string | number | null;
     hideOutside: boolean;
@@ -148,10 +157,12 @@ export type EditorStoreOptions = {
     currentYear: number;
 };
 
+// Hỗ trợ setter nhận cả value trực tiếp và updater function giống React setState.
 function resolveNextState<T>(next: SetStateAction<T>, prev: T): T {
     return typeof next === "function" ? (next as (prevState: T) => T)(prev) : next;
 }
 
+// Khởi tạo visibility mặc định cho từng geo type trong map.
 function buildInitialGeometryVisibility() {
     const next: Record<string, boolean> = {};
     for (const key of GEO_TYPE_KEYS) {
@@ -161,6 +172,7 @@ function buildInitialGeometryVisibility() {
 }
 
 export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
+    // Năm timeline ban đầu luôn nằm trong fixed range để slider/map nhất quán.
     const initialTimelineYear = clampYearValue(
         options.currentYear,
         options.fallbackTimelineRange.min,
@@ -168,15 +180,21 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
     );
 
     return createStore<EditorStoreState>()((set) => {
+        // Setter generic để tránh lặp boilerplate cho từng field trong store.
         const setValue = <K extends keyof EditorStoreValues>(
             key: K,
             next: SetStateAction<EditorStoreValues[K]>
         ) => {
-            set((state) => ({
-                [key]: resolveNextState(next, state[key]),
-            } as Pick<EditorStoreValues, K>));
+            set((state) => {
+                const nextValue = resolveNextState(next, state[key]);
+                if (Object.is(nextValue, state[key])) return state;
+                return {
+                    [key]: nextValue,
+                } as Pick<EditorStoreValues, K>;
+            });
         };
 
+        // Setter riêng cho task flags vì saving/submitting/opening không nên đồng thời true.
         const setTaskFlag = (
             task: "saving" | "submitting" | "opening-project",
             next: SetStateAction<boolean>
@@ -230,6 +248,8 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
             entityForm: {
                 name: "",
                 description: "",
+                time_start: "",
+                time_end: "",
             },
             selectedGeometryEntityIds: [],
             geometryMetaForm: {
@@ -327,6 +347,7 @@ type EditorStoreProviderProps = {
 };
 
 export function EditorStoreProvider({ children, options }: EditorStoreProviderProps) {
+    // State giữ store instance ổn định trong suốt vòng đời provider.
     const [store] = useState(() => createEditorStore(options));
 
     return (
@@ -337,6 +358,7 @@ export function EditorStoreProvider({ children, options }: EditorStoreProviderPr
 }
 
 export function useEditorStore<T>(selector: (state: EditorStoreState) => T) {
+    // Hook đọc store bằng selector để component chỉ re-render theo slice cần thiết.
     const store = useContext(EditorStoreContext);
     if (!store) {
         throw new Error("useEditorStore must be used within EditorStoreProvider.");
@@ -346,6 +368,7 @@ export function useEditorStore<T>(selector: (state: EditorStoreState) => T) {
 }
 
 export function useEditorStoreApi() {
+    // Hook lấy raw StoreApi cho command layer cần getState/setState ngoài render.
     const store = useContext(EditorStoreContext);
     if (!store) {
         throw new Error("useEditorStoreApi must be used within EditorStoreProvider.");

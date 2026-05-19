@@ -51,11 +51,26 @@ export function buildFeatureEntityPatch(
     const entityNames = entityIds
         .map((id) => entities.find((entity) => entity.id === id)?.name || "")
         .filter((name) => name.length > 0);
+    const entityLabelCandidates = entityIds
+        .map((id) => {
+            const entity = entities.find((item) => item.id === id) || null;
+            if (!entity) return null;
+            const name = String(entity.name || "").trim();
+            if (!name) return null;
+            return {
+                id,
+                name,
+                time_start: entity.time_start ?? null,
+                time_end: entity.time_end ?? null,
+            };
+        })
+        .filter((candidate) => candidate !== null);
 
     return {
         entity_id: primaryEntityId,
         entity_ids: entityIds,
         entity_name: primaryEntity?.name || null,
         entity_names: entityNames,
+        entity_label_candidates: entityLabelCandidates,
     };
 }

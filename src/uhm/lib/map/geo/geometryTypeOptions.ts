@@ -75,6 +75,7 @@ const RAW_GEOMETRY_TYPE_OPTIONS: Array<{
     { value: "state", label: "State", groupId: "polygon", geometryPreset: "polygon" },
     { value: "empire", label: "Empire", groupId: "polygon", geometryPreset: "polygon" },
     { value: "kingdom", label: "Kingdom", groupId: "polygon", geometryPreset: "polygon" },
+    { value: "faction", label: "Faction", groupId: "polygon", geometryPreset: "polygon" },
 
     { value: "war", label: "War", groupId: "circle", geometryPreset: "circle-area" },
     { value: "battle", label: "Battle", groupId: "circle", geometryPreset: "circle-area" },
