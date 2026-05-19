@@ -46,7 +46,7 @@ export default function LandingPage() {
 
   return (
     // Sử dụng tông màu Vàng cổ (Parchment) và Xanh rêu (Dark Slate Green)
-    <div className="relative min-h-screen w-full text-[#2D3A3A] font-sans selection:bg-[#A88B4C] selection:text-white overflow-x-hidden">
+    <div className="relative min-h-screen max-w-[1200px] mx-auto text-[#2D3A3A] font-sans selection:bg-[#A88B4C] selection:text-white overflow-x-hidden">
       {/* --- BACKGROUND IMAGE --- */}
       <div className="fixed inset-0 -z-20 pointer-events-none">
         <Image
@@ -65,20 +65,6 @@ export default function LandingPage() {
         <div className="text-xl font-bold tracking-widest text-[#2D3A3A] uppercase">
           <span className="text-[#A88B4C]">Geo</span>History
         </div>
-        <nav className="flex gap-4 items-center">
-          <Link
-            href="/auth/signin"
-            className="text-sm font-semibold text-[#2D3A3A] hover:text-[#A88B4C] transition-colors"
-          >
-            Đăng nhập
-          </Link>
-          <Link
-            href="/user"
-            className="text-sm font-semibold px-4 py-2 bg-[#2D3A3A] text-[#FDFBF7] rounded-lg hover:bg-[#1a2323] transition-colors"
-          >
-            Vào Hệ thống
-          </Link>
-        </nav>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pt-32 pb-24 flex flex-col gap-32 w-full relative">

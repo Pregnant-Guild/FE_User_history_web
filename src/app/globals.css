@@ -822,3 +822,11 @@ html {
 .dark .ql-editor {
   color: #f3f4f6;
 }
+
+/* Fix scrollbar jump for modals (SweetAlert2, Headless UI, etc.) */
+body.swal2-shown,
+body.modal-open,
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}

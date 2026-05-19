@@ -33,8 +33,8 @@ export default function Profile() {
   return (
     <div>
       <StickyHeader header={`Thông tin tài khoản`} />
-      <div className="p-6 my-8 flex mx-auto ">
-        <div className="max-w-82 pr-4 border-r border-gray-300">
+      <div className="md:px-12 flex mx-auto ">
+        <div className="xl:max-w-82 pr-4 border-r border-gray-300 md:max-w-72">
           <UserMetaCard data={user ?? {}} />
           <UserInfoCard data={{ ...user, openEdit: true }} />
           <AccountDetails data={user ?? {}} />

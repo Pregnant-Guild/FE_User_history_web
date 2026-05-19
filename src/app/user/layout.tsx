@@ -44,7 +44,7 @@ export default function AdminLayout({
         className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
       >
         {/* <AppHeader /> */}
-        <div className="mx-auto max-w-(--breakpoint-2xl)">{children}</div>
+        <div className="mx-auto p-4 pt-0 max-w-[1240px]">{children}</div>
       </div>
       <ChatbotWidget />
     </div>
