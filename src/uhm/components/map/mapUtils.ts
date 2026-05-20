@@ -130,7 +130,7 @@ export function getSelectableLayers(map: maplibregl.Map): string[] {
     const selectableSources = ["countries", "places", PATH_ARROW_SOURCE_ID];
     const style = map.getStyle();
     if (!style || !style.layers) return [];
-    
+
     return style.layers
         .filter((layer) => "source" in layer && selectableSources.includes(layer.source as string))
         .map((layer) => layer.id);
@@ -446,8 +446,8 @@ export function buildPathArrowGeometry(coords: [number, number][]): Geometry | n
 
     if (bodyPoints.length < 2) return null;
 
-    const tailWidth = clampNumber(totalLength * 0.005, 8000, 40000);
-    const shoulderWidth = clampNumber(totalLength * 0.015, 18000, 100000);
+    const tailWidth = clampNumber(totalLength * 0.02, 5, 40000);
+    const shoulderWidth = clampNumber(totalLength * 0.1, 10, 100000);
     const headWidth = shoulderWidth * 2.0;
 
     const leftBody: ProjectedPoint[] = [];

@@ -18,6 +18,9 @@ type Props = {
     error?: string | null;
     onClose: () => void;
     onWikiLinkRequest: (request: { slug: string; rect: DOMRect }) => void;
+    sidebarWidth?: number;
+    onSidebarWidthChange?: (width: number) => void;
+    maxDragWidth?: number;
 };
 
 function escapeHtml(input: string): string {
@@ -30,8 +33,11 @@ function escapeHtml(input: string): string {
 }
 
 function normalizeWikiContentToHtml(raw: string | null | undefined): string {
-    const value = String(raw || "").trim();
+    let value = String(raw || "").trim();
     if (!value.length) return "";
+
+    // Replace non-breaking spaces to allow text wrap
+    value = value.replaceAll("&nbsp;", " ").replaceAll("\u00a0", " ");
 
     if (value[0] === "<") return value;
 
@@ -122,8 +128,52 @@ export default function PublicWikiSidebar({
     error,
     onClose,
     onWikiLinkRequest,
+    sidebarWidth,
+    onSidebarWidthChange,
+    maxDragWidth,
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
+
+    const [localWidth, setLocalWidth] = useState<number>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("public-wiki-sidebar-width");
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed >= 320 && parsed <= 800) {
+                    return parsed;
+                }
+            }
+        }
+        return 420;
+    });
+
+    const width = sidebarWidth ?? localWidth;
+    const setWidth = onSidebarWidthChange ?? setLocalWidth;
+    const maxDragWidthLimit = maxDragWidth ?? 800;
+
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        const startX = event.clientX;
+        const startWidth = width;
+
+        const onMove = (e: PointerEvent) => {
+            const deltaX = e.clientX - startX;
+            const nextWidth = Math.max(320, Math.min(maxDragWidthLimit, startWidth - deltaX));
+            setWidth(nextWidth);
+            if (typeof window !== "undefined") {
+                localStorage.setItem("public-wiki-sidebar-width", String(nextWidth));
+            }
+        };
+
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+    };
+
     const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
     const processedWiki = useMemo(() => {
         if (!wiki) return { html: "", toc: [] as TocItem[] };
@@ -187,7 +237,19 @@ export default function PublicWikiSidebar({
     }, [onWikiLinkRequest, renderHtml]);
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950">
+        <div
+            style={{ width: `${width}px` }}
+            className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+        >
+            {/* Drag Handle on the left edge */}
+            <div
+                onPointerDown={handlePointerDown}
+                className="absolute left-0 top-0 bottom-0 w-[6px] cursor-col-resize z-50 group select-none hover:bg-black/[0.03] dark:hover:bg-white/[0.02]"
+                title="Kéo để chỉnh kích thước"
+            >
+                {/* Visual drag line overlay */}
+                <div className="absolute left-[2px] top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-brand-500/50 group-active:bg-brand-500 transition-colors" />
+            </div>
             <div className="border-b border-gray-200 px-4 py-4 dark:border-gray-800">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -271,6 +333,11 @@ export default function PublicWikiSidebar({
                     height: auto;
                     overflow-y: visible;
                     padding: 18px 18px 22px;
+                    line-height: 1.6;
+                    font-size: 14.5px;
+                    word-wrap: break-word;
+                    word-break: break-word;
+                    overflow-wrap: break-word;
                 }
                 .uhm-wiki-sidebar-view.ql-editor p {
                     margin: 0 0 0.75em;
@@ -317,16 +384,22 @@ export default function PublicWikiSidebar({
                     border: 1px solid rgba(226, 232, 240, 1);
                     border-radius: 10px;
                     background: rgba(248, 250, 252, 1);
-                    overflow: auto;
+                    overflow-x: auto;
+                    white-space: pre-wrap;
+                    word-break: break-all;
                 }
                 :is(.dark *) .uhm-wiki-sidebar-view.ql-editor pre {
                     border-color: rgba(51, 65, 85, 1);
                     background: rgba(2, 6, 23, 0.4);
                 }
                 .uhm-wiki-sidebar-view.ql-editor img {
-                    max-width: 100%;
-                    height: auto;
+                    display: block !important;
+                    max-width: 100% !important;
+                    height: auto !important;
                     border-radius: 8px;
+                    float: none !important;
+                    margin: 1.25em auto !important;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
                 }
                 .uhm-wiki-sidebar-view.ql-editor a {
                     text-decoration: underline;
@@ -351,6 +424,18 @@ export default function PublicWikiSidebar({
                 :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a[href=""],
                 :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a[href="__missing__"] {
                     color: #f87171;
+                }
+                @media (max-width: 640px) {
+                    .uhm-wiki-sidebar-view.ql-editor {
+                        padding: 14px 14px 20px;
+                        font-size: 13.5px;
+                    }
+                    .uhm-wiki-sidebar-view.ql-editor h1 {
+                        font-size: 1.4em;
+                    }
+                    .uhm-wiki-sidebar-view.ql-editor h2 {
+                        font-size: 1.2em;
+                    }
                 }
             `}</style>
         </div>

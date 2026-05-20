@@ -8,7 +8,7 @@ import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import { fetchEntities, type Entity } from "@/uhm/api/entities";
 import { fetchGeometriesByBBox } from "@/uhm/api/geometries";
 import { ApiError } from "@/uhm/api/http";
-import { fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import { fetchWikiBySlug, getContentByVersionWikiId, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import {
     BACKGROUND_LAYER_OPTIONS,
     type BackgroundLayerId,
@@ -87,6 +87,34 @@ export default function Page() {
     const [activeWikiError, setActiveWikiError] = useState<string | null>(null);
     const [linkEntityPopup, setLinkEntityPopup] = useState<LinkEntityPopupState | null>(null);
     const [entityFocusToken, setEntityFocusToken] = useState(0);
+
+    const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("public-wiki-sidebar-width");
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed >= 320 && parsed <= 800) {
+                    return parsed;
+                }
+            }
+        }
+        return 420;
+    });
+    const [isLargeScreen, setIsLargeScreen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handleResize = () => {
+            setIsLargeScreen(window.innerWidth >= 1024);
+        };
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const maxDragWidth = typeof window !== "undefined"
+        ? Math.min(800, window.innerWidth - 340)
+        : 800;
 
     const timelineFetchRequestRef = useRef(0);
     const hoverHideTimerRef = useRef<number | null>(null);
@@ -339,7 +367,7 @@ export default function Page() {
 
         selectEntity(onlyEntityId, {
             sourceFeatureId: selectedFeatureIds[0],
-            focusMap: false,
+            focusMap: true,
             selectGeometry: false,
         });
     }, [activeEntityId, relations.geometryEntityIds, selectEntity, selectedFeatureIds]);
@@ -386,6 +414,8 @@ export default function Page() {
         };
     }, [linkEntityPopup]);
 
+    const cachedWiki = activeWikiSlug ? (wikiCache[activeWikiSlug] as Wiki & { __fetched?: boolean }) : undefined;
+
     useEffect(() => {
         if (!activeWikiSlug) {
             setIsActiveWikiLoading(false);
@@ -393,10 +423,13 @@ export default function Page() {
             return;
         }
 
-        const cached = wikiCache[activeWikiSlug] || relations.wikiBySlug[activeWikiSlug] || null;
-        if (cached?.content) {
+        if (cachedWiki && (cachedWiki.__fetched || cachedWiki.id === "__not_found__")) {
             setIsActiveWikiLoading(false);
-            setActiveWikiError(null);
+            if (cachedWiki.id === "__not_found__") {
+                setActiveWikiError("Không tìm thấy wiki cho entity đã chọn.");
+            } else {
+                setActiveWikiError(null);
+            }
             return;
         }
 
@@ -407,9 +440,30 @@ export default function Page() {
             try {
                 const row = await fetchWikiBySlug(activeWikiSlug);
                 if (disposed) return;
+
                 if (row) {
-                    setWikiCache((prev) => ({ ...prev, [activeWikiSlug]: row }));
+                    let versionContent = row.content;
+                    try {
+                        if (row.content_sample?.[0]?.id) {
+                            const res = await getContentByVersionWikiId(row.content_sample[0].id);
+                            if (res?.data?.content) {
+                                versionContent = res.data.content;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Failed to fetch version content:", err);
+                    }
+
+                    if (disposed) return;
+                    setWikiCache((prev) => ({
+                        ...prev,
+                        [activeWikiSlug]: { ...row, content: versionContent, __fetched: true } as any,
+                    }));
                 } else {
+                    setWikiCache((prev) => ({
+                        ...prev,
+                        [activeWikiSlug]: { id: "__not_found__", project_id: "" },
+                    }));
                     setActiveWikiError("Không tìm thấy wiki cho entity đã chọn.");
                 }
             } catch (err) {
@@ -423,7 +477,7 @@ export default function Page() {
         return () => {
             disposed = true;
         };
-    }, [activeWikiSlug, relations.wikiBySlug, wikiCache]);
+    }, [activeWikiSlug, cachedWiki]);
 
     const handleWikiLinkRequest = useCallback(async ({ slug, rect }: { slug: string; rect: DOMRect }) => {
         const linkedEntityIds = relations.wikiEntityIdsBySlug[slug] || [];
@@ -482,7 +536,7 @@ export default function Page() {
                         highlightFeatures={activeEntityGeometries}
                         focusFeatureCollection={activeEntityGeometries}
                         focusRequestKey={entityFocusToken}
-                        focusPadding={activeEntityId ? { top: 84, right: 500, bottom: 116, left: 84 } : { top: 84, right: 84, bottom: 116, left: 84 }}
+                        focusPadding={activeEntityId && isLargeScreen ? { top: 84, right: sidebarWidth + 80, bottom: 116, left: 84 } : { top: 84, right: 84, bottom: 116, left: 84 }}
                     />
                 ) : (
                     <div className="h-screen w-full bg-[#0b1220]" />
@@ -496,6 +550,7 @@ export default function Page() {
                     isLoading={isTimelineLoading}
                     disabled={false}
                     statusText={timelineStatus}
+                    style={activeEntityId && isLargeScreen ? { right: `${sidebarWidth + 32}px` } : undefined}
                 />
 
                 <div className="absolute left-4 top-4 z-20 w-[280px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/10 bg-slate-950/92 shadow-xl backdrop-blur">
@@ -632,7 +687,7 @@ export default function Page() {
                 ) : null}
 
                 {activeEntity ? (
-                    <aside className="absolute bottom-4 right-4 top-4 z-20 w-[420px] max-w-[calc(100vw-2rem)]">
+                    <aside className="absolute bottom-4 right-4 top-4 z-20 max-w-[calc(100vw-2rem)]">
                         <PublicWikiSidebar
                             entity={activeEntity}
                             wiki={activeWiki}
@@ -643,8 +698,12 @@ export default function Page() {
                                 setActiveWikiSlug(null);
                                 setActiveWikiError(null);
                                 setLinkEntityPopup(null);
+                                setSelectedFeatureIds([]);
                             }}
                             onWikiLinkRequest={handleWikiLinkRequest}
+                            sidebarWidth={sidebarWidth}
+                            onSidebarWidthChange={setSidebarWidth}
+                            maxDragWidth={maxDragWidth}
                         />
                     </aside>
                 ) : null}

@@ -34,7 +34,7 @@ export default function AdminLayout({
     ? "ml-0"
     : isExpanded || isHovered
       ? "lg:ml-[290px]"
-      : "lg:ml-[0px]";
+      : "lg:ml-[88px]";
 
   return (
     <div className="min-h-screen xl:flex">

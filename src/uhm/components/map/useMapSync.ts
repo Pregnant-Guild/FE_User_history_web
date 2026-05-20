@@ -72,6 +72,8 @@ export function useMapSync({
     const fitToDraftBoundsRef = useRef(fitToDraftBounds);
     const highlightFeaturesRef = useRef<FeatureCollection | null>(highlightFeatures || null);
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay || null);
+    const focusFeatureCollectionRef = useRef<FeatureCollection | null | undefined>(focusFeatureCollection);
+    const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
 
     const fitBoundsAppliedRef = useRef(false);
 
@@ -85,6 +87,8 @@ export function useMapSync({
     useEffect(() => { fitToDraftBoundsRef.current = fitToDraftBounds; }, [fitToDraftBounds]);
     useEffect(() => { highlightFeaturesRef.current = highlightFeatures || null; }, [highlightFeatures]);
     useEffect(() => { imageOverlayRef.current = imageOverlay || null; }, [imageOverlay]);
+    useEffect(() => { focusFeatureCollectionRef.current = focusFeatureCollection; }, [focusFeatureCollection]);
+    useEffect(() => { focusPaddingRef.current = focusPadding; }, [focusPadding]);
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;
@@ -217,7 +221,7 @@ export function useMapSync({
     useEffect(() => {
         if (focusRequestKey === null || focusRequestKey === undefined) return;
         const map = mapRef.current;
-        const target = focusFeatureCollection;
+        const target = focusFeatureCollectionRef.current;
         if (!target || !target.features.length) return;
         if (!map) return;
 
@@ -226,7 +230,7 @@ export function useMapSync({
 
         const focus = () => {
             if (cancelled || mapRef.current !== map || !map.isStyleLoaded()) return;
-            fitMapToFeatureCollection(map, target, focusPadding, {
+            fitMapToFeatureCollection(map, target, focusPaddingRef.current, {
                 duration: 550,
                 maxZoom: 10,
                 pointZoom: 9,
@@ -243,7 +247,7 @@ export function useMapSync({
             cancelled = true;
             if (rafId !== null) cancelAnimationFrame(rafId);
         };
-    }, [focusFeatureCollection, focusPadding, focusRequestKey, mapRef]);
+    }, [focusRequestKey, mapRef]);
 
     return {
         applyDraftToMap,

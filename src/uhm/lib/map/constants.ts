@@ -1,7 +1,7 @@
 export const PATH_ARROW_ICON_ID = "path-arrow-icon";
 
 export const MAP_MIN_ZOOM = 2;
-export const MAP_MAX_ZOOM = 10;
+export const MAP_MAX_ZOOM = 14;
 
 export const RASTER_BASE_SOURCE_ID = "rasterBase";
 export const RASTER_BASE_LAYER_ID = "raster-base-layer";

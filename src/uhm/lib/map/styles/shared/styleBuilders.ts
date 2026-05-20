@@ -102,7 +102,7 @@ export function buildLineGeotypeLayers(
             source: pathArrowSourceId,
             filter: ["==", TYPE_MATCH_EXPR, style.typeId],
             paint: {
-                "fill-color": statusColor(style.color),
+                "fill-color": statusFillColor(style.color),
                 "fill-opacity": [
                     "case",
                     SELECTED_EXPR,
@@ -140,7 +140,7 @@ export function buildPolygonGeotypeLayers(
             source: sourceId,
             filter: polygonFilter(style.typeId),
             paint: {
-                "fill-color": statusColor(style.fillColor),
+                "fill-color": statusFillColor(style.fillColor),
                 "fill-opacity": [
                     "case",
                     SELECTED_EXPR,
@@ -183,9 +183,18 @@ function statusStroke(normalColor: string): maplibregl.ExpressionSpecification {
     return [
         "case",
         SELECTED_EXPR,
-        SELECTED_STROKE,
+        SELECTED_COLOR,
         DRAFT_ENTITY_EXPR,
         DRAFT_STROKE,
+        normalColor,
+    ];
+}
+
+function statusFillColor(normalColor: string): maplibregl.ExpressionSpecification {
+    return [
+        "case",
+        DRAFT_ENTITY_EXPR,
+        DRAFT_COLOR,
         normalColor,
     ];
 }

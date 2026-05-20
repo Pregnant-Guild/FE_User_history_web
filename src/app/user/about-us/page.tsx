@@ -61,13 +61,13 @@ export default function LandingPage() {
       <div className="fixed inset-0 bg-gradient-to-b from-[#FDFBF7]/80 via-[#FDFBF7]/70 to-[#FDFBF7]/90 -z-10 pointer-events-none"></div>
 
       {/* --- HEADER NAVBAR --- */}
-      <header className="fixed top-0 w-full px-6 py-4 flex justify-between items-center backdrop-blur-sm bg-[#FDFBF7]/70 z-50 border-b border-[#A88B4C]/20">
+      <header className="sticky top-0 w-full px-6 py-4 flex justify-between items-center backdrop-blur-sm bg-[#FDFBF7]/70 z-40 border-b border-[#A88B4C]/20">
         <div className="text-xl font-bold tracking-widest text-[#2D3A3A] uppercase">
           <span className="text-[#A88B4C]">Geo</span>History
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 pt-32 pb-24 flex flex-col gap-32 w-full relative">
+      <main className="max-w-6xl mx-auto px-6 pt-8 pb-24 flex flex-col gap-32 w-full relative">
         {/* --- PHẦN 1: GIỚI THIỆU TỔNG QUAN --- */}
         <section className="min-h-[70vh] flex flex-col justify-center relative">
           <h1 className="text-5xl md:text-7xl font-black leading-tight tracking-tight mb-6">

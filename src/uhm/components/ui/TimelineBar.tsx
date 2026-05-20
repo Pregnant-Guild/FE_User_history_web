@@ -12,6 +12,7 @@ type Props = {
     statusText?: string | null;
     filterEnabled?: boolean;
     onFilterEnabledChange?: (enabled: boolean) => void;
+    style?: React.CSSProperties;
 };
 
 export default function TimelineBar({
@@ -24,6 +25,7 @@ export default function TimelineBar({
     statusText,
     filterEnabled,
     onFilterEnabledChange,
+    style,
 }: Props) {
     const lower = FIXED_TIMELINE_START_YEAR;
     const upper = FIXED_TIMELINE_END_YEAR;
@@ -58,6 +60,7 @@ export default function TimelineBar({
                 padding: "10px 12px",
                 color: "#e2e8f0",
                 backdropFilter: "blur(2px)",
+                ...style,
             }}
             title={helperText || undefined}
         >
@@ -65,7 +68,9 @@ export default function TimelineBar({
                 style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
+                    flexWrap: "wrap",
+                    rowGap: "8px",
+                    columnGap: "10px",
                     fontSize: "12px",
                 }}
             >
@@ -129,7 +134,7 @@ export default function TimelineBar({
                     aria-label="Timeline year"
                     style={{
                         flex: 1,
-                        minWidth: 0,
+                        minWidth: "120px",
                         accentColor: "#22c55e",
                         cursor: effectiveDisabled ? "not-allowed" : "pointer",
                         opacity: effectiveDisabled ? 0.6 : 1,
