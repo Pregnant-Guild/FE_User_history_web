@@ -94,7 +94,12 @@ export function useMapSync({
         fitBoundsAppliedRef.current = false;
     }, [fitBoundsKey]);
 
-    const applyDraftToMap = useCallback((fc: FeatureCollection) => {
+    const applyDraftToMap = useCallback((
+        fc: FeatureCollection,
+        labelContextOverride?: FeatureCollection,
+        selectedIdsOverride?: (string | number)[],
+        highlightFeaturesOverride?: FeatureCollection | null
+    ) => {
         const map = mapRef.current;
         if (!map) return;
 
@@ -110,11 +115,16 @@ export function useMapSync({
             }
         }
 
+        const labelContext = labelContextOverride || labelContextDraftRef.current || fc;
+        const currentSelectedIds = selectedIdsOverride || selectedFeatureIdsRef.current;
+        const highlightFeaturesVal = highlightFeaturesOverride !== undefined
+            ? highlightFeaturesOverride
+            : highlightFeaturesRef.current;
+
         const visibleDraftRaw = respectBindingFilterRef.current
-            ? filterDraftByBinding(fc, selectedFeatureIdsRef.current, highlightFeaturesRef.current)
-            : fc;
+            ? filterDraftByBinding(labelContext, currentSelectedIds, highlightFeaturesVal)
+            : labelContext;
         const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
-        const labelContext = labelContextDraftRef.current || fc;
         const labelTimelineYear = labelTimelineYearRef.current;
         const { polygons, points } = splitDraftFeatures(visibleDraft);
         const labeledGeometries = decorateLineFeaturesWithLabels(polygons, labelContext, labelTimelineYear);
@@ -127,7 +137,6 @@ export function useMapSync({
         polygonLabelSource.setData(polygonLabels);
         (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)?.setData(pathArrowShapes);
 
-        const currentSelectedIds = selectedFeatureIdsRef.current;
         currentSelectedIds.forEach((id) => {
             setSelectedFeatureState(map, id, true);
         });
@@ -197,7 +206,7 @@ export function useMapSync({
     }, [imageOverlay, mapRef]);
 
     useEffect(() => {
-        applyDraftToMap(draft);
+        applyDraftToMap(draft, labelContextDraft, selectedFeatureIds, highlightFeatures);
         const editingId = editingEngineRef.current?.editingRef?.current?.id;
         if (allowGeometryEditing && editingId !== undefined && editingId !== null) {
             const stillExists = draft.features.some((f) => f.properties.id === editingId);

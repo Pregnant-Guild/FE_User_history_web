@@ -2283,6 +2283,8 @@ function buildEntityLabelContextDraft(draft: FeatureCollection, entities: Entity
                 ...feature,
                 properties: {
                     ...feature.properties,
+                    entity_id: entityIds[0] || null,
+                    entity_ids: entityIds,
                     entity_name: candidates[0]?.name || null,
                     entity_names: candidates.map((candidate) => candidate.name),
                     entity_label_candidates: candidates,

@@ -1,7 +1,11 @@
 import maplibregl, { LayerSpecification } from "maplibre-gl";
 
 const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get", "type"], ["get", "entity_type_id"], ""];
-const DRAFT_ENTITY_EXPR: maplibregl.ExpressionSpecification = ["==", ["coalesce", ["get", "entity_id"], ""], ""];
+const DRAFT_ENTITY_EXPR: maplibregl.ExpressionSpecification = [
+    "all",
+    ["==", ["coalesce", ["get", "entity_id"], ""], ""],
+    ["!", ["has", "binding"]]
+];
 const SELECTED_EXPR: maplibregl.ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
 const SELECTED_COLOR = "#22c55e";

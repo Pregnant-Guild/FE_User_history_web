@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { type MapHoverPayload } from "@/uhm/components/Map";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
+import mapLayersStyles from "./MapLayers.module.css";
 import { fetchEntities, type Entity } from "@/uhm/api/entities";
 import { fetchGeometriesByBBox } from "@/uhm/api/geometries";
 import { ApiError } from "@/uhm/api/http";
@@ -80,6 +81,7 @@ export default function Page() {
         total: 0,
     });
     const [hoverAnchor, setHoverAnchor] = useState<MapHoverPayload | null>(null);
+    const [isMapLayersCollapsed, setIsMapLayersCollapsed] = useState(false);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
     const [wikiCache, setWikiCache] = useState<Record<string, Wiki>>({});
@@ -553,26 +555,55 @@ export default function Page() {
                     style={activeEntityId && isLargeScreen ? { right: `${sidebarWidth + 32}px` } : undefined}
                 />
 
-                <div className="absolute left-4 top-4 z-20 w-[280px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/10 bg-slate-950/92 shadow-xl backdrop-blur">
-                    <div className="border-b border-white/10 px-4 py-3">
-                        <div className="text-sm font-semibold text-white">Map Layers</div>
-                        <div className="mt-1 text-xs text-slate-400">{helperText}</div>
+                <div className={mapLayersStyles.panel}>
+                    <div className={`${mapLayersStyles.header} ${isMapLayersCollapsed ? mapLayersStyles.headerCollapsed : ""}`}>
+                        <div>
+                            <div className={mapLayersStyles.title}>Map Layers</div>
+                            <div className={mapLayersStyles.subtitle}>{helperText}</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsMapLayersCollapsed(!isMapLayersCollapsed)}
+                            className={mapLayersStyles.collapseButton}
+                            aria-label={isMapLayersCollapsed ? "Expand Map Layers" : "Collapse Map Layers"}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className={`${mapLayersStyles.collapseIcon} ${isMapLayersCollapsed ? mapLayersStyles.iconRotated : ""}`}
+                            >
+                                <polyline points="18 15 12 9 6 15" />
+                            </svg>
+                        </button>
                     </div>
 
-                    <div className="grid gap-4 px-4 py-4">
+                    <div className={`${mapLayersStyles.content} ${isMapLayersCollapsed ? mapLayersStyles.contentCollapsed : ""}`}>
                         <div>
-                            <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.08em] text-slate-500">
+                            <div className={mapLayersStyles.sectionHeader}>
                                 <span>Background</span>
-                                <div className="flex gap-2">
-                                    <button type="button" onClick={handleShowAllBackgroundLayers} className="text-slate-300 transition hover:text-white">
+                                <div className={mapLayersStyles.actions}>
+                                    <button
+                                        type="button"
+                                        onClick={handleShowAllBackgroundLayers}
+                                        className={mapLayersStyles.actionButton}
+                                    >
                                         All
                                     </button>
-                                    <button type="button" onClick={handleHideAllBackgroundLayers} className="text-slate-300 transition hover:text-white">
+                                    <button
+                                        type="button"
+                                        onClick={handleHideAllBackgroundLayers}
+                                        className={mapLayersStyles.actionButton}
+                                    >
                                         Off
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className={mapLayersStyles.listContainer}>
                                 {BACKGROUND_LAYER_OPTIONS.map((layer) => {
                                     const active = Boolean(backgroundVisibility[layer.id]);
                                     return (
@@ -580,12 +611,58 @@ export default function Page() {
                                             key={layer.id}
                                             type="button"
                                             onClick={() => handleToggleBackgroundLayer(layer.id)}
-                                            className={`rounded-md border px-2.5 py-1 text-xs transition ${active
-                                                ? "border-sky-400/40 bg-sky-500/10 text-sky-200"
-                                                : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200"
-                                                }`}
+                                            className={`${mapLayersStyles.listItem} ${
+                                                active ? mapLayersStyles.listItemActiveSky : mapLayersStyles.listItemInactive
+                                            }`}
                                         >
-                                            {layer.label}
+                                            <div className={mapLayersStyles.listItemLeft}>
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.itemHashIcon}
+                                                >
+                                                    <line x1="4" y1="9" x2="20" y2="9" />
+                                                    <line x1="4" y1="15" x2="20" y2="15" />
+                                                    <line x1="10" y1="3" x2="8" y2="21" />
+                                                    <line x1="16" y1="3" x2="14" y2="21" />
+                                                </svg>
+                                                <span className={mapLayersStyles.itemName}>{layer.label}</span>
+                                            </div>
+                                            
+                                            {active ? (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.eyeIcon}
+                                                >
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                    <circle cx="12" cy="12" r="3" />
+                                                </svg>
+                                            ) : (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.eyeIconInactive}
+                                                >
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                                    <line x1="1" y1="1" x2="23" y2="23" />
+                                                </svg>
+                                            )}
                                         </button>
                                     );
                                 })}
@@ -593,10 +670,10 @@ export default function Page() {
                         </div>
 
                         <div>
-                            <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-slate-500">
+                            <div className={mapLayersStyles.sectionTitle}>
                                 Geometry
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className={mapLayersStyles.listContainer}>
                                 {GEO_TYPE_KEYS.map((typeKey) => {
                                     const active = geometryVisibility[typeKey] !== false;
                                     return (
@@ -609,12 +686,60 @@ export default function Page() {
                                                     [typeKey]: prev[typeKey] === false,
                                                 }));
                                             }}
-                                            className={`rounded-md border px-2.5 py-1 text-xs capitalize transition ${active
-                                                ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                                                : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-slate-200"
-                                                }`}
+                                            className={`${mapLayersStyles.listItem} ${
+                                                active ? mapLayersStyles.listItemActiveEmerald : mapLayersStyles.listItemInactive
+                                            }`}
                                         >
-                                            {typeKey.replaceAll("_", " ")}
+                                            <div className={mapLayersStyles.listItemLeft}>
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.itemHashIcon}
+                                                >
+                                                    <line x1="4" y1="9" x2="20" y2="9" />
+                                                    <line x1="4" y1="15" x2="20" y2="15" />
+                                                    <line x1="10" y1="3" x2="8" y2="21" />
+                                                    <line x1="16" y1="3" x2="14" y2="21" />
+                                                </svg>
+                                                <span className={mapLayersStyles.itemName}>
+                                                    {typeKey.replaceAll("_", " ")}
+                                                </span>
+                                            </div>
+
+                                            {active ? (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.eyeIcon}
+                                                >
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                    <circle cx="12" cy="12" r="3" />
+                                                </svg>
+                                            ) : (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className={mapLayersStyles.eyeIconInactive}
+                                                >
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                                    <line x1="1" y1="1" x2="23" y2="23" />
+                                                </svg>
+                                            )}
                                         </button>
                                     );
                                 })}
