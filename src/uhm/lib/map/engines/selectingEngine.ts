@@ -11,7 +11,8 @@ export function initSelect(
     onHide?: (id: string | number) => void,
     onSelectIds?: (ids: (string | number)[]) => void,
     onReplayEdit?: (id: string | number) => void,
-    isEditSessionActive?: () => boolean
+    isEditSessionActive?: () => boolean,
+    onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -20,7 +21,7 @@ export function initSelect(
         "path-arrow-shapes",
     ] as const;
     const selectedIds = new Set<number | string>();
-    const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit);
+    const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit || onBindGeometries);
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
 
@@ -97,8 +98,13 @@ export function initSelect(
         const id = feature.id ?? feature.properties?.id;
         if (id === undefined || id === null) return;
 
-        // if right-clicked item not selected, make it the sole selection
-        if (!selectedIds.has(id)) {
+        const isRightClickedItemAlreadySelected = selectedIds.has(id);
+        const hasSelection = selectedIds.size > 0;
+
+        // If the right-clicked item is not selected, and there is no active selection,
+        // make it the sole selection. If there is an active selection, do not clear it
+        // so we can bind the active selection to this target geometry.
+        if (!isRightClickedItemAlreadySelected && !hasSelection) {
             clearSelection();
             selectFeature(feature, false);
         }
@@ -106,7 +112,9 @@ export function initSelect(
         showContextMenu(
             e.originalEvent?.clientX ?? e.point.x,
             e.originalEvent?.clientY ?? e.point.y,
-            feature
+            feature,
+            isRightClickedItemAlreadySelected,
+            hasSelection
         );
     }
 
@@ -161,6 +169,21 @@ export function initSelect(
         return 0;
     }
 
+    // Đồng bộ selection state từ React.
+    function syncSelection(ids: (string | number)[]) {
+        const nextSet = new Set(ids);
+        selectedIds.forEach((id) => {
+            if (!nextSet.has(id)) {
+                setSelectionStateForId(id, false);
+            }
+        });
+        selectedIds.clear();
+        ids.forEach((id) => {
+            setSelectionStateForId(id, true);
+            selectedIds.add(id);
+        });
+    }
+
     map.on("click", onClick);
     map.on("mousemove", onMove);
     if (hasContextActions) {
@@ -180,6 +203,7 @@ export function initSelect(
     return {
         cleanup,
         clearSelection,
+        syncSelection,
     };
 
     // Ẩn và dọn dẹp context menu hiện tại.
@@ -198,7 +222,9 @@ export function initSelect(
     function showContextMenu(
         x: number,
         y: number,
-        clickedFeature: maplibregl.MapGeoJSONFeature
+        clickedFeature: maplibregl.MapGeoJSONFeature,
+        isRightClickedItemAlreadySelected: boolean,
+        hasSelection: boolean
     ) {
         hideContextMenu();
 
@@ -231,65 +257,84 @@ export function initSelect(
             return item;
         };
 
-        const selectedCount = selectedIds.size || 1;
+        const selectedCount = selectedIds.size;
         let hasMenuItems = false;
 
-        if (
-            selectedCount === 1 &&
-            clickedFeature.source === "countries" &&
-            clickedFeature.geometry?.type === "Polygon" &&
-            onEdit
-        ) {
-            const single = clickedFeature;
-            menu.appendChild(createItem("Chỉnh sửa", () => onEdit(single)));
-            hasMenuItems = true;
-        }
-
-        if (selectedCount === 1 && onDuplicate) {
-            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
-            if (featureId !== undefined && featureId !== null) {
-                menu.appendChild(createItem("Duplicate", () => onDuplicate(featureId)));
+        if (!isRightClickedItemAlreadySelected && hasSelection) {
+            if (onBindGeometries) {
+                const targetId = clickedFeature.id ?? clickedFeature.properties?.id;
+                if (targetId !== undefined && targetId !== null) {
+                    const sourceIds = Array.from(selectedIds);
+                    menu.appendChild(
+                        createItem(
+                            `Bind ${selectedCount} geo đang chọn vào geo này`,
+                            () => {
+                                onBindGeometries(targetId, sourceIds);
+                            }
+                        )
+                    );
+                    hasMenuItems = true;
+                }
+            }
+        } else {
+            const effectiveCount = selectedCount || 1;
+            if (
+                effectiveCount === 1 &&
+                clickedFeature.source === "countries" &&
+                clickedFeature.geometry?.type === "Polygon" &&
+                onEdit
+            ) {
+                const single = clickedFeature;
+                menu.appendChild(createItem("Chỉnh sửa", () => onEdit(single)));
                 hasMenuItems = true;
             }
-        }
 
-        if (selectedCount === 1 && onHide) {
-            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
-            if (featureId !== undefined && featureId !== null) {
-                menu.appendChild(createItem("Hide", () => onHide(featureId)));
-                hasMenuItems = true;
+            if (effectiveCount === 1 && onDuplicate) {
+                const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+                if (featureId !== undefined && featureId !== null) {
+                    menu.appendChild(createItem("Duplicate", () => onDuplicate(featureId)));
+                    hasMenuItems = true;
+                }
             }
-        }
 
-        if (onReplayEdit) {
-            const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
-            if (featureId) {
+            if (effectiveCount === 1 && onHide) {
+                const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+                if (featureId !== undefined && featureId !== null) {
+                    menu.appendChild(createItem("Hide", () => onHide(featureId)));
+                    hasMenuItems = true;
+                }
+            }
+
+            if (onReplayEdit) {
+                const featureId = clickedFeature.id ?? clickedFeature.properties?.id;
+                if (featureId) {
+                    menu.appendChild(
+                        createItem(
+                            effectiveCount > 1 ? `Vào replay (${effectiveCount} geo)` : "Vào replay",
+                            () => onReplayEdit(featureId)
+                        )
+                    );
+                    hasMenuItems = true;
+                }
+            }
+
+            if (onDelete) {
                 menu.appendChild(
                     createItem(
-                        selectedCount > 1 ? `Vào replay (${selectedCount} geo)` : "Vào replay",
-                        () => onReplayEdit(featureId)
+                        effectiveCount > 1 ? `Xóa ${effectiveCount} mục` : "Xóa",
+                        () => {
+                            const ids = selectedIds.size
+                                ? Array.from(selectedIds)
+                                : [clickedFeature.id ?? clickedFeature.properties?.id];
+                            ids.forEach((eachId) => {
+                                if (eachId !== undefined && eachId !== null) onDelete(eachId);
+                            });
+                            clearSelection();
+                        }
                     )
                 );
                 hasMenuItems = true;
             }
-        }
-
-        if (onDelete) {
-            menu.appendChild(
-                createItem(
-                    selectedCount > 1 ? `Xóa ${selectedCount} mục` : "Xóa",
-                    () => {
-                        const ids = selectedIds.size
-                            ? Array.from(selectedIds)
-                            : [clickedFeature.id ?? clickedFeature.properties?.id];
-                        ids.forEach((eachId) => {
-                            if (eachId !== undefined && eachId !== null) onDelete(eachId);
-                        });
-                        clearSelection();
-                    }
-                )
-            );
-            hasMenuItems = true;
         }
 
         if (!hasMenuItems) return;

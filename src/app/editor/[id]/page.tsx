@@ -1540,6 +1540,36 @@ function EditorPageContent() {
         setIsEntitySubmitting,
     ]);
 
+    // Bind nhiều geometries vào target geometry.
+    const handleBindGeometries = useCallback((targetId: string | number, sourceIds: (string | number)[]) => {
+        const idStr = String(targetId).trim();
+        if (!idStr) return;
+
+        const targetFeature = editor.draft.features.find((f) => String(f.properties.id) === idStr);
+        if (!targetFeature) {
+            flashGeoBindingStatus("Không tìm thấy geometry đích.");
+            return;
+        }
+
+        const prevBindingIds = normalizeFeatureBindingIds(targetFeature);
+        
+        // Merge prevBindingIds with sourceIds (which are strings of selected features)
+        // filter out targetId itself (we can't bind a geometry to itself)
+        const newSources = sourceIds.map(String).filter((x) => x !== idStr);
+        const merged = Array.from(new Set([...prevBindingIds, ...newSources]));
+
+        editor.patchFeaturePropertiesBatch(
+            [{
+                id: targetFeature.properties.id,
+                patch: { binding: merged },
+            }],
+            "Bind các geometry đã chọn vào GEO"
+        );
+
+        setSelectedFeatureIds([targetFeature.properties.id]);
+        flashGeoBindingStatus(`Đã bind ${newSources.length} geometry vào GEO này. Commit khi sẵn sàng.`, 3000);
+    }, [editor, flashGeoBindingStatus, setSelectedFeatureIds]);
+
     // Focus/zoom tới geometry từ binding panel; nếu geo có time_start thì kéo year filter về năm đó.
     const handleFocusGeometryFromBindingPanel = useCallback((geoId: string) => {
         const id = String(geoId || "").trim();
@@ -2019,6 +2049,7 @@ function EditorPageContent() {
                             focusPadding={96}
                             imageOverlay={imageOverlay}
                             onImageOverlayChange={setImageOverlay}
+                            onBindGeometries={handleBindGeometries}
                         />
                     ) : (
                         <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />

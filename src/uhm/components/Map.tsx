@@ -57,6 +57,7 @@ type MapProps = {
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
     imageOverlay?: MapImageOverlay | null;
     onImageOverlayChange?: (overlay: MapImageOverlay) => void;
+    onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -85,6 +86,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     focusPadding,
     imageOverlay = null,
     onImageOverlayChange,
+    onBindGeometries,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
@@ -108,7 +110,9 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay);
     // Ref callback update overlay mới nhất để interaction không stale.
     const onImageOverlayChangeRef = useRef<MapProps["onImageOverlayChange"]>(onImageOverlayChange);
-
+    // Ref callback bind geometry mới nhất để interaction không stale.
+    const onBindGeometriesRef = useRef<MapProps["onBindGeometries"]>(onBindGeometries);
+ 
     useEffect(() => { modeRef.current = mode; }, [mode]);
     useEffect(() => { draftRef.current = draft; }, [draft]);
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
@@ -120,6 +124,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     useEffect(() => { onUpdateRef.current = onUpdateFeature; }, [onUpdateFeature]);
     useEffect(() => { imageOverlayRef.current = imageOverlay; }, [imageOverlay]);
     useEffect(() => { onImageOverlayChangeRef.current = onImageOverlayChange; }, [onImageOverlayChange]);
+    useEffect(() => { onBindGeometriesRef.current = onBindGeometries; }, [onBindGeometries]);
 
     // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {
@@ -164,6 +169,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         onHideRef,
         onUpdateRef,
         onHoverFeatureChangeRef,
+        onBindGeometriesRef,
     });
 
     // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.

@@ -16,6 +16,7 @@ type EngineBinding = {
     cleanup: () => void;
     cancel?: () => void;
     clearSelection?: (skipNotify?: boolean) => void;
+    syncSelection?: (ids: (string | number)[]) => void;
 };
 
 type UseMapInteractionProps = {
@@ -32,6 +33,7 @@ type UseMapInteractionProps = {
     onHideRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
     onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
+    onBindGeometriesRef?: React.MutableRefObject<((targetId: string | number, sourceIds: (string | number)[]) => void) | undefined>;
 };
 
 export function useMapInteraction({
@@ -48,6 +50,7 @@ export function useMapInteraction({
     onHideRef,
     onUpdateRef,
     onHoverFeatureChangeRef,
+    onBindGeometriesRef,
 }: UseMapInteractionProps) {
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
     const engineBindingsRef = useRef<Partial<Record<EditorMode, EngineBinding>>>({});
@@ -71,6 +74,13 @@ export function useMapInteraction({
             engineBindingsRef.current.select?.clearSelection?.(false);
         }
     }, [mode, selectedFeatureIds]);
+
+    useEffect(() => {
+        const selectEngine = engineBindingsRef.current.select;
+        if (selectEngine?.syncSelection) {
+            selectEngine.syncSelection(selectedFeatureIds);
+        }
+    }, [selectedFeatureIds]);
 
     useEffect(() => {
         const previousMode = previousModeRef.current;
@@ -170,7 +180,8 @@ export function useMapInteraction({
                 : undefined,
             (ids) => onSelectFeatureIdsRef.current?.(ids),
             (id: string | number) => onSetModeRef.current?.("replay", id),
-            () => Boolean(editingEngineRef.current?.editingRef.current)
+            () => Boolean(editingEngineRef.current?.editingRef.current),
+            (targetId, sourceIds) => onBindGeometriesRef?.current?.(targetId, sourceIds)
         );
 
         const cleanupPoint = initPoint(
