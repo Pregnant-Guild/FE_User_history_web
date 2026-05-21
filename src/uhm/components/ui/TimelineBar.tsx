@@ -1,6 +1,7 @@
 "use client";
 
 import { FIXED_TIMELINE_END_YEAR, FIXED_TIMELINE_START_YEAR, clampYearValue } from "@/uhm/lib/utils/timeline";
+import styles from "./TimelineBar.module.css";
 
 type Props = {
     year: number;
@@ -48,68 +49,22 @@ export default function TimelineBar({
 
     return (
         <div
-            style={{
-                position: "absolute",
-                left: "18px",
-                right: "18px",
-                bottom: "16px",
-                zIndex: 10,
-                background: "rgba(15, 23, 42, 0.9)",
-                border: "1px solid rgba(148, 163, 184, 0.3)",
-                borderRadius: "10px",
-                padding: "10px 12px",
-                color: "#e2e8f0",
-                backdropFilter: "blur(2px)",
-                ...style,
-            }}
+            className={`${styles.container} ${isLoading ? styles.containerLoading : ""} ${effectiveDisabled ? styles.disabled : ""}`}
+            style={style}
             title={helperText || undefined}
         >
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    rowGap: "8px",
-                    columnGap: "10px",
-                    fontSize: "12px",
-                }}
-            >
+            <div className={styles.flexWrapper}>
                 {typeof filterEnabled === "boolean" && onFilterEnabledChange ? (
                     <label
                         title={filterEnabled ? "Dang bat loc timeline" : "Dang tat loc timeline (hien thi tat ca geometry)"}
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            cursor: effectiveDisabled ? "not-allowed" : "pointer",
-                            userSelect: "none",
-                            opacity: effectiveDisabled ? 0.6 : 1,
-                        }}
+                        className={`${styles.toggleContainer} ${effectiveDisabled ? styles.disabled : ""}`}
                     >
                         <span
                             aria-hidden="true"
-                            style={{
-                                width: 36,
-                                height: 20,
-                                borderRadius: 999,
-                                border: "1px solid rgba(148, 163, 184, 0.45)",
-                                background: filterEnabled ? "rgba(34, 197, 94, 0.9)" : "rgba(148, 163, 184, 0.25)",
-                                position: "relative",
-                                flex: "0 0 auto",
-                            }}
+                            className={`${styles.toggleTrack} ${filterEnabled ? styles.toggleTrackActive : ""}`}
                         >
                             <span
-                                style={{
-                                    position: "absolute",
-                                    top: 2,
-                                    left: filterEnabled ? 18 : 2,
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: 999,
-                                    background: "#0b1220",
-                                    border: "1px solid rgba(148, 163, 184, 0.35)",
-                                    transition: "left 120ms ease",
-                                }}
+                                className={`${styles.toggleThumb} ${filterEnabled ? styles.toggleThumbActive : ""}`}
                             />
                         </span>
                         <input
@@ -122,7 +77,7 @@ export default function TimelineBar({
                         />
                     </label>
                 ) : null}
-                <span style={{ color: "#94a3b8", minWidth: 44 }}>{formatYear(lower)}</span>
+                <span className={styles.labelBounds}>{formatYear(lower)}</span>
                 <input
                     type="range"
                     min={lower}
@@ -131,16 +86,10 @@ export default function TimelineBar({
                     value={safeYear}
                     onChange={(event) => handleYearChange(Number(event.target.value))}
                     disabled={effectiveDisabled}
+                    className={styles.slider}
                     aria-label="Timeline year"
-                    style={{
-                        flex: 1,
-                        minWidth: "120px",
-                        accentColor: "#22c55e",
-                        cursor: effectiveDisabled ? "not-allowed" : "pointer",
-                        opacity: effectiveDisabled ? 0.6 : 1,
-                    }}
                 />
-                <span style={{ color: "#94a3b8", minWidth: 44, textAlign: "right" }}>
+                <span className={styles.labelBoundsRight}>
                     {formatYear(upper)}
                 </span>
                 <input
@@ -151,31 +100,15 @@ export default function TimelineBar({
                     value={safeYear}
                     onChange={(event) => handleYearChange(Number(event.target.value))}
                     disabled={effectiveDisabled}
+                    className={styles.numberInput}
                     aria-label="Timeline exact year"
-                    style={{
-                        width: "128px",
-                        border: "1px solid rgba(148, 163, 184, 0.45)",
-                        borderRadius: "6px",
-                        padding: "6px 8px",
-                        background: "rgba(15, 23, 42, 0.7)",
-                        color: "#f8fafc",
-                        fontSize: "13px",
-                        outline: "none",
-                    }}
                 />
                 {typeof timeRange === "number" && onTimeRangeChange ? (
                     <label
                         title="time_range (0-30)"
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            color: "#94a3b8",
-                            whiteSpace: "nowrap",
-                            opacity: effectiveDisabled ? 0.6 : 1,
-                        }}
+                        className={`${styles.rangeLabel} ${effectiveDisabled ? styles.disabled : ""}`}
                     >
-                        <span style={{ fontSize: "12px" }}>Range</span>
+                        <span>Range</span>
                         <input
                             type="number"
                             min={0}
@@ -184,17 +117,8 @@ export default function TimelineBar({
                             value={Math.max(0, Math.min(30, Math.trunc(timeRange)))}
                             onChange={(event) => handleTimeRangeChange(Number(event.target.value))}
                             disabled={effectiveDisabled}
+                            className={styles.rangeInput}
                             aria-label="Timeline range"
-                            style={{
-                                width: "84px",
-                                border: "1px solid rgba(148, 163, 184, 0.45)",
-                                borderRadius: "6px",
-                                padding: "6px 8px",
-                                background: "rgba(15, 23, 42, 0.7)",
-                                color: "#f8fafc",
-                                fontSize: "13px",
-                                outline: "none",
-                            }}
                         />
                     </label>
                 ) : null}
@@ -209,3 +133,4 @@ function formatYear(year: number): string {
     }
     return `${year}`;
 }
+
