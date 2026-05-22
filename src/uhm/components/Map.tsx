@@ -42,7 +42,7 @@ type MapProps = {
     labelContextDraft?: FeatureCollection;
     labelTimelineYear?: number | null;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
-    onDeleteFeature?: (id: string | number) => void;
+    onDeleteFeature?: (id: string | number | (string | number)[]) => void;
     onHideFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
     allowGeometryEditing?: boolean;

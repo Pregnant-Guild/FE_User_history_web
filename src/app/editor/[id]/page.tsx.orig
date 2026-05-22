@@ -742,12 +742,10 @@ function EditorPageContent() {
 
         if (m === "replay" && featureId) {
             // QUY TẮC: Geo chọn đầu tiên là geo main.
-            const finalSelectedIds = Array.from(new Set([...selectedFeatureIds, featureId]));
             const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
-            
             setReplayFeatureId(triggerId);
             setReplaySelection({ stageId: null, stepIndex: null });
-            editor.switchReplayContext(triggerId, finalSelectedIds);
+            editor.switchReplayContext(triggerId, selectedFeatureIds);
             setSelectedFeatureIds([]);
         } else if (m !== "replay") {
             if (mode === "replay") {
@@ -2039,13 +2037,7 @@ function EditorPageContent() {
                             selectedFeatureIds={selectedFeatureIds}
                             onSelectFeatureIds={setSelectedFeatureIds}
                             onCreateFeature={handleCreateFeature}
-                            onDeleteFeature={(id) => {
-                                if (Array.isArray(id)) {
-                                    editor.deleteFeatures(id);
-                                } else {
-                                    editor.deleteFeature(id);
-                                }
-                            }}
+                            onDeleteFeature={editor.deleteFeature}
                             onHideFeature={handleHideGeometryLocal}
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
@@ -2198,15 +2190,10 @@ function EditorPageContent() {
                                 <EntityWikiBindingsPanel
                                     setLinks={setSnapshotEntityWikiLinksUndoable}
                                 />
-                                {selectedFeatures.length > 0 ? (
+                                {selectedFeature ? (
                                     <SelectedGeometryPanel
                                         selectedFeatures={selectedFeatures}
                                         onApplyGeometryMetadata={featureCommands.applyGeometryMetadata}
-                                        onDeleteFeatures={(ids) => {
-                                            editor.deleteFeatures(ids);
-                                            setSelectedFeatureIds([]);
-                                        }}
-                                        onDeselectAll={() => setSelectedFeatureIds([])}
                                         changeCount={editor.changeCount}
                                         onReplayEdit={(id) => setMode("replay", id)}
                                     />

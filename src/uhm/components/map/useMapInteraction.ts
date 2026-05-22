@@ -29,7 +29,7 @@ type UseMapInteractionProps = {
     onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
     onSetModeRef: React.MutableRefObject<((mode: EditorMode, featureId?: string | number) => void) | undefined>;
     onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
-    onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
+    onDeleteRef: React.MutableRefObject<((id: string | number | (string | number)[]) => void) | undefined>;
     onHideRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
     onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
@@ -144,7 +144,7 @@ export function useMapInteraction({
             map,
             () => modeRef.current,
             allowGeometryEditing
-                ? (id: string | number) => {
+                ? (id: string | number | (string | number)[]) => {
                     editingEngineRef.current?.clearEditing();
                     onSelectFeatureIdsRef.current?.([]);
                     onDeleteRef.current?.(id);

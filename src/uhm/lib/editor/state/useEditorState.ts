@@ -540,6 +540,33 @@ export function useEditorState(
         commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
+    function deleteFeatures(ids: Array<FeatureProperties["id"]>) {
+        if (mode === "replay") {
+            return;
+        }
+
+        const idsSet = new Set(ids.map(String));
+        const nextFeatures: Feature[] = [];
+        const undoActions: UndoAction[] = [];
+
+        for (const feature of mainDraftRef.current.features) {
+            if (idsSet.has(String(feature.properties.id))) {
+                undoActions.push({ type: "delete", feature: deepClone(feature) });
+            } else {
+                nextFeatures.push(feature);
+            }
+        }
+
+        if (undoActions.length === 0) return;
+
+        pushMainUndo(
+            undoActions.length === 1
+                ? undoActions[0]
+                : { type: "group", label: `Xóa ${undoActions.length} geometry`, actions: undoActions }
+        );
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
+    }
+
     function buildPayload(): Change[] {
         return Array.from(changes.values()).map((change) => deepClone(change));
     }
@@ -695,6 +722,7 @@ export function useEditorState(
         patchFeaturePropertiesBatch,
         updateFeature,
         deleteFeature,
+        deleteFeatures,
         undo,
         buildPayload,
         clearChanges,

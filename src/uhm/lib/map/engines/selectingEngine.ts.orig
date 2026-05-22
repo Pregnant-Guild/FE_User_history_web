@@ -5,7 +5,7 @@ import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
 export function initSelect(
     map: maplibregl.Map,
     getMode: ModeGetter,
-    onDelete?: (id: string | number | (string | number)[]) => void,
+    onDelete?: (id: string | number) => void,
     onEdit?: (feature: maplibregl.MapGeoJSONFeature) => void,
     onDuplicate?: (id: string | number) => void,
     onHide?: (id: string | number) => void,
@@ -261,27 +261,29 @@ export function initSelect(
         };
 
         const selectedCount = selectedIds.size;
+        let hasMenuItems = false;
+
         const effectiveCount = selectedCount || 1;
         const targetId = clickedFeature.id ?? clickedFeature.properties?.id;
         const isClickOutsideSelection = !isRightClickedItemAlreadySelected && hasSelection;
 
-        type MenuItem = {
-            label: string;
-            onClick: () => void;
-            group: "edit" | "bind" | "replay" | "delete";
-        };
-
-        const items: MenuItem[] = [];
-
         if (isClickOutsideSelection && onBindGeometries && targetId !== undefined && targetId !== null) {
             const sourceIds = Array.from(selectedIds);
-            items.push({
-                group: "bind",
-                label: `Bind ${selectedCount} geo đang chọn vào geo này`,
-                onClick: () => {
-                    onBindGeometries(targetId, sourceIds);
-                },
-            });
+            menu.appendChild(
+                createItem(
+                    `Bind ${selectedCount} geo đang chọn vào geo này`,
+                    () => {
+                        onBindGeometries(targetId, sourceIds);
+                    }
+                )
+            );
+            hasMenuItems = true;
+
+            const separator = document.createElement("div");
+            separator.style.height = "1px";
+            separator.style.background = "#374151";
+            separator.style.margin = "4px 0";
+            menu.appendChild(separator);
         }
 
         if (!isClickOutsideSelection) {
@@ -292,74 +294,53 @@ export function initSelect(
                 onEdit
             ) {
                 const single = clickedFeature;
-                items.push({
-                    group: "edit",
-                    label: "Chỉnh sửa",
-                    onClick: () => onEdit(single),
-                });
+                menu.appendChild(createItem("Chỉnh sửa", () => onEdit(single)));
+                hasMenuItems = true;
             }
 
             if (effectiveCount === 1 && onDuplicate && targetId !== undefined && targetId !== null) {
-                items.push({
-                    group: "edit",
-                    label: "Duplicate",
-                    onClick: () => onDuplicate(targetId),
-                });
+                menu.appendChild(createItem("Duplicate", () => onDuplicate(targetId)));
+                hasMenuItems = true;
             }
 
             if (effectiveCount === 1 && onHide && targetId !== undefined && targetId !== null) {
-                items.push({
-                    group: "edit",
-                    label: "Hide",
-                    onClick: () => onHide(targetId),
-                });
+                menu.appendChild(createItem("Hide", () => onHide(targetId)));
+                hasMenuItems = true;
             }
         }
 
         if (onReplayEdit) {
-            const replayId = targetId;
+            const replayId = isClickOutsideSelection ? Array.from(selectedIds)[0] : targetId;
             if (replayId !== undefined && replayId !== null) {
-                const totalCount = isClickOutsideSelection ? selectedIds.size + 1 : effectiveCount;
-                items.push({
-                    group: "replay",
-                    label: totalCount > 1 ? `Vào replay (${totalCount} geo)` : "Vào replay",
-                    onClick: () => onReplayEdit(replayId),
-                });
+                menu.appendChild(
+                    createItem(
+                        effectiveCount > 1 ? `Vào replay (${effectiveCount} geo)` : "Vào replay",
+                        () => onReplayEdit(replayId)
+                    )
+                );
+                hasMenuItems = true;
             }
         }
 
         if (onDelete) {
-            items.push({
-                group: "delete",
-                label: effectiveCount > 1 ? `Xóa ${effectiveCount} mục` : "Xóa",
-                onClick: () => {
-                    const ids = selectedIds.size
-                        ? Array.from(selectedIds)
-                        : [targetId];
-                    if (ids.length === 1) {
-                        onDelete(ids[0]);
-                    } else {
-                        onDelete(ids);
+            menu.appendChild(
+                createItem(
+                    effectiveCount > 1 ? `Xóa ${effectiveCount} mục` : "Xóa",
+                    () => {
+                        const ids = selectedIds.size
+                            ? Array.from(selectedIds)
+                            : [targetId];
+                        ids.forEach((eachId) => {
+                            if (eachId !== undefined && eachId !== null) onDelete(eachId);
+                        });
+                        clearSelection();
                     }
-                    clearSelection();
-                },
-            });
+                )
+            );
+            hasMenuItems = true;
         }
 
-        if (items.length === 0) return;
-
-        let lastGroup: string | null = null;
-        items.forEach((item) => {
-            if (lastGroup !== null && lastGroup !== item.group) {
-                const separator = document.createElement("div");
-                separator.style.height = "1px";
-                separator.style.background = "#374151";
-                separator.style.margin = "4px 0";
-                menu.appendChild(separator);
-            }
-            menu.appendChild(createItem(item.label, item.onClick));
-            lastGroup = item.group;
-        });
+        if (!hasMenuItems) return;
 
         document.body.appendChild(menu);
         contextMenu = menu;
