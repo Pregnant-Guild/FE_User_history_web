@@ -1,7 +1,7 @@
 "use client";
 
 import { FIXED_TIMELINE_END_YEAR, FIXED_TIMELINE_START_YEAR, clampYearValue } from "@/uhm/lib/utils/timeline";
-import styles from "./TimelineBar.module.css";
+import styles from "@/styles/TimelineBar.module.css";
 
 type Props = {
     year: number;

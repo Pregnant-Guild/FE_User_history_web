@@ -17,6 +17,18 @@ export const POINT_GEOTYPE_IDS = [
 
 export type PointGeotypeId = (typeof POINT_GEOTYPE_IDS)[number];
 
+export const POINT_GEOTYPE_ICON_PATHS: Partial<Record<PointGeotypeId, string>> = {
+    person_birthplace: "/images/mapIcon/point/house.png",
+    person_deathplace: "/images/mapIcon/point/tombstone.png",
+    person_activity: "/images/mapIcon/point/flag.png",
+    temple: "/images/mapIcon/point/temple.png",
+    capital: "/images/mapIcon/point/capital.png",
+    city: "/images/mapIcon/point/city.png",
+    fortress: "/images/mapIcon/point/fortress.png",
+    castle: "/images/mapIcon/point/castle.png",
+    ruin: "/images/mapIcon/point/ruin.png",
+};
+
 type PointIconVariant = "default" | "draft";
 
 type PointLayerOptions = {
@@ -36,7 +48,7 @@ const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get",
 const DRAFT_ENTITY_EXPR: maplibregl.ExpressionSpecification = ["==", ["coalesce", ["get", "entity_id"], ""], ""];
 const SELECTED_EXPR: maplibregl.ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
-const ICON_CANVAS_SIZE = 64;
+const ICON_CANVAS_SIZE = 48;
 const DRAFT_FILL = "#ef4444";
 const DRAFT_RIM = "#7f1d1d";
 const POINT_GEOMETRY_FILTER: maplibregl.ExpressionSpecification = [
@@ -141,11 +153,11 @@ export function buildPointGeotypeLayers(
             source: pointSourceId,
             filter: pointFilter(typeId),
             paint: {
-                "circle-color": "#22c55e",
+                "circle-color": config.fill,
                 "circle-radius": ["case", SELECTED_EXPR, haloRadius, 0],
                 "circle-opacity": ["case", SELECTED_EXPR, 0.24, 0],
                 "circle-blur": ["case", SELECTED_EXPR, 0.8, 0],
-                "circle-stroke-color": "#14532d",
+                "circle-stroke-color": config.rim,
                 "circle-stroke-width": ["case", SELECTED_EXPR, 1.6, 0],
                 "circle-stroke-opacity": ["case", SELECTED_EXPR, 0.48, 0],
             },
@@ -197,8 +209,57 @@ export function buildPointGeotypeLayers(
     ];
 }
 
+const preloadedImages: Record<string, HTMLImageElement> = {};
+const loadedImageKeys = new Set<string>();
+const mapsToUpdate = new Set<maplibregl.Map>();
+
+function preloadPointIcons() {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    for (const [typeId, path] of Object.entries(POINT_GEOTYPE_ICON_PATHS)) {
+        if (!preloadedImages[typeId]) {
+            const img = new Image();
+            img.src = path;
+            img.onload = () => {
+                loadedImageKeys.add(typeId);
+                for (const map of mapsToUpdate) {
+                    updateIconsOnMap(map, typeId as PointGeotypeId);
+                }
+            };
+            preloadedImages[typeId] = img;
+        }
+    }
+}
+
+function updateIconsOnMap(map: maplibregl.Map, typeId: PointGeotypeId) {
+    if (!map || !map.getStyle()) return;
+    try {
+        for (const variant of ["default", "draft"] as const) {
+            const iconId = getPointIconId(typeId, variant);
+            const imageData = createPointIconImageData(typeId, variant);
+            if (imageData) {
+                if (map.hasImage(iconId)) {
+                    map.updateImage(iconId, imageData);
+                } else {
+                    map.addImage(iconId, imageData, { pixelRatio: 2 });
+                }
+            }
+        }
+    } catch (err) {
+        console.warn(`Failed to update icon ${typeId} on map:`, err);
+    }
+}
+
 export function ensurePointGeotypeIcons(map: maplibregl.Map): boolean {
     if (typeof document === "undefined") return false;
+
+    preloadPointIcons();
+
+    const missingAny = Object.keys(POINT_GEOTYPE_ICON_PATHS).some(
+        (key) => !loadedImageKeys.has(key)
+    );
+    if (missingAny) {
+        mapsToUpdate.add(map);
+    }
 
     for (const typeId of POINT_GEOTYPE_IDS) {
         for (const variant of ["default", "draft"] as const) {
@@ -271,181 +332,226 @@ function drawGlyphWithOutline(
 }
 
 function drawHouseGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.moveTo(22, 34);
-    ctx.lineTo(32, 24);
-    ctx.lineTo(42, 34);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.rect(25.5, 34, 13, 9);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(32, 43);
-    ctx.lineTo(32, 36.5);
-    ctx.stroke();
-}
-
-function drawMemorialGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3.6;
-    ctx.beginPath();
-    ctx.moveTo(32, 22);
-    ctx.lineTo(32, 43);
-    ctx.moveTo(25, 28.5);
-    ctx.lineTo(39, 28.5);
-    ctx.stroke();
-
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(24, 45);
-    ctx.lineTo(40, 45);
-    ctx.stroke();
-}
-
-function drawFlagGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.moveTo(26, 22);
-    ctx.lineTo(26, 43);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(28, 23);
-    ctx.lineTo(40, 27);
-    ctx.lineTo(28, 31);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(22.5, 44.5);
-    ctx.lineTo(31, 44.5);
-    ctx.stroke();
-}
-
-function drawTempleGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(22, 30);
-    ctx.lineTo(32, 22);
-    ctx.lineTo(42, 30);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(21, 31);
-    ctx.lineTo(43, 31);
-    ctx.moveTo(23, 42);
-    ctx.lineTo(41, 42);
-    ctx.stroke();
-
-    ctx.lineWidth = 2.8;
-    for (const x of [26, 32, 38]) {
+    const img = preloadedImages["person_birthplace"];
+    if (img && loadedImageKeys.has("person_birthplace")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.moveTo(x, 31);
-        ctx.lineTo(x, 42);
+        ctx.moveTo(22, 34);
+        ctx.lineTo(32, 24);
+        ctx.lineTo(42, 34);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.rect(25.5, 34, 13, 9);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(32, 43);
+        ctx.lineTo(32, 36.5);
         ctx.stroke();
     }
 }
 
-function drawCrownGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(22, 41);
-    ctx.lineTo(24.5, 28);
-    ctx.lineTo(30, 34);
-    ctx.lineTo(32, 23);
-    ctx.lineTo(34, 34);
-    ctx.lineTo(39.5, 28);
-    ctx.lineTo(42, 41);
-    ctx.closePath();
-    ctx.stroke();
+function drawMemorialGlyph(ctx: CanvasRenderingContext2D) {
+    const img = preloadedImages["person_deathplace"];
+    if (img && loadedImageKeys.has("person_deathplace")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3.6;
+        ctx.beginPath();
+        ctx.moveTo(32, 22);
+        ctx.lineTo(32, 43);
+        ctx.moveTo(25, 28.5);
+        ctx.lineTo(39, 28.5);
+        ctx.stroke();
 
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(23.5, 41.5);
-    ctx.lineTo(40.5, 41.5);
-    ctx.stroke();
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(24, 45);
+        ctx.lineTo(40, 45);
+        ctx.stroke();
+    }
+}
+
+function drawFlagGlyph(ctx: CanvasRenderingContext2D) {
+    const img = preloadedImages["person_activity"];
+    if (img && loadedImageKeys.has("person_activity")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(26, 22);
+        ctx.lineTo(26, 43);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(28, 23);
+        ctx.lineTo(40, 27);
+        ctx.lineTo(28, 31);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(22.5, 44.5);
+        ctx.lineTo(31, 44.5);
+        ctx.stroke();
+    }
+}
+
+function drawTempleGlyph(ctx: CanvasRenderingContext2D) {
+    const img = preloadedImages["temple"];
+    if (img && loadedImageKeys.has("temple")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(22, 30);
+        ctx.lineTo(32, 22);
+        ctx.lineTo(42, 30);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(21, 31);
+        ctx.lineTo(43, 31);
+        ctx.moveTo(23, 42);
+        ctx.lineTo(41, 42);
+        ctx.stroke();
+
+        ctx.lineWidth = 2.8;
+        for (const x of [26, 32, 38]) {
+            ctx.beginPath();
+            ctx.moveTo(x, 31);
+            ctx.lineTo(x, 42);
+            ctx.stroke();
+        }
+    }
+}
+
+function drawCrownGlyph(ctx: CanvasRenderingContext2D) {
+    const img = preloadedImages["capital"];
+    if (img && loadedImageKeys.has("capital")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(22, 41);
+        ctx.lineTo(24.5, 28);
+        ctx.lineTo(30, 34);
+        ctx.lineTo(32, 23);
+        ctx.lineTo(34, 34);
+        ctx.lineTo(39.5, 28);
+        ctx.lineTo(42, 41);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(23.5, 41.5);
+        ctx.lineTo(40.5, 41.5);
+        ctx.stroke();
+    }
 }
 
 function drawCityGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.fillRect(23, 33, 7, 10);
-    ctx.fillRect(30, 27, 6, 16);
-    ctx.fillRect(36, 30, 6, 13);
+    const img = preloadedImages["city"];
+    if (img && loadedImageKeys.has("city")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.fillRect(23, 33, 7, 10);
+        ctx.fillRect(30, 27, 6, 16);
+        ctx.fillRect(36, 30, 6, 13);
 
-    ctx.clearRect(25, 36, 1.5, 1.5);
-    ctx.clearRect(25, 39, 1.5, 1.5);
-    ctx.clearRect(32, 31, 1.5, 1.5);
-    ctx.clearRect(32, 35, 1.5, 1.5);
-    ctx.clearRect(38, 33, 1.5, 1.5);
-    ctx.clearRect(38, 37, 1.5, 1.5);
+        ctx.clearRect(25, 36, 1.5, 1.5);
+        ctx.clearRect(25, 39, 1.5, 1.5);
+        ctx.clearRect(32, 31, 1.5, 1.5);
+        ctx.clearRect(32, 35, 1.5, 1.5);
+        ctx.clearRect(38, 33, 1.5, 1.5);
+        ctx.clearRect(38, 37, 1.5, 1.5);
+    }
 }
 
 function drawShieldGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.moveTo(32, 22.5);
-    ctx.lineTo(41, 26.5);
-    ctx.lineTo(39, 37.5);
-    ctx.lineTo(32, 43);
-    ctx.lineTo(25, 37.5);
-    ctx.lineTo(23, 26.5);
-    ctx.closePath();
-    ctx.stroke();
+    const img = preloadedImages["fortress"];
+    if (img && loadedImageKeys.has("fortress")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(32, 22.5);
+        ctx.lineTo(41, 26.5);
+        ctx.lineTo(39, 37.5);
+        ctx.lineTo(32, 43);
+        ctx.lineTo(25, 37.5);
+        ctx.lineTo(23, 26.5);
+        ctx.closePath();
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(32, 25);
-    ctx.lineTo(32, 39);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(32, 25);
+        ctx.lineTo(32, 39);
+        ctx.stroke();
+    }
 }
 
 function drawCastleGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.rect(24, 31, 16, 11);
-    ctx.stroke();
+    const img = preloadedImages["castle"];
+    if (img && loadedImageKeys.has("castle")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.rect(24, 31, 16, 11);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(24, 31);
-    ctx.lineTo(24, 26);
-    ctx.lineTo(28, 26);
-    ctx.lineTo(28, 29);
-    ctx.lineTo(32, 29);
-    ctx.lineTo(32, 24);
-    ctx.lineTo(36, 24);
-    ctx.lineTo(36, 29);
-    ctx.lineTo(40, 29);
-    ctx.lineTo(40, 26);
-    ctx.lineTo(44, 26);
-    ctx.lineTo(44, 31);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(24, 31);
+        ctx.lineTo(24, 26);
+        ctx.lineTo(28, 26);
+        ctx.lineTo(28, 29);
+        ctx.lineTo(32, 29);
+        ctx.lineTo(32, 24);
+        ctx.lineTo(36, 24);
+        ctx.lineTo(36, 29);
+        ctx.lineTo(40, 29);
+        ctx.lineTo(40, 26);
+        ctx.lineTo(44, 26);
+        ctx.lineTo(44, 31);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(32, 42);
-    ctx.lineTo(32, 34);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(32, 42);
+        ctx.lineTo(32, 34);
+        ctx.stroke();
+    }
 }
 
 function drawRuinGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.rect(26, 24, 12, 18);
-    ctx.stroke();
+    const img = preloadedImages["ruin"];
+    if (img && loadedImageKeys.has("ruin")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.rect(26, 24, 12, 18);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(24, 24);
-    ctx.lineTo(40, 24);
-    ctx.moveTo(24, 42);
-    ctx.lineTo(40, 42);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(24, 24);
+        ctx.lineTo(40, 24);
+        ctx.moveTo(24, 42);
+        ctx.lineTo(40, 42);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(34, 24);
-    ctx.lineTo(31, 29);
-    ctx.lineTo(35, 33);
-    ctx.lineTo(30, 39);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(34, 24);
+        ctx.lineTo(31, 29);
+        ctx.lineTo(35, 33);
+        ctx.lineTo(30, 39);
+        ctx.stroke();
+    }
 }
 
 function drawAnchorGlyph(ctx: CanvasRenderingContext2D) {
@@ -494,3 +600,5 @@ function drawBridgeGlyph(ctx: CanvasRenderingContext2D) {
     ctx.lineTo(38, 31);
     ctx.stroke();
 }
+
+
