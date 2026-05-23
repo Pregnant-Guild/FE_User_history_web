@@ -232,15 +232,13 @@ function preloadPointIcons() {
 function updateIconsOnMap(map: maplibregl.Map, typeId: PointGeotypeId) {
     if (!map || !map.getStyle()) return;
     try {
-        for (const variant of ["default", "draft"] as const) {
-            const iconId = getPointIconId(typeId, variant);
-            const imageData = createPointIconImageData(typeId, variant);
-            if (imageData) {
-                if (map.hasImage(iconId)) {
-                    map.updateImage(iconId, imageData);
-                } else {
-                    map.addImage(iconId, imageData, { pixelRatio: 2 });
-                }
+        const iconId = getPointIconId(typeId);
+        const imageData = createPointIconImageData(typeId);
+        if (imageData) {
+            if (map.hasImage(iconId)) {
+                map.updateImage(iconId, imageData);
+            } else {
+                map.addImage(iconId, imageData, { pixelRatio: 2 });
             }
         }
     } catch (err) {
