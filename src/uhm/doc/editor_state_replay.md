@@ -8,6 +8,7 @@ Nguồn thật:
 - `src/uhm/lib/editor/state/useEditorState.ts`
 - `src/uhm/lib/editor/project/useProjectCommands.ts`
 - `src/uhm/lib/editor/snapshot/editorSnapshot.ts`
+- `src/uhm/doc/editor_replay_actions.md`
 
 ## 1. Kết luận ngắn
 
@@ -15,7 +16,7 @@ Replay mode hiện tại có 2 lớp state:
 
 - `activeReplayDraft`
   - là `BattleReplay` đang chỉnh
-  - chỉ chứa `geometry_id`, `target_geometry_ids`, `detail`
+  - chỉ chứa `id`, `geometry_id`, `target_geometry_ids`, `detail`
 - `replayDraft`
   - là `FeatureCollection` local, được FE hydrate lại từ `mainDraft + target_geometry_ids`
   - chỉ dùng để map/render/select trong replay mode
@@ -125,6 +126,10 @@ Nên khi `mode === "replay"`:
 - `editor.draftRef` trỏ vào `replayDraftRef`
 - map chỉ render tập geo đang nằm trong `target_geometry_ids`
 
+`editor.draftRef` ở đây là ref nội bộ của editor state; map interaction dùng tên `renderDraftRef` để tránh nhầm với draft commit chính.
+
+Khi `mode === "replay_preview"`, page dùng `previewSession.draft` và replay preview state để tạo `mapRenderDraft` rồi render/ẩn geometry. Mode này không mutate `replayDraft` hoặc `mainDraft`.
+
 ## 7. Replay mode còn sửa geometry không
 
 Không.
@@ -132,7 +137,7 @@ Không.
 Hiện tại state layer đã chặn toàn bộ nhánh mutate geometry trong replay mode:
 
 - `createFeature`
-- `createFeatureWithSnapshotEntities`
+- `createFeatureWithSnapshotEntityRows`
 - `patchFeatureProperties`
 - `patchFeaturePropertiesBatch`
 - `updateFeature`
@@ -160,6 +165,8 @@ Các thay đổi đó đi qua:
 Undo replay vẫn riêng ở:
 
 - `replayUndoStack`
+
+Danh sách action và tuple `params` nằm ở `editor_replay_actions.md`.
 
 ## 9. Khi nào replay được flush về `replays[]`
 

@@ -3,6 +3,13 @@
 Tài liệu này mô tả editor đang chạy tại `src/app/editor/[id]/page.tsx` và các panel liên quan trong `src/uhm/components/`.
 Mục tiêu của tài liệu là phản ánh đúng implementation hiện tại, không mô tả các tính năng chưa được nối dây.
 
+Docs liên quan:
+
+- `src/uhm/doc/editor_operations.md`: ma trận thao tác/undo/snapshot.
+- `src/uhm/doc/editor_snapshot_contract.md`: contract commit snapshot.
+- `src/uhm/doc/editor_manual_test_checklist.md`: checklist test tay.
+- `src/uhm/doc/editor_replay_actions.md`: catalog action replay.
+
 ## 1. Cách mở editor
 
 - `GET /editor/[id]`: mở editor đầy đủ với map, panel trái và panel phải.
@@ -17,7 +24,7 @@ Mục tiêu của tài liệu là phản ánh đúng implementation hiện tại
   - `UndoListPanel`
 - Khu vực giữa
   - `Map`
-  - `TimelineBar` khi không ở `replay`
+  - `TimelineBar` khi không ở `replay`; trong `replay_preview` phụ thuộc action `timeline`
 - Cột phải (`BackgroundLayersPanel`)
   - Search hợp nhất
   - Geometry Binding
@@ -40,6 +47,7 @@ Hai cột hai bên đều resize được bằng drag handle.
 - `add-path`
 - `add-circle`
 - `replay`
+- `replay_preview`
 
 Ý nghĩa thực tế:
 
@@ -49,7 +57,8 @@ Hai cột hai bên đều resize được bằng drag handle.
 - `add-line`: vẽ `LineString`.
 - `add-path`: vẽ `LineString` có render arrow layer cho route.
 - `add-circle`: kéo chuột để tạo polygon hình tròn, có `circle_center` và `circle_radius`.
-- `replay`: hiện là chế độ tập trung vào một geometry và các geometry trong `binding`; chưa có hệ thống script replay UI/map như file schema tham chiếu.
+- `replay`: chế độ tập trung vào một geometry và tập `target_geometry_ids`, có sidebar sửa stage/step/action, preview overlay và undo riêng cho session replay.
+- `replay_preview`: chạy preview từ replay đang edit; action điều khiển camera/timeline/wiki/narrative overlay và hidden geometry ids.
 
 ## 4. Công cụ vẽ và phím điều khiển
 
@@ -161,14 +170,14 @@ Panel phải có `UnifiedSearchBar` với 3 loại search:
 
 - `entity`
   - tìm local + backend theo tên/mô tả
-  - nút `Add` sẽ thêm entity vào `snapshotEntities` dưới dạng `reference`
+  - nút `Add` sẽ thêm entity vào `snapshotEntityRows` dưới dạng `reference`
 - `wiki`
   - tìm backend theo title
   - nút `Add` sẽ thêm wiki vào `snapshotWikis` dưới dạng `reference`
 - `geo`
   - tìm geometry theo tên entity
   - nút `Import` sẽ import geometry vào draft hiện tại
-  - đồng thời thêm entity tương ứng vào `snapshotEntities` nếu chưa có
+  - đồng thời thêm entity tương ứng vào `snapshotEntityRows` nếu chưa có
   - import sẽ tự tắt timeline filter để geometry mới import không bị ẩn
 
 ## 9. Entity và binding
@@ -200,6 +209,14 @@ Panel `ProjectEntityRefsPanel` là nơi bind/unbind entity theo geometry đang c
 - Bind/unbind với geometry khác trong project.
 - Có nút focus để zoom vào geometry trong list binding.
 - Có toggle `Filter`: map chỉ hiển thị geometry liên quan tới selection nếu filter binding đang bật.
+- Row geometry hiển thị chip trạng thái trong panel:
+  - `no entity` nếu geometry chưa bind entity.
+  - `no time` nếu thiếu cả `time_start` và `time_end`.
+  - `partial time` nếu chỉ có một trong hai mốc thời gian.
+  - `timeline` hoặc `out timeline` khi timeline filter đang bật.
+  - `hidden`, `bound`, `new` theo trạng thái UI tương ứng.
+- ID geometry không render trực tiếp trong row; ID chỉ nằm trong `title` tooltip của row/nút thao tác.
+- Geometry mồ côi không có style riêng trên map. Cảnh báo nằm ở panel và validation commit/submit.
 
 ## 10. Wiki và entity-wiki
 
@@ -247,12 +264,14 @@ Số trong nút `Commit` không chỉ là geometry diff. Nó gồm:
 - `+1` nếu danh sách wiki dirty
 - `+1` nếu danh sách entity dirty
 - `+1` nếu danh sách entity-wiki dirty
+- `+1` nếu replay script dirty
 
 ### Commit
 
 `commitSection()`:
 
-- build snapshot từ `draft` + `snapshotEntities` + `snapshotWikis` + `snapshotEntityWikiLinks`
+- build snapshot từ `mainDraft` + `snapshotEntityRows` + `snapshotWikis` + `snapshotEntityWikiLinks` + `effectiveReplays`
+- chặn commit nếu không có thay đổi, còn orphan geometry, hoặc payload vượt guardrail kích thước
 - gửi `snapshot_json` lên API tạo commit
 - nếu thành công:
   - reset baseline sang snapshot vừa commit
@@ -263,11 +282,13 @@ Số trong nút `Commit` không chỉ là geometry diff. Nó gồm:
 
 - chỉ submit được khi project có `head_commit_id`
 - không submit nếu còn thay đổi chưa commit
+- không submit nếu còn orphan geometry
 
 ### Restore
 
 `CommitHistoryPanel` có nút `Restore`, nhưng restore hiện là:
 
+- chỉ chạy khi không còn pending changes
 - load snapshot từ commit cũ vào FE
 - không đổi head commit trên backend
 
@@ -293,4 +314,3 @@ Các mục sau không nên xem là tính năng hiện hành của editor:
 - import/export wiki JSON chuyên biệt như một workflow riêng
 - bộ shortcut toàn cục kiểu `Ctrl+S`, `Ctrl+Z`, `Ctrl+Y`
 - workflow duyệt `Approved/Rejected` được render đầy đủ trong editor page
-- hệ thống replay script theo `replays[]` trong schema snapshot

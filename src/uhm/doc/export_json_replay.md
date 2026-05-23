@@ -5,6 +5,8 @@ Tài liệu này mô tả đúng payload mà nút `Export JSON` của replay đa
 Nguồn thật:
 
 - `src/uhm/components/editor/ReplayTimelineSidebar.tsx`
+- `src/uhm/types/projects.ts`
+- `src/uhm/doc/editor_replay_actions.md`
 
 ## 1. Kết luận ngắn
 

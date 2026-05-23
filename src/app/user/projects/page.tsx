@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import { toast } from "sonner";
 import { useModal } from "@/hooks/useModal";
@@ -11,18 +10,38 @@ import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Badge from "@/components/ui/badge/Badge";
-import { CreateProjectPayload, Project } from "@/interface/project";
+import { CreateProjectPayload, Project, ProjectMember } from "@/interface/project";
 import {
   apiCreateProject,
   apiCreateProjectCommit,
   apiGetProjectCommits,
   getCurrentProject,
 } from "@/service/projectService";
-import { normalizeEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
-import type { EditorSnapshot } from "@/uhm/types/projects";
+import { normalizeEditorSnapshot, toApiEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import type { EditorSnapshot, ProjectCommit } from "@/uhm/types/projects";
 import StickyHeader from "@/components/ui/StickyHeader";
 
 export type ProjectSortColumn = "created_at" | "updated_at" | "title";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function extractProjectCommitList(value: unknown): ProjectCommit[] {
+  let rows: unknown[] = [];
+  if (Array.isArray(value)) {
+    rows = value;
+  } else if (isRecord(value)) {
+    if (Array.isArray(value.items)) {
+      rows = value.items;
+    } else if (Array.isArray(value.data)) {
+      rows = value.data;
+    } else if (isRecord(value.data) && Array.isArray(value.data.items)) {
+      rows = value.data.items;
+    }
+  }
+  return rows.filter((row): row is ProjectCommit => isRecord(row) && typeof row.id === "string");
+}
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -101,10 +120,11 @@ export default function ProjectsPage() {
 
       // Bước 2: Nếu có snapshot, tạo commit ban đầu từ JSON
       if (importSnapshot) {
+        const snapshot = toApiEditorSnapshot(importSnapshot);
         await apiCreateProjectCommit(projectId, {
           edit_summary: `Init project from ${importSnapshotName || "JSON"}`,
-          snapshot_json: importSnapshot as any,
-        } as any);
+          snapshot_json: snapshot,
+        });
         toast.success("Tạo dự án từ JSON thành công!");
       } else {
         toast.success("Tạo dự án mới thành công!");
@@ -138,11 +158,10 @@ export default function ProjectsPage() {
     }
     setIsExportingProjectId(projectId);
     try {
-      const res: any = await apiGetProjectCommits(projectId);
-      const rawList = res?.data?.items ?? res?.data ?? res?.items ?? [];
-      const commits = Array.isArray(rawList) ? rawList : [];
+      const res = await apiGetProjectCommits(projectId);
+      const commits = extractProjectCommitList(res);
       const head =
-        commits.find((c: any) => String(c?.id || "") === headCommitId) || null;
+        commits.find((c) => String(c.id || "") === headCommitId) || null;
       const snapshot = head?.snapshot_json ?? null;
       if (!snapshot) {
         toast.error("Không tìm thấy snapshot_json của head commit.");
@@ -200,12 +219,9 @@ export default function ProjectsPage() {
     }
   };
 
-  const sortedProjects = [...projects].sort((a: any, b: any) => {
-    let valA = a[sortBy];
-    let valB = b[sortBy];
-
-    if (!valA) valA = "";
-    if (!valB) valB = "";
+  const sortedProjects = [...projects].sort((a, b) => {
+    const valA = String(a[sortBy] || "");
+    const valB = String(b[sortBy] || "");
 
     if (valA < valB) return sortOrder === "asc" ? -1 : 1;
     if (valA > valB) return sortOrder === "asc" ? 1 : -1;
@@ -331,7 +347,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                    {sortedProjects.map((project: any) => (
+                    {sortedProjects.map((project) => (
                       <div
                         key={project.id}
                         className="group flex items-center p-5 hover:bg-gray-50 dark:hover:bg-[#161b22]/50 transition-colors"
@@ -383,7 +399,7 @@ export default function ProjectsPage() {
                               <>
                                 {project.members
                                   .slice(0, 4)
-                                  .map((m: any, index: number) =>
+                                  .map((m: ProjectMember, index: number) =>
                                     m.avatar_url ? (
                                       <Image
                                         key={index}

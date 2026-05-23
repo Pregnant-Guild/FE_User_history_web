@@ -23,7 +23,9 @@ type UseMapInteractionProps = {
     mapRef: React.MutableRefObject<maplibregl.Map | null>;
     mode: EditorMode;
     modeRef: React.MutableRefObject<EditorMode>;
-    draftRef: React.MutableRefObject<FeatureCollection>;
+    // Rendered/interacted FeatureCollection from Map.tsx. This may already be filtered by
+    // replay/timeline state, so do not treat it as the canonical commit/edit draft.
+    renderDraftRef: React.MutableRefObject<FeatureCollection>;
     allowGeometryEditing: boolean;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
@@ -40,7 +42,7 @@ export function useMapInteraction({
     mapRef,
     mode,
     modeRef,
-    draftRef,
+    renderDraftRef,
     allowGeometryEditing,
     selectedFeatureIds,
     onSelectFeatureIdsRef,
@@ -153,7 +155,7 @@ export function useMapInteraction({
             allowGeometryEditing
                 ? (feature) => {
                     const rawId = feature.id ?? feature.properties?.id;
-                    const originalFeature = draftRef.current.features.find(
+                    const originalFeature = renderDraftRef.current.features.find(
                         (item) => String(item.properties.id) === String(rawId)
                     );
                     editingEngineRef.current?.beginEditing(
@@ -163,7 +165,7 @@ export function useMapInteraction({
                 : undefined,
             allowGeometryEditing
                 ? (id: string | number) => {
-                    const originalFeature = draftRef.current.features.find(
+                    const originalFeature = renderDraftRef.current.features.find(
                         (item) => String(item.properties.id) === String(id)
                     );
                     if (!originalFeature) return;
@@ -312,7 +314,7 @@ export function useMapInteraction({
             }
 
             const currentFeature =
-                draftRef.current.features.find(
+                renderDraftRef.current.features.find(
                     (item) => String(item.properties.id) === String(rawFeatureId)
                 ) || null;
 

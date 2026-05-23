@@ -11,7 +11,8 @@
  * - Nhiều field root để optional vì frontend còn phải đọc snapshot cũ / partial.
  * - Replay actions trong dữ liệu thật dùng `params: unknown[]` theo positional tuple.
  * - Snapshot replay cũ còn `replay_features` sẽ được FE migrate sang `target_geometry_ids` khi load.
- * - Trước khi gửi API, frontend còn normalize thêm một số field, ví dụ `geometries[].type`.
+ * - Trước khi gửi API, frontend còn normalize thêm một số field, ví dụ
+ *   `time_start/time_end` và `geometries[].type`.
  */
 
 // ---- Root request ----
@@ -53,6 +54,12 @@ export type FeatureProperties = {
     entity_ids?: string[];
     entity_name?: string | null;
     entity_names?: string[];
+    entity_label_candidates?: Array<{
+        id: string;
+        name: string;
+        time_start?: number | null;
+        time_end?: number | null;
+    }>;
     entity_type_id?: string | null;
     point_label?: string | null;
     line_label?: string | null;
@@ -85,6 +92,8 @@ export type EntitySnapshot = {
     operation?: EntitySnapshotOperation;
     name?: string;
     description?: string | null;
+    time_start?: number | null;
+    time_end?: number | null;
 };
 
 export type GeometrySnapshot = {
@@ -267,15 +276,11 @@ export type ReplayGeoFunctionParamTupleDocs = {
         padding?: number,
         duration?: number,
     ];
-    fly_to_geometries: [geometry_ids: string[]];
+    fly_to_geometries: [geometry_ids: string[], duration?: number];
     set_geometry_visibility: [geometry_ids: string[], visible: boolean];
     show_geometries: [geometry_ids: string[]];
     hide_geometries: [geometry_ids: string[]];
-    fit_to_geometries: [
-        geometry_ids: string[],
-        padding?: number,
-        duration?: number,
-    ];
+    fit_to_geometries: [geometry_ids: string[], duration?: number];
     orbit_camera_around_geometry: [
         geometry_id: string,
         zoom?: number,

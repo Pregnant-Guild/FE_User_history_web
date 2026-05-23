@@ -3,15 +3,27 @@
 import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
+import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import { useEditorStore } from "@/uhm/store/editorStore";
 
 type GeometryChoice = {
   id: string;
   label?: string;
-  time_start?: number | null;
-  time_end?: number | null;
+  time_start?: unknown;
+  time_end?: unknown;
   isTimelineVisible?: boolean;
+  isOrphan?: boolean;
+  timeStatus?: GeometryTimeStatus;
+  timelineStatus?: GeometryTimelineStatus;
   isNew?: boolean;
+};
+
+type GeometryTimeStatus = "missing" | "partial" | "complete";
+type GeometryTimelineStatus = "off" | "visible" | "filteredOut";
+type GeometryRow = Required<Pick<GeometryChoice, "id" | "label" | "isOrphan" | "timeStatus" | "timelineStatus" | "isNew">> & {
+  time_start: number | null;
+  time_end: number | null;
+  isTimelineVisible: boolean;
 };
 
 type Props = {
@@ -61,9 +73,12 @@ export default function GeometryBindingPanel({
       .map((g) => ({
         id: g.id.trim(),
         label: (g.label || "").trim(),
-        time_start: typeof g.time_start === "number" ? g.time_start : null,
-        time_end: typeof g.time_end === "number" ? g.time_end : null,
+        time_start: normalizeTimelineYearValue(g.time_start),
+        time_end: normalizeTimelineYearValue(g.time_end),
         isTimelineVisible: Boolean(g.isTimelineVisible),
+        isOrphan: Boolean(g.isOrphan),
+        timeStatus: resolveTimeStatus(g),
+        timelineStatus: resolveTimelineStatus(g),
         isNew: Boolean(g.isNew),
       }));
     cleaned.sort((a, b) => a.id.localeCompare(b.id));
@@ -85,6 +100,31 @@ export default function GeometryBindingPanel({
         return a.id.localeCompare(b.id);
       });
   }, [bindingSet, effectiveSelectedGeometryId, rows]);
+  const summary = useMemo(() => {
+    let orphan = 0;
+    let missingTime = 0;
+    let partialTime = 0;
+    let filteredOut = 0;
+    let hidden = 0;
+
+    for (const row of rows) {
+      if (row.isOrphan) orphan += 1;
+      if (row.timeStatus === "missing") missingTime += 1;
+      if (row.timeStatus === "partial") partialTime += 1;
+      if (row.timelineStatus === "filteredOut") filteredOut += 1;
+      if (geometryVisibility[row.id] === false) hidden += 1;
+    }
+
+    return {
+      total: rows.length,
+      orphan,
+      missingTime,
+      partialTime,
+      timeIssues: missingTime + partialTime,
+      filteredOut,
+      hidden,
+    };
+  }, [geometryVisibility, rows]);
 
   const handleFocusKeyDown = (event: KeyboardEvent<HTMLDivElement>, geometryId: string) => {
     if (!canFocusGeometry) return;
@@ -114,29 +154,72 @@ export default function GeometryBindingPanel({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex",flexDirection: "column", gap: 10, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: "14px", whiteSpace: "nowrap" }}>Geometry Binding</div>
-          <label
+          <div
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              cursor: "pointer",
               userSelect: "none",
             }}
             title={bindingFilterEnabled ? "Đang ẩn geo theo binding" : "Đang hiển thị tất cả geo"}
           >
-            <input
-              type="checkbox"
-              checked={bindingFilterEnabled}
-              onChange={(e) => setGeometryBindingFilterEnabled(e.target.checked)}
-              style={{ width: 14, height: 14 }}
-            />
-            <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>Filter</span>
-          </label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={bindingFilterEnabled}
+              aria-label="Toggle geometry binding filter"
+              onClick={() => setGeometryBindingFilterEnabled(!bindingFilterEnabled)}
+              style={{
+                width: 32,
+                height: 18,
+                padding: 2,
+                borderRadius: 999,
+                border: bindingFilterEnabled ? "1px solid #38bdf8" : "1px solid #334155",
+                background: bindingFilterEnabled ? "rgba(14, 165, 233, 0.32)" : "#111827",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: bindingFilterEnabled ? "flex-end" : "flex-start",
+                transition: "background 140ms ease, border-color 140ms ease",
+              }}
+            >
+              <span
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 999,
+                  background: bindingFilterEnabled ? "#67e8f9" : "#94a3b8",
+                  boxShadow: bindingFilterEnabled ? "0 0 8px rgba(103, 232, 249, 0.45)" : "none",
+                  transition: "background 140ms ease, box-shadow 140ms ease",
+                }}
+              />
+            </button>
+            <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>Filter binding</span>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>{rows.length}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <div style={summaryWrapStyle}>
+            <span style={summaryBadgeStyle} title="Total geometry count">all {summary.total}</span>
+            {summary.orphan > 0 ? (
+              <span style={summaryDangerBadgeStyle} title="Geometry without any bound entity">entity {summary.orphan}</span>
+            ) : null}
+            {summary.timeIssues > 0 ? (
+              <span
+                style={summaryWarningBadgeStyle}
+                title={`Missing time: ${summary.missingTime}; partial time: ${summary.partialTime}`}
+              >
+                time {summary.timeIssues}
+              </span>
+            ) : null}
+            {summary.filteredOut > 0 ? (
+              <span style={summaryMutedBadgeStyle} title="Geometry filtered out by timeline">out {summary.filteredOut}</span>
+            ) : null}
+            {summary.hidden > 0 ? (
+              <span style={summaryMutedBadgeStyle} title="Geometry hidden manually">hidden {summary.hidden}</span>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
@@ -164,8 +247,8 @@ export default function GeometryBindingPanel({
       {collapsed ? null : selectedGeometry ? (
         (() => {
           const isHidden = geometryVisibility[selectedGeometry.id] === false;
-          const idColor = getGeometryIdColor(selectedGeometry);
-          const labelColor = selectedGeometry.isTimelineVisible ? "#22c55e" : "#e5e7eb";
+          const isBound = bindingSet.has(selectedGeometry.id);
+          const title = buildGeometryTitle(selectedGeometry, isHidden, isBound);
           return (
         <div
           style={{
@@ -179,7 +262,7 @@ export default function GeometryBindingPanel({
             opacity: isHidden ? 0.58 : 1,
             boxShadow: "none",
           }}
-          title={selectedGeometry.id}
+          title={title}
           role={canFocusGeometry ? "button" : undefined}
           tabIndex={canFocusGeometry ? 0 : undefined}
           onClick={() => handleFocusGeometry(selectedGeometry.id)}
@@ -198,19 +281,7 @@ export default function GeometryBindingPanel({
             Selected
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: "12px",
-                color: labelColor,
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {selectedGeometry.label || selectedGeometry.id}
-            </span>
-            {isHidden ? <span style={hiddenBadgeStyle}>hidden</span> : null}
+            <GeometryLabel row={selectedGeometry} color="#dbeafe" />
             {selectedGeometry.isNew ? <NewBadge /> : null}
             <button
               type="button"
@@ -225,18 +296,7 @@ export default function GeometryBindingPanel({
               {isHidden ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
-          <div
-            style={{
-              marginTop: 3,
-              fontSize: "11px",
-              color: idColor,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {selectedGeometry.id}
-          </div>
+          <StatusChips row={selectedGeometry} isHidden={isHidden} isBound={isBound} />
         </div>
           );
         })()
@@ -248,8 +308,7 @@ export default function GeometryBindingPanel({
             .map((g) => {
               const isBound = bindingSet.has(g.id);
               const isHidden = geometryVisibility[g.id] === false;
-              const idColor = getGeometryIdColor(g);
-              const labelColor = g.isTimelineVisible ? "#22c55e" : "#e5e7eb";
+              const title = buildGeometryTitle(g, isHidden, isBound);
               return (
                 <div
                   key={g.id}
@@ -269,7 +328,7 @@ export default function GeometryBindingPanel({
                     opacity: isHidden ? 0.55 : canBindToggle ? 1 : 0.75,
                     boxShadow: "none",
                   }}
-                  title={g.id}
+                  title={title}
                   role={canFocusGeometry ? "button" : undefined}
                   tabIndex={canFocusGeometry ? 0 : undefined}
                   onClick={() => handleFocusGeometry(g.id)}
@@ -284,33 +343,10 @@ export default function GeometryBindingPanel({
                         minWidth: 0,
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          color: labelColor,
-                          fontWeight: 700,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {g.label || g.id}
-                      </span>
-                      {isHidden ? <span style={hiddenBadgeStyle}>hidden</span> : null}
-                      {isBound ? <span style={boundBadgeStyle}>bound</span> : null}
+                      <GeometryLabel row={g} />
                       {g.isNew ? <NewBadge /> : null}
                     </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: idColor,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {g.id}
-                    </div>
+                    <StatusChips row={g} isHidden={isHidden} isBound={isBound} />
                   </div>
 
                   <button
@@ -375,7 +411,86 @@ export default function GeometryBindingPanel({
   );
 }
 
-const boundBadgeStyle: CSSProperties = {
+function GeometryLabel({ row, color = "#e5e7eb" }: { row: GeometryRow; color?: string }) {
+  return (
+    <span
+      style={{
+        fontSize: "12px",
+        color,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {row.label || "Geometry"}
+    </span>
+  );
+}
+
+function StatusChips({ row, isHidden, isBound }: { row: GeometryRow; isHidden: boolean; isBound: boolean }) {
+  return (
+    <div style={statusChipRowStyle}>
+      {row.isOrphan ? <span style={dangerBadgeStyle}>no entity</span> : null}
+      {row.timeStatus === "missing" ? <span style={dangerBadgeStyle}>no time</span> : null}
+      {row.timeStatus === "partial" ? <span style={warningBadgeStyle}>partial time</span> : null}
+      {row.timelineStatus === "visible" ? <span style={timelineBadgeStyle}>timeline</span> : null}
+      {row.timelineStatus === "filteredOut" ? <span style={mutedBadgeStyle}>out timeline</span> : null}
+      {isHidden ? <span style={hiddenBadgeStyle}>hidden</span> : null}
+      {isBound ? <span style={boundBadgeStyle}>bound</span> : null}
+    </div>
+  );
+}
+
+function resolveTimeStatus(geometry: GeometryChoice): GeometryTimeStatus {
+  if (geometry.timeStatus === "missing" || geometry.timeStatus === "partial" || geometry.timeStatus === "complete") {
+    return geometry.timeStatus;
+  }
+
+  const hasStart = normalizeTimelineYearValue(geometry.time_start) !== null;
+  const hasEnd = normalizeTimelineYearValue(geometry.time_end) !== null;
+  if (!hasStart && !hasEnd) return "missing";
+  if (!hasStart || !hasEnd) return "partial";
+  return "complete";
+}
+
+function resolveTimelineStatus(geometry: GeometryChoice): GeometryTimelineStatus {
+  if (
+    geometry.timelineStatus === "off" ||
+    geometry.timelineStatus === "visible" ||
+    geometry.timelineStatus === "filteredOut"
+  ) {
+    return geometry.timelineStatus;
+  }
+
+  return geometry.isTimelineVisible ? "visible" : "off";
+}
+
+function buildGeometryTitle(row: GeometryRow, isHidden: boolean, isBound: boolean): string {
+  const parts = [`ID: ${row.id}`];
+
+  if (row.isOrphan) parts.push("Orphan");
+  if (row.timeStatus === "missing") parts.push("Missing time");
+  if (row.timeStatus === "partial") parts.push("Partial time");
+  if (row.timelineStatus === "visible") parts.push("Timeline visible");
+  if (row.timelineStatus === "filteredOut") parts.push("Filtered out by timeline");
+  if (isHidden) parts.push("Hidden");
+  if (isBound) parts.push("Bound");
+  if (row.isNew) parts.push("New");
+
+  return parts.join(" | ");
+}
+
+const summaryWrapStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 4,
+  minWidth: 0,
+  flexWrap: "wrap",
+};
+
+const baseBadgeStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -383,32 +498,91 @@ const boundBadgeStyle: CSSProperties = {
   height: 17,
   padding: "0 6px",
   borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 900,
+  lineHeight: 1,
+  textTransform: "uppercase",
+  letterSpacing: 0,
+  whiteSpace: "nowrap",
+};
+
+const summaryBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  background: "rgba(15, 23, 42, 0.9)",
+  color: "#cbd5e1",
+};
+
+const summaryDangerBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(248, 113, 113, 0.5)",
+  background: "rgba(127, 29, 29, 0.32)",
+  color: "#fecaca",
+};
+
+const summaryWarningBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(250, 204, 21, 0.48)",
+  background: "rgba(113, 63, 18, 0.3)",
+  color: "#fde68a",
+};
+
+const summaryMutedBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(148, 163, 184, 0.4)",
+  background: "rgba(51, 65, 85, 0.32)",
+  color: "#cbd5e1",
+};
+
+const statusChipRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 4,
+  marginTop: 5,
+  minHeight: 17,
+};
+
+const dangerBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(248, 113, 113, 0.5)",
+  background: "rgba(127, 29, 29, 0.28)",
+  color: "#fecaca",
+};
+
+const warningBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(250, 204, 21, 0.5)",
+  background: "rgba(113, 63, 18, 0.28)",
+  color: "#fde68a",
+};
+
+const timelineBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(34, 197, 94, 0.5)",
+  background: "rgba(20, 83, 45, 0.3)",
+  color: "#bbf7d0",
+};
+
+const mutedBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
+  border: "1px solid rgba(148, 163, 184, 0.45)",
+  background: "rgba(71, 85, 105, 0.28)",
+  color: "#cbd5e1",
+};
+
+const boundBadgeStyle: CSSProperties = {
+  ...baseBadgeStyle,
   border: "1px solid rgba(45, 212, 191, 0.5)",
   background: "rgba(20, 184, 166, 0.18)",
   color: "#99f6e4",
-  fontSize: 10,
-  fontWeight: 900,
-  lineHeight: 1,
-  textTransform: "uppercase",
-  letterSpacing: 0,
 };
 
 const hiddenBadgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flex: "0 0 auto",
-  height: 17,
-  padding: "0 6px",
-  borderRadius: 999,
+  ...baseBadgeStyle,
   border: "1px solid rgba(148, 163, 184, 0.45)",
   background: "rgba(71, 85, 105, 0.32)",
   color: "#cbd5e1",
-  fontSize: 10,
-  fontWeight: 900,
-  lineHeight: 1,
-  textTransform: "uppercase",
-  letterSpacing: 0,
 };
 
 const iconButtonStyle: CSSProperties = {
@@ -423,14 +597,6 @@ const iconButtonStyle: CSSProperties = {
   cursor: "pointer",
   flex: "0 0 auto",
 };
-
-function getGeometryIdColor(geometry: GeometryChoice): string {
-  const hasStart = typeof geometry.time_start === "number";
-  const hasEnd = typeof geometry.time_end === "number";
-  if (!hasStart && !hasEnd) return "#f87171";
-  if (!hasStart || !hasEnd) return "#facc15";
-  return "#94a3b8";
-}
 
 function EyeIcon() {
   return (

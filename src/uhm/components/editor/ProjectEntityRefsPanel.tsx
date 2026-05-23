@@ -22,7 +22,7 @@ export default function ProjectEntityRefsPanel({
   onToggleBindEntityForSelectedGeometry,
 }: Props) {
   const {
-    snapshotEntities,
+    snapshotEntityRows,
     entityForm,
     setEntityForm,
     isEntitySubmitting,
@@ -30,7 +30,7 @@ export default function ProjectEntityRefsPanel({
     selectedGeometryEntityIds,
   } = useEditorStore(
     useShallow((state) => ({
-      snapshotEntities: state.snapshotEntities,
+      snapshotEntityRows: state.snapshotEntityRows,
       entityForm: state.entityForm,
       setEntityForm: state.setEntityForm,
       isEntitySubmitting: state.isEntitySubmitting,
@@ -53,14 +53,14 @@ export default function ProjectEntityRefsPanel({
   );
   const entityRefs = useMemo(() => {
     const byId = new globalThis.Map<string, EntitySnapshot>();
-    for (const ref of snapshotEntities || []) {
+    for (const ref of snapshotEntityRows || []) {
       const id = String(ref?.id || "").trim();
       if (!id || byId.has(id)) continue;
       if (ref.operation === "delete") continue;
       byId.set(id, ref);
     }
     return Array.from(byId.values());
-  }, [snapshotEntities]);
+  }, [snapshotEntityRows]);
   const sortedEntityRefs = useMemo(() => {
     const rows = [...(entityRefs || [])];
     rows.sort((a, b) => {

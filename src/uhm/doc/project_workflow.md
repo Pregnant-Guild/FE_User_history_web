@@ -60,7 +60,7 @@ Phần nó thật sự quan tâm là:
 ### Bước 1: load baseline
 
 - `baselineSnapshot` lấy từ head commit hoặc commit được restore
-- `initialData` lấy từ `baselineSnapshot.editor_feature_collection`
+- `baselineFeatureCollection` lấy từ `baselineSnapshot.editor_feature_collection`
 - `useEditorState()` reset draft và undo
 
 ### Bước 2: chỉnh sửa cục bộ
@@ -71,6 +71,7 @@ User có thể sửa:
 - entity snapshot
 - wiki snapshot
 - entity-wiki snapshot
+- replay script
 
 Tất cả thay đổi lúc này mới chỉ ở memory của frontend.
 
@@ -80,6 +81,7 @@ Tất cả thay đổi lúc này mới chỉ ở memory của frontend.
 
 - đã mở được project
 - `pendingSaveCount > 0`
+- không còn orphan geometry
 
 Luồng commit:
 
@@ -91,7 +93,7 @@ Luồng commit:
    - refresh `projectState`
    - refresh `sectionCommits`
    - cập nhật `baselineSnapshot`
-   - set `initialData = editor.draft`
+   - set `baselineFeatureCollection = editor.mainDraft`
    - `editor.clearChanges()`
    - clear `commitTitle`
 
@@ -102,6 +104,7 @@ Luồng commit:
 - project đang mở
 - có `head_commit_id`
 - `pendingSaveCount === 0`
+- không còn orphan geometry
 
 Frontend sẽ lấy latest commit từ project hiện tại rồi tạo submission mới.
 
@@ -109,6 +112,7 @@ Frontend sẽ lấy latest commit từ project hiện tại rồi tạo submissi
 
 Nút `Restore` trong `CommitHistoryPanel` hiện là restore phía frontend:
 
+- chỉ chạy khi `pendingSaveCount === 0`
 - tải commit list mới nhất
 - lấy snapshot của commit được chọn
 - normalize snapshot
@@ -128,9 +132,10 @@ Nói cách khác, đây là `load snapshot into editor`, không phải `server-s
 
 - `draft`
 - `changes`
-- `snapshotEntities`
+- `snapshotEntityRows`
 - `snapshotWikis`
 - `snapshotEntityWikiLinks`
+- `effectiveReplays`
 - `previousSnapshot`
 
 và sinh ra:
@@ -141,12 +146,14 @@ và sinh ra:
 - `geometry_entity`
 - `wikis`
 - `entity_wiki`
+- `replays`
 
 Các điểm quan trọng:
 
 - geometry many-to-many với entity được persist ở `geometry_entity[]`
 - denormalized fields trên feature như `entity_ids`, `entity_name`, `binding`, `time_start` sẽ bị strip khỏi `editor_feature_collection` trước khi gửi API
 - wiki/entity/link được chuẩn hóa lại thành `reference`, `binding`, `delete`, `create`, `update` tùy baseline
+- replay script được persist ở `replays[]`; `replayDraft` không được gửi
 
 ## 7. Dirty state mà user nhìn thấy
 
@@ -158,6 +165,7 @@ Nó gồm:
 - cộng thêm 1 nếu entity dirty
 - cộng thêm 1 nếu wiki dirty
 - cộng thêm 1 nếu entity-wiki dirty
+- cộng thêm 1 nếu replay dirty
 
 Vì vậy:
 

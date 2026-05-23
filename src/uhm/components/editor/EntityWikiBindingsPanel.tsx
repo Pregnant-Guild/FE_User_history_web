@@ -31,13 +31,13 @@ function wikiTitle(w: WikiSnapshot): string {
 export default function EntityWikiBindingsPanel({ setLinks }: Props) {
   const {
     entityCatalog,
-    snapshotEntities,
+    snapshotEntityRows,
     wikis,
     links,
   } = useEditorStore(
     useShallow((state) => ({
       entityCatalog: state.entityCatalog,
-      snapshotEntities: state.snapshotEntities,
+      snapshotEntityRows: state.snapshotEntityRows,
       wikis: state.snapshotWikis,
       links: state.snapshotEntityWikiLinks,
     }))
@@ -59,18 +59,18 @@ export default function EntityWikiBindingsPanel({ setLinks }: Props) {
   );
 
   const entityChoices = useMemo<EntityChoice[]>(() => {
-    const visibleSnapshotEntities = new globalThis.Map<string, { id: string; name: string; isNew: boolean }>();
-    for (const ref of snapshotEntities || []) {
+    const visibleSnapshotEntityRows = new globalThis.Map<string, { id: string; name: string; isNew: boolean }>();
+    for (const ref of snapshotEntityRows || []) {
       const id = String(ref?.id || "").trim();
-      if (!id || ref?.operation === "delete" || visibleSnapshotEntities.has(id)) continue;
-      visibleSnapshotEntities.set(id, {
+      if (!id || ref?.operation === "delete" || visibleSnapshotEntityRows.has(id)) continue;
+      visibleSnapshotEntityRows.set(id, {
         id,
         name: String(ref?.name || id),
         isNew: ref?.source === "inline" && ref?.operation === "create",
       });
     }
 
-    const rows = Array.from(visibleSnapshotEntities.values()).map((entity) => {
+    const rows = Array.from(visibleSnapshotEntityRows.values()).map((entity) => {
       const found = entityCatalog.find((item) => String(item.id) === entity.id) || null;
       return {
         id: entity.id,
@@ -80,7 +80,7 @@ export default function EntityWikiBindingsPanel({ setLinks }: Props) {
     });
     rows.sort((a, b) => a.name.localeCompare(b.name));
     return rows;
-  }, [entityCatalog, snapshotEntities]);
+  }, [entityCatalog, snapshotEntityRows]);
 
   const activeLinks = useMemo(() => {
     const set = new Set<string>();

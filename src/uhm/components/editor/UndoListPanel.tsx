@@ -49,6 +49,7 @@ export function formatUndoLabel(action: UndoAction) {
         case "snapshot_wikis":
         case "snapshot_entity_wiki":
         case "replay":
+        case "replays":
         case "replay_session":
         case "group":
             return action.label;

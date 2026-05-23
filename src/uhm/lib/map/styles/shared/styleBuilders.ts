@@ -1,17 +1,9 @@
 import maplibregl, { LayerSpecification } from "maplibre-gl";
 
 const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get", "type"], ["get", "entity_type_id"], ""];
-const DRAFT_ENTITY_EXPR: maplibregl.ExpressionSpecification = [
-    "all",
-    ["==", ["coalesce", ["get", "entity_id"], ""], ""],
-    ["!", ["has", "binding"]]
-];
 const SELECTED_EXPR: maplibregl.ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
 const SELECTED_COLOR = "#22c55e";
-const SELECTED_STROKE = "#14532d";
-const DRAFT_COLOR = "#ef4444";
-const DRAFT_STROKE = "#7f1d1d";
 
 type ZoomStops = {
     z1: number;
@@ -177,8 +169,6 @@ function statusColor(normalColor: string): maplibregl.ExpressionSpecification {
         "case",
         SELECTED_EXPR,
         SELECTED_COLOR,
-        DRAFT_ENTITY_EXPR,
-        DRAFT_COLOR,
         normalColor,
     ];
 }
@@ -188,19 +178,12 @@ function statusStroke(normalColor: string): maplibregl.ExpressionSpecification {
         "case",
         SELECTED_EXPR,
         SELECTED_COLOR,
-        DRAFT_ENTITY_EXPR,
-        DRAFT_STROKE,
         normalColor,
     ];
 }
 
-function statusFillColor(normalColor: string): maplibregl.ExpressionSpecification {
-    return [
-        "case",
-        DRAFT_ENTITY_EXPR,
-        DRAFT_COLOR,
-        normalColor,
-    ];
+function statusFillColor(normalColor: string): string {
+    return normalColor;
 }
 
 function lineFilter(typeId: string): maplibregl.ExpressionSpecification {

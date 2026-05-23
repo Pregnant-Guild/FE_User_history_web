@@ -11,7 +11,7 @@ Map hiện có hai nhóm style tách biệt:
 
 ### Background/base map
 
-Định nghĩa trong `useMapLayers.ts` qua `getBaseMapStyle()`.
+`getBaseMapStyle()` chỉ tạo skeleton style có `background` layer và Goong glyph proxy. Raster/vector background thật được thêm sau khi map load qua `mapUtils.ts` và `tiles.ts`.
 
 ### Geotype style
 
@@ -22,24 +22,23 @@ Map hiện có hai nhóm style tách biệt:
 Danh sách layer toggle được expose ở `backgroundLayers.ts`:
 
 - `raster-base-layer`
-- `graticules-line`
-- `land`
-- `bg-countries-fill`
 - `bg-country-borders-line`
+- `bg-province-borders-line`
+- `bg-district-borders-line`
 - `country-labels`
-- `regions-line`
-- `lakes-fill`
 - `rivers-line`
-- `geolines-line`
 
 Lưu ý:
 
-- không phải layer nào trong list cũng nhất thiết được add từ cùng một source path trong tương lai
+- `raster-base-layer` là layer raster lazy-add từ `goong_satellite.json`
+- các nhóm còn lại là overlay layer clone từ `goong_map_web.json`
+- overlay layer thật có id dạng `goong-...`, nhưng metadata `uhmBackgroundGroupId` trỏ về toggle id ở trên
 - `BackgroundLayersPanel` chỉ biết toggle theo `id`
 
 Visibility mặc định:
 
-- tất cả `true`
+- `raster-base-layer`, `bg-country-borders-line`, `country-labels`, `rivers-line` bật
+- `bg-province-borders-line`, `bg-district-borders-line` tắt
 - được persist bằng `uhm.backgroundLayerVisibility.v1`
 
 ## 3. Geotype registry
@@ -77,7 +76,7 @@ Các type đang được register:
 - `port`
 - `bridge`
 
-`GEOMETRY_TYPE_OPTIONS` trong `geometryTypeOptions.ts` phải khớp với tập geotype này nếu muốn user chọn được từ UI.
+`GEOMETRY_TYPE_OPTIONS` trong `src/uhm/lib/map/geo/geometryTypeOptions.ts` phải khớp với tập geotype này nếu muốn user chọn được từ UI.
 
 ## 4. Type matching
 
@@ -119,6 +118,8 @@ Point geotype dùng icon pipeline trong:
 - `shared/pointStyle.ts`
 - `ensurePointGeotypeIcons(map)`
 
+Icon point hiện chọn theo geotype bình thường. Không còn branch icon/style riêng cho draft-orphan geometry.
+
 Điều này có nghĩa là khi thêm geotype point mới, chỉ thêm layer là chưa đủ; cần chắc icon/style builder cũng hiểu type mới đó.
 
 ## 7. Preview và edit styling
@@ -157,6 +158,8 @@ Có ba lớp filter hiển thị trong runtime:
 3. binding filter / replay filter / timeline filter ở phía data trước khi set source
 
 Vì vậy khi một geometry "không hiện", có thể nguyên nhân nằm ở data filtering chứ không phải style layer.
+
+Geometry không bind entity không có màu/icon riêng trên map. Trạng thái orphan/time/timeline nằm trong `GeometryBindingPanel`, còn map chỉ giữ style geotype + selected/focus/edit states.
 
 ## 9. Thêm geotype mới - checklist đúng với code hiện tại
 

@@ -1,3 +1,5 @@
+import type { EditorSnapshot } from "@/uhm/types/projects";
+
 export interface Project {
   id: string;
   title: string;
@@ -14,9 +16,9 @@ export interface Project {
     display_name: string;
     avatar_url: string;
   };
-  commits?: any[];
+  commits?: unknown[];
   // Legacy (old BE): submission_ids
-  submission_ids?: any[];
+  submission_ids?: string[];
   // New BE: lightweight submissions list on project response
   submissions?: Array<{ id: string; status: string }>;
   members?: ProjectMember[];
@@ -63,7 +65,7 @@ export interface GetProjectsParams {
 }
 export interface CreateCommitPayload {
   edit_summary: string;
-  snapshot_json: number[]; 
+  snapshot_json: EditorSnapshot;
 }
 export interface RestoreCommitPayload {
   commit_id: string;

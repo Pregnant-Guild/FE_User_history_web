@@ -56,6 +56,7 @@ let quillLinkSanitizePatched = false;
 type Props = {
   projectId: string;
   setWikis: React.Dispatch<React.SetStateAction<WikiSnapshot[]>>;
+  onRemoveWiki?: (wikiId: string) => void;
 };
 
 function clampTitle(title: string) {
@@ -63,7 +64,7 @@ function clampTitle(title: string) {
   return t.length ? t.slice(0, 120) : "Untitled wiki";
 }
 
-export default function WikiSidebarPanel({ projectId, setWikis }: Props) {
+export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: Props) {
   const { wikis, requestedActiveId } = useEditorStore(
     useShallow((state) => ({
       wikis: state.snapshotWikis,
@@ -252,7 +253,11 @@ export default function WikiSidebarPanel({ projectId, setWikis }: Props) {
   };
 
   const removeWiki = (id: string) => {
-    setWikis((prev) => prev.filter((w) => w.id !== id));
+    if (onRemoveWiki) {
+      onRemoveWiki(id);
+    } else {
+      setWikis((prev) => prev.filter((w) => w.id !== id));
+    }
     if (activeId === id) setActiveId(null);
   };
 

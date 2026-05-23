@@ -1,5 +1,6 @@
 import { DEFAULT_GEOMETRY_TYPE_ID } from "@/uhm/lib/map/geo/geometryTypeOptions";
 import { normalizeGeoTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
+import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
@@ -94,6 +95,11 @@ function getRefId(value: unknown): string {
     return typeof value.id === "string" ? value.id : "";
 }
 
+function normalizeApiTimeFields(row: UnknownRecord): void {
+    if ("time_start" in row) row.time_start = normalizeTimelineYearValue(row.time_start);
+    if ("time_end" in row) row.time_end = normalizeTimelineYearValue(row.time_end);
+}
+
 export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
     if (!isRecord(raw)) return null;
     const snapshot = raw as UnknownRecord;
@@ -126,8 +132,8 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     operation,
                     name: typeof e.name === "string" ? e.name : undefined,
                     description: typeof e.description === "string" ? e.description : e.description == null ? undefined : undefined,
-                    time_start: typeof e.time_start === "number" ? e.time_start : e.time_start == null ? undefined : undefined,
-                    time_end: typeof e.time_end === "number" ? e.time_end : e.time_end == null ? undefined : undefined,
+                    time_start: normalizeTimelineYearValue(e.time_start) ?? undefined,
+                    time_end: normalizeTimelineYearValue(e.time_end) ?? undefined,
                 };
             })
         : undefined;
@@ -156,8 +162,8 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     draw_geometry: row.draw_geometry as GeometrySnapshot["draw_geometry"],
                     geometry: row.geometry as GeometrySnapshot["geometry"],
                     binding: Array.isArray(row.binding) ? row.binding as string[] : undefined,
-                    time_start: typeof row.time_start === "number" ? row.time_start : row.time_start == null ? undefined : undefined,
-                    time_end: typeof row.time_end === "number" ? row.time_end : row.time_end == null ? undefined : undefined,
+                    time_start: normalizeTimelineYearValue(row.time_start) ?? undefined,
+                    time_end: normalizeTimelineYearValue(row.time_end) ?? undefined,
                     bbox: isRecord(row.bbox)
                         ? {
                             min_lng: Number(row.bbox.min_lng),
@@ -278,8 +284,8 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             const name = typeof row.name === "string" ? String(row.name).trim() : "";
             if (name) entityNameById.set(id, name);
             entityTimeById.set(id, {
-                time_start: typeof row.time_start === "number" ? row.time_start : null,
-                time_end: typeof row.time_end === "number" ? row.time_end : null,
+                time_start: normalizeTimelineYearValue(row.time_start),
+                time_end: normalizeTimelineYearValue(row.time_end),
             });
         }
         const geometryById = new Map<string, GeometrySnapshot>();
@@ -293,6 +299,18 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             const gid = String(feature.properties.id);
             const entity_ids = byGeom.get(gid) || [];
             const p = feature.properties as unknown as UnknownRecord;
+            const existingTimeStart = normalizeTimelineYearValue(p.time_start);
+            const existingTimeEnd = normalizeTimelineYearValue(p.time_end);
+            if (existingTimeStart !== null) {
+                p.time_start = existingTimeStart;
+            } else {
+                delete p.time_start;
+            }
+            if (existingTimeEnd !== null) {
+                p.time_end = existingTimeEnd;
+            } else {
+                delete p.time_end;
+            }
 
             const existingTypeKey = normalizeGeoTypeKey(p.type) || normalizeGeoTypeKey(p.entity_type_id);
             const fallbackTypeKey = getDefaultTypeIdForFeature(feature);
@@ -334,8 +352,18 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     || fallbackTypeKey;
                 if (typeKey) p.type = typeKey;
                 if (Array.isArray(geo.binding) && geo.binding.length) p.binding = geo.binding;
-                if (typeof geo.time_start === "number") p.time_start = geo.time_start;
-                if (typeof geo.time_end === "number") p.time_end = geo.time_end;
+                const timeStart = normalizeTimelineYearValue(geo.time_start);
+                const timeEnd = normalizeTimelineYearValue(geo.time_end);
+                if (timeStart !== null) {
+                    p.time_start = timeStart;
+                } else {
+                    delete p.time_start;
+                }
+                if (timeEnd !== null) {
+                    p.time_end = timeEnd;
+                } else {
+                    delete p.time_end;
+                }
             } else if (!existingTypeKey) {
                 p.type = fallbackTypeKey;
             }
@@ -359,7 +387,7 @@ export function buildEditorSnapshot(options: {
     project: Project;
     draft: FeatureCollection;
     changes: Change[];
-    snapshotEntities: EntitySnapshot[];
+    snapshotEntityRows: EntitySnapshot[];
     snapshotWikis: WikiSnapshot[];
     snapshotEntityWikiLinks: EntityWikiLinkSnapshot[];
     replays: BattleReplay[];
@@ -410,11 +438,11 @@ export function buildEditorSnapshot(options: {
             operation: "reference",
             name: typeof cloned.name === "string" ? cloned.name : undefined,
             description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
-            time_start: typeof cloned.time_start === "number" ? cloned.time_start : cloned.time_start ?? undefined,
-            time_end: typeof cloned.time_end === "number" ? cloned.time_end : cloned.time_end ?? undefined,
+            time_start: normalizeTimelineYearValue(cloned.time_start) ?? undefined,
+            time_end: normalizeTimelineYearValue(cloned.time_end) ?? undefined,
         });
     }
-    for (const row of options.snapshotEntities || []) {
+    for (const row of options.snapshotEntityRows || []) {
         if (!row) continue;
         const id = typeof row.id === "string" || typeof row.id === "number" ? String(row.id) : "";
         if (!id) continue;
@@ -435,8 +463,8 @@ export function buildEditorSnapshot(options: {
             name,
             operation,
             description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
-            time_start: typeof cloned.time_start === "number" ? cloned.time_start : cloned.time_start ?? undefined,
-            time_end: typeof cloned.time_end === "number" ? cloned.time_end : cloned.time_end ?? undefined,
+            time_start: normalizeTimelineYearValue(cloned.time_start) ?? undefined,
+            time_end: normalizeTimelineYearValue(cloned.time_end) ?? undefined,
         });
     }
 
@@ -483,6 +511,8 @@ export function buildEditorSnapshot(options: {
                         : "reference";
         const bbox = getFeatureBBox(feature);
         const typeKey = normalizeGeoTypeKey(feature.properties.type) || getDefaultTypeIdForFeature(feature);
+        const timeStart = normalizeTimelineYearValue(feature.properties.time_start);
+        const timeEnd = normalizeTimelineYearValue(feature.properties.time_end);
         return {
             id,
             operation,
@@ -490,8 +520,8 @@ export function buildEditorSnapshot(options: {
             type: typeKey,
             draw_geometry: feature.geometry,
             binding: normalizeFeatureBindingIds(feature),
-            time_start: feature.properties.time_start ?? null,
-            time_end: feature.properties.time_end ?? null,
+            time_start: timeStart,
+            time_end: timeEnd,
             bbox: bbox
                 ? {
                     min_lng: bbox.minLng,
@@ -689,8 +719,8 @@ export function buildEditorSnapshot(options: {
                 operation: e.operation,
                 name: typeof e.name === "string" ? e.name : undefined,
                 description: typeof (e as RawEntityRow).description === "string" ? (e as RawEntityRow).description : (e as RawEntityRow).description ?? null,
-                time_start: typeof e.time_start === "number" ? e.time_start : e.time_start ?? undefined,
-                time_end: typeof e.time_end === "number" ? e.time_end : e.time_end ?? undefined,
+                time_start: normalizeTimelineYearValue(e.time_start) ?? undefined,
+                time_end: normalizeTimelineYearValue(e.time_end) ?? undefined,
             }))
             .sort((a, b) => String(a.id).localeCompare(String(b.id))),
         geometries: geometries.slice().sort((a, b) => String(a.id).localeCompare(String(b.id))),
@@ -713,11 +743,31 @@ export function buildEditorSnapshot(options: {
 export function toApiEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
     const cloned = JSON.parse(JSON.stringify(snapshot)) as EditorSnapshot;
 
+    if (Array.isArray(cloned.editor_feature_collection?.features)) {
+        cloned.editor_feature_collection.features = cloned.editor_feature_collection.features.map((feature) => {
+            const properties = { ...(feature.properties as unknown as UnknownRecord) };
+            normalizeApiTimeFields(properties);
+            return {
+                ...feature,
+                properties: properties as unknown as Feature["properties"],
+            };
+        });
+    }
+
+    if (Array.isArray(cloned.entities)) {
+        cloned.entities = cloned.entities.map((entity) => {
+            const row = { ...(entity as unknown as UnknownRecord) };
+            normalizeApiTimeFields(row);
+            return row as unknown as EntitySnapshot;
+        });
+    }
+
     if (Array.isArray(cloned.geometries)) {
         cloned.geometries = cloned.geometries.map((geometry) => {
             const row = { ...(geometry as unknown as UnknownRecord) };
             const typeKey = normalizeGeoTypeKey(row.type) || normalizeGeoTypeKey(row.geo_type);
             delete row.geo_type;
+            normalizeApiTimeFields(row);
 
             if (typeKey) {
                 const typeCode = typeKeyToGeoTypeCode(typeKey);
@@ -846,6 +896,7 @@ function normalizeReplayUiOption(value: unknown): UIOptionName | null {
         case "timeline":
         case "layer_panel":
         case "wiki_panel":
+        case "close_wiki_panel":
         case "zoom_panel":
         case "wiki":
         case "toast":
@@ -910,6 +961,7 @@ function normalizeReplayMapFunctionName(value: unknown): MapFunctionName | null 
         case "toggle_labels":
         case "show_labels":
         case "hide_labels":
+        case "show_all_geometries":
         case "reset_camera_north":
             return value;
         default:
@@ -958,10 +1010,15 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
 function normalizeReplayNarrativeFunctionName(value: unknown): NarrativeFunctionName | null {
     switch (value) {
         case "set_title":
+        case "clear_title":
         case "set_descriptions":
+        case "clear_descriptions":
         case "show_dialog_box":
+        case "clear_dialog_box":
         case "display_historical_image":
+        case "clear_historical_image":
         case "set_step_subtitle":
+        case "clear_step_subtitle":
             return value;
         default:
             return null;

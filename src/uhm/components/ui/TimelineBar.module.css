@@ -214,9 +214,19 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
   user-select: none;
   transition: opacity 0.2s;
+}
+
+.toggleContainer:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.8);
+  outline-offset: 3px;
+  border-radius: 999px;
 }
 
 .toggleTrack {

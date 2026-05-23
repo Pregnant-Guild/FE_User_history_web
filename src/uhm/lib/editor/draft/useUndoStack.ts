@@ -96,6 +96,10 @@ function isSameUndo(a: UndoAction | undefined, b: UndoAction) {
                 && JSON.stringify(a.prevReplay) === JSON.stringify(next.prevReplay)
             );
         }
+        case "replays": {
+            const next = b as Extract<UndoAction, { type: "replays" }>;
+            return a.label === next.label && JSON.stringify(a.prevReplays) === JSON.stringify(next.prevReplays);
+        }
         case "replay_session": {
             const next = b as Extract<UndoAction, { type: "replay_session" }>;
             return (

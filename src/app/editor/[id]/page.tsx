@@ -52,7 +52,7 @@ import {
     scaleImageOverlayCoordinatesByFactor,
     type MapImageOverlay,
 } from "@/uhm/components/map/imageOverlay";
-import { FIXED_TIMELINE_RANGE, clampYearToFixedRange } from "@/uhm/lib/utils/timeline";
+import { FIXED_TIMELINE_RANGE, clampYearToFixedRange, normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import { useFeatureCommands } from "./featureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
@@ -126,7 +126,7 @@ function EditorPageContent() {
     const {
         mode,
         internalSetMode,
-        initialData,
+        baselineFeatureCollection,
         isSaving,
         isSubmitting,
         isOpeningSection,
@@ -139,8 +139,8 @@ function EditorPageContent() {
         baselineSnapshot,
         entityCatalog,
         setEntityCatalog,
-        snapshotEntities,
-        setSnapshotEntities,
+        snapshotEntityRows,
+        setSnapshotEntityRows,
         entityStatus,
         setEntityStatus,
         selectedFeatureIds,
@@ -203,7 +203,7 @@ function EditorPageContent() {
     } = useEditorStore(useShallow((state) => ({
         mode: state.mode,
         internalSetMode: state.setMode,
-        initialData: state.initialData,
+        baselineFeatureCollection: state.baselineFeatureCollection,
         isSaving: state.isSaving,
         isSubmitting: state.isSubmitting,
         isOpeningSection: state.isOpeningSection,
@@ -216,8 +216,8 @@ function EditorPageContent() {
         baselineSnapshot: state.baselineSnapshot,
         entityCatalog: state.entityCatalog,
         setEntityCatalog: state.setEntityCatalog,
-        snapshotEntities: state.snapshotEntities,
-        setSnapshotEntities: state.setSnapshotEntities,
+        snapshotEntityRows: state.snapshotEntityRows,
+        setSnapshotEntityRows: state.setSnapshotEntityRows,
         entityStatus: state.entityStatus,
         setEntityStatus: state.setEntityStatus,
         selectedFeatureIds: state.selectedFeatureIds,
@@ -284,12 +284,12 @@ function EditorPageContent() {
     const geoSearchRequestRef = useRef(0);
 
     // Refs mirror snapshot arrays để undo callbacks luôn đọc state mới nhất.
-    const snapshotEntitiesRef = useRef(snapshotEntities);
+    const snapshotEntityRowsRef = useRef(snapshotEntityRows);
     const snapshotWikisRef = useRef(snapshotWikis);
     const snapshotEntityWikiLinksRef = useRef(snapshotEntityWikiLinks);
     useEffect(() => {
-        snapshotEntitiesRef.current = snapshotEntities;
-    }, [snapshotEntities]);
+        snapshotEntityRowsRef.current = snapshotEntityRows;
+    }, [snapshotEntityRows]);
     useEffect(() => {
         snapshotWikisRef.current = snapshotWikis;
     }, [snapshotWikis]);
@@ -298,10 +298,10 @@ function EditorPageContent() {
     }, [snapshotEntityWikiLinks]);
 
     // Hook quản lý draft/changes/undo cho main editor và replay editor.
-    const editor = useEditorState(initialData, {
+    const editor = useEditorState(baselineFeatureCollection, {
         snapshotUndo: {
-            snapshotEntitiesRef,
-            setSnapshotEntities,
+            snapshotEntityRowsRef,
+            setSnapshotEntityRows,
             snapshotWikisRef,
             setSnapshotWikis,
             snapshotEntityWikiLinksRef,
@@ -324,26 +324,39 @@ function EditorPageContent() {
         },
         [editor]
     );
+    // Xóa wiki là một thay đổi snapshot kép: wiki row + các binding entity-wiki trỏ tới wiki đó.
+    const removeSnapshotWikiUndoable = useCallback(
+        (wikiId: string) => {
+            const id = String(wikiId || "").trim();
+            if (!id) return;
+            editor.setSnapshotWikisAndEntityWikiLinks(
+                (prev) => prev.filter((wiki) => wiki.id !== id),
+                (prev) => prev.filter((link) => String(link.wiki_id) !== id),
+                `Xóa wiki #${id}`
+            );
+        },
+        [editor]
+    );
     // Chuyển entity snapshot local thành entity catalog row để search/binding dùng chung.
-    const snapshotEntitiesAsEntities = useMemo(() => {
-        const rows = snapshotEntities || [];
+    const snapshotEntityRowsAsEntities = useMemo(() => {
+        const rows = snapshotEntityRows || [];
         return rows
             .filter((e) => e && e.operation !== "delete")
             .map((e) => ({
                 id: String(e.id || ""),
                 name: String(e.name || "").trim() || String(e.id || ""),
                 description: e.description ?? null,
-                time_start: e.time_start ?? null,
-                time_end: e.time_end ?? null,
+                time_start: normalizeTimelineYearValue(e.time_start),
+                time_end: normalizeTimelineYearValue(e.time_end),
                 geometry_count: 0,
             }))
             .filter((e) => e.id.length > 0 && e.name.length > 0);
-    }, [snapshotEntities]);
+    }, [snapshotEntityRows]);
 
     // Entity list hợp nhất giữa backend catalog và snapshot local.
     const entities = useMemo(
-        () => mergeEntitySearchResults(entityCatalog, snapshotEntitiesAsEntities),
-        [entityCatalog, snapshotEntitiesAsEntities]
+        () => mergeEntitySearchResults(entityCatalog, snapshotEntityRowsAsEntities),
+        [entityCatalog, snapshotEntityRowsAsEntities]
     );
     // State vị trí stage/step đang chọn trong replay editor.
     const [replaySelection, setReplaySelection] = useState<{
@@ -450,7 +463,7 @@ function EditorPageContent() {
         const localCreatedIds = localCreatedEntityIdsRef.current;
         if (!localCreatedIds.size) return;
 
-        const snapshotIds = new Set((snapshotEntities || []).map((entity) => String(entity.id || "")));
+        const snapshotIds = new Set((snapshotEntityRows || []).map((entity) => String(entity.id || "")));
         setEntityCatalog((prev) => {
             let changed = false;
             const next = (prev || []).filter((entity) => {
@@ -465,7 +478,7 @@ function EditorPageContent() {
             });
             return changed ? next : prev;
         });
-    }, [snapshotEntities, setEntityCatalog]);
+    }, [snapshotEntityRows, setEntityCatalog]);
 
     // Clamp năm timeline vào range cố định trước khi đưa vào store.
     const handleTimelineYearChange = useCallback((nextYear: number) => {
@@ -484,33 +497,45 @@ function EditorPageContent() {
         selectedStepIndex: previewSession?.selectedStepIndex ?? replaySelection.stepIndex,
         onSelectStep: () => {},
     });
+    const {
+        hiddenGeometryIds: replayPreviewHiddenGeometryIds,
+        timelineYear: replayPreviewTimelineYear,
+        timelineFilterEnabled: replayPreviewTimelineFilterEnabled,
+        resetPreview: resetReplayPreview,
+        playFromSelection: playReplayPreviewFromSelection,
+        playFromStart: playReplayPreviewFromStart,
+        activeCursor: replayPreviewActiveCursor,
+        activeWikiId: replayPreviewActiveWikiId,
+        sidebarOpen: replayPreviewSidebarOpen,
+        openWikiPanelById: openReplayPreviewWikiPanelById,
+    } = replayPreview;
 
     // Draft hiển thị trong preview có thể ẩn bớt geometry theo action replay.
     const replayPreviewDraft = useMemo(() => {
         const sourceDraft = previewSession?.draft || EMPTY_FEATURE_COLLECTION;
-        if (!isReplayPreviewMode || replayPreview.hiddenGeometryIds.length === 0) {
+        if (!isReplayPreviewMode || replayPreviewHiddenGeometryIds.length === 0) {
             return sourceDraft;
         }
-        const hiddenIds = new Set(replayPreview.hiddenGeometryIds);
+        const hiddenIds = new Set(replayPreviewHiddenGeometryIds);
         return {
             ...sourceDraft,
             features: sourceDraft.features.filter(
                 (feature) => !hiddenIds.has(String(feature.properties.id))
             ),
         };
-    }, [isReplayPreviewMode, previewSession?.draft, replayPreview.hiddenGeometryIds]);
+    }, [isReplayPreviewMode, previewSession?.draft, replayPreviewHiddenGeometryIds]);
 
     const activeTimelineYear = isReplayPreviewMode
-        ? replayPreview.timelineYear
+        ? replayPreviewTimelineYear
         : timelineDraftYear;
     const activeTimelineFilterEnabled = isReplayPreviewMode
-        ? replayPreview.timelineFilterEnabled
+        ? replayPreviewTimelineFilterEnabled
         : timelineFilterEnabled;
 
-    // Timeline filter: only affects persisted snapshot features.
+    // Render draft is the only FeatureCollection that decides what appears on the map.
+    // It may be timeline-filtered, replay-filtered, or preview-filtered, but it is not the edit source.
     // New features created in the current session remain visible regardless of time range.
-    // Draft cuối cùng đưa vào map sau khi áp filter timeline.
-    const timelineVisibleDraft = useMemo(() => {
+    const mapRenderDraft = useMemo(() => {
         const activeDraft = isReplayPreviewMode
             ? replayPreviewDraft
             : isReplayEditMode
@@ -555,8 +580,8 @@ function EditorPageContent() {
     const selectedGeometryTime = useMemo(() => {
         if (!selectedFeature) return null;
         return {
-            time_start: selectedFeature.properties.time_start ?? null,
-            time_end: selectedFeature.properties.time_end ?? null,
+            time_start: normalizeTimelineYearValue(selectedFeature.properties.time_start),
+            time_end: normalizeTimelineYearValue(selectedFeature.properties.time_end),
         };
     }, [selectedFeature]);
 
@@ -566,8 +591,8 @@ function EditorPageContent() {
         for (const [id, change] of editor.changes.entries()) {
             if (change.action === "create") createdGeometryIds.add(String(id));
         }
-        const timelineVisibleGeometryIds = new Set(
-            timelineVisibleDraft.features.map((feature) => String(feature.properties.id))
+        const mapRenderGeometryIds = new Set(
+            mapRenderDraft.features.map((feature) => String(feature.properties.id))
         );
 
         const rows = (editor.draft.features || [])
@@ -575,19 +600,38 @@ function EditorPageContent() {
             .map((f) => {
                 const id = String(f.properties.id);
                 const semantic = String(f.properties.type || getDefaultTypeIdForFeature(f) || "").trim();
-                const label = semantic.length ? `${semantic} (${f.geometry.type})` : f.geometry.type;
+                const label = semantic.length ? `${semantic} (${f.geometry.type})` : "Geometry";
+                const timeStart = normalizeTimelineYearValue(f.properties.time_start);
+                const timeEnd = normalizeTimelineYearValue(f.properties.time_end);
+                const hasStart = timeStart !== null;
+                const hasEnd = timeEnd !== null;
+                const timeStatus: "missing" | "partial" | "complete" =
+                    !hasStart && !hasEnd
+                        ? "missing"
+                        : !hasStart || !hasEnd
+                            ? "partial"
+                            : "complete";
+                const isTimelineVisible = mapRenderGeometryIds.has(id);
+                const timelineStatus: "off" | "visible" | "filteredOut" = !activeTimelineFilterEnabled
+                    ? "off"
+                    : isTimelineVisible
+                        ? "visible"
+                        : "filteredOut";
                 return {
                     id,
                     label,
-                    time_start: f.properties.time_start ?? null,
-                    time_end: f.properties.time_end ?? null,
-                    isTimelineVisible: timelineVisibleGeometryIds.has(id),
+                    time_start: timeStart,
+                    time_end: timeEnd,
+                    isTimelineVisible,
+                    isOrphan: normalizeFeatureEntityIds(f).length === 0,
+                    timeStatus,
+                    timelineStatus,
                     isNew: createdGeometryIds.has(id) || !editor.hasPersistedFeature(f.properties.id),
                 };
             });
         rows.sort((a, b) => a.id.localeCompare(b.id));
         return rows;
-    }, [editor, timelineVisibleDraft.features]);
+    }, [activeTimelineFilterEnabled, editor, mapRenderDraft.features]);
 
     // Binding ids của geometry đại diện đang chọn.
     const selectedGeometryBindingIds = useMemo(() => {
@@ -620,13 +664,13 @@ function EditorPageContent() {
     // Dirty flag cho entity snapshot so với baseline commit.
     const entitiesDirty = useMemo(() => {
         const prev = normalizeEntitiesForCompare(baselineSnapshot?.entities);
-        const next = normalizeEntitiesForCompare(snapshotEntities);
+        const next = normalizeEntitiesForCompare(snapshotEntityRows);
         try {
             return JSON.stringify(prev) !== JSON.stringify(next);
         } catch {
             return true;
         }
-    }, [baselineSnapshot?.entities, snapshotEntities]);
+    }, [baselineSnapshot?.entities, snapshotEntityRows]);
 
     // Dirty flag cho binding entity-wiki so với baseline commit.
     const entityWikiDirty = useMemo(() => {
@@ -679,11 +723,11 @@ function EditorPageContent() {
 
     // Thoát preview và quay về replay edit mode.
     const exitReplayPreview = useCallback(() => {
-        replayPreview.resetPreview();
+        resetReplayPreview();
         setPreviewAutoplayMode(null);
         setPreviewSession(null);
         internalSetMode("replay");
-    }, [internalSetMode, replayPreview.resetPreview]);
+    }, [internalSetMode, resetReplayPreview]);
 
     // Đóng băng draft/replay hiện tại thành session preview để phát thử.
     const openReplayPreview = useCallback((autoplayMode: "start" | "selection") => {
@@ -722,7 +766,7 @@ function EditorPageContent() {
         }
 
         if (mode === "replay_preview") {
-            replayPreview.resetPreview();
+            resetReplayPreview();
             setPreviewAutoplayMode(null);
             setPreviewSession(null);
 
@@ -763,7 +807,7 @@ function EditorPageContent() {
         editor,
         internalSetMode,
         mode,
-        replayPreview.resetPreview,
+        resetReplayPreview,
         selectedFeatureIds,
         setHideOutside,
         setReplayFeatureId,
@@ -811,17 +855,17 @@ function EditorPageContent() {
     useEffect(() => {
         if (!isReplayPreviewMode || !previewSession || !previewAutoplayMode) return;
         if (previewAutoplayMode === "selection") {
-            replayPreview.playFromSelection();
+            playReplayPreviewFromSelection();
         } else {
-            replayPreview.playFromStart();
+            playReplayPreviewFromStart();
         }
         setPreviewAutoplayMode(null);
     }, [
         isReplayPreviewMode,
+        playReplayPreviewFromSelection,
+        playReplayPreviewFromStart,
         previewAutoplayMode,
         previewSession,
-        replayPreview.playFromSelection,
-        replayPreview.playFromStart,
     ]);
 
     useEffect(() => {
@@ -833,29 +877,32 @@ function EditorPageContent() {
     // Label ngắn cho overlay preview tại step đang phát.
     const replayPreviewActiveStepLabel = useMemo(() => {
         if (
-            replayPreview.activeCursor.stageId == null ||
-            replayPreview.activeCursor.stepIndex == null
+            replayPreviewActiveCursor.stageId == null ||
+            replayPreviewActiveCursor.stepIndex == null
         ) {
             return null;
         }
-        return `Stage #${replayPreview.activeCursor.stageId} · Step ${replayPreview.activeCursor.stepIndex + 1}`;
-    }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
+        return `Stage #${replayPreviewActiveCursor.stageId} · Step ${replayPreviewActiveCursor.stepIndex + 1}`;
+    }, [replayPreviewActiveCursor.stageId, replayPreviewActiveCursor.stepIndex]);
 
-    const replayPreviewWikiRows = previewSession?.wikis || [];
+    const replayPreviewWikiRows = useMemo(
+        () => previewSession?.wikis || [],
+        [previewSession?.wikis]
+    );
     // Wiki snapshot đang được step preview yêu cầu mở.
     const replayPreviewActiveWikiSnapshot = useMemo(() => {
-        if (!replayPreview.activeWikiId) return null;
-        return replayPreviewWikiRows.find((item) => item.id === replayPreview.activeWikiId) || null;
-    }, [replayPreview.activeWikiId, replayPreviewWikiRows]);
+        if (!replayPreviewActiveWikiId) return null;
+        return replayPreviewWikiRows.find((item) => item.id === replayPreviewActiveWikiId) || null;
+    }, [replayPreviewActiveWikiId, replayPreviewWikiRows]);
 
     useEffect(() => {
-        if (!isReplayPreviewMode || !replayPreview.sidebarOpen) {
+        if (!isReplayPreviewMode || !replayPreviewSidebarOpen) {
             setPreviewWikiError(null);
             setIsPreviewWikiLoading(false);
             return;
         }
 
-        const activeWikiId = String(replayPreview.activeWikiId || "").trim();
+        const activeWikiId = String(replayPreviewActiveWikiId || "").trim();
         if (!activeWikiId.length) {
             setPreviewWikiError(null);
             setIsPreviewWikiLoading(false);
@@ -905,8 +952,8 @@ function EditorPageContent() {
     }, [
         isReplayPreviewMode,
         previewWikiCache,
-        replayPreview.activeWikiId,
-        replayPreview.sidebarOpen,
+        replayPreviewActiveWikiId,
+        replayPreviewSidebarOpen,
         replayPreviewWikiRows,
     ]);
 
@@ -936,8 +983,8 @@ function EditorPageContent() {
             return;
         }
         setPreviewWikiError(null);
-        replayPreview.openWikiPanelById(match.id);
-    }, [replayPreview.openWikiPanelById, replayPreviewWikiRows]);
+        openReplayPreviewWikiPanelById(match.id);
+    }, [openReplayPreviewWikiPanelById, replayPreviewWikiRows]);
 
     // Visibility cuối cùng theo type/layer, có override riêng cho replay edit/preview.
     const effectiveGeometryVisibility = useMemo(() => {
@@ -1259,12 +1306,12 @@ function EditorPageContent() {
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
         const stillExistIds = selectedFeatureIds.filter(id =>
-            timelineVisibleDraft.features.some(feature => String(feature.properties.id) === String(id))
+            editor.draft.features.some(feature => String(feature.properties.id) === String(id))
         );
         if (stillExistIds.length !== selectedFeatureIds.length) {
             setSelectedFeatureIds(stillExistIds);
         }
-    }, [timelineVisibleDraft, selectedFeatureIds, setSelectedFeatureIds]);
+    }, [editor.draft.features, selectedFeatureIds, setSelectedFeatureIds]);
 
     useEffect(() => {
         if (!selectedFeature) {
@@ -1285,15 +1332,13 @@ function EditorPageContent() {
             ? selectedFeature.properties.type
             : getDefaultTypeIdForFeature(selectedFeature);
         const currentId = String(selectedFeature.properties.id);
+        const timeStart = normalizeTimelineYearValue(selectedFeature.properties.time_start);
+        const timeEnd = normalizeTimelineYearValue(selectedFeature.properties.time_end);
         setSelectedGeometryEntityIds(featureEntityIds);
         setGeometryMetaForm({
             type_key: nextTypeKey,
-            time_start: selectedFeature.properties.time_start != null
-                ? String(selectedFeature.properties.time_start)
-                : "",
-            time_end: selectedFeature.properties.time_end != null
-                ? String(selectedFeature.properties.time_end)
-                : "",
+            time_start: timeStart != null ? String(timeStart) : "",
+            time_end: timeEnd != null ? String(timeEnd) : "",
             binding: normalizeFeatureBindingIds(selectedFeature).join(", "),
         });
         // Only clear status when switching to a different geometry, not when patching metadata/bindings
@@ -1348,7 +1393,7 @@ function EditorPageContent() {
     const handleAddEntityRefToProject = useCallback((entity: Entity) => {
         const id = String(entity.id || "").trim();
         if (!id) return;
-        editor.setSnapshotEntities((prev) => {
+        editor.setSnapshotEntityRows((prev) => {
             if (prev.some((e) => String(e.id) === id)) return prev;
             return [
                 {
@@ -1357,8 +1402,8 @@ function EditorPageContent() {
                     operation: "reference",
                     name: entity.name,
                     description: entity.description ?? null,
-                    time_start: entity.time_start ?? null,
-                    time_end: entity.time_end ?? null,
+                    time_start: normalizeTimelineYearValue(entity.time_start),
+                    time_end: normalizeTimelineYearValue(entity.time_end),
                 },
                 ...prev,
             ];
@@ -1399,7 +1444,7 @@ function EditorPageContent() {
             return;
         }
 
-        editor.setSnapshotEntities((prev) => prev.map((e) => {
+        editor.setSnapshotEntityRows((prev) => prev.map((e) => {
             if (!e || String(e.id) !== id) return e;
             const source = e.source === "inline" ? "inline" : "ref";
             const operation =
@@ -1583,8 +1628,8 @@ function EditorPageContent() {
             return;
         }
 
-        const geoTimeStart = feature.properties.time_start;
-        if (typeof geoTimeStart === "number" && Number.isFinite(geoTimeStart)) {
+        const geoTimeStart = normalizeTimelineYearValue(feature.properties.time_start);
+        if (geoTimeStart !== null) {
             setTimelineDraftYear(clampYearToFixedRange(Math.trunc(geoTimeStart)));
         }
 
@@ -1756,8 +1801,8 @@ function EditorPageContent() {
             properties: {
                 id: geoId,
                 type: typeKey,
-                time_start: typeof geo.time_start === "number" ? geo.time_start : null,
-                time_end: typeof geo.time_end === "number" ? geo.time_end : null,
+                time_start: normalizeTimelineYearValue(geo.time_start),
+                time_end: normalizeTimelineYearValue(geo.time_end),
                 binding: bindingIds.length ? bindingIds : undefined,
                 entity_id: entityItem.entity_id,
                 entity_ids: [entityItem.entity_id],
@@ -1767,7 +1812,7 @@ function EditorPageContent() {
             geometry,
         };
 
-        editor.createFeatureWithSnapshotEntities(
+        editor.createFeatureWithSnapshotEntityRows(
             feature,
             (prev) => {
                 if (prev.some((e) => String(e.id) === importedEntity.id)) return prev;
@@ -1859,7 +1904,7 @@ function EditorPageContent() {
         setIsEntitySubmitting(true);
         setEntityFormStatus(null);
         try {
-            editor.setSnapshotEntities((prev) => {
+            editor.setSnapshotEntityRows((prev) => {
                 if (prev.some((e) => String(e.id) === entityId)) return prev;
                 return [
                     {
@@ -1910,13 +1955,15 @@ function EditorPageContent() {
         setSelectedFeatureIds([feature.properties.id]);
     };
 
-    // Draft nguồn dùng để render label trong map khi preview đang dùng draft đóng băng.
-    const mapLabelSourceDraft = isReplayPreviewMode
+    // Base draft for label lookup only. It must not decide which geometry is rendered.
+    const labelContextBaseDraft = isReplayPreviewMode
         ? previewSession?.draft || EMPTY_FEATURE_COLLECTION
         : editor.draft;
+    // Enriched label context may contain geometries that mapRenderDraft filtered out.
+    // Map rendering must still use mapRenderDraft above.
     const mapLabelContextDraft = useMemo(
-        () => buildEntityLabelContextDraft(mapLabelSourceDraft, entities),
-        [entities, mapLabelSourceDraft]
+        () => buildEntityLabelContextDraft(labelContextBaseDraft, entities),
+        [entities, labelContextBaseDraft]
     );
 
     return (
@@ -2033,7 +2080,7 @@ function EditorPageContent() {
                             ref={mapHandleRef}
                             mode={mode}
                             onSetMode={setMode}
-                            draft={timelineVisibleDraft}
+                            renderDraft={mapRenderDraft}
                             labelContextDraft={mapLabelContextDraft}
                             labelTimelineYear={activeTimelineFilterEnabled ? activeTimelineYear : null}
                             selectedFeatureIds={selectedFeatureIds}
@@ -2050,7 +2097,7 @@ function EditorPageContent() {
                             onUpdateFeature={editor.updateFeature}
                             backgroundVisibility={backgroundVisibility}
                             geometryVisibility={effectiveGeometryVisibility}
-                            respectBindingFilter={isReplayEditMode || isReplayPreviewMode ? false : geometryBindingFilterEnabled}
+                            applyGeometryBindingFilter={isReplayEditMode || isReplayPreviewMode ? false : geometryBindingFilterEnabled}
                             highlightFeatures={null}
                             focusFeatureCollection={geometryFocusRequest?.collection || null}
                             focusRequestKey={geometryFocusRequest?.key ?? null}
@@ -2193,6 +2240,7 @@ function EditorPageContent() {
                                 <WikiSidebarPanel
                                     projectId={projectId}
                                     setWikis={setSnapshotWikisUndoable}
+                                    onRemoveWiki={removeSnapshotWikiUndoable}
                                 />
 
                                 <EntityWikiBindingsPanel
@@ -2287,8 +2335,8 @@ function buildEntityLabelContextDraft(draft: FeatureCollection, entities: Entity
                 return {
                     id,
                     name,
-                    time_start: entity?.time_start ?? null,
-                    time_end: entity?.time_end ?? null,
+                    time_start: normalizeTimelineYearValue(entity?.time_start),
+                    time_end: normalizeTimelineYearValue(entity?.time_end),
                 };
             }).filter((candidate) => candidate !== null);
 
