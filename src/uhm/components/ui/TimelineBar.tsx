@@ -55,9 +55,15 @@ export default function TimelineBar({
         >
             <div className={styles.flexWrapper}>
                 {typeof filterEnabled === "boolean" && onFilterEnabledChange ? (
-                    <label
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={filterEnabled}
+                        aria-label="Toggle timeline filter"
                         title={filterEnabled ? "Dang bat loc timeline" : "Dang tat loc timeline (hien thi tat ca geometry)"}
                         className={`${styles.toggleContainer} ${effectiveDisabled ? styles.disabled : ""}`}
+                        onClick={() => onFilterEnabledChange(!filterEnabled)}
+                        disabled={effectiveDisabled}
                     >
                         <span
                             aria-hidden="true"
@@ -67,15 +73,7 @@ export default function TimelineBar({
                                 className={`${styles.toggleThumb} ${filterEnabled ? styles.toggleThumbActive : ""}`}
                             />
                         </span>
-                        <input
-                            type="checkbox"
-                            checked={filterEnabled}
-                            onChange={(e) => onFilterEnabledChange(e.target.checked)}
-                            disabled={effectiveDisabled}
-                            aria-label="Toggle timeline filter"
-                            style={{ display: "none" }}
-                        />
-                    </label>
+                    </button>
                 ) : null}
                 <span className={styles.labelBounds}>{formatYear(lower)}</span>
                 <input
@@ -133,4 +131,3 @@ function formatYear(year: number): string {
     }
     return `${year}`;
 }
-

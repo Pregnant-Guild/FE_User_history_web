@@ -16,29 +16,33 @@ type EngineBinding = {
     cleanup: () => void;
     cancel?: () => void;
     clearSelection?: (skipNotify?: boolean) => void;
+    syncSelection?: (ids: (string | number)[]) => void;
 };
 
 type UseMapInteractionProps = {
     mapRef: React.MutableRefObject<maplibregl.Map | null>;
     mode: EditorMode;
     modeRef: React.MutableRefObject<EditorMode>;
-    draftRef: React.MutableRefObject<FeatureCollection>;
+    // Rendered/interacted FeatureCollection from Map.tsx. This may already be filtered by
+    // replay/timeline state, so do not treat it as the canonical commit/edit draft.
+    renderDraftRef: React.MutableRefObject<FeatureCollection>;
     allowGeometryEditing: boolean;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIdsRef: React.MutableRefObject<(ids: (string | number)[]) => void>;
     onSetModeRef: React.MutableRefObject<((mode: EditorMode, featureId?: string | number) => void) | undefined>;
     onCreateRef: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
-    onDeleteRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
+    onDeleteRef: React.MutableRefObject<((id: string | number | (string | number)[]) => void) | undefined>;
     onHideRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
     onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
+    onBindGeometriesRef?: React.MutableRefObject<((targetId: string | number, sourceIds: (string | number)[]) => void) | undefined>;
 };
 
 export function useMapInteraction({
     mapRef,
     mode,
     modeRef,
-    draftRef,
+    renderDraftRef,
     allowGeometryEditing,
     selectedFeatureIds,
     onSelectFeatureIdsRef,
@@ -48,6 +52,7 @@ export function useMapInteraction({
     onHideRef,
     onUpdateRef,
     onHoverFeatureChangeRef,
+    onBindGeometriesRef,
 }: UseMapInteractionProps) {
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
     const engineBindingsRef = useRef<Partial<Record<EditorMode, EngineBinding>>>({});
@@ -71,6 +76,13 @@ export function useMapInteraction({
             engineBindingsRef.current.select?.clearSelection?.(false);
         }
     }, [mode, selectedFeatureIds]);
+
+    useEffect(() => {
+        const selectEngine = engineBindingsRef.current.select;
+        if (selectEngine?.syncSelection) {
+            selectEngine.syncSelection(selectedFeatureIds);
+        }
+    }, [selectedFeatureIds]);
 
     useEffect(() => {
         const previousMode = previousModeRef.current;
@@ -134,7 +146,7 @@ export function useMapInteraction({
             map,
             () => modeRef.current,
             allowGeometryEditing
-                ? (id: string | number) => {
+                ? (id: string | number | (string | number)[]) => {
                     editingEngineRef.current?.clearEditing();
                     onSelectFeatureIdsRef.current?.([]);
                     onDeleteRef.current?.(id);
@@ -143,7 +155,7 @@ export function useMapInteraction({
             allowGeometryEditing
                 ? (feature) => {
                     const rawId = feature.id ?? feature.properties?.id;
-                    const originalFeature = draftRef.current.features.find(
+                    const originalFeature = renderDraftRef.current.features.find(
                         (item) => String(item.properties.id) === String(rawId)
                     );
                     editingEngineRef.current?.beginEditing(
@@ -153,7 +165,7 @@ export function useMapInteraction({
                 : undefined,
             allowGeometryEditing
                 ? (id: string | number) => {
-                    const originalFeature = draftRef.current.features.find(
+                    const originalFeature = renderDraftRef.current.features.find(
                         (item) => String(item.properties.id) === String(id)
                     );
                     if (!originalFeature) return;
@@ -170,7 +182,8 @@ export function useMapInteraction({
                 : undefined,
             (ids) => onSelectFeatureIdsRef.current?.(ids),
             (id: string | number) => onSetModeRef.current?.("replay", id),
-            () => Boolean(editingEngineRef.current?.editingRef.current)
+            () => Boolean(editingEngineRef.current?.editingRef.current),
+            (targetId, sourceIds) => onBindGeometriesRef?.current?.(targetId, sourceIds)
         );
 
         const cleanupPoint = initPoint(
@@ -301,7 +314,7 @@ export function useMapInteraction({
             }
 
             const currentFeature =
-                draftRef.current.features.find(
+                renderDraftRef.current.features.find(
                     (item) => String(item.properties.id) === String(rawFeatureId)
                 ) || null;
 

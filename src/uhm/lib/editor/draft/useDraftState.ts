@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeatureCollection } from "@/uhm/types/geo";
 import { deepClone } from "@/uhm/lib/editor/draft/draftDiff";
 
-export function useDraftState(initialData: FeatureCollection) {
+export function useDraftState(seedFeatureCollection: FeatureCollection) {
     // Draft hiện tại (React state) để UI re-render khi dữ liệu thay đổi.
-    const [draft, setDraft] = useState<FeatureCollection>(() => deepClone(initialData));
+    const [draft, setDraft] = useState<FeatureCollection>(() => deepClone(seedFeatureCollection));
     // Draft ref để đọc giá trị mới nhất trong event handlers/engines mà không cần deps.
-    const draftRef = useRef<FeatureCollection>(deepClone(initialData));
+    const draftRef = useRef<FeatureCollection>(deepClone(seedFeatureCollection));
 
     const commitDraft = useCallback((nextDraft: FeatureCollection) => {
         const cloned = deepClone(nextDraft);

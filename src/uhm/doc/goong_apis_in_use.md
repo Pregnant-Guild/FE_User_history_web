@@ -4,7 +4,7 @@ Mục tiêu của tài liệu này:
 
 - mô tả **chính xác** frontend hiện tại đang dùng gì từ Goong
 - mô tả **backend cần proxy gì** để giấu `api_key`
-- mô tả **response nào phải rewrite**
+- mô tả **response nào phải sanitize/rewrite**
 - tránh liệt kê thừa các API Goong mà app hiện tại không đụng tới
 
 Phạm vi kiểm tra:
@@ -22,33 +22,40 @@ Frontend hiện tại **không** `map.setStyle(goongStyleJson)` trực tiếp.
 
 Thay vào đó:
 
-1. app tự `fetch()` 2 style JSON của Goong
+1. app tự `fetch()` 2 style JSON của Goong qua backend proxy
 2. app parse style JSON để lấy:
    - `raster source` từ `goong_satellite.json`
    - `sources + layers` cần thiết từ `goong_map_web.json`
-3. app `map.addSource(...)` và `map.addLayer(...)` thủ công
-4. từ thời điểm đó, **MapLibre tự request tiếp** các `source.url`
-5. rồi từ các source manifest đó, **MapLibre lại tự request tiếp** các tile URLs nằm trong `tiles[]`
+3. nếu source dùng `url`, app tiếp tục fetch source manifest qua proxy trong `tiles.ts`
+4. app rewrite `tiles[]` về backend proxy rồi `map.addSource(...)` và `map.addLayer(...)` thủ công
+5. từ thời điểm đó, **MapLibre tự request tiếp** tile/font URLs đã là URL proxy
 
 Hệ quả:
 
 - nếu BE chỉ proxy `assets/*.json` thì **chưa đủ**
-- nếu BE chỉ proxy `sources/*.json` mà **không rewrite `tiles[]`** thì **vẫn lộ key ở request tile**
+- proxy phải cover style JSON, source manifest, tile URLs và glyph PBF
+- frontend hiện không nhúng `api_key` trong URL; backend proxy chịu trách nhiệm gọi upstream bằng key server-side nếu upstream yêu cầu
 
 ## 2. Luồng request thật hiện tại
 
-### 2.1. App fetch trực tiếp style JSON
+### 2.1. App fetch style JSON qua proxy
 
-Frontend gọi trực tiếp:
+Frontend gọi:
 
-1. `https://tiles.goong.io/assets/goong_satellite.json?api_key=...`
-2. `https://tiles.goong.io/assets/goong_map_web.json?api_key=...`
+1. `${API_BASE_URL}/proxy/tiles.goong.io/assets/goong_satellite.json`
+2. `${API_BASE_URL}/proxy/tiles.goong.io/assets/goong_map_web.json`
+
+Upstream gốc trong code vẫn là:
+
+1. `https://tiles.goong.io/assets/goong_satellite.json`
+2. `https://tiles.goong.io/assets/goong_map_web.json`
 
 Nguồn trong code:
 
-- `GOONG_SATELLITE_STYLE_URL` ở [config.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts:15)
-- `GOONG_VECTOR_OVERLAY_STYLE_URL` ở [config.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts:19)
-- `loadGoongStyleDocument(...)` ở [tiles.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/tiles.ts:211)
+- `GOONG_SATELLITE_STYLE_UPSTREAM_URL` ở [config.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts:8)
+- `GOONG_VECTOR_OVERLAY_STYLE_UPSTREAM_URL` ở [config.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts:9)
+- `buildGoongProxyUrl(...)` ở [config.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts:29)
+- `loadGoongStyleDocument(...)` ở [tiles.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/tiles.ts:199)
 
 Mục đích:
 
@@ -63,9 +70,9 @@ Mục đích:
     - `Country Labels`
     - `Rivers`
 
-### 2.2. MapLibre fetch source manifests
+### 2.2. Frontend fetch source manifests qua proxy
 
-Sau khi app clone source spec từ style JSON và `addSource(...)`, MapLibre tự bắn tiếp các request `source.url`.
+Khi style source có field `url`, `tiles.ts` tự fetch source manifest qua proxy trước khi gọi `map.addSource(...)`.
 
 Các source URL đang xuất hiện trong style JSON:
 
@@ -89,21 +96,24 @@ Các source URL đang xuất hiện trong style JSON:
 - `sources/goong.json`
   - vector source manifest cho các lớp `riversandlakes`, `vietnam_administrator`
 
-### 2.3. MapLibre fetch tile URLs nằm trong source manifests
+### 2.3. MapLibre fetch tile URLs đã rewrite
 
 Đây là phần dễ bị bỏ sót nhất.
 
-Khi MapLibre đã tải `sources/satellite.json`, `sources/base.json`, `sources/goong.json`, nó sẽ tiếp tục request các URL nằm trong field:
+Khi `tiles.ts` đã tải `sources/satellite.json`, `sources/base.json`, `sources/goong.json`, nó rewrite mọi URL trong field:
 
 - `tiles[]`
 
+về `${API_BASE_URL}/proxy/tiles.goong.io/...`, rồi mới đưa source spec cho MapLibre.
+
 Tức là runtime thật của frontend hiện tại là:
 
-1. fetch style JSON
-2. fetch source manifest
-3. fetch tile URL bên trong source manifest
+1. FE fetch style JSON qua proxy
+2. FE fetch source manifest qua proxy
+3. FE rewrite `tiles[]` về proxy
+4. MapLibre fetch tile URL đã rewrite
 
-Nếu backend muốn che key hoàn toàn, thì **bước 3 bắt buộc phải được proxy hoặc rewrite về domain backend**.
+Nếu backend muốn che key hoàn toàn, thì backend proxy phải xử lý cả các tile URL này bằng key server-side.
 
 ## 3. Những upstream Goong resource đang dùng thật
 
@@ -130,6 +140,7 @@ Lưu ý:
 
 - tile URL pattern chính xác phải đọc từ source manifest upstream ở runtime
 - backend không nên hardcode khi chưa xác minh nội dung `tiles[]`
+- frontend hiện giữ nguyên upstream target path trong proxy URL sau khi strip `api_key`
 
 ## 4. Những thứ frontend hiện tại dùng thêm hoặc KHÔNG dùng
 
@@ -143,7 +154,7 @@ Flow hiện tại **có dùng glyphs của Goong qua proxy**.
 
 Map đang trỏ `glyphs` vào:
 
-- `/proxy/{encoded-https://tiles.goong.io/fonts/{fontstack}/{range}.pbf}`
+- `${API_BASE_URL}/proxy/tiles.goong.io/fonts/{fontstack}/{range}.pbf`
 
 Nguồn trong code:
 
@@ -201,7 +212,8 @@ Có 2 cách:
 
 #### Cách A: Transparent proxy
 
-BE trả về gần như đúng response của Goong, chỉ rewrite URL.
+BE trả về gần như đúng response của Goong, nhưng strip/sanitize mọi `api_key` lồng trong JSON.
+Frontend hiện tự wrap các upstream URL đó bằng `buildGoongProxyUrl(...)`.
 
 Ưu điểm:
 
@@ -210,7 +222,7 @@ BE trả về gần như đúng response của Goong, chỉ rewrite URL.
 
 Nhược điểm:
 
-- BE phải rewrite nhiều chỗ
+- BE phải sanitize JSON response để không lộ key trong body response
 
 #### Cách B: Normalize thành API nội bộ
 
@@ -227,11 +239,13 @@ Nhược điểm:
 
 Với frontend hiện tại, **Cách A** là hợp lý nhất.
 
+Lưu ý quan trọng: frontend hiện mong nhận `sources.*.url` và `tiles[]` ở dạng upstream URL hoặc relative URL. Không rewrite các URL này thành `/proxy/...` trong JSON response hiện tại, vì FE sẽ tự gọi `buildGoongProxyUrl(...)`; rewrite sẵn sẽ dễ bị double-proxy.
+
 ## 6. Contract backend được khuyến nghị
 
 ### 6.1. Proxy style JSON
 
-#### `GET /proxy/goong/assets/goong_satellite.json`
+#### `GET /proxy/tiles.goong.io/assets/goong_satellite.json`
 
 Upstream:
 
@@ -241,15 +255,16 @@ Backend phải:
 
 - fetch upstream bằng key server-side
 - parse JSON
-- rewrite `sources.*.url` về domain backend
+- strip `api_key` khỏi `sources.*.url`, `glyphs`, `sprite` nếu các field đó xuất hiện trong body
+- giữ URL upstream/relative để frontend tự wrap bằng `buildGoongProxyUrl(...)`
 - có thể giữ nguyên các field khác
 
 Response:
 
 - `Content-Type: application/json`
-- body: style JSON đã rewrite
+- body: style JSON đã sanitize, chưa rewrite sang `/proxy/...`
 
-#### `GET /proxy/goong/assets/goong_map_web.json`
+#### `GET /proxy/tiles.goong.io/assets/goong_map_web.json`
 
 Upstream:
 
@@ -259,17 +274,18 @@ Backend phải:
 
 - fetch upstream bằng key server-side
 - parse JSON
-- rewrite `sources.*.url` về domain backend
+- strip `api_key` khỏi `sources.*.url`, `glyphs`, `sprite` nếu các field đó xuất hiện trong body
+- giữ URL upstream/relative để frontend tự wrap bằng `buildGoongProxyUrl(...)`
 - có thể giữ nguyên các field khác
 
 Response:
 
 - `Content-Type: application/json`
-- body: style JSON đã rewrite
+- body: style JSON đã sanitize, chưa rewrite sang `/proxy/...`
 
 ### 6.2. Proxy source manifests
 
-#### `GET /proxy/goong/sources/satellite.json`
+#### `GET /proxy/tiles.goong.io/sources/satellite.json`
 
 Upstream:
 
@@ -279,7 +295,8 @@ Backend phải:
 
 - fetch upstream
 - parse JSON
-- rewrite mọi URL trong `tiles[]` về domain backend
+- strip `api_key` khỏi mọi URL trong `tiles[]`
+- giữ URL upstream/relative để frontend tự wrap bằng `buildGoongProxyUrl(...)`
 - giữ nguyên metadata quan trọng:
   - `tileSize`
   - `minzoom`
@@ -291,9 +308,9 @@ Backend phải:
 Response:
 
 - `Content-Type: application/json`
-- body: source manifest đã rewrite
+- body: source manifest đã sanitize, chưa rewrite sang `/proxy/...`
 
-#### `GET /proxy/goong/sources/base.json`
+#### `GET /proxy/tiles.goong.io/sources/base.json`
 
 Upstream:
 
@@ -303,10 +320,11 @@ Backend phải:
 
 - fetch upstream
 - parse JSON
-- rewrite mọi URL trong `tiles[]` về domain backend
+- strip `api_key` khỏi mọi URL trong `tiles[]`
+- giữ URL upstream/relative để frontend tự wrap bằng `buildGoongProxyUrl(...)`
 - giữ nguyên metadata tilejson khác
 
-#### `GET /proxy/goong/sources/goong.json`
+#### `GET /proxy/tiles.goong.io/sources/goong.json`
 
 Upstream:
 
@@ -316,22 +334,17 @@ Backend phải:
 
 - fetch upstream
 - parse JSON
-- rewrite mọi URL trong `tiles[]` về domain backend
+- strip `api_key` khỏi mọi URL trong `tiles[]`
+- giữ URL upstream/relative để frontend tự wrap bằng `buildGoongProxyUrl(...)`
 - giữ nguyên metadata tilejson khác
 
 ### 6.3. Proxy tile endpoints
 
 Backend bắt buộc phải có route để trả tile thật.
 
-Có thể làm generic, ví dụ:
+Frontend hiện build URL proxy generic theo upstream target:
 
-- `GET /proxy/goong/tiles/*`
-
-hoặc explicit hơn theo source:
-
-- `GET /proxy/goong/tiles/satellite/...`
-- `GET /proxy/goong/tiles/base/...`
-- `GET /proxy/goong/tiles/goong/...`
+- `GET /proxy/tiles.goong.io/...`
 
 Yêu cầu:
 
@@ -357,8 +370,9 @@ Luồng:
 
 1. FE đọc `goong_satellite.json`
 2. FE lấy `sources.satellite`
-3. MapLibre gọi `sources/satellite.json`
-4. MapLibre gọi raster tile URLs trong `tiles[]`
+3. FE gọi `sources/satellite.json` qua proxy trong `tiles.ts`
+4. FE rewrite `tiles[]` về proxy URL
+5. MapLibre gọi raster tile URLs đã rewrite
 
 BE cần cover:
 
@@ -372,9 +386,10 @@ Luồng:
 
 1. FE đọc `goong_map_web.json`
 2. FE lấy selected layers + selected sources
-3. MapLibre gọi `sources/base.json`
-4. MapLibre gọi `sources/goong.json`
-5. MapLibre gọi vector tile URLs của 2 source manifest này
+3. FE gọi `sources/base.json` qua proxy trong `tiles.ts`
+4. FE gọi `sources/goong.json` qua proxy trong `tiles.ts`
+5. FE rewrite `tiles[]` về proxy URL
+6. MapLibre gọi vector tile URLs đã rewrite
 
 BE cần cover:
 
@@ -386,20 +401,20 @@ BE cần cover:
 
 Nếu chỉ làm đúng những gì frontend hiện tại dùng, checklist tối thiểu là:
 
-1. proxy `assets/goong_satellite.json`
-2. proxy `assets/goong_map_web.json`
-3. proxy `sources/satellite.json`
-4. proxy `sources/base.json`
-5. proxy `sources/goong.json`
-6. proxy toàn bộ tile URL được khai báo trong `sources/satellite.json`
-7. proxy toàn bộ tile URL được khai báo trong `sources/base.json`
-8. proxy toàn bộ tile URL được khai báo trong `sources/goong.json`
+1. proxy `tiles.goong.io/assets/goong_satellite.json`
+2. proxy `tiles.goong.io/assets/goong_map_web.json`
+3. proxy `tiles.goong.io/sources/satellite.json`
+4. proxy `tiles.goong.io/sources/base.json`
+5. proxy `tiles.goong.io/sources/goong.json`
+6. proxy `tiles.goong.io/fonts/{fontstack}/{range}.pbf`
+7. proxy toàn bộ tile URL được khai báo trong `sources/satellite.json`
+8. proxy toàn bộ tile URL được khai báo trong `sources/base.json`
+9. proxy toàn bộ tile URL được khai báo trong `sources/goong.json`
 
 ## 9. Những gì BE chưa cần làm ngay
 
 Cho flow hiện tại, BE **chưa cần**:
 
-- proxy Goong `glyphs`
 - proxy Goong `sprite`
 - proxy geocoding / directions / autocomplete
 
@@ -417,9 +432,10 @@ vì khi đó chúng có thể trở thành dependency bắt buộc.
 Nếu muốn làm ít rủi ro nhất:
 
 1. làm proxy `assets/*.json`
-2. rewrite `sources.*.url`
+2. sanitize nested `api_key` trong style JSON
 3. làm proxy `sources/*.json`
-4. rewrite `tiles[]`
+4. sanitize nested `api_key` trong source manifests
 5. làm proxy generic cho tile
+6. làm proxy Goong fonts/glyphs
 
-Nếu làm thiếu bước 4 hoặc 5 thì key vẫn có thể lộ ở request tile.
+Nếu sanitize JSON thiếu thì key có thể lộ ngay trong response style/source. Nếu proxy tile/font thiếu thì map background hoặc labels có thể không tải được.

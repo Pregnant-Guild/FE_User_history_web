@@ -35,9 +35,9 @@ export type GeometryFocusRequest = {
 };
 
 type EditorStoreValues = {
-    // Editor mode + draft seed.
+    // Editor mode + baseline FeatureCollection used to seed/reset useEditorState.
     mode: EditorMode;
-    initialData: FeatureCollection;
+    baselineFeatureCollection: FeatureCollection;
     // Task flags; setTaskFlag ensures only one blocking task is active at a time.
     isSaving: boolean;
     isSubmitting: boolean;
@@ -54,7 +54,7 @@ type EditorStoreValues = {
     baselineSnapshot: EditorSnapshot | null;
     // Entity state: backend catalog plus snapshot-local rows and form/search status.
     entityCatalog: Entity[];
-    snapshotEntities: EntitySnapshot[];
+    snapshotEntityRows: EntitySnapshot[];
     entityStatus: string | null;
     selectedFeatureIds: FeatureId[];
     entityForm: EntityFormState;
@@ -92,12 +92,13 @@ type EditorStoreValues = {
     geometryFocusRequest: GeometryFocusRequest | null;
     replayFeatureId: string | number | null;
     hideOutside: boolean;
+    // Map visibility overrides keyed by either a geometry id or a semantic geo type key.
     geometryVisibility: Record<string, boolean>;
 };
 
 type EditorStoreActions = {
     setMode: (next: SetStateAction<EditorMode>) => void;
-    setInitialData: (next: SetStateAction<FeatureCollection>) => void;
+    setBaselineFeatureCollection: (next: SetStateAction<FeatureCollection>) => void;
     setIsSaving: (next: SetStateAction<boolean>) => void;
     setIsSubmitting: (next: SetStateAction<boolean>) => void;
     setIsOpeningSection: (next: SetStateAction<boolean>) => void;
@@ -111,7 +112,7 @@ type EditorStoreActions = {
     setProjectCommits: (next: SetStateAction<ProjectCommit[]>) => void;
     setBaselineSnapshot: (next: SetStateAction<EditorSnapshot | null>) => void;
     setEntityCatalog: (next: SetStateAction<Entity[]>) => void;
-    setSnapshotEntities: (next: SetStateAction<EntitySnapshot[]>) => void;
+    setSnapshotEntityRows: (next: SetStateAction<EntitySnapshot[]>) => void;
     setEntityStatus: (next: SetStateAction<string | null>) => void;
     setSelectedFeatureIds: (next: SetStateAction<FeatureId[]>) => void;
     setEntityForm: (next: SetStateAction<EntityFormState>) => void;
@@ -228,7 +229,7 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
 
         return {
             mode: "idle",
-            initialData: options.emptyFeatureCollection,
+            baselineFeatureCollection: options.emptyFeatureCollection,
             isSaving: false,
             isSubmitting: false,
             isOpeningSection: false,
@@ -242,7 +243,7 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
             sectionCommits: [],
             baselineSnapshot: null,
             entityCatalog: [],
-            snapshotEntities: [],
+            snapshotEntityRows: [],
             entityStatus: null,
             selectedFeatureIds: [],
             entityForm: {
@@ -287,7 +288,7 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
             hideOutside: false,
             geometryVisibility: buildInitialGeometryVisibility(),
             setMode: (next) => setValue("mode", next),
-            setInitialData: (next) => setValue("initialData", next),
+            setBaselineFeatureCollection: (next) => setValue("baselineFeatureCollection", next),
             setIsSaving: (next) => setTaskFlag("saving", next),
             setIsSubmitting: (next) => setTaskFlag("submitting", next),
             setIsOpeningSection: (next) => setTaskFlag("opening-project", next),
@@ -301,7 +302,7 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
             setProjectCommits: (next) => setValue("sectionCommits", next),
             setBaselineSnapshot: (next) => setValue("baselineSnapshot", next),
             setEntityCatalog: (next) => setValue("entityCatalog", next),
-            setSnapshotEntities: (next) => setValue("snapshotEntities", next),
+            setSnapshotEntityRows: (next) => setValue("snapshotEntityRows", next),
             setEntityStatus: (next) => setValue("entityStatus", next),
             setSelectedFeatureIds: (next) => setValue("selectedFeatureIds", next),
             setEntityForm: (next) => setValue("entityForm", next),

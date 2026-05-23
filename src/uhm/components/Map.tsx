@@ -33,20 +33,23 @@ export type MapHandle = {
 
 type MapProps = {
     mode: EditorMode;
-    draft: FeatureCollection;
+    // FeatureCollection that should actually be rendered/interacted with on the map.
+    // Callers should apply timeline/replay filters before passing it here.
+    renderDraft: FeatureCollection;
     backgroundVisibility: BackgroundLayerVisibility;
     geometryVisibility?: Record<string, boolean>;
     selectedFeatureIds: (string | number)[];
     onSelectFeatureIds: (ids: (string | number)[]) => void;
     onSetMode?: (mode: EditorMode, featureId?: string | number) => void;
+    // Label lookup context only. It may include non-rendered geometries for entity label resolution.
     labelContextDraft?: FeatureCollection;
     labelTimelineYear?: number | null;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
-    onDeleteFeature?: (id: string | number) => void;
+    onDeleteFeature?: (id: string | number | (string | number)[]) => void;
     onHideFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
     allowGeometryEditing?: boolean;
-    respectBindingFilter?: boolean;
+    applyGeometryBindingFilter?: boolean;
     height?: CSSProperties["height"];
     fitToDraftBounds?: boolean;
     fitBoundsKey?: string | number | null;
@@ -57,12 +60,13 @@ type MapProps = {
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
     imageOverlay?: MapImageOverlay | null;
     onImageOverlayChange?: (overlay: MapImageOverlay) => void;
+    onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
     mode,
     onSetMode,
-    draft,
+    renderDraft,
     backgroundVisibility,
     geometryVisibility,
     selectedFeatureIds,
@@ -74,7 +78,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     onHideFeature,
     onUpdateFeature,
     allowGeometryEditing = true,
-    respectBindingFilter = true,
+    applyGeometryBindingFilter = true,
     height = "100vh",
     fitToDraftBounds = false,
     fitBoundsKey = null,
@@ -85,11 +89,12 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     focusPadding,
     imageOverlay = null,
     onImageOverlayChange,
+    onBindGeometries,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
-    // Ref giữ draft mới nhất để engine đọc không bị stale closure.
-    const draftRef = useRef<FeatureCollection>(draft);
+    // Ref giữ render draft mới nhất để map engines đọc không bị stale closure.
+    const renderDraftRef = useRef<FeatureCollection>(renderDraft);
     // Ref callback select feature mới nhất cho event click trên map.
     const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
     // Ref callback đổi mode mới nhất, dùng khi map interaction chuyển sang replay/select.
@@ -108,9 +113,11 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay);
     // Ref callback update overlay mới nhất để interaction không stale.
     const onImageOverlayChangeRef = useRef<MapProps["onImageOverlayChange"]>(onImageOverlayChange);
-
+    // Ref callback bind geometry mới nhất để interaction không stale.
+    const onBindGeometriesRef = useRef<MapProps["onBindGeometries"]>(onBindGeometries);
+ 
     useEffect(() => { modeRef.current = mode; }, [mode]);
-    useEffect(() => { draftRef.current = draft; }, [draft]);
+    useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
     useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
     useEffect(() => { onHoverFeatureChangeRef.current = onHoverFeatureChange; }, [onHoverFeatureChange]);
@@ -120,6 +127,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     useEffect(() => { onUpdateRef.current = onUpdateFeature; }, [onUpdateFeature]);
     useEffect(() => { imageOverlayRef.current = imageOverlay; }, [imageOverlay]);
     useEffect(() => { onImageOverlayChangeRef.current = onImageOverlayChange; }, [onImageOverlayChange]);
+    useEffect(() => { onBindGeometriesRef.current = onBindGeometries; }, [onBindGeometries]);
 
     // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {
@@ -154,7 +162,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         mapRef,
         mode,
         modeRef,
-        draftRef,
+        renderDraftRef,
         allowGeometryEditing,
         selectedFeatureIds,
         onSelectFeatureIdsRef,
@@ -164,23 +172,24 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         onHideRef,
         onUpdateRef,
         onHoverFeatureChangeRef,
+        onBindGeometriesRef,
     });
 
     // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.
     const {
-        applyDraftToMap,
+        applyRenderDraftToMap,
         applyHighlightToMap,
         applyImageOverlayToMap,
         tryCenterToUserLocation,
     } = useMapSync({
         mapRef,
-        draft,
+        renderDraft,
         labelContextDraft,
         labelTimelineYear,
         backgroundVisibility,
         geometryVisibility,
         selectedFeatureIds,
-        respectBindingFilter,
+        applyGeometryBindingFilter,
         fitToDraftBounds,
         fitBoundsKey,
         highlightFeatures,
@@ -200,7 +209,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         setupMapLayers(map, backgroundVisibility, highlightFeatures, applyHighlightToMap);
         applyImageOverlayToMap();
         setupMapInteractions(map);
-        applyDraftToMap(draftRef.current);
+        applyRenderDraftToMap(renderDraftRef.current);
         tryCenterToUserLocation();
 
         return () => {

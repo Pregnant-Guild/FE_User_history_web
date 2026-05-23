@@ -24,8 +24,8 @@ type Options = {
 export function useEditorSessionState(options: Options) {
     // Mode thao tác map/editor hiện tại.
     const [mode, setMode] = useState<EditorMode>("idle");
-    // FeatureCollection "gốc" của session hiện tại (global timeline hoặc project snapshot).
-    const [initialData, setInitialData] = useState<FeatureCollection>(options.emptyFeatureCollection);
+    // Baseline FeatureCollection used to seed/reset the editor draft for the current session.
+    const [baselineFeatureCollection, setBaselineFeatureCollection] = useState<FeatureCollection>(options.emptyFeatureCollection);
 
     const project = useProjectSessionState({
         defaultEditorUserId: options.defaultEditorUserId,
@@ -41,8 +41,8 @@ export function useEditorSessionState(options: Options) {
     return {
         mode,
         setMode,
-        initialData,
-        setInitialData,
+        baselineFeatureCollection,
+        setBaselineFeatureCollection,
         ...project,
         ...entity,
         ...timeline,

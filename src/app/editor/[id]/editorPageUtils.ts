@@ -3,6 +3,7 @@ import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { Feature, Geometry } from "@/uhm/types/geo";
 import type { BattleReplay } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
+import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 
 // Giới hạn kích thước panel khi drag resize để tránh layout bị vỡ.
 export function clampNumber(value: number, min: number, max: number): number {
@@ -18,10 +19,10 @@ export function formatCommitTitle(commit: ProjectCommit): string {
 
 // Kiểm tra feature có nằm trong năm timeline đang active hay không.
 export function isFeatureVisibleAtYear(feature: Feature, year: number): boolean {
-    const start = feature.properties.time_start;
-    const end = feature.properties.time_end;
-    if (typeof start === "number" && Number.isFinite(start) && year < start) return false;
-    if (typeof end === "number" && Number.isFinite(end) && year > end) return false;
+    const start = normalizeTimelineYearValue(feature.properties.time_start);
+    const end = normalizeTimelineYearValue(feature.properties.time_end);
+    if (start !== null && year < start) return false;
+    if (end !== null && year > end) return false;
     return true;
 }
 
@@ -57,8 +58,8 @@ export function normalizeEntitiesForCompare(input: EntitySnapshot[] | null | und
             source: e.source,
             name: typeof e.name === "string" ? e.name.trim() : "",
             description: e.description == null ? null : String(e.description),
-            time_start: typeof e.time_start === "number" ? e.time_start : null,
-            time_end: typeof e.time_end === "number" ? e.time_end : null,
+            time_start: normalizeTimelineYearValue(e.time_start),
+            time_end: normalizeTimelineYearValue(e.time_end),
         }))
         .sort((a, b) => a.id.localeCompare(b.id));
 }

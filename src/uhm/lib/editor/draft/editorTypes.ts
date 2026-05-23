@@ -13,9 +13,10 @@ export type Change = GeometryChange;
 export type UndoAction =
     | { type: "update"; id: FeatureProperties["id"]; prevGeometry: Geometry }
     | { type: "properties"; id: FeatureProperties["id"]; prevProperties: FeatureProperties }
-    | { type: "delete"; feature: Feature }
+    | { type: "delete"; feature: Feature; index?: number }
     | { type: "create"; id: FeatureProperties["id"] }
     | { type: "replay"; geometryId: string; label: string; prevReplay: BattleReplay | null }
+    | { type: "replays"; label: string; prevReplays: BattleReplay[] }
     | { type: "replay_session"; geometryId: string; label: string; prevReplay: BattleReplay | null }
     // Snapshot-scoped undo (affects commit snapshot but not GeoJSON draft directly)
     | { type: "snapshot_entities"; label: string; prev: EntitySnapshot[] }

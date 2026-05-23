@@ -55,6 +55,7 @@ Quy ước operation:
 - wiki ref thêm từ search: `source: "ref"`, `operation: "reference"`
 - wiki đã tồn tại nhưng sửa nội dung: `operation: "update"`
 - wiki bị remove khỏi current state: được chuyển thành `delete` khi build snapshot so với baseline
+- khi remove wiki, page editor cũng gỡ các link `entity_wiki` trỏ tới wiki đó trong cùng undo group nếu handler ngoài được truyền vào
 
 ## 4. Slug
 
@@ -177,4 +178,5 @@ Hiện tại chưa có:
 - schema block editor mới cho project wiki
 - cross-project link graph UI
 
-File `doc/commit_snapshot.ts` có chứa schema `replays[]`, nhưng phần replay narrative đó chưa được nối với wiki editor hiện tại.
+Replay preview có thể mở `PublicWikiSidebar` bằng action `wiki_panel`, `close_wiki_panel` và `wiki`.
+Wiki editor vẫn không lưu narrative replay trực tiếp; narrative/script nằm trong `replays[]`.

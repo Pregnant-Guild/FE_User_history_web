@@ -8,7 +8,13 @@ import {
     openSectionEditor,
     submitSection,
 } from "@/uhm/api/projects";
-import { buildEditorSnapshot, normalizeEditorSnapshot, toApiEditorSnapshot } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import {
+    buildEditorSnapshot,
+    normalizeEditorSnapshot,
+    normalizeFeatureEntityIds,
+    toApiEditorSnapshot,
+} from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
 import type { BattleReplay, EditorSnapshot, ProjectCommit, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
@@ -42,15 +48,15 @@ export function useProjectCommands(options: Options) {
         // operations should not carry over as deltas into the next commit.
         const sessionSnapshot = snapshot ? toEditorSessionSnapshot(snapshot) : null;
         const commits = await fetchProjectCommits(projectId);
-        const nextInitialData = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
+        const nextBaselineFeatureCollection = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
 
         state.setActiveSection(editorPayload.project);
         state.setSelectedProjectId(editorPayload.project.id);
         state.setProjectState(editorPayload.state);
         state.setBaselineSnapshot(sessionSnapshot);
-        state.setInitialData(nextInitialData);
+        state.setBaselineFeatureCollection(nextBaselineFeatureCollection);
         state.setProjectCommits(commits);
-        state.setSnapshotEntities(sessionSnapshot?.entities || []);
+        state.setSnapshotEntityRows(sessionSnapshot?.entities || []);
         state.setSnapshotWikis(sessionSnapshot?.wikis || []);
         state.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
         state.setSelectedFeatureIds([]);
@@ -68,6 +74,15 @@ export function useProjectCommands(options: Options) {
             return;
         }
 
+        const orphanGeometries = findOrphanGeometries(options.editor.mainDraft);
+        if (orphanGeometries.length > 0) {
+            const firstOrphan = orphanGeometries[0];
+            state.setSelectedFeatureIds([firstOrphan.id]);
+            state.setEntityFormStatus("Geometry này chưa bind entity.");
+            state.setEntityStatus(formatOrphanGeometryMessage("Commit", orphanGeometries));
+            return;
+        }
+
         const geometryChanges = options.editor.buildPayload();
         state.setIsSaving(true);
         state.setEntityStatus(null);
@@ -76,7 +91,7 @@ export function useProjectCommands(options: Options) {
                 project: state.activeSection,
                 draft: options.editor.mainDraft,
                 changes: geometryChanges,
-                snapshotEntities: state.snapshotEntities,
+                snapshotEntityRows: state.snapshotEntityRows,
                 snapshotWikis: state.snapshotWikis,
                 snapshotEntityWikiLinks: state.snapshotEntityWikiLinks,
                 replays: options.editor.effectiveReplays,
@@ -111,10 +126,10 @@ export function useProjectCommands(options: Options) {
             const sessionSnapshot = toEditorSessionSnapshot(snapshot);
             state.setProjectState(result.state);
             state.setBaselineSnapshot(sessionSnapshot);
-            state.setSnapshotEntities(sessionSnapshot.entities || []);
+            state.setSnapshotEntityRows(sessionSnapshot.entities || []);
             state.setSnapshotWikis(sessionSnapshot.wikis || []);
             state.setSnapshotEntityWikiLinks(sessionSnapshot.entity_wiki || []);
-            state.setInitialData(options.editor.mainDraft);
+            state.setBaselineFeatureCollection(options.editor.mainDraft);
             options.editor.clearChanges();
             state.setCommitTitle("");
             state.setProjectCommits(await fetchProjectCommits(state.activeSection.id));
@@ -206,6 +221,15 @@ export function useProjectCommands(options: Options) {
             return;
         }
 
+        const orphanGeometries = findOrphanGeometries(options.editor.mainDraft);
+        if (orphanGeometries.length > 0) {
+            const firstOrphan = orphanGeometries[0];
+            state.setSelectedFeatureIds([firstOrphan.id]);
+            state.setEntityFormStatus("Geometry này chưa bind entity.");
+            state.setEntityStatus(formatOrphanGeometryMessage("Submit", orphanGeometries));
+            return;
+        }
+
         state.setIsSubmitting(true);
         state.setEntityStatus(null);
         try {
@@ -220,7 +244,7 @@ export function useProjectCommands(options: Options) {
         } finally {
             state.setIsSubmitting(false);
         }
-    }, [options.pendingSaveCount, options.store]);
+    }, [options.editor.mainDraft, options.pendingSaveCount, options.store]);
 
     const restoreCommit = useCallback(async (commitId: string) => {
         const state = options.store.getState();
@@ -247,11 +271,11 @@ export function useProjectCommands(options: Options) {
 
             const snapshot = normalizeEditorSnapshot(target.snapshot_json);
             const sessionSnapshot = snapshot ? toEditorSessionSnapshot(snapshot) : null;
-            const nextInitialData = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
+            const nextBaselineFeatureCollection = sessionSnapshot?.editor_feature_collection || options.emptyFeatureCollection;
 
             state.setBaselineSnapshot(sessionSnapshot);
-            state.setInitialData(nextInitialData);
-            state.setSnapshotEntities(sessionSnapshot?.entities || []);
+            state.setBaselineFeatureCollection(nextBaselineFeatureCollection);
+            state.setSnapshotEntityRows(sessionSnapshot?.entities || []);
             state.setSnapshotWikis(sessionSnapshot?.wikis || []);
             state.setSnapshotEntityWikiLinks(sessionSnapshot?.entity_wiki || []);
             state.setSelectedFeatureIds([]);
@@ -279,6 +303,34 @@ export function useProjectCommands(options: Options) {
         submitCurrentSection,
         restoreCommit,
     };
+}
+
+type OrphanGeometry = {
+    id: Feature["properties"]["id"];
+    label: string;
+};
+
+function findOrphanGeometries(draft: FeatureCollection): OrphanGeometry[] {
+    const rows: OrphanGeometry[] = [];
+
+    for (const feature of draft.features || []) {
+        const entityIds = normalizeFeatureEntityIds(feature);
+        if (entityIds.length > 0) continue;
+
+        const id = feature.properties.id;
+        rows.push({
+            id,
+            label: String(id),
+        });
+    }
+
+    return rows;
+}
+
+function formatOrphanGeometryMessage(action: "Commit" | "Submit", rows: OrphanGeometry[]): string {
+    const sample = rows.slice(0, 8).map((row) => row.label).join(", ");
+    const more = rows.length > 8 ? `, ... (+${rows.length - 8})` : "";
+    return `Không thể ${action}: còn ${rows.length} geometry chưa bind entity. Hãy bind entity cho: ${sample}${more}.`;
 }
 
 function toEditorSessionSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
@@ -311,8 +363,8 @@ function toEditorSessionEntities(input: EditorSnapshot["entities"]): EntitySnaps
                 operation: "reference",
                 name: typeof e.name === "string" ? e.name : undefined,
                 description: typeof e.description === "string" ? e.description : e.description ?? null,
-                time_start: typeof e.time_start === "number" ? e.time_start : e.time_start ?? undefined,
-                time_end: typeof e.time_end === "number" ? e.time_end : e.time_end ?? undefined,
+                time_start: normalizeTimelineYearValue(e.time_start) ?? undefined,
+                time_end: normalizeTimelineYearValue(e.time_end) ?? undefined,
             };
         });
 }
@@ -333,8 +385,8 @@ function toEditorSessionGeometries(input: EditorSnapshot["geometries"]): Geometr
                 draw_geometry: g.draw_geometry,
                 geometry: g.geometry,
                 binding: Array.isArray(g.binding) ? [...g.binding] : undefined,
-                time_start: typeof g.time_start === "number" ? g.time_start : g.time_start ?? undefined,
-                time_end: typeof g.time_end === "number" ? g.time_end : g.time_end ?? undefined,
+                time_start: normalizeTimelineYearValue(g.time_start) ?? undefined,
+                time_end: normalizeTimelineYearValue(g.time_end) ?? undefined,
                 bbox: g.bbox
                     ? {
                         min_lng: g.bbox.min_lng,

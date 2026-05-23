@@ -45,7 +45,6 @@ type PointStyleConfig = {
 };
 
 const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get", "type"], ["get", "entity_type_id"], ""];
-const DRAFT_ENTITY_EXPR: maplibregl.ExpressionSpecification = ["==", ["coalesce", ["get", "entity_id"], ""], ""];
 const SELECTED_EXPR: maplibregl.ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
 const ICON_CANVAS_SIZE = 48;
@@ -168,7 +167,7 @@ export function buildPointGeotypeLayers(
             source: pointSourceId,
             filter: pointFilter(typeId),
             layout: {
-                "icon-image": pointIconExpression(typeId),
+                "icon-image": getPointIconId(typeId),
                 "icon-size": [
                     "interpolate",
                     ["linear"],
@@ -262,13 +261,11 @@ export function ensurePointGeotypeIcons(map: maplibregl.Map): boolean {
     }
 
     for (const typeId of POINT_GEOTYPE_IDS) {
-        for (const variant of ["default", "draft"] as const) {
-            const iconId = getPointIconId(typeId, variant);
-            if (map.hasImage(iconId)) continue;
-            const imageData = createPointIconImageData(typeId, variant);
-            if (!imageData) return false;
-            map.addImage(iconId, imageData, { pixelRatio: 2 });
-        }
+        const iconId = getPointIconId(typeId);
+        if (map.hasImage(iconId)) continue;
+        const imageData = createPointIconImageData(typeId);
+        if (!imageData) return false;
+        map.addImage(iconId, imageData, { pixelRatio: 2 });
     }
 
     return true;
@@ -278,19 +275,13 @@ function pointFilter(typeId: PointGeotypeId): maplibregl.ExpressionSpecification
     return ["all", POINT_GEOMETRY_FILTER, ["==", TYPE_MATCH_EXPR, typeId]];
 }
 
-function pointIconExpression(typeId: PointGeotypeId): maplibregl.ExpressionSpecification {
-    return ["case", DRAFT_ENTITY_EXPR, getPointIconId(typeId, "draft"), getPointIconId(typeId, "default")];
+function getPointIconId(typeId: PointGeotypeId): string {
+    return `point-${typeId}`;
 }
 
-function getPointIconId(typeId: PointGeotypeId, variant: PointIconVariant): string {
-    return `point-${typeId}-${variant}`;
-}
-
-function createPointIconImageData(typeId: PointGeotypeId, variant: PointIconVariant): ImageData | null {
+function createPointIconImageData(typeId: PointGeotypeId): ImageData | null {
     const config = POINT_STYLE_CONFIG[typeId];
-    const palette = variant === "draft"
-        ? { fill: DRAFT_FILL, rim: DRAFT_RIM }
-        : { fill: config.fill, rim: config.rim };
+    const palette = { fill: config.fill, rim: config.rim };
 
     const canvas = document.createElement("canvas");
     canvas.width = ICON_CANVAS_SIZE;

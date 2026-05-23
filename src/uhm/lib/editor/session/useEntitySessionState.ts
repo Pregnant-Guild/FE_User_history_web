@@ -11,7 +11,7 @@ export function useEntitySessionState() {
     // Entity catalog loaded from backend (global list, used for search/lookup).
     const [entityCatalog, setEntityCatalog] = useState<Entity[]>([]);
     // Snapshot entity store for the current editor session (single source of truth for snapshot.entities).
-    const [snapshotEntities, setSnapshotEntities] = useState<EntitySnapshot[]>([]);
+    const [snapshotEntityRows, setSnapshotEntityRows] = useState<EntitySnapshot[]>([]);
     // Thông báo trạng thái/lỗi liên quan entity/session.
     const [entityStatus, setEntityStatus] = useState<string | null>(null);
     // Features đang được chọn để thao tác bind entities/metadata.
@@ -48,8 +48,8 @@ export function useEntitySessionState() {
     return {
         entityCatalog,
         setEntityCatalog,
-        snapshotEntities,
-        setSnapshotEntities,
+        snapshotEntityRows,
+        setSnapshotEntityRows,
         entityStatus,
         setEntityStatus,
         selectedFeatureIds,

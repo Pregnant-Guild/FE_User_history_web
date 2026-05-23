@@ -20,13 +20,17 @@ import { applyImageOverlay, type MapImageOverlay } from "./imageOverlay";
 
 type UseMapSyncProps = {
     mapRef: React.MutableRefObject<maplibregl.Map | null>;
-    draft: FeatureCollection;
+    // Already-filtered FeatureCollection that should be written to MapLibre sources.
+    // Timeline/replay filters must be applied before this hook receives it.
+    renderDraft: FeatureCollection;
+    // Lookup-only context for labels. It may contain geometries that are not rendered.
+    // Never use it to decide which geometries appear on the map.
     labelContextDraft?: FeatureCollection;
     labelTimelineYear?: number | null;
     backgroundVisibility: BackgroundLayerVisibility;
     geometryVisibility?: Record<string, boolean>;
     selectedFeatureIds: (string | number)[];
-    respectBindingFilter: boolean;
+    applyGeometryBindingFilter: boolean;
     fitToDraftBounds: boolean;
     fitBoundsKey?: string | number | null;
     highlightFeatures?: FeatureCollection | null;
@@ -44,13 +48,13 @@ type UseMapSyncProps = {
 
 export function useMapSync({
     mapRef,
-    draft,
+    renderDraft,
     labelContextDraft,
     labelTimelineYear,
     backgroundVisibility,
     geometryVisibility,
     selectedFeatureIds,
-    respectBindingFilter,
+    applyGeometryBindingFilter,
     fitToDraftBounds,
     fitBoundsKey,
     highlightFeatures,
@@ -62,13 +66,13 @@ export function useMapSync({
     editingEngineRef,
     geolocationCenteredRef,
 }: UseMapSyncProps) {
-    const draftRef = useRef<FeatureCollection>(draft);
+    const renderDraftRef = useRef<FeatureCollection>(renderDraft);
     const labelContextDraftRef = useRef<FeatureCollection | undefined>(labelContextDraft);
     const labelTimelineYearRef = useRef<number | null | undefined>(labelTimelineYear);
     const backgroundVisibilityRef = useRef<BackgroundLayerVisibility>(backgroundVisibility);
     const geometryVisibilityRef = useRef<Record<string, boolean> | undefined>(geometryVisibility);
     const selectedFeatureIdsRef = useRef<(string | number)[]>(selectedFeatureIds);
-    const respectBindingFilterRef = useRef(respectBindingFilter);
+    const applyGeometryBindingFilterRef = useRef(applyGeometryBindingFilter);
     const fitToDraftBoundsRef = useRef(fitToDraftBounds);
     const highlightFeaturesRef = useRef<FeatureCollection | null>(highlightFeatures || null);
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay || null);
@@ -77,13 +81,13 @@ export function useMapSync({
 
     const fitBoundsAppliedRef = useRef(false);
 
-    useEffect(() => { draftRef.current = draft; }, [draft]);
+    useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
     useEffect(() => { labelContextDraftRef.current = labelContextDraft; }, [labelContextDraft]);
     useEffect(() => { labelTimelineYearRef.current = labelTimelineYear; }, [labelTimelineYear]);
     useEffect(() => { backgroundVisibilityRef.current = backgroundVisibility; }, [backgroundVisibility]);
     useEffect(() => { geometryVisibilityRef.current = geometryVisibility; }, [geometryVisibility]);
     useEffect(() => { selectedFeatureIdsRef.current = selectedFeatureIds; }, [selectedFeatureIds]);
-    useEffect(() => { respectBindingFilterRef.current = respectBindingFilter; }, [respectBindingFilter]);
+    useEffect(() => { applyGeometryBindingFilterRef.current = applyGeometryBindingFilter; }, [applyGeometryBindingFilter]);
     useEffect(() => { fitToDraftBoundsRef.current = fitToDraftBounds; }, [fitToDraftBounds]);
     useEffect(() => { highlightFeaturesRef.current = highlightFeatures || null; }, [highlightFeatures]);
     useEffect(() => { imageOverlayRef.current = imageOverlay || null; }, [imageOverlay]);
@@ -94,8 +98,8 @@ export function useMapSync({
         fitBoundsAppliedRef.current = false;
     }, [fitBoundsKey]);
 
-    const applyDraftToMap = useCallback((
-        fc: FeatureCollection,
+    const applyRenderDraftToMap = useCallback((
+        renderFc: FeatureCollection,
         labelContextOverride?: FeatureCollection,
         selectedIdsOverride?: (string | number)[],
         highlightFeaturesOverride?: FeatureCollection | null
@@ -115,22 +119,22 @@ export function useMapSync({
             }
         }
 
-        const labelContext = labelContextOverride || labelContextDraftRef.current || fc;
+        const labelContext = labelContextOverride || labelContextDraftRef.current || renderFc;
         const currentSelectedIds = selectedIdsOverride || selectedFeatureIdsRef.current;
         const highlightFeaturesVal = highlightFeaturesOverride !== undefined
             ? highlightFeaturesOverride
             : highlightFeaturesRef.current;
 
-        const visibleDraftRaw = respectBindingFilterRef.current
-            ? filterDraftByBinding(labelContext, currentSelectedIds, highlightFeaturesVal)
-            : labelContext;
-        const visibleDraft = filterDraftByGeometryVisibility(visibleDraftRaw, geometryVisibilityRef.current);
+        const bindingFilteredRenderDraft = applyGeometryBindingFilterRef.current
+            ? filterDraftByBinding(renderFc, currentSelectedIds, highlightFeaturesVal)
+            : renderFc;
+        const mapSourceDraft = filterDraftByGeometryVisibility(bindingFilteredRenderDraft, geometryVisibilityRef.current);
         const labelTimelineYear = labelTimelineYearRef.current;
-        const { polygons, points } = splitDraftFeatures(visibleDraft);
+        const { polygons, points } = splitDraftFeatures(mapSourceDraft);
         const labeledGeometries = decorateLineFeaturesWithLabels(polygons, labelContext, labelTimelineYear);
         const labeledPoints = decoratePointFeaturesWithLabels(points, labelContext, labelTimelineYear);
         const polygonLabels = buildPolygonLabelFeatureCollection(polygons, labelContext, labelTimelineYear);
-        const pathArrowShapes = buildPathArrowFeatureCollection(visibleDraft);
+        const pathArrowShapes = buildPathArrowFeatureCollection(mapSourceDraft);
 
         countriesSource.setData(labeledGeometries);
         placesSource.setData(labeledPoints);
@@ -147,7 +151,7 @@ export function useMapSync({
             });
         });
         if (fitToDraftBoundsRef.current && !fitBoundsAppliedRef.current) {
-            fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, visibleDraft);
+            fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, mapSourceDraft);
         }
     }, [mapRef]);
 
@@ -206,24 +210,24 @@ export function useMapSync({
     }, [imageOverlay, mapRef]);
 
     useEffect(() => {
-        applyDraftToMap(draft, labelContextDraft, selectedFeatureIds, highlightFeatures);
+        applyRenderDraftToMap(renderDraft, labelContextDraft, selectedFeatureIds, highlightFeatures);
         const editingId = editingEngineRef.current?.editingRef?.current?.id;
         if (allowGeometryEditing && editingId !== undefined && editingId !== null) {
-            const stillExists = draft.features.some((f) => f.properties.id === editingId);
+            const stillExists = renderDraft.features.some((f) => f.properties.id === editingId);
             if (!stillExists) {
                 editingEngineRef.current?.clearEditing();
             }
         }
     }, [
         allowGeometryEditing,
-        draft,
+        renderDraft,
         labelContextDraft,
         labelTimelineYear,
         selectedFeatureIds,
-        respectBindingFilter,
+        applyGeometryBindingFilter,
         geometryVisibility,
         highlightFeatures,
-        applyDraftToMap,
+        applyRenderDraftToMap,
         editingEngineRef,
     ]);
 
@@ -259,7 +263,7 @@ export function useMapSync({
     }, [focusRequestKey, mapRef]);
 
     return {
-        applyDraftToMap,
+        applyRenderDraftToMap,
         applyHighlightToMap,
         tryCenterToUserLocation,
         applyImageOverlayToMap: () => {

@@ -47,6 +47,8 @@ type LinkEntityPopupState = {
     left: number;
 };
 
+type CachedWiki = Wiki & { __fetched?: boolean };
+
 const EMPTY_RELATIONS: RelationIndex = {
     entitiesById: {},
     entityGeometriesById: {},
@@ -84,7 +86,7 @@ export default function Page() {
     const [isMapLayersCollapsed, setIsMapLayersCollapsed] = useState(false);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
-    const [wikiCache, setWikiCache] = useState<Record<string, Wiki>>({});
+    const [wikiCache, setWikiCache] = useState<Record<string, CachedWiki>>({});
     const [isActiveWikiLoading, setIsActiveWikiLoading] = useState(false);
     const [activeWikiError, setActiveWikiError] = useState<string | null>(null);
     const [linkEntityPopup, setLinkEntityPopup] = useState<LinkEntityPopupState | null>(null);
@@ -122,13 +124,6 @@ export default function Page() {
     const hoverHideTimerRef = useRef<number | null>(null);
     const hoverPopupHoveredRef = useRef(false);
     const linkEntityPopupRef = useRef<HTMLDivElement | null>(null);
-
-    const selectedFeature = useMemo(() => {
-        if (!selectedFeatureIds || selectedFeatureIds.length === 0) return null;
-        return (
-            data.features.find((feature) => String(feature.properties.id) === String(selectedFeatureIds[0])) || null
-        );
-    }, [data.features, selectedFeatureIds]);
 
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
@@ -416,7 +411,7 @@ export default function Page() {
         };
     }, [linkEntityPopup]);
 
-    const cachedWiki = activeWikiSlug ? (wikiCache[activeWikiSlug] as Wiki & { __fetched?: boolean }) : undefined;
+    const cachedWiki = activeWikiSlug ? wikiCache[activeWikiSlug] : undefined;
 
     useEffect(() => {
         if (!activeWikiSlug) {
@@ -459,7 +454,7 @@ export default function Page() {
                     if (disposed) return;
                     setWikiCache((prev) => ({
                         ...prev,
-                        [activeWikiSlug]: { ...row, content: versionContent, __fetched: true } as any,
+                        [activeWikiSlug]: { ...row, content: versionContent, __fetched: true },
                     }));
                 } else {
                     setWikiCache((prev) => ({
@@ -525,7 +520,7 @@ export default function Page() {
                 {isBackgroundVisibilityReady ? (
                     <Map
                         mode="select"
-                        draft={data}
+                        renderDraft={data}
                         labelContextDraft={mapLabelContextDraft}
                         labelTimelineYear={timelineDraftYear}
                         selectedFeatureIds={selectedFeatureIds}
@@ -533,7 +528,7 @@ export default function Page() {
                         backgroundVisibility={backgroundVisibility}
                         geometryVisibility={geometryVisibility}
                         allowGeometryEditing={false}
-                        respectBindingFilter={true}
+                        applyGeometryBindingFilter={true}
                         onHoverFeatureChange={handleMapHoverChange}
                         highlightFeatures={activeEntityGeometries}
                         focusFeatureCollection={activeEntityGeometries}

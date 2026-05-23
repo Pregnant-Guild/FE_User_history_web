@@ -122,8 +122,12 @@ Những label dễ gây rối nếu bật nhiều:
 
 ## Gợi ý mapping cho UI
 
-- `Country Borders` -> `boundary-land-type-0` + `boundary-land-type-0-bg`
-- `Province Borders` -> `boundary-land-type-1` + `boundary-land-type-1-bg`
-- `District Borders` -> `boundary-land-type-2` + `boundary-land-type-2-bg`
-- `Country Labels` -> `place-country-*`, `place-city-capital*`, `place-city*`, `place-town*`
-- `Rivers` -> `water`, `water-shadow`, `river-name-*`, `lake-name_*`
+Mapping hiện tại trong `tiles.ts` là heuristic runtime, không hardcode đúng từng id này:
+
+- `Country Borders` -> ưu tiên `boundary-land-type-0`, bỏ `boundary-land-type-0-bg`
+- `Province Borders` -> ưu tiên `boundary-land-type-1`, bỏ `boundary-land-type-1-bg`
+- `District Borders` -> `boundary-land-type-2` và các layer cấp sâu hơn
+- `Country Labels` -> symbol layer có text field và tên/source-layer giống country/admin/place/city/town/capital
+- `Rivers` -> line/fill layer có tên/source-layer giống water/waterway/river/stream/canal/lake/reservoir/sea/ocean
+
+Water label symbol như `river-name-*`/`lake-name_*` chỉ được đưa vào nếu heuristic sau này mở rộng; code hiện tại chủ yếu lấy line/fill water.

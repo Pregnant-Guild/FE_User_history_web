@@ -23,3 +23,18 @@ export function clampYearValue(year: number, minYear: number, maxYear: number): 
 export function clampYearToFixedRange(year: number): number {
     return clampYearValue(year, FIXED_TIMELINE_START_YEAR, FIXED_TIMELINE_END_YEAR);
 }
+
+export function normalizeTimelineYearValue(value: unknown): number | null {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? Math.trunc(value) : null;
+    }
+
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed.length) return null;
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
+    }
+
+    return null;
+}

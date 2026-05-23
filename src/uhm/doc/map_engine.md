@@ -29,21 +29,23 @@ Nếu map init lỗi, `Map.tsx` render overlay lỗi thay vì crash im lặng.
 
 ## 2. Base style và background layers
 
-`getBaseMapStyle()` dựng style MapLibre từ vector tile source `base`.
+`getBaseMapStyle()` chỉ dựng skeleton style MapLibre:
 
-Background layers hiện có:
+- `glyphs` trỏ vào Goong glyph proxy
+- `sources: {}`
+- một layer `background` màu nền tối
 
-- `graticules-line`
-- `land`
-- `bg-countries-fill`
-- `bg-country-borders-line`
-- `country-labels`
-- `regions-line`
-- `lakes-fill`
-- `rivers-line`
-- `geolines-line`
+Background thật được thêm sau khi map load:
 
-Visibility của các layer này đi qua `BackgroundLayerVisibility`.
+- `raster-base-layer` được lazy-add từ `goong_satellite.json` qua proxy khi visibility bật.
+- overlay vector từ `goong_map_web.json` được clone theo nhóm:
+  - `bg-country-borders-line`
+  - `bg-province-borders-line`
+  - `bg-district-borders-line`
+  - `country-labels`
+  - `rivers-line`
+
+Visibility của các nhóm này đi qua `BackgroundLayerVisibility`.
 
 ## 3. Sources mà editor đang dùng
 
@@ -85,17 +87,20 @@ Source này dùng cho:
 
 `useMapSync()` chịu trách nhiệm:
 
-1. filter draft theo binding nếu `respectBindingFilter = true`
-2. filter theo geometry visibility
-3. split feature thành nhóm polygon/line/point
-4. decorate line/polygon/point cho label rendering
-5. build source riêng cho path arrows
-6. set selected feature state
+1. nhận `renderDraft` đã được page áp timeline/replay/preview filter trước
+2. filter draft theo binding nếu `applyGeometryBindingFilter = true`
+3. filter theo geometry visibility
+4. split feature thành nhóm polygon/line/point
+5. decorate line/polygon/point cho label rendering
+6. build source riêng cho path arrows
+7. set selected feature state
 
 Điểm quan trọng:
 
-- data mà map nhận không phải raw `draft` nguyên xi
-- nó là `draft` sau khi đã qua visibility, binding filter và label decoration
+- data mà map render không phải raw `mainDraft` nguyên xi
+- `renderDraft` là nguồn quyết định geometry nào xuất hiện trên map
+- `labelContextDraft` chỉ dùng để lookup label/entity name, có thể chứa geometry đã bị timeline filter ẩn, và không được dùng để quyết định render
+- source MapLibre cuối cùng là `renderDraft` sau khi đã qua binding filter, geometry visibility và label decoration
 
 ## 5. Map interaction layer
 
@@ -111,6 +116,8 @@ Binding hiện tại:
 - `add-circle` -> `initCircle`
 
 `add-point` được init riêng bằng `initPoint`, nhưng hiện chưa được đưa vào `engineBindingsRef` như các mode còn lại; logic create point vẫn được bind trong `setupMapInteractions`.
+
+`replay_preview` không có engine interaction riêng; preview controller điều khiển camera/timeline/visibility qua replay dispatcher.
 
 ## 6. Các engine cụ thể
 
@@ -153,11 +160,12 @@ Binding hiện tại:
 - bắt đầu edit geometry
 - chuyển sang `replay`
 
-`replay` hiện không phải cinematic replay đầy đủ.
-Nó là mode hiển thị tập trung vào một geometry:
+Trong map interaction, `replay` vẫn dùng `initSelect`; `replay_preview` không cho edit/select theo engine.
+Phần script/preview replay nằm ở sidebar và preview overlay:
 
-- có nút thoát replay
-- có thể ẩn geometry ngoài danh sách `binding`
+- map render `replayDraft` hydrate từ `target_geometry_ids`
+- preview action có thể điều khiển camera, timeline, hidden geometry ids và presentation overlay
+- replay mode không cho mutate geometry chính
 
 ## 8. Đồng bộ selection và feature state
 
@@ -194,6 +202,7 @@ Nếu thất bại, map giữ nguyên center mặc định.
 ## 11. Những điều cần nhớ khi sửa map engine
 
 - preview source/layer và persisted source/layer là hai tầng khác nhau
-- `draftRef` được dùng để tránh closure stale trong event handlers
+- `renderDraftRef` trong map interaction là dữ liệu đang được render/interact, không phải canonical commit draft
+- `draftRef` trong `useEditorState()` vẫn là ref nội bộ của draft để tránh closure stale trong editor state
 - `Map` chỉ là orchestration component; logic lớn nằm ở hooks
 - geometry render pipeline phụ thuộc khá nhiều vào `mapUtils.ts`, không chỉ mỗi `useMapSync.ts`

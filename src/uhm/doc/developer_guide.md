@@ -17,6 +17,14 @@ Tài liệu này dành cho người sửa editor hiện tại, không phải mô
 
 Nếu chưa đọc 5 file này, chưa nên sửa behavior lớn của editor.
 
+Docs nên đọc trước khi sửa editor:
+
+- `src/uhm/doc/editor_operations.md`
+- `src/uhm/doc/editor_data_roles.md`
+- `src/uhm/doc/editor_snapshot_contract.md`
+- `src/uhm/doc/editor_manual_test_checklist.md`
+- `src/uhm/doc/editor_replay_actions.md`
+
 ## 2. Cấu trúc thư mục nên ưu tiên hiểu
 
 - `src/uhm/components/editor/`
@@ -40,14 +48,17 @@ Editor có 3 tầng dữ liệu:
 
 1. `baselineSnapshot`
    - snapshot gốc của session
-2. `initialData`
+2. `baselineFeatureCollection`
    - `FeatureCollection` rehydrate từ snapshot đó
-3. `draft`
+   - seed/reset cho `useEditorState()`
+3. `mainDraft`
    - working copy để user sửa trên map
+
+Map không render trực tiếp `mainDraft` mọi lúc. Page tạo `mapRenderDraft` từ `mainDraft`/`replayDraft`/preview draft sau khi áp timeline/replay filter, rồi truyền xuống `Map` dưới prop `renderDraft`. `labelContextDraft` chỉ dùng để lookup label, không được dùng để quyết định geometry nào hiện trên map.
 
 Khi commit:
 
-- geometry đi từ `draft`
+- geometry đi từ `mainDraft`
 - entity/wiki/link đi từ snapshot collections
 - `buildEditorSnapshot()` quyết định operation nào là `reference`, `binding`, `update`, `delete`
 
@@ -150,9 +161,10 @@ Nghĩa là:
 
 Một số nguyên tắc nên giữ:
 
-- dùng `draftRef`/refs trong map engines để tránh rebind handler vô ích
+- dùng `renderDraftRef`/refs trong map engines để tránh rebind handler vô ích
 - giữ component panel càng dumb càng tốt, logic patch state đặt ở page/hooks
 - khi cần undo cho entity/wiki/link, đi qua `editor.setSnapshot*()` để undo stack biết
+- khi cần undo cho replay script, đi qua `editor.mutateActiveReplay()` hoặc replay collection helper hiện có
 - hạn chế thêm `JSON.stringify` compare ở chỗ nóng nếu chưa đo hiệu năng
 
 ## 12. Chỗ dễ gây hiểu nhầm khi debug
@@ -173,7 +185,7 @@ Không phải lúc nào cũng là bug render layer.
 
 ### Selection mất
 
-Khi timeline filter làm geometry đang chọn không còn visible, page sẽ tự cắt `selectedFeatureIds`.
+Selection hiện bám theo `editor.draft`, không theo `mapRenderDraft`. Vì vậy geometry đang chọn có thể bị timeline filter ẩn khỏi map nhưng panel metadata vẫn đọc được draft gốc.
 
 ## 13. Nên test gì sau khi sửa
 
