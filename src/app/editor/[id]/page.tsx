@@ -495,7 +495,7 @@ function EditorPageContent() {
         initialMapViewState: previewSession?.mapViewState ?? null,
         selectedStageId: previewSession?.selectedStageId ?? replaySelection.stageId,
         selectedStepIndex: previewSession?.selectedStepIndex ?? replaySelection.stepIndex,
-        onSelectStep: () => {},
+        onSelectStep: () => { },
     });
     const {
         hiddenGeometryIds: replayPreviewHiddenGeometryIds,
@@ -788,7 +788,7 @@ function EditorPageContent() {
             // QUY TẮC: Geo chọn đầu tiên là geo main.
             const finalSelectedIds = Array.from(new Set([...selectedFeatureIds, featureId]));
             const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
-            
+
             setReplayFeatureId(triggerId);
             setReplaySelection({ stageId: null, stepIndex: null });
             editor.switchReplayContext(triggerId, finalSelectedIds);
@@ -997,7 +997,7 @@ function EditorPageContent() {
             if (isReplayEditMode && hideOutside) {
                 // Trong mode replay, ta chỉ hiển thị những gì có trong draft của replay đó
                 const currentReplayFeatureIds = new Set(editor.draft.features.map(f => String(f.properties.id)));
-                
+
                 // Ẩn tất cả các geo KHÔNG nằm trong draft replay hiện tại
                 Object.keys(visibility).forEach(fid => {
                     if (fid === String(replayFeatureId)) {
@@ -1062,7 +1062,7 @@ function EditorPageContent() {
     // Xóa pending submission để backend cho phép mở editor lại.
     const unlockByDeletingPendingSubmission = useCallback(async () => {
         if (!blockedPendingSubmissionId) return;
-        const confirmed = window.confirm("Xoa submission PENDING de unlock editor? Hanh dong nay khong the hoan tac.");
+        const confirmed = window.confirm("Bạn chắc chắn muốn xóa Submition? - việc này không làm hỏng project của bạn");
         if (!confirmed) return;
         try {
             setIsOpeningSection(true);
@@ -1599,7 +1599,7 @@ function EditorPageContent() {
         }
 
         const prevBindingIds = normalizeFeatureBindingIds(targetFeature);
-        
+
         // Merge prevBindingIds with sourceIds (which are strings of selected features)
         // filter out targetId itself (we can't bind a geometry to itself)
         const newSources = sourceIds.map(String).filter((x) => x !== idStr);
@@ -1966,6 +1966,127 @@ function EditorPageContent() {
         [entities, labelContextBaseDraft]
     );
 
+    if (blockedPendingSubmissionId) {
+        return (
+            <div style={{ display: "flex", minHeight: "100vh", width: "100vw", background: "#0b1220", color: "white", padding: "40px", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ maxWidth: 640, width: "100%", background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 32, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                        <svg style={{ width: 28, height: 28, color: "#ef4444" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" width="28" height="28">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Editor đang bị khóa</h2>
+                    </div>
+                    <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: "1.6" }}>
+                        Project này đang có submission ở trạng thái <b style={{ color: "#ef4444" }}>PENDING</b> (id: <code style={{ color: "#f1f5f9", background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>{blockedPendingSubmissionId}</code>). Theo quy trình làm việc, khi submission đang pending thì không được tạo submission/commit mới và không được vào editor.
+                    </div>
+                    <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+                        <button
+                            onClick={unlockByDeletingPendingSubmission}
+                            disabled={isOpeningSection}
+                            style={{
+                                padding: "10px 16px",
+                                borderRadius: 6,
+                                border: "none",
+                                background: isOpeningSection ? "#334155" : "#ef4444",
+                                color: "white",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                cursor: isOpeningSection ? "not-allowed" : "pointer",
+                                transition: "background 0.2s",
+                            }}
+                            onMouseEnter={(e) => { if (!isOpeningSection) e.currentTarget.style.background = "#dc2626"; }}
+                            onMouseLeave={(e) => { if (!isOpeningSection) e.currentTarget.style.background = "#ef4444"; }}
+                        >
+                            Xóa submission pending để unlock
+                        </button>
+                        <button
+                            onClick={() => router.push("/user/projects")}
+                            style={{
+                                padding: "10px 16px",
+                                borderRadius: 6,
+                                border: "1px solid #334155",
+                                background: "#1e293b",
+                                color: "#f1f5f9",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                cursor: "pointer",
+                                transition: "background 0.2s",
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "#334155"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "#1e293b"}
+                        >
+                            Quay lại danh sách projects
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isOpeningSection || !activeSection) {
+        return (
+            <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", width: "100vw", background: "#0b1220", color: "white", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+                {!activeSection && !isOpeningSection ? (
+                    <div style={{ maxWidth: 480, textAlign: "center", padding: "20px" }}>
+                        <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px", color: "#ef4444" }}>Lỗi tải Project</h2>
+                        <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "20px" }}>
+                            {entityStatus || "Không thể tải thông tin dự án. Vui lòng thử lại hoặc quay lại danh sách."}
+                        </div>
+                        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                            <button
+                                onClick={openProject}
+                                style={{
+                                    padding: "8px 16px",
+                                    borderRadius: 6,
+                                    background: "#3b82f6",
+                                    color: "white",
+                                    border: "none",
+                                    fontWeight: "600",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Thử lại
+                            </button>
+                            <button
+                                onClick={() => router.push("/user/projects")}
+                                style={{
+                                    padding: "8px 16px",
+                                    borderRadius: 6,
+                                    background: "#1e293b",
+                                    color: "#f1f5f9",
+                                    border: "1px solid #334155",
+                                    fontWeight: "600",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Quay lại
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="premium-spinner" style={{
+                            width: "40px",
+                            height: "40px",
+                            border: "3px solid rgba(255, 255, 255, 0.1)",
+                            borderRadius: "50%",
+                            borderTopColor: "#3b82f6",
+                            animation: "spin 1s linear infinite"
+                        }} />
+                        <style>{`
+                            @keyframes spin {
+                                to { transform: rotate(360deg); }
+                            }
+                        `}</style>
+                        <div style={{ fontSize: "15px", fontWeight: "500", color: "#94a3b8" }}>
+                            Đang tải dữ liệu bản đồ...
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
             {!isReplayEditMode && !isReplayPreviewMode ? (
@@ -1980,7 +2101,7 @@ function EditorPageContent() {
                         onRestoreCommit={restoreCommit}
                         isSaving={isSaving}
                         isSubmitting={isSubmitting}
-                        sectionTitle={activeSection?.title || "Đang tải project"}
+                        sectionTitle={activeSection.title || "Đang tải project"}
                         projectStatus={projectState?.status || "editing"}
                         commitTitle={commitTitle}
                         onCommitTitleChange={setCommitTitle}
@@ -2019,8 +2140,8 @@ function EditorPageContent() {
                         previewPlaybackSpeed={1}
                         onPlayPreviewFromStart={() => openReplayPreview("start")}
                         onPlayPreviewFromSelection={() => openReplayPreview("selection")}
-                        onStopPreview={() => {}}
-                        onResetPreview={() => {}}
+                        onStopPreview={() => { }}
+                        onResetPreview={() => { }}
                     />
                     <ResizeHandle
                         title="Resize left panel"
@@ -2031,158 +2152,113 @@ function EditorPageContent() {
                 </>
             ) : null}
 
-            {blockedPendingSubmissionId ? (
-                <div style={{ flex: 1, minHeight: "100vh", background: "#0b1220", color: "white", padding: "24px" }}>
-                    <div style={{ maxWidth: 720 }}>
-                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Editor dang bi khoa</h2>
-                        <div style={{ marginTop: 10, fontSize: 13, color: "#cbd5e1" }}>
-                            Project nay dang co submission o trang thai <b>PENDING</b> (id:{" "}
-                            <code style={{ color: "white" }}>{blockedPendingSubmissionId}</code>). Theo BE moi, khi
-                            submission dang pending thi khong duoc tao submission/commit moi va khong duoc vao editor.
-                        </div>
-                        <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
-                            <button
-                                onClick={unlockByDeletingPendingSubmission}
-                                disabled={isOpeningSection}
-                                style={{
-                                    padding: "10px 12px",
-                                    borderRadius: 6,
-                                    border: "1px solid #334155",
-                                    background: isOpeningSection ? "#334155" : "#ef4444",
-                                    color: "white",
-                                    cursor: isOpeningSection ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                Xoa submission pending de unlock
-                            </button>
-                            <button
-                                onClick={() => router.push("/user/projects")}
-                                style={{
-                                    padding: "10px 12px",
-                                    borderRadius: 6,
-                                    border: "1px solid #334155",
-                                    background: "#111827",
-                                    color: "white",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Quay lai danh sach projects
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-
-            {!blockedPendingSubmissionId ? (
-                <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
-                    {isBackgroundVisibilityReady ? (
-                        <Map
-                            ref={mapHandleRef}
-                            mode={mode}
-                            onSetMode={setMode}
-                            renderDraft={mapRenderDraft}
-                            labelContextDraft={mapLabelContextDraft}
-                            labelTimelineYear={activeTimelineFilterEnabled ? activeTimelineYear : null}
-                            selectedFeatureIds={selectedFeatureIds}
-                            onSelectFeatureIds={setSelectedFeatureIds}
-                            onCreateFeature={handleCreateFeature}
-                            onDeleteFeature={(id) => {
-                                if (Array.isArray(id)) {
-                                    editor.deleteFeatures(id);
-                                } else {
-                                    editor.deleteFeature(id);
-                                }
-                            }}
-                            onHideFeature={handleHideGeometryLocal}
-                            onUpdateFeature={editor.updateFeature}
-                            backgroundVisibility={backgroundVisibility}
-                            geometryVisibility={effectiveGeometryVisibility}
-                            applyGeometryBindingFilter={isReplayEditMode || isReplayPreviewMode ? false : geometryBindingFilterEnabled}
-                            highlightFeatures={null}
-                            focusFeatureCollection={geometryFocusRequest?.collection || null}
-                            focusRequestKey={geometryFocusRequest?.key ?? null}
-                            focusPadding={96}
-                            imageOverlay={imageOverlay}
-                            onImageOverlayChange={setImageOverlay}
-                            onBindGeometries={handleBindGeometries}
-                        />
-                    ) : (
-                        <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
-                    )}
-                    {isReplayPreviewMode ? (
-                        <ReplayPreviewOverlay
-                            isPreviewMode={true}
-                            isPlaying={replayPreview.isPlaying}
-                            title={replayPreview.title}
-                            descriptions={replayPreview.descriptions}
-                            subtitle={replayPreview.subtitle}
-                            dialog={replayPreview.dialog}
-                            image={replayPreview.image}
-                            toasts={replayPreview.toasts}
-                            sidebarOpen={replayPreview.sidebarOpen}
-                            playbackSpeed={replayPreview.playbackSpeed}
-                            activeStepLabel={replayPreviewActiveStepLabel}
-                            activeStepNumber={replayPreview.activeStepNumber}
-                            totalSteps={replayPreview.totalSteps}
-                            onPlayPreview={replayPreview.playFromStart}
-                            onStopPreview={replayPreview.stopPreview}
-                            onResetPreview={replayPreview.resetPreview}
-                            onExitPreview={exitReplayPreview}
-                        />
-                    ) : null}
-                    {isReplayPreviewMode && replayPreview.sidebarOpen ? (
-                        <aside
-                            style={{
-                                position: "absolute",
-                                top: 16,
-                                right: 16,
-                                bottom: 16,
-                                width: 420,
-                                maxWidth: "calc(100vw - 2rem)",
-                                zIndex: 16,
-                            }}
-                        >
-                            <PublicWikiSidebar
-                                entity={null}
-                                wiki={replayPreviewActiveWiki}
-                                isLoading={isPreviewWikiLoading}
-                                error={replayPreview.activeWikiId ? previewWikiError : "Chưa có wiki được chọn trong step này."}
-                                onClose={() => {
-                                    setPreviewWikiError(null);
-                                    replayPreview.closeWikiPanel();
-                                }}
-                                onWikiLinkRequest={handleReplayPreviewWikiLinkRequest}
-                            />
-                        </aside>
-                    ) : null}
-                    {!isReplayPreviewMode || replayPreview.timelineVisible ? (
-                        <TimelineBar
-                            year={activeTimelineYear}
-                            onYearChange={
-                                isReplayPreviewMode
-                                    ? replayPreview.setTimelineYear
-                                    : handleTimelineYearChange
+            <div style={{ flex: 1, position: "relative", minHeight: "100vh" }}>
+                {isBackgroundVisibilityReady ? (
+                    <Map
+                        ref={mapHandleRef}
+                        mode={mode}
+                        onSetMode={setMode}
+                        renderDraft={mapRenderDraft}
+                        labelContextDraft={mapLabelContextDraft}
+                        labelTimelineYear={activeTimelineFilterEnabled ? activeTimelineYear : null}
+                        selectedFeatureIds={selectedFeatureIds}
+                        onSelectFeatureIds={setSelectedFeatureIds}
+                        onCreateFeature={handleCreateFeature}
+                        onDeleteFeature={(id) => {
+                            if (Array.isArray(id)) {
+                                editor.deleteFeatures(id);
+                            } else {
+                                editor.deleteFeature(id);
                             }
-                            isLoading={false}
-                            disabled={false}
-                            statusText={null}
-                            filterEnabled={activeTimelineFilterEnabled}
-                            onFilterEnabledChange={
-                                isReplayPreviewMode
-                                    ? replayPreview.setTimelineFilterEnabled
-                                    : setTimelineFilterEnabled
-                            }
+                        }}
+                        onHideFeature={handleHideGeometryLocal}
+                        onUpdateFeature={editor.updateFeature}
+                        backgroundVisibility={backgroundVisibility}
+                        geometryVisibility={effectiveGeometryVisibility}
+                        applyGeometryBindingFilter={isReplayEditMode || isReplayPreviewMode ? false : geometryBindingFilterEnabled}
+                        highlightFeatures={null}
+                        focusFeatureCollection={geometryFocusRequest?.collection || null}
+                        focusRequestKey={geometryFocusRequest?.key ?? null}
+                        focusPadding={96}
+                        imageOverlay={imageOverlay}
+                        onImageOverlayChange={setImageOverlay}
+                        onBindGeometries={handleBindGeometries}
+                    />
+                ) : (
+                    <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
+                )}
+                {isReplayPreviewMode ? (
+                    <ReplayPreviewOverlay
+                        isPreviewMode={true}
+                        isPlaying={replayPreview.isPlaying}
+                        title={replayPreview.title}
+                        descriptions={replayPreview.descriptions}
+                        subtitle={replayPreview.subtitle}
+                        dialog={replayPreview.dialog}
+                        image={replayPreview.image}
+                        toasts={replayPreview.toasts}
+                        sidebarOpen={replayPreview.sidebarOpen}
+                        playbackSpeed={replayPreview.playbackSpeed}
+                        activeStepLabel={replayPreviewActiveStepLabel}
+                        activeStepNumber={replayPreview.activeStepNumber}
+                        totalSteps={replayPreview.totalSteps}
+                        onPlayPreview={replayPreview.playFromStart}
+                        onStopPreview={replayPreview.stopPreview}
+                        onResetPreview={replayPreview.resetPreview}
+                        onExitPreview={exitReplayPreview}
+                    />
+                ) : null}
+                {isReplayPreviewMode && replayPreview.sidebarOpen ? (
+                    <aside
+                        style={{
+                            position: "absolute",
+                            top: 16,
+                            right: 16,
+                            bottom: 16,
+                            width: 420,
+                            maxWidth: "calc(100vw - 2rem)",
+                            zIndex: 16,
+                        }}
+                    >
+                        <PublicWikiSidebar
+                            entity={null}
+                            wiki={replayPreviewActiveWiki}
+                            isLoading={isPreviewWikiLoading}
+                            error={replayPreview.activeWikiId ? previewWikiError : "Chưa có wiki được chọn trong step này."}
+                            onClose={() => {
+                                setPreviewWikiError(null);
+                                replayPreview.closeWikiPanel();
+                            }}
+                            onWikiLinkRequest={handleReplayPreviewWikiLinkRequest}
                         />
-                    ) : null}
-                </div>
-            ) : null}
+                    </aside>
+                ) : null}
+                {!isReplayPreviewMode || replayPreview.timelineVisible ? (
+                    <TimelineBar
+                        year={activeTimelineYear}
+                        onYearChange={
+                            isReplayPreviewMode
+                                ? replayPreview.setTimelineYear
+                                : handleTimelineYearChange
+                        }
+                        isLoading={false}
+                        disabled={false}
+                        statusText={null}
+                        filterEnabled={activeTimelineFilterEnabled}
+                        onFilterEnabledChange={
+                            isReplayPreviewMode
+                                ? replayPreview.setTimelineFilterEnabled
+                                : setTimelineFilterEnabled
+                        }
+                    />
+                ) : null}
+            </div>
 
             {!isReplayEditMode && !isReplayPreviewMode ? (
                 <>
                     <ResizeHandle
                         title="Resize right panel"
                         onDrag={(deltaX) => {
-                            // dragging handle (between map and right panel): moving right increases right panel width
                             setRightPanelWidth((prev) => clampNumber(prev - deltaX, 260, 720));
                         }}
                     />

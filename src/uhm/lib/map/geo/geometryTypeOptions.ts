@@ -62,37 +62,25 @@ const RAW_GEOMETRY_TYPE_OPTIONS: Array<{
     geometryPreset: GeometryPreset;
 }> = [
     { value: "defense_line", label: "Defense Line", groupId: "line", geometryPreset: "line" },
-
-    { value: "attack_route", label: "Attack Route", groupId: "line", geometryPreset: "line" },
+    { value: "military_route", label: "Military Route", groupId: "line", geometryPreset: "line" },
     { value: "retreat_route", label: "Retreat Route", groupId: "line", geometryPreset: "line" },
-    { value: "invasion_route", label: "Invasion Route", groupId: "line", geometryPreset: "line" },
     { value: "migration_route", label: "Migration Route", groupId: "line", geometryPreset: "line" },
-    { value: "refugee_route", label: "Refugee Route", groupId: "line", geometryPreset: "line" },
     { value: "trade_route", label: "Trade Route", groupId: "line", geometryPreset: "line" },
-    { value: "shipping_route", label: "Shipping Route", groupId: "line", geometryPreset: "line" },
 
     { value: "country", label: "Country", groupId: "polygon", geometryPreset: "polygon" },
     { value: "state", label: "State", groupId: "polygon", geometryPreset: "polygon" },
-    { value: "empire", label: "Empire", groupId: "polygon", geometryPreset: "polygon" },
-    { value: "kingdom", label: "Kingdom", groupId: "polygon", geometryPreset: "polygon" },
     { value: "faction", label: "Faction", groupId: "polygon", geometryPreset: "polygon" },
 
-    { value: "war", label: "War", groupId: "circle", geometryPreset: "circle-area" },
     { value: "battle", label: "Battle", groupId: "circle", geometryPreset: "circle-area" },
-    { value: "civilization", label: "Civilization", groupId: "circle", geometryPreset: "circle-area" },
     { value: "rebellion_zone", label: "Rebellion Zone", groupId: "circle", geometryPreset: "circle-area" },
 
-    { value: "person_deathplace", label: "Person Deathplace", groupId: "point", geometryPreset: "point" },
-    { value: "person_birthplace", label: "Person Birthplace", groupId: "point", geometryPreset: "point" },
-    { value: "person_activity", label: "Person Activity", groupId: "point", geometryPreset: "point" },
+    { value: "person_event", label: "Person Event", groupId: "point", geometryPreset: "point" },
     { value: "temple", label: "Temple", groupId: "point", geometryPreset: "point" },
     { value: "capital", label: "Capital", groupId: "point", geometryPreset: "point" },
     { value: "city", label: "City", groupId: "point", geometryPreset: "point" },
-    { value: "fortress", label: "Fortress", groupId: "point", geometryPreset: "point" },
-    { value: "castle", label: "Castle", groupId: "point", geometryPreset: "point" },
+    { value: "fortification", label: "Fortification", groupId: "point", geometryPreset: "point" },
     { value: "ruin", label: "Ruin", groupId: "point", geometryPreset: "point" },
     { value: "port", label: "Port", groupId: "point", geometryPreset: "point" },
-    { value: "bridge", label: "Bridge", groupId: "point", geometryPreset: "point" },
 ];
 
 export const GEOMETRY_TYPE_OPTIONS: GeometryTypeOption[] = RAW_GEOMETRY_TYPE_OPTIONS.map((item) => ({

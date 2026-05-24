@@ -23,6 +23,7 @@ export function initCircle(
 
     // Xóa dữ liệu preview circle trên map.
     const clearPreview = () => {
+        if (!map.isStyleLoaded()) return;
         (map.getSource("draw-circle-preview") as maplibregl.GeoJSONSource | undefined)?.setData(
             EMPTY_PREVIEW
         );
@@ -32,7 +33,7 @@ export function initCircle(
     const releaseDragPan = () => {
         if (!dragPanDisabledByCircle) return;
         dragPanDisabledByCircle = false;
-        if (!map.dragPan.isEnabled()) {
+        if (map.isStyleLoaded() && !map.dragPan.isEnabled()) {
             map.dragPan.enable();
         }
     };
@@ -53,6 +54,7 @@ export function initCircle(
             return;
         }
 
+        if (!map.isStyleLoaded()) return;
         const ring = buildCircleRing(center, radiusMeters, CIRCLE_SEGMENTS);
         (map.getSource("draw-circle-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
             type: "FeatureCollection",
@@ -91,7 +93,7 @@ export function initCircle(
     const onMouseMove = (e: maplibregl.MapMouseEvent) => {
         const canvas = map.getCanvas();
         if (getMode() !== "add-circle") {
-            if (canvas.style.cursor === "crosshair") {
+            if (canvas && canvas.style.cursor === "crosshair") {
                 canvas.style.cursor = "";
             }
             if (isDragging) {
@@ -100,7 +102,9 @@ export function initCircle(
             return;
         }
 
-        canvas.style.cursor = "crosshair";
+        if (canvas) {
+            canvas.style.cursor = "crosshair";
+        }
         if (!isDragging || !center) return;
 
         radiusMeters = distanceMeters(center, [e.lngLat.lng, e.lngLat.lat]);
@@ -150,13 +154,20 @@ export function initCircle(
     document.addEventListener("keydown", onKeyDown);
 
     const cleanup = () => {
-        map.off("mousedown", onMouseDown);
-        map.off("mousemove", onMouseMove);
-        map.off("mouseup", onMouseUp);
-        document.removeEventListener("keydown", onKeyDown);
-        resetDrawingState();
-        if (map.getCanvas().style.cursor === "crosshair") {
-            map.getCanvas().style.cursor = "";
+        try {
+            map.off("mousedown", onMouseDown);
+            map.off("mousemove", onMouseMove);
+            map.off("mouseup", onMouseUp);
+            document.removeEventListener("keydown", onKeyDown);
+            resetDrawingState();
+            if (map.isStyleLoaded()) {
+                const canvas = map.getCanvas();
+                if (canvas && canvas.style.cursor === "crosshair") {
+                    canvas.style.cursor = "";
+                }
+            }
+        } catch {
+            // ignore
         }
     };
 

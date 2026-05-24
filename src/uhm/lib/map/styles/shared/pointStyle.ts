@@ -2,30 +2,23 @@ import maplibregl, { LayerSpecification } from "maplibre-gl";
 import { MAP_EMPHASIS_TEXT_FONT_STACK } from "./textFonts";
 
 export const POINT_GEOTYPE_IDS = [
-    "person_birthplace",
-    "person_deathplace",
-    "person_activity",
+    "person_event",
     "temple",
     "capital",
     "city",
-    "fortress",
-    "castle",
+    "fortification",
     "ruin",
     "port",
-    "bridge",
 ] as const;
 
 export type PointGeotypeId = (typeof POINT_GEOTYPE_IDS)[number];
 
 export const POINT_GEOTYPE_ICON_PATHS: Partial<Record<PointGeotypeId, string>> = {
-    person_birthplace: "/images/mapIcon/point/house.png",
-    person_deathplace: "/images/mapIcon/point/tombstone.png",
-    person_activity: "/images/mapIcon/point/flag.png",
+    person_event: "/images/mapIcon/point/flag.png",
     temple: "/images/mapIcon/point/temple.png",
     capital: "/images/mapIcon/point/capital.png",
     city: "/images/mapIcon/point/city.png",
-    fortress: "/images/mapIcon/point/fortress.png",
-    castle: "/images/mapIcon/point/castle.png",
+    fortification: "/images/mapIcon/point/castle.png",
     ruin: "/images/mapIcon/point/ruin.png",
 };
 
@@ -57,21 +50,7 @@ const POINT_GEOMETRY_FILTER: maplibregl.ExpressionSpecification = [
 ];
 
 const POINT_STYLE_CONFIG: Record<PointGeotypeId, PointStyleConfig> = {
-    person_birthplace: {
-        fill: "#22c55e",
-        rim: "#166534",
-        iconScale: 1,
-        haloRadius: 15,
-        drawGlyph: drawHouseGlyph,
-    },
-    person_deathplace: {
-        fill: "#b91c1c",
-        rim: "#450a0a",
-        iconScale: 1,
-        haloRadius: 15,
-        drawGlyph: drawMemorialGlyph,
-    },
-    person_activity: {
+    person_event: {
         fill: "#f97316",
         rim: "#9a3412",
         iconScale: 0.98,
@@ -99,14 +78,7 @@ const POINT_STYLE_CONFIG: Record<PointGeotypeId, PointStyleConfig> = {
         haloRadius: 15,
         drawGlyph: drawCityGlyph,
     },
-    fortress: {
-        fill: "#64748b",
-        rim: "#334155",
-        iconScale: 1.04,
-        haloRadius: 16,
-        drawGlyph: drawShieldGlyph,
-    },
-    castle: {
+    fortification: {
         fill: "#7c3aed",
         rim: "#4c1d95",
         iconScale: 1.04,
@@ -126,13 +98,6 @@ const POINT_STYLE_CONFIG: Record<PointGeotypeId, PointStyleConfig> = {
         iconScale: 1.02,
         haloRadius: 15,
         drawGlyph: drawAnchorGlyph,
-    },
-    bridge: {
-        fill: "#b45309",
-        rim: "#7c2d12",
-        iconScale: 1,
-        haloRadius: 14,
-        drawGlyph: drawBridgeGlyph,
     },
 };
 
@@ -320,53 +285,9 @@ function drawGlyphWithOutline(
     ctx.restore();
 }
 
-function drawHouseGlyph(ctx: CanvasRenderingContext2D) {
-    const img = preloadedImages["person_birthplace"];
-    if (img && loadedImageKeys.has("person_birthplace")) {
-        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
-    } else {
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        ctx.moveTo(22, 34);
-        ctx.lineTo(32, 24);
-        ctx.lineTo(42, 34);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.rect(25.5, 34, 13, 9);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(32, 43);
-        ctx.lineTo(32, 36.5);
-        ctx.stroke();
-    }
-}
-
-function drawMemorialGlyph(ctx: CanvasRenderingContext2D) {
-    const img = preloadedImages["person_deathplace"];
-    if (img && loadedImageKeys.has("person_deathplace")) {
-        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
-    } else {
-        ctx.lineWidth = 3.6;
-        ctx.beginPath();
-        ctx.moveTo(32, 22);
-        ctx.lineTo(32, 43);
-        ctx.moveTo(25, 28.5);
-        ctx.lineTo(39, 28.5);
-        ctx.stroke();
-
-        ctx.lineWidth = 2.4;
-        ctx.beginPath();
-        ctx.moveTo(24, 45);
-        ctx.lineTo(40, 45);
-        ctx.stroke();
-    }
-}
-
 function drawFlagGlyph(ctx: CanvasRenderingContext2D) {
-    const img = preloadedImages["person_activity"];
-    if (img && loadedImageKeys.has("person_activity")) {
+    const img = preloadedImages["person_event"];
+    if (img && loadedImageKeys.has("person_event")) {
         ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
     } else {
         ctx.lineWidth = 3.2;
@@ -462,32 +383,9 @@ function drawCityGlyph(ctx: CanvasRenderingContext2D) {
     }
 }
 
-function drawShieldGlyph(ctx: CanvasRenderingContext2D) {
-    const img = preloadedImages["fortress"];
-    if (img && loadedImageKeys.has("fortress")) {
-        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
-    } else {
-        ctx.lineWidth = 3.2;
-        ctx.beginPath();
-        ctx.moveTo(32, 22.5);
-        ctx.lineTo(41, 26.5);
-        ctx.lineTo(39, 37.5);
-        ctx.lineTo(32, 43);
-        ctx.lineTo(25, 37.5);
-        ctx.lineTo(23, 26.5);
-        ctx.closePath();
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(32, 25);
-        ctx.lineTo(32, 39);
-        ctx.stroke();
-    }
-}
-
 function drawCastleGlyph(ctx: CanvasRenderingContext2D) {
-    const img = preloadedImages["castle"];
-    if (img && loadedImageKeys.has("castle")) {
+    const img = preloadedImages["fortification"];
+    if (img && loadedImageKeys.has("fortification")) {
         ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
     } else {
         ctx.lineWidth = 3;

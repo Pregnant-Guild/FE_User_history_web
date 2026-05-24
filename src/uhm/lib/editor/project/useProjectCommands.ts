@@ -74,14 +74,7 @@ export function useProjectCommands(options: Options) {
             return;
         }
 
-        const orphanGeometries = findOrphanGeometries(options.editor.mainDraft);
-        if (orphanGeometries.length > 0) {
-            const firstOrphan = orphanGeometries[0];
-            state.setSelectedFeatureIds([firstOrphan.id]);
-            state.setEntityFormStatus("Geometry này chưa bind entity.");
-            state.setEntityStatus(formatOrphanGeometryMessage("Commit", orphanGeometries));
-            return;
-        }
+
 
         const geometryChanges = options.editor.buildPayload();
         state.setIsSaving(true);
@@ -221,14 +214,7 @@ export function useProjectCommands(options: Options) {
             return;
         }
 
-        const orphanGeometries = findOrphanGeometries(options.editor.mainDraft);
-        if (orphanGeometries.length > 0) {
-            const firstOrphan = orphanGeometries[0];
-            state.setSelectedFeatureIds([firstOrphan.id]);
-            state.setEntityFormStatus("Geometry này chưa bind entity.");
-            state.setEntityStatus(formatOrphanGeometryMessage("Submit", orphanGeometries));
-            return;
-        }
+
 
         state.setIsSubmitting(true);
         state.setEntityStatus(null);
@@ -305,33 +291,7 @@ export function useProjectCommands(options: Options) {
     };
 }
 
-type OrphanGeometry = {
-    id: Feature["properties"]["id"];
-    label: string;
-};
 
-function findOrphanGeometries(draft: FeatureCollection): OrphanGeometry[] {
-    const rows: OrphanGeometry[] = [];
-
-    for (const feature of draft.features || []) {
-        const entityIds = normalizeFeatureEntityIds(feature);
-        if (entityIds.length > 0) continue;
-
-        const id = feature.properties.id;
-        rows.push({
-            id,
-            label: String(id),
-        });
-    }
-
-    return rows;
-}
-
-function formatOrphanGeometryMessage(action: "Commit" | "Submit", rows: OrphanGeometry[]): string {
-    const sample = rows.slice(0, 8).map((row) => row.label).join(", ");
-    const more = rows.length > 8 ? `, ... (+${rows.length - 8})` : "";
-    return `Không thể ${action}: còn ${rows.length} geometry chưa bind entity. Hãy bind entity cho: ${sample}${more}.`;
-}
 
 function toEditorSessionSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
     return {

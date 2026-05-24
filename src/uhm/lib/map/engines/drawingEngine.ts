@@ -12,6 +12,7 @@ export function initDrawing(
     let coords: [number, number][] = [];
 
     const clearPreview = () => {
+        if (!map.isStyleLoaded()) return;
         (map.getSource("draw-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
             type: "FeatureCollection",
             features: [],
@@ -39,6 +40,7 @@ export function initDrawing(
     function update(c: [number, number][]) {
         const closed = closePolygon(c);
 
+        if (!map.isStyleLoaded()) return;
         (map.getSource("draw-preview") as maplibregl.GeoJSONSource)?.setData({
             type: "FeatureCollection",
             features: [
@@ -130,12 +132,18 @@ export function initDrawing(
     document.addEventListener("keydown", onKeyDown);
 
     const cleanup = () => {
-        map.boxZoom.enable();
-        map.doubleClickZoom.enable();
-        map.off("click", onClick);
-        map.off("mousemove", onMove);
-        document.removeEventListener("keydown", onKeyDown);
-        cancelDrawing();
+        try {
+            if (map.isStyleLoaded()) {
+                map.boxZoom.enable();
+                map.doubleClickZoom.enable();
+            }
+            map.off("click", onClick);
+            map.off("mousemove", onMove);
+            document.removeEventListener("keydown", onKeyDown);
+            cancelDrawing();
+        } catch {
+            // ignore
+        }
     };
 
     return {

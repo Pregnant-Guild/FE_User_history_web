@@ -150,6 +150,7 @@ export function initSelect(
     }
 
     function setSelectionStateForId(id: string | number, selected: boolean) {
+        if (!map.isStyleLoaded()) return;
         for (const source of FEATURE_STATE_SOURCES) {
             if (!map.getSource(source)) continue;
             map.setFeatureState({ source, id }, { selected });
@@ -194,13 +195,19 @@ export function initSelect(
     }
 
     const cleanup = () => {
-        map.off("click", onClick);
-        map.off("mousemove", onMove);
-        if (hasContextActions) {
-            map.off("contextmenu", onRightClick);
+        try {
+            map.off("click", onClick);
+            map.off("mousemove", onMove);
+            if (hasContextActions) {
+                map.off("contextmenu", onRightClick);
+            }
+            if (map.isStyleLoaded()) {
+                clearSelection(false);
+            }
+            hideContextMenu();
+        } catch {
+            // ignore
         }
-        clearSelection(false);
-        hideContextMenu();
     };
 
     return {

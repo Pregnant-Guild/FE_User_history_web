@@ -41,10 +41,17 @@ export function initPoint(
     map.on("mousemove", onMove);
 
     return () => {
-        map.off("click", onClick);
-        map.off("mousemove", onMove);
-        if (map.getCanvas().style.cursor === "crosshair") {
-            map.getCanvas().style.cursor = "";
+        try {
+            map.off("click", onClick);
+            map.off("mousemove", onMove);
+            if (map.isStyleLoaded()) {
+                const canvas = map.getCanvas();
+                if (canvas && canvas.style.cursor === "crosshair") {
+                    canvas.style.cursor = "";
+                }
+            }
+        } catch {
+            // ignore
         }
     };
 }

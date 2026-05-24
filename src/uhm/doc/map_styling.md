@@ -48,33 +48,22 @@ Geotype render hiện được tập trung ở `getAllGeotypeLayers(...)` trong 
 Các type đang được register:
 
 - `defense_line`
-- `attack_route`
+- `military_route`
 - `retreat_route`
-- `invasion_route`
 - `migration_route`
-- `refugee_route`
 - `trade_route`
-- `shipping_route`
 - `country`
 - `state`
-- `empire`
-- `kingdom`
 - `faction`
-- `war`
 - `battle`
-- `civilization`
 - `rebellion_zone`
-- `person_deathplace`
-- `person_birthplace`
-- `person_activity`
+- `person_event`
 - `temple`
 - `capital`
 - `city`
-- `fortress`
-- `castle`
+- `fortification`
 - `ruin`
 - `port`
-- `bridge`
 
 `GEOMETRY_TYPE_OPTIONS` trong `src/uhm/lib/map/geo/geometryTypeOptions.ts` phải khớp với tập geotype này nếu muốn user chọn được từ UI.
 

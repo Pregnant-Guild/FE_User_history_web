@@ -37,7 +37,7 @@ export function createEditingEngine(options: {
         setDeleteVertexMode(false);
         hideContextMenu();
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || !map.isStyleLoaded()) return;
         const empty: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
         (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(empty);
         (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(empty);
@@ -47,7 +47,7 @@ export function createEditingEngine(options: {
     const updateEditSources = () => {
         const editing = editingRef.current;
         const map = mapRef.current;
-        if (!editing || !map) return;
+        if (!editing || !map || !map.isStyleLoaded()) return;
 
         let shape: GeoJSON.FeatureCollection<GeoJSON.Polygon>;
         let handles: GeoJSON.FeatureCollection<GeoJSON.Point>;
@@ -143,7 +143,7 @@ export function createEditingEngine(options: {
     const setDeleteVertexMode = (enabled: boolean) => {
         deleteVertexModeRef.current = enabled;
         const map = mapRef.current;
-        if (!map?.getLayer("edit-handles-circle")) return;
+        if (!map || !map.isStyleLoaded() || !map.getLayer("edit-handles-circle")) return;
         map.setPaintProperty("edit-handles-circle", "circle-color", enabled ? "#ef4444" : "#f97316");
         map.setPaintProperty("edit-handles-circle", "circle-stroke-color", enabled ? "#7f1d1d" : "#0f172a");
     };

@@ -40,6 +40,15 @@ export function geoTypeCodeToTypeKey(code: number | null | undefined): string | 
     return KEY_BY_CODE.get(Math.trunc(code)) ?? null;
 }
 
+const DEPRECATED_MAPPING: Record<string, string> = {
+    attack_route: "military_route",
+    person_birthplace: "person_event",
+    person_deathplace: "person_event",
+    person_activity: "person_event",
+    fortress: "fortification",
+    castle: "fortification",
+};
+
 export function normalizeGeoTypeKey(value: unknown): string | null {
     if (typeof value === "number") {
         return geoTypeCodeToTypeKey(value);
@@ -52,6 +61,15 @@ export function normalizeGeoTypeKey(value: unknown): string | null {
 
     if (/^-?\d+$/.test(normalized)) {
         return geoTypeCodeToTypeKey(Number(normalized));
+    }
+
+    if (normalized in DEPRECATED_MAPPING) {
+        return DEPRECATED_MAPPING[normalized];
+    }
+
+    const code = CODE_BY_KEY.get(normalized);
+    if (code !== undefined) {
+        return KEY_BY_CODE.get(code) ?? normalized;
     }
 
     return normalized;

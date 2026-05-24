@@ -18,6 +18,7 @@ export function initPath(
 
     // Xóa dữ liệu preview path.
     const clearPreview = () => {
+        if (!map.isStyleLoaded()) return;
         (map.getSource("draw-path-preview") as maplibregl.GeoJSONSource | undefined)?.setData(
             EMPTY_PREVIEW
         );
@@ -30,6 +31,7 @@ export function initPath(
             return;
         }
 
+        if (!map.isStyleLoaded()) return;
         (map.getSource("draw-path-preview") as maplibregl.GeoJSONSource | undefined)?.setData({
             type: "FeatureCollection",
             features: [
@@ -92,13 +94,15 @@ export function initPath(
             if (coords.length) {
                 cancelPath();
             }
-            if (canvas.style.cursor === "crosshair") {
+            if (canvas && canvas.style.cursor === "crosshair") {
                 canvas.style.cursor = "";
             }
             return;
         }
 
-        canvas.style.cursor = "crosshair";
+        if (canvas) {
+            canvas.style.cursor = "crosshair";
+        }
         if (coords.length === 0) return;
 
         const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
@@ -134,12 +138,19 @@ export function initPath(
     document.addEventListener("keydown", onKeyDown);
 
     const cleanup = () => {
-        map.off("click", onClick);
-        map.off("mousemove", onMove);
-        document.removeEventListener("keydown", onKeyDown);
-        cancelPath();
-        if (map.getCanvas().style.cursor === "crosshair") {
-            map.getCanvas().style.cursor = "";
+        try {
+            map.off("click", onClick);
+            map.off("mousemove", onMove);
+            document.removeEventListener("keydown", onKeyDown);
+            cancelPath();
+            if (map.isStyleLoaded()) {
+                const canvas = map.getCanvas();
+                if (canvas && canvas.style.cursor === "crosshair") {
+                    canvas.style.cursor = "";
+                }
+            }
+        } catch {
+            // ignore
         }
     };
 
