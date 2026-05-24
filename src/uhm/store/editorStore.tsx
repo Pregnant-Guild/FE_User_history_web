@@ -257,7 +257,6 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
                 type_key: "",
                 time_start: "",
                 time_end: "",
-                binding: "",
             },
             isEntitySubmitting: false,
             entityFormStatus: null,

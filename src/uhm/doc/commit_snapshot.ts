@@ -47,7 +47,7 @@ export type FeatureProperties = {
     geometry_preset?: GeometryPreset | null;
     time_start?: number | null;
     time_end?: number | null;
-    binding?: string[];
+    bound_with?: string | null;
 
     // UI/editor-only denormalized fields.
     entity_id?: string | null;
@@ -103,7 +103,7 @@ export type GeometrySnapshot = {
     type?: string | null;
     draw_geometry?: Geometry;
     geometry?: Geometry;
-    binding?: string[];
+    bound_with?: string | null;
     time_start?: number | null;
     time_end?: number | null;
     bbox?: {

@@ -144,7 +144,7 @@ Có ba lớp filter hiển thị trong runtime:
 
 1. background layer visibility
 2. geometry visibility theo type key từ panel phải
-3. binding filter / replay filter / timeline filter ở phía data trước khi set source
+3. bound_with filter / replay filter / timeline filter ở phía data trước khi set source
 
 Vì vậy khi một geometry "không hiện", có thể nguyên nhân nằm ở data filtering chứ không phải style layer.
 
@@ -170,6 +170,6 @@ Implementation hiện tại không làm vậy.
 Thay vào đó:
 
 - timeline filter đang chạy phía data trong `page.tsx`
-- binding filter và geometry visibility cũng chủ yếu chạy trước khi set source
+- bound_with filter và geometry visibility cũng chủ yếu chạy trước khi set source
 
 Tức là phần lớn filtering là `prepare data -> set source`, không phải `add layer filter expression per year`.

@@ -151,7 +151,7 @@ và sinh ra:
 Các điểm quan trọng:
 
 - geometry many-to-many với entity được persist ở `geometry_entity[]`
-- denormalized fields trên feature như `entity_ids`, `entity_name`, `binding`, `time_start` sẽ bị strip khỏi `editor_feature_collection` trước khi gửi API
+- denormalized fields trên feature như `entity_ids`, `entity_name`, `bound_with`, `time_start` sẽ bị strip khỏi `editor_feature_collection` trước khi gửi API
 - wiki/entity/link được chuẩn hóa lại thành `reference`, `binding`, `delete`, `create`, `update` tùy baseline
 - replay script được persist ở `replays[]`; `replayDraft` không được gửi
 

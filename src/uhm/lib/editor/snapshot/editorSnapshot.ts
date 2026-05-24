@@ -2,6 +2,11 @@ import { DEFAULT_GEOMETRY_TYPE_ID } from "@/uhm/lib/map/geo/geometryTypeOptions"
 import { normalizeGeoTypeKey, typeKeyToGeoTypeCode } from "@/uhm/lib/map/geo/geoTypeMap";
 import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import type { Change } from "@/uhm/lib/editor/draft/editorTypes";
+import {
+    normalizeBoundWithId,
+    normalizeFeatureBoundWith,
+    normalizeLegacyGeometryBindingIds,
+} from "@/uhm/lib/editor/geometry/geometryBinding";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { EntitySnapshotOperation } from "@/uhm/types/entities";
 import type { Feature, FeatureCollection, GeometryEntitySnapshot, GeometrySnapshot } from "@/uhm/types/geo";
@@ -55,6 +60,8 @@ interface RawGeometryRow extends UnknownRecord {
     geo_type?: unknown;
     draw_geometry?: unknown;
     geometry?: unknown;
+    bound_with?: unknown;
+    // Legacy parent->children geometry binding, migrated to child.bound_with on load.
     binding?: unknown;
     time_start?: unknown;
     time_end?: unknown;
@@ -100,6 +107,35 @@ function normalizeApiTimeFields(row: UnknownRecord): void {
     if ("time_end" in row) row.time_end = normalizeTimelineYearValue(row.time_end);
 }
 
+function buildLegacyBoundWithByChildId(
+    geometriesRaw: unknown,
+    fc: FeatureCollection | undefined
+): Map<string, string> {
+    const boundWithByChildId = new Map<string, string>();
+
+    const ingestParentBinding = (parentId: unknown, rawBinding: unknown) => {
+        const normalizedParentId = normalizeBoundWithId(parentId);
+        if (!normalizedParentId) return;
+        for (const childId of normalizeLegacyGeometryBindingIds(rawBinding)) {
+            if (childId === normalizedParentId || boundWithByChildId.has(childId)) continue;
+            boundWithByChildId.set(childId, normalizedParentId);
+        }
+    };
+
+    if (Array.isArray(geometriesRaw)) {
+        for (const raw of geometriesRaw) {
+            if (!isRecord(raw)) continue;
+            ingestParentBinding(raw.id, raw.binding);
+        }
+    }
+
+    for (const feature of fc?.features || []) {
+        ingestParentBinding(feature.properties?.id, (feature.properties as unknown as UnknownRecord)?.binding);
+    }
+
+    return boundWithByChildId;
+}
+
 export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
     if (!isRecord(raw)) return null;
     const snapshot = raw as UnknownRecord;
@@ -139,6 +175,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
         : undefined;
 
     const geometriesRaw = snapshot.geometries;
+    const legacyBoundWithByChildId = buildLegacyBoundWithByChildId(geometriesRaw, fc);
     const geometries: GeometrySnapshot[] | undefined = Array.isArray(geometriesRaw)
         ? geometriesRaw
             .filter(isRecord)
@@ -153,6 +190,10 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const hasInlineGeometry = "draw_geometry" in row || "geometry" in row;
                 const source: "inline" | "ref" = existingSource || (refId || !hasInlineGeometry ? "ref" : "inline");
                 const typeKey = normalizeGeoTypeKey(row.type) || normalizeGeoTypeKey(row.geo_type);
+                const canonicalBoundWith = "bound_with" in row ? normalizeBoundWithId(row.bound_with) : undefined;
+                const boundWith = canonicalBoundWith !== undefined
+                    ? canonicalBoundWith
+                    : legacyBoundWithByChildId.get(id);
 
                 return {
                     id,
@@ -161,7 +202,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     type: typeKey,
                     draw_geometry: row.draw_geometry as GeometrySnapshot["draw_geometry"],
                     geometry: row.geometry as GeometrySnapshot["geometry"],
-                    binding: Array.isArray(row.binding) ? row.binding as string[] : undefined,
+                    bound_with: boundWith,
                     time_start: normalizeTimelineYearValue(row.time_start) ?? undefined,
                     time_end: normalizeTimelineYearValue(row.time_end) ?? undefined,
                     bbox: isRecord(row.bbox)
@@ -299,6 +340,17 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
             const gid = String(feature.properties.id);
             const entity_ids = byGeom.get(gid) || [];
             const p = feature.properties as unknown as UnknownRecord;
+            const existingBoundWith = "bound_with" in p ? normalizeBoundWithId(p.bound_with) : undefined;
+            const migratedBoundWith = legacyBoundWithByChildId.get(gid);
+            if (existingBoundWith !== undefined) {
+                p.bound_with = existingBoundWith;
+            } else if (migratedBoundWith !== undefined) {
+                p.bound_with = migratedBoundWith;
+            } else {
+                delete p.bound_with;
+            }
+            delete p.binding;
+
             const existingTimeStart = normalizeTimelineYearValue(p.time_start);
             const existingTimeEnd = normalizeTimelineYearValue(p.time_end);
             if (existingTimeStart !== null) {
@@ -351,7 +403,9 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                     || existingTypeKey
                     || fallbackTypeKey;
                 if (typeKey) p.type = typeKey;
-                if (Array.isArray(geo.binding) && geo.binding.length) p.binding = geo.binding;
+                if (geo.bound_with !== undefined) {
+                    p.bound_with = geo.bound_with;
+                }
                 const timeStart = normalizeTimelineYearValue(geo.time_start);
                 const timeEnd = normalizeTimelineYearValue(geo.time_end);
                 if (timeStart !== null) {
@@ -519,7 +573,7 @@ export function buildEditorSnapshot(options: {
             source: "inline",
             type: typeKey,
             draw_geometry: feature.geometry,
-            binding: normalizeFeatureBindingIds(feature),
+            bound_with: normalizeFeatureBoundWith(feature),
             time_start: timeStart,
             time_end: timeEnd,
             bbox: bbox
@@ -588,6 +642,7 @@ export function buildEditorSnapshot(options: {
         delete p.type;
         delete p.time_start;
         delete p.time_end;
+        delete p.bound_with;
         delete p.binding;
         delete p.entity_id;
         delete p.entity_ids;
@@ -1111,27 +1166,6 @@ export function normalizeFeatureEntityIds(feature: Feature): string[] {
     }
 
     return [];
-}
-
-export function normalizeFeatureBindingIds(feature: Feature): string[] {
-    const rawBinding = feature.properties.binding;
-    if (!Array.isArray(rawBinding)) return [];
-    return uniqueEntityIds(rawBinding
-        .map((id) => {
-            if (typeof id !== "string" && typeof id !== "number") return "";
-            return String(id).trim();
-        })
-        .filter((id) => id.length > 0));
-}
-
-export function parseBindingInput(raw: string): string[] {
-    if (!raw.trim().length) return [];
-    return uniqueEntityIds(
-        raw
-            .split(/[,\n]/)
-            .map((item) => item.trim())
-            .filter((item) => item.length > 0)
-    );
 }
 
 export function uniqueEntityIds(ids: string[]): string[] {

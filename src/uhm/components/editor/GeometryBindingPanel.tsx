@@ -29,7 +29,7 @@ type GeometryRow = Required<Pick<GeometryChoice, "id" | "label" | "isOrphan" | "
 type Props = {
   geometries: GeometryChoice[];
   selectedGeometryId?: string | null;
-  selectedGeometryBindingIds: string[];
+  selectedGeometryChildIds: string[];
   onToggleBindGeometryForSelectedGeometry?: (geometryId: string, nextChecked: boolean) => void;
   onFocusGeometry?: (geometryId: string) => void;
 };
@@ -37,7 +37,7 @@ type Props = {
 export default function GeometryBindingPanel({
   geometries,
   selectedGeometryId,
-  selectedGeometryBindingIds,
+  selectedGeometryChildIds,
   onToggleBindGeometryForSelectedGeometry,
   onFocusGeometry,
 }: Props) {
@@ -85,7 +85,7 @@ export default function GeometryBindingPanel({
     return cleaned;
   }, [geometries]);
 
-  const bindingSet = useMemo(() => new Set(selectedGeometryBindingIds || []), [selectedGeometryBindingIds]);
+  const childSet = useMemo(() => new Set(selectedGeometryChildIds || []), [selectedGeometryChildIds]);
   const selectedGeometry = useMemo(() => {
     if (!effectiveSelectedGeometryId) return null;
     return rows.find((g) => g.id === effectiveSelectedGeometryId) || null;
@@ -94,12 +94,12 @@ export default function GeometryBindingPanel({
     return rows
       .filter((g) => g.id !== effectiveSelectedGeometryId)
       .sort((a, b) => {
-        const aBound = bindingSet.has(a.id);
-        const bBound = bindingSet.has(b.id);
+        const aBound = childSet.has(a.id);
+        const bBound = childSet.has(b.id);
         if (aBound !== bBound) return aBound ? -1 : 1;
         return a.id.localeCompare(b.id);
       });
-  }, [bindingSet, effectiveSelectedGeometryId, rows]);
+  }, [childSet, effectiveSelectedGeometryId, rows]);
   const summary = useMemo(() => {
     let orphan = 0;
     let missingTime = 0;
@@ -247,7 +247,7 @@ export default function GeometryBindingPanel({
       {collapsed ? null : selectedGeometry ? (
         (() => {
           const isHidden = geometryVisibility[selectedGeometry.id] === false;
-          const isBound = bindingSet.has(selectedGeometry.id);
+          const isBound = childSet.has(selectedGeometry.id);
           const title = buildGeometryTitle(selectedGeometry, isHidden, isBound);
           return (
         <div
@@ -306,7 +306,7 @@ export default function GeometryBindingPanel({
         <div style={{ marginTop: "10px", display: "grid", gap: "6px", maxHeight: 250, overflowY: "auto", paddingRight: 4 }}>
           {visibleRows
             .map((g) => {
-              const isBound = bindingSet.has(g.id);
+              const isBound = childSet.has(g.id);
               const isHidden = geometryVisibility[g.id] === false;
               const title = buildGeometryTitle(g, isHidden, isBound);
               return (

@@ -75,7 +75,7 @@ Geometry mới mặc định có:
 - `type: "country"`
 - `geometry_preset: "polygon"`
 - `entity_ids: []`
-- `binding: []`
+- `bound_with: null`
 
 ### Point (`add-point`)
 
@@ -143,7 +143,7 @@ Khi đang ở `select`, editor có thể sửa polygon/circle qua `editingEngine
 - `time_start`
 - `time_end`
 
-`binding` đang được hiển thị trong state form nhưng không có input edit trực tiếp trong panel; việc bind/unbind geometry hiện đi qua `GeometryBindingPanel`.
+`bound_with` không nằm trong form metadata; việc bind/unbind geometry hiện đi qua `GeometryBindingPanel`.
 
 Các ràng buộc đang có:
 
@@ -203,12 +203,12 @@ Panel `ProjectEntityRefsPanel` là nơi bind/unbind entity theo geometry đang c
 
 ### Geometry ↔ Geometry
 
-`GeometryBindingPanel` thao tác trên `feature.properties.binding`.
+`GeometryBindingPanel` thao tác trên `feature.properties.bound_with` của geometry con.
 
 - Chọn một geometry làm gốc.
-- Bind/unbind với geometry khác trong project.
+- Bind/unbind với geometry khác trong project bằng cách set/clear `bound_with` của geometry con.
 - Có nút focus để zoom vào geometry trong list binding.
-- Có toggle `Filter`: map chỉ hiển thị geometry liên quan tới selection nếu filter binding đang bật.
+- Có toggle `Filter`: map chỉ hiển thị geometry liên quan tới selection nếu filter bound_with đang bật.
 - Row geometry hiển thị chip trạng thái trong panel:
   - `no entity` nếu geometry chưa bind entity.
   - `no time` nếu thiếu cả `time_start` và `time_end`.

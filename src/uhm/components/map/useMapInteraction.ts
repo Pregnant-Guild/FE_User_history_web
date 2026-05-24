@@ -135,7 +135,7 @@ export function useMapInteraction({
                         entity_ids: [],
                         entity_name: null,
                         entity_type_id: null,
-                        binding: [],
+                        bound_with: null,
                     },
                     geometry,
                 });
@@ -201,7 +201,7 @@ export function useMapInteraction({
                         entity_ids: [],
                         entity_name: null,
                         entity_type_id: null,
-                        binding: [],
+                        bound_with: null,
                     },
                     geometry,
                 });
@@ -223,7 +223,7 @@ export function useMapInteraction({
                         entity_ids: [],
                         entity_name: null,
                         entity_type_id: null,
-                        binding: [],
+                        bound_with: null,
                     },
                     geometry,
                 });
@@ -245,7 +245,7 @@ export function useMapInteraction({
                         entity_ids: [],
                         entity_name: null,
                         entity_type_id: null,
-                        binding: [],
+                        bound_with: null,
                     },
                     geometry,
                 });
@@ -267,7 +267,7 @@ export function useMapInteraction({
                         entity_ids: [],
                         entity_name: null,
                         entity_type_id: null,
-                        binding: [],
+                        bound_with: null,
                     },
                     geometry,
                 });
@@ -372,7 +372,7 @@ function buildDuplicatedFeatureShapeOnly(
             entity_ids: [],
             entity_name: null,
             entity_names: [],
-            binding: [],
+            bound_with: null,
         },
         geometry,
     };

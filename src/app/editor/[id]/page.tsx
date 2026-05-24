@@ -30,10 +30,14 @@ import {
 import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 import {
     getDefaultTypeIdForFeature,
-    normalizeFeatureBindingIds,
     normalizeFeatureEntityIds,
     uniqueEntityIds,
 } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import {
+    getDirectGeometryChildIds,
+    normalizeFeatureBoundWith,
+    wouldCreateGeometryBoundWithCycle,
+} from "@/uhm/lib/editor/geometry/geometryBinding";
 import {
     buildClientEntityId,
     mergeEntitySearchResults,
@@ -71,7 +75,7 @@ import {
     isFeatureVisibleAtYear,
     normalizeEntitiesForCompare,
     normalizeEntityWikiLinksForCompare,
-    normalizeGeoSearchBindingIds,
+    normalizeGeoSearchBoundWith,
     normalizeGeoSearchGeometry,
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
@@ -630,11 +634,11 @@ function EditorPageContent() {
         return rows;
     }, [activeTimelineFilterEnabled, editor, mapRenderDraft.features]);
 
-    // Binding ids của geometry đại diện đang chọn.
-    const selectedGeometryBindingIds = useMemo(() => {
+    // Child ids bound to the selected geometry via child.properties.bound_with.
+    const selectedGeometryChildIds = useMemo(() => {
         if (!selectedFeature) return [];
-        return normalizeFeatureBindingIds(selectedFeature);
-    }, [selectedFeature]);
+        return getDirectGeometryChildIds(editor.draft, selectedFeature.properties.id);
+    }, [editor.draft, selectedFeature]);
 
     // Choices wiki dùng trong replay actions và binding panel.
     const wikiChoices = useMemo(() => {
@@ -1317,7 +1321,6 @@ function EditorPageContent() {
                 type_key: "",
                 time_start: "",
                 time_end: "",
-                binding: "",
             });
             setEntityFormStatus(null);
             lastSelectedFeatureIdRef.current = null;
@@ -1336,7 +1339,6 @@ function EditorPageContent() {
             type_key: nextTypeKey,
             time_start: timeStart != null ? String(timeStart) : "",
             time_end: timeEnd != null ? String(timeEnd) : "",
-            binding: normalizeFeatureBindingIds(selectedFeature).join(", "),
         });
         // Only clear status when switching to a different geometry, not when patching metadata/bindings
         // on the same selected geometry (otherwise messages will blink).
@@ -1518,10 +1520,14 @@ function EditorPageContent() {
         setSelectedGeometryEntityIds,
     ]);
 
-    // Bind/unbind geometry id vào trường binding của selected geometry.
+    // Bind/unbind geometry con vào selected geometry qua field child.bound_with.
     const handleToggleBindGeometryForSelectedGeometry = useCallback((geoId: string, nextChecked: boolean) => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             flashGeoBindingStatus("Chưa chọn geometry để bind.");
+            return;
+        }
+        if (selectedFeatures.length !== 1 || !selectedFeature) {
+            flashGeoBindingStatus("Chỉ bind geometry-geometry khi chọn đúng một geometry cha.");
             return;
         }
         if (!isMultiEditValid) {
@@ -1530,46 +1536,39 @@ function EditorPageContent() {
         }
         const id = String(geoId || "").trim();
         if (!id) return;
-        if (selectedFeatures.some(f => String(f.properties.id) === id)) return;
-
-
+        const parentId = String(selectedFeature.properties.id);
+        if (parentId === id) return;
+        const childFeature = editor.draft.features.find((f) => String(f.properties.id) === id);
+        if (!childFeature) {
+            flashGeoBindingStatus("Không tìm thấy geometry con.");
+            return;
+        }
+        if (nextChecked && wouldCreateGeometryBoundWithCycle(editor.draft.features, id, parentId)) {
+            flashGeoBindingStatus("Không thể bind vì sẽ tạo vòng lặp bound_with.");
+            return;
+        }
 
         setIsEntitySubmitting(true);
         flashGeoBindingStatus(null, 0);
         try {
-            const bindingPatches = selectedFeatures.map((feature) => {
-                const prevBindingIds = normalizeFeatureBindingIds(feature);
-                const has = prevBindingIds.includes(id);
-                const nextBindingIds = (() => {
-                    if (nextChecked) {
-                        if (has) return prevBindingIds;
-                        return [...prevBindingIds, id];
-                    }
-                    if (!has) return prevBindingIds;
-                    return prevBindingIds.filter((x) => x !== id);
-                })();
-                return {
-                    id: feature.properties.id,
-                    patch: { binding: nextBindingIds },
-                };
-            });
+            const currentParentId = normalizeFeatureBoundWith(childFeature);
+            const nextBoundWith = nextChecked
+                ? parentId
+                : currentParentId === parentId
+                    ? null
+                    : currentParentId;
             editor.patchFeaturePropertiesBatch(
-                bindingPatches,
+                [{
+                    id: childFeature.properties.id,
+                    patch: { bound_with: nextBoundWith },
+                }],
                 nextChecked ? "Bind geometry vào GEO" : "Unbind geometry khỏi GEO"
             );
 
-            // Assume selectedFeature (the first one) reflects the representative binding in UI
-            const firstFeaturePrevBindings = normalizeFeatureBindingIds(selectedFeatures[0]);
-            const firstFeatureHas = firstFeaturePrevBindings.includes(id);
-            const nextBindingIdsForUI = (() => {
-                if (nextChecked) return firstFeatureHas ? firstFeaturePrevBindings : [...firstFeaturePrevBindings, id];
-                return firstFeatureHas ? firstFeaturePrevBindings.filter(x => x !== id) : firstFeaturePrevBindings;
-            })();
-            setGeometryMetaForm((prev) => ({ ...prev, binding: nextBindingIdsForUI.join(", ") }));
             flashGeoBindingStatus(
                 nextChecked
-                    ? "Đã bind geometry vào binding. Commit khi sẵn sàng."
-                    : "Đã gỡ binding geometry. Commit khi sẵn sàng.",
+                    ? "Đã set bound_with cho geometry con. Commit khi sẵn sàng."
+                    : "Đã gỡ bound_with khỏi geometry con. Commit khi sẵn sàng.",
                 3000
             );
         } finally {
@@ -1578,13 +1577,13 @@ function EditorPageContent() {
     }, [
         editor,
         flashGeoBindingStatus,
+        selectedFeature,
         selectedFeatures,
         isMultiEditValid,
-        setGeometryMetaForm,
         setIsEntitySubmitting,
     ]);
 
-    // Bind nhiều geometries vào target geometry.
+    // Bind nhiều geometries con vào target geometry.
     const handleBindGeometries = useCallback((targetId: string | number, sourceIds: (string | number)[]) => {
         const idStr = String(targetId).trim();
         if (!idStr) return;
@@ -1595,23 +1594,27 @@ function EditorPageContent() {
             return;
         }
 
-        const prevBindingIds = normalizeFeatureBindingIds(targetFeature);
+        const sourceFeatures = sourceIds
+            .map((sourceId) => editor.draft.features.find((f) => String(f.properties.id) === String(sourceId)))
+            .filter((feature): feature is Feature => Boolean(feature))
+            .filter((feature) => String(feature.properties.id) !== idStr)
+            .filter((feature) => !wouldCreateGeometryBoundWithCycle(editor.draft.features, feature.properties.id, idStr));
 
-        // Merge prevBindingIds with sourceIds (which are strings of selected features)
-        // filter out targetId itself (we can't bind a geometry to itself)
-        const newSources = sourceIds.map(String).filter((x) => x !== idStr);
-        const merged = Array.from(new Set([...prevBindingIds, ...newSources]));
+        if (!sourceFeatures.length) {
+            flashGeoBindingStatus("Không có geometry con hợp lệ để bind.");
+            return;
+        }
 
         editor.patchFeaturePropertiesBatch(
-            [{
-                id: targetFeature.properties.id,
-                patch: { binding: merged },
-            }],
+            sourceFeatures.map((feature) => ({
+                id: feature.properties.id,
+                patch: { bound_with: idStr },
+            })),
             "Bind các geometry đã chọn vào GEO"
         );
 
         setSelectedFeatureIds([targetFeature.properties.id]);
-        flashGeoBindingStatus(`Đã bind ${newSources.length} geometry vào GEO này. Commit khi sẵn sàng.`, 3000);
+        flashGeoBindingStatus(`Đã set bound_with cho ${sourceFeatures.length} geometry con. Commit khi sẵn sàng.`, 3000);
     }, [editor, flashGeoBindingStatus, setSelectedFeatureIds]);
 
     // Focus/zoom tới geometry từ binding panel; nếu geo có time_start thì kéo year filter về năm đó.
@@ -1787,7 +1790,7 @@ function EditorPageContent() {
             return;
         }
 
-        const bindingIds = normalizeGeoSearchBindingIds(geo.binding);
+        const boundWith = normalizeGeoSearchBoundWith(geo.bound_with);
         const typeKey = geo.type || null;
 
         const feature: Feature = {
@@ -1797,7 +1800,7 @@ function EditorPageContent() {
                 type: typeKey,
                 time_start: normalizeTimelineYearValue(geo.time_start),
                 time_end: normalizeTimelineYearValue(geo.time_end),
-                binding: bindingIds.length ? bindingIds : undefined,
+                bound_with: boundWith,
                 entity_id: entityItem.entity_id,
                 entity_ids: [entityItem.entity_id],
                 entity_name: (entityItem.name || "").trim() || entityItem.entity_id,
@@ -2345,7 +2348,7 @@ function EditorPageContent() {
                                 <GeometryBindingPanel
                                     geometries={geometryChoices}
                                     selectedGeometryId={selectedFeature ? String(selectedFeature.properties.id) : null}
-                                    selectedGeometryBindingIds={selectedGeometryBindingIds}
+                                    selectedGeometryChildIds={selectedGeometryChildIds}
                                     onToggleBindGeometryForSelectedGeometry={handleToggleBindGeometryForSelectedGeometry}
                                     onFocusGeometry={handleFocusGeometryFromBindingPanel}
                                 />

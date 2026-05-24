@@ -25,12 +25,11 @@ export function useEntitySessionState() {
     });
     // Danh sách entity IDs đang chọn để bind vào geometry hiện tại.
     const [selectedGeometryEntityIds, setSelectedGeometryEntityIds] = useState<string[]>([]);
-    // Form metadata geometry (time range + binding ids).
+    // Form metadata geometry (type + time range).
     const [geometryMetaForm, setGeometryMetaForm] = useState<GeometryMetaFormState>({
         type_key: "",
         time_start: "",
         time_end: "",
-        binding: "",
     });
     // Cờ loading khi apply entity/metadata (local submit).
     const [isEntitySubmitting, setIsEntitySubmitting] = useState(false);

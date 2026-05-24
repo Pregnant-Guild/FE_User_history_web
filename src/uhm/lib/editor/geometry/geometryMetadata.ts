@@ -1,9 +1,6 @@
 import type { Feature, FeatureProperties } from "@/uhm/types/geo";
 import type { GeometryMetaFormState } from "@/uhm/lib/editor/session/sessionTypes";
-import {
-    normalizeFeatureBindingIds,
-    parseBindingInput,
-} from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import { normalizeFeatureBoundWith } from "@/uhm/lib/editor/geometry/geometryBinding";
 
 export type GeometryMetadataPatch = {
     patch: Partial<FeatureProperties>;
@@ -18,27 +15,22 @@ export function buildGeometryMetadataPatch(form: GeometryMetaFormState): Geometr
         throw new Error("time_start phải <= time_end.");
     }
 
-    const bindingIds = parseBindingInput(form.binding);
     return {
         patch: {
             type: typeKey.length ? typeKey : undefined,
             time_start: timeStart,
             time_end: timeEnd,
-            binding: bindingIds,
         },
         formState: {
             type_key: typeKey,
             time_start: timeStart != null ? String(timeStart) : "",
             time_end: timeEnd != null ? String(timeEnd) : "",
-            binding: bindingIds.join(", "),
         },
     };
 }
 
-export function formatBindingIdsForDisplay(feature: Feature): string {
-    const bindingIds = normalizeFeatureBindingIds(feature);
-    if (!bindingIds.length) return "Không có";
-    return bindingIds.join(", ");
+export function formatBoundWithForDisplay(feature: Feature): string {
+    return normalizeFeatureBoundWith(feature) || "Không có";
 }
 
 function parseOptionalYearInput(raw: string, fieldName: string): number | null {

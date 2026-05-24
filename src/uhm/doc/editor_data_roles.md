@@ -94,9 +94,9 @@ Các link entity-wiki hiện tại của snapshot. Snapshot builder sẽ tự si
 
 Join table persist quan hệ geometry-entity trong snapshot commit. `feature.properties.entity_ids` chỉ là field denormalized cho UI.
 
-### `binding`
+### `bound_with`
 
-Field geometry-geometry binding trên feature. Binding này không tính là entity binding; geometry không có `entity_ids/entity_id` hợp lệ vẫn là orphan.
+Field geometry-geometry trên feature con, lưu id geometry cha mà nó nằm trong. `bound_with` không tính là entity binding; geometry không có `entity_ids/entity_id` hợp lệ vẫn là orphan.
 
 ### `geometryVisibility`
 
@@ -104,7 +104,7 @@ Map local visibility override. Key có thể là geometry id hoặc semantic geo
 
 ### `applyGeometryBindingFilter`
 
-Filter map theo selection/binding. Chỉ ảnh hưởng render trên map, không đổi draft và không đi snapshot.
+Filter map theo selection/bound_with. Chỉ ảnh hưởng render trên map, không đổi draft và không đi snapshot.
 
 ## Guard rails
 

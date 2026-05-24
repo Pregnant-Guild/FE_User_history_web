@@ -52,7 +52,7 @@ Checklist này dùng sau mỗi lần sửa editor. Không thay thế typecheck/l
 - Chọn một geometry, bind geometry khác trong `GeometryBindingPanel`.
 - Panel hiện chip `bound` cho geometry liên quan.
 - Toggle Filter: map chỉ hiện selection, selected children và parent/root phù hợp.
-- Undo bind/unbind geometry phải khôi phục `properties.binding`.
+- Undo bind/unbind geometry phải khôi phục `properties.bound_with`.
 - Bind geometry-geometry không làm mất chip `no entity` nếu geometry vẫn chưa bind entity.
 
 ## 6. Wiki và entity-wiki
@@ -69,7 +69,7 @@ Checklist này dùng sau mỗi lần sửa editor. Không thay thế typecheck/l
 ## 7. Replay
 
 - Chọn geometry có entity, bấm replay.
-- Replay mở với MAIN geo và các target ids liên quan binding.
+- Replay mở với MAIN geo và các target ids có `bound_with` trỏ tới MAIN.
 - Tạo stage, tạo step, đổi duration.
 - Thêm narrative action `set_title` và `set_descriptions`.
 - Thêm map action `set_time_filter`, `show_labels`, `hide_labels`.

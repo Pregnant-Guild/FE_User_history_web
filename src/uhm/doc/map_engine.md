@@ -88,7 +88,7 @@ Source này dùng cho:
 `useMapSync()` chịu trách nhiệm:
 
 1. nhận `renderDraft` đã được page áp timeline/replay/preview filter trước
-2. filter draft theo binding nếu `applyGeometryBindingFilter = true`
+2. filter draft theo `bound_with` nếu `applyGeometryBindingFilter = true`
 3. filter theo geometry visibility
 4. split feature thành nhóm polygon/line/point
 5. decorate line/polygon/point cho label rendering
@@ -100,7 +100,7 @@ Source này dùng cho:
 - data mà map render không phải raw `mainDraft` nguyên xi
 - `renderDraft` là nguồn quyết định geometry nào xuất hiện trên map
 - `labelContextDraft` chỉ dùng để lookup label/entity name, có thể chứa geometry đã bị timeline filter ẩn, và không được dùng để quyết định render
-- source MapLibre cuối cùng là `renderDraft` sau khi đã qua binding filter, geometry visibility và label decoration
+- source MapLibre cuối cùng là `renderDraft` sau khi đã qua bound_with filter, geometry visibility và label decoration
 
 ## 5. Map interaction layer
 

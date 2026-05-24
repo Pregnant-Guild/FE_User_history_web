@@ -10,7 +10,7 @@ export type EntityGeometrySearchGeo = {
     id: string;
     type: string | null;
     draw_geometry: Geometry;
-    binding?: string[];
+    bound_with?: string | null;
 
     time_start?: number | null;
     time_end?: number | null;
@@ -96,7 +96,7 @@ export async function searchGeometriesByEntityName(
                 id: geometry.id,
                 type: geoTypeCodeToTypeKey(geometry.geo_type) || null,
                 draw_geometry: geometry.draw_geometry,
-                binding: geometry.binding,
+                bound_with: normalizeBoundWith(geometry.bound_with),
                 time_start: geometry.time_start ?? null,
                 time_end: geometry.time_end ?? null,
             })),
@@ -108,7 +108,7 @@ type GeometryRow = {
     id: string;
     geo_type: number;
     draw_geometry: Geometry;
-    binding?: string[];
+    bound_with?: string | null;
 
     time_start?: number;
     time_end?: number;
@@ -127,7 +127,7 @@ function geometriesToFeatureCollection(rows: GeometryRow[]): FeatureCollection {
         const geometry = normalizeGeometry(row.draw_geometry);
         if (!geometry) continue;
 
-        const binding = normalizeBinding(row.binding);
+        const boundWith = normalizeBoundWith(row.bound_with);
         const typeKey = geoTypeCodeToTypeKey(row.geo_type) || null;
 
         const properties: FeatureProperties = {
@@ -135,7 +135,7 @@ function geometriesToFeatureCollection(rows: GeometryRow[]): FeatureCollection {
             type: typeKey,
             time_start: row.time_start ?? null,
             time_end: row.time_end ?? null,
-            binding: binding.length ? binding : undefined,
+            bound_with: boundWith,
         };
 
         features.push({
@@ -156,11 +156,9 @@ function normalizeGeometry(value: unknown): Geometry | null {
     return value as Geometry;
 }
 
-function normalizeBinding(value: unknown): string[] {
-    if (!value) return [];
-    if (Array.isArray(value)) {
-        return value.map((v) => String(v)).filter((v) => v.length > 0);
-    }
-    // Some deployments may return binding as an object; ignore it for FE properties.binding.
-    return [];
+function normalizeBoundWith(value: unknown): string | null {
+    if (value == null) return null;
+    if (typeof value !== "string" && typeof value !== "number") return null;
+    const id = String(value).trim();
+    return id.length ? id : null;
 }

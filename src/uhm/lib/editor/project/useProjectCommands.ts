@@ -11,7 +11,6 @@ import {
 import {
     buildEditorSnapshot,
     normalizeEditorSnapshot,
-    normalizeFeatureEntityIds,
     toApiEditorSnapshot,
 } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
@@ -230,7 +229,7 @@ export function useProjectCommands(options: Options) {
         } finally {
             state.setIsSubmitting(false);
         }
-    }, [options.editor.mainDraft, options.pendingSaveCount, options.store]);
+    }, [options.pendingSaveCount, options.store]);
 
     const restoreCommit = useCallback(async (commitId: string) => {
         const state = options.store.getState();
@@ -344,7 +343,7 @@ function toEditorSessionGeometries(input: EditorSnapshot["geometries"]): Geometr
                 type: g.type ?? undefined,
                 draw_geometry: g.draw_geometry,
                 geometry: g.geometry,
-                binding: Array.isArray(g.binding) ? [...g.binding] : undefined,
+                bound_with: g.bound_with ?? null,
                 time_start: normalizeTimelineYearValue(g.time_start) ?? undefined,
                 time_end: normalizeTimelineYearValue(g.time_end) ?? undefined,
                 bbox: g.bbox

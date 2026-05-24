@@ -27,7 +27,6 @@ export type GeometryMetaFormState = {
     type_key: string;
     time_start: string;
     time_end: string;
-    binding: string;
 };
 
 export type PendingEntityCreate = {

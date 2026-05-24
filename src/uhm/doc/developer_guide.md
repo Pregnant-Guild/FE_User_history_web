@@ -76,7 +76,7 @@ Checklist an toàn:
    - `type`
    - `geometry_preset`
    - `entity_ids`
-   - `binding`
+   - `bound_with`
 6. Kiểm tra interaction cleanup khi chuyển mode.
 
 Nếu mode chưa được cleanup đúng, map rất dễ giữ preview cũ hoặc event listener cũ.
@@ -101,7 +101,7 @@ File quan trọng nhất là `editorSnapshot.ts`.
 
 - `normalizeEditorSnapshot(raw)`
   - đọc payload từ backend
-  - rehydrate fields UI như `entity_ids`, `entity_name`, `binding`, `time_start`, `time_end`
+  - rehydrate fields UI như `entity_ids`, `entity_name`, `bound_with`, `time_start`, `time_end`
 - `buildEditorSnapshot(options)`
   - strip các field generate-only khỏi `editor_feature_collection`
   - build `geometry_entity[]` và `entity_wiki[]`
@@ -175,7 +175,7 @@ Có thể do:
 
 - timeline filter
 - geometry visibility theo type
-- binding filter
+- bound_with filter
 
 Không phải lúc nào cũng là bug render layer.
 

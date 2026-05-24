@@ -82,7 +82,7 @@ Replay seed mới có dạng:
 
 - MAIN geo
 - toàn bộ bulk selection hiện tại
-- toàn bộ `binding` của MAIN geo trong `mainDraft`
+- toàn bộ geometry con có `bound_with` trỏ tới MAIN geo trong `mainDraft`
 
 Rule hiện tại:
 
@@ -110,7 +110,7 @@ Hydrate hiện tại:
 
 - lấy feature từ `mainDraft` theo đúng thứ tự `target_geometry_ids`
 - clone ra `FeatureCollection` mới
-- flatten `binding` thành `[]` để các geo trong replay bình đẳng với nhau
+- flatten `bound_with` thành `null` để các geo trong replay bình đẳng với nhau
 
 ## 6. Trong replay mode map đang đọc gì
 

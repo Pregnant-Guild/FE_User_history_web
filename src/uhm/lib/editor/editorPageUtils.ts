@@ -126,17 +126,10 @@ export function normalizeGeoSearchGeometry(value: unknown): Geometry | null {
     return value as Geometry;
 }
 
-// Chuẩn hóa danh sách binding id từ API search GEO.
-export function normalizeGeoSearchBindingIds(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    const deduped: string[] = [];
-    const seen = new Set<string>();
-    for (const rawId of value) {
-        if (typeof rawId !== "string" && typeof rawId !== "number") continue;
-        const id = String(rawId).trim();
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        deduped.push(id);
-    }
-    return deduped;
+// Chuẩn hóa parent id từ API search GEO.
+export function normalizeGeoSearchBoundWith(value: unknown): string | null {
+    if (value == null) return null;
+    if (typeof value !== "string" && typeof value !== "number") return null;
+    const id = String(value).trim();
+    return id.length ? id : null;
 }

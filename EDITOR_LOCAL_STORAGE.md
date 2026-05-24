@@ -83,7 +83,7 @@ Nguồn: `const editor = useEditorState(initialData)`
 
 - `editor.draft: FeatureCollection`
   - **Single source of truth** cho geometry đang hiển thị + chỉnh sửa.
-  - Map render trực tiếp từ `draft` (hoặc bản “visibleDraft” đã filter theo timeline/binding).
+  - Map render trực tiếp từ `draft` (hoặc bản “visibleDraft” đã filter theo timeline/bound_with).
   - Đây chính là **store runtime của GEO** trong session.
 
 - `editor.changes: Map<id, Change>`
@@ -247,7 +247,7 @@ Khi bấm **Import** một geometry từ kết quả search:
 3. Nếu geometry chưa có trong `editor.draft`:
    - tạo `Feature` mới với `id = geometry.id`
    - set `properties.type` từ `geo_type` (map qua `geoTypeCodeToTypeKey`)
-   - set `time_start/time_end/binding`
+   - set `time_start/time_end/bound_with`
    - set denormalized `entity_id/entity_ids/entity_name/entity_names` để UI/joins hoạt động
 4. `editor.createFeature(feature)` và auto select feature đó.
 

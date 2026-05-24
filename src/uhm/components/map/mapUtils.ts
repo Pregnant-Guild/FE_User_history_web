@@ -13,6 +13,7 @@ import { PATH_RENDER_BY_TYPE } from "@/uhm/lib/map/styles/style";
 import { getBackgroundRasterSourceSpecification } from "@/uhm/api/tiles";
 import { newId } from "@/uhm/lib/utils/id";
 import { normalizeGeoTypeKey } from "@/uhm/lib/map/geo/geoTypeMap";
+import { normalizeBoundWithId, normalizeFeatureBoundWith } from "@/uhm/lib/editor/geometry/geometryBinding";
 import type { EntityLabelCandidate } from "@/uhm/types/geo";
 
 type Coordinate = [number, number];
@@ -149,23 +150,23 @@ export function filterDraftByBinding(
     }
 
     const childIds = new Set<string>();
+    const selectedChildren = new Set<string>();
+    const selectedParents = new Set<string>();
     for (const feature of fc.features) {
-        for (const id of normalizeBindingIds(feature.properties.binding)) {
-            childIds.add(id);
+        const featureId = String(feature.properties.id);
+        const parentId = normalizeFeatureBoundWith(feature);
+        if (!parentId) continue;
+        childIds.add(featureId);
+        if (selectedIds.has(parentId)) {
+            selectedChildren.add(featureId);
+        }
+        if (selectedIds.has(featureId)) {
+            selectedParents.add(parentId);
         }
     }
 
     if (selectedIds.size === 0) {
         return { ...fc, features: fc.features.filter((f) => !childIds.has(String(f.properties.id))) };
-    }
-
-    const selectedChildren = new Set<string>();
-    for (const feature of fc.features) {
-        if (selectedIds.has(String(feature.properties.id))) {
-            for (const id of normalizeBindingIds(feature.properties.binding)) {
-                selectedChildren.add(id);
-            }
-        }
     }
 
     return {
@@ -174,6 +175,7 @@ export function filterDraftByBinding(
             const featureId = String(feature.properties.id);
             if (selectedIds.has(featureId)) return true;
             if (selectedChildren.has(featureId)) return true;
+            if (selectedParents.has(featureId)) return true;
             return !childIds.has(featureId);
         }),
     };
@@ -198,20 +200,6 @@ export function filterDraftByGeometryVisibility(
             return visibility[key] !== false;
         }),
     };
-}
-
-export function normalizeBindingIds(rawBinding: unknown): string[] {
-    if (!Array.isArray(rawBinding)) return [];
-    const deduped: string[] = [];
-    const seen = new Set<string>();
-    for (const rawId of rawBinding) {
-        if (typeof rawId !== "string" && typeof rawId !== "number") continue;
-        const id = String(rawId).trim();
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        deduped.push(id);
-    }
-    return deduped;
 }
 
 export function splitDraftFeatures(fc: FeatureCollection) {
@@ -683,21 +671,13 @@ function createFeatureLabelResolver(
     }
 
     for (const feature of fc.features) {
-        const parentLabel = directLabelsByFeatureId.get(String(feature.properties.id));
         const featureId = String(feature.properties.id);
-        const bindingIds = normalizeBindingIds(feature.properties.binding);
+        const parentId = normalizeBoundWithId(feature.properties.bound_with);
+        if (!parentId) continue;
 
+        const parentLabel = directLabelsByFeatureId.get(parentId);
         if (parentLabel) {
-            for (const childId of bindingIds) {
-                mergeInheritedFeatureLabel(inheritedLabelsByChildId, childId, parentLabel);
-            }
-        }
-
-        for (const parentId of bindingIds) {
-            const linkedParentLabel = directLabelsByFeatureId.get(parentId);
-            if (linkedParentLabel) {
-                mergeInheritedFeatureLabel(inheritedLabelsByChildId, featureId, linkedParentLabel);
-            }
+            mergeInheritedFeatureLabel(inheritedLabelsByChildId, featureId, parentLabel);
         }
     }
 

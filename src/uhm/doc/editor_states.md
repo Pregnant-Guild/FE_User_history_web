@@ -116,9 +116,8 @@ Editor hiện có `undo`, nhưng chưa có redo.
   - `type_key`
   - `time_start`
   - `time_end`
-  - `binding`
 
-`geometryMetaForm.binding` hiện chủ yếu là giá trị hiển thị/đồng bộ UI, còn chỉnh sửa binding thật đi qua `GeometryBindingPanel`.
+Geometry-geometry bound state không nằm trong `geometryMetaForm`; `GeometryBindingPanel` chỉnh trực tiếp `feature.properties.bound_with` của geometry con.
 
 ### 4.3. Replay state
 
@@ -324,5 +323,5 @@ Hiệu ứng:
 - có `undo`, chưa có `redo`
 - timeline state có `timelineYear`, nhưng page hiện dùng `timelineDraftYear` cho filtering
 - dirty count của commit không tương ứng một-một với số mutation backend
-- map selection, binding filter và timeline filter đều là state client-side
+- map selection, bound_with filter và timeline filter đều là state client-side
 - trạng thái orphan/time/timeline trong `GeometryBindingPanel` là derived từ draft + visibility, không phải field persist riêng

@@ -43,7 +43,7 @@ export function useFeatureCommands(options: Options) {
         setEntityFormStatus,
     } = options;
 
-    // Áp metadata GEO (type/time/binding) cho toàn bộ selectedFeatures.
+    // Áp metadata GEO (type/time) cho toàn bộ selectedFeatures.
     const applyGeometryMetadata = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
             const msg = "Hãy chọn ít nhất một geometry trước.";

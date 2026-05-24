@@ -14,7 +14,7 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
-import { newId } from "@/uhm/lib/utils/id";
+import { normalizeFeatureBoundWith } from "@/uhm/lib/editor/geometry/geometryBinding";
 
 export type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
 export type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
@@ -552,12 +552,25 @@ export function useEditorState(
         if (idx === -1) return;
 
         const feature = mainDraftRef.current.features[idx];
+        const deletedId = String(feature.properties.id);
         const nextFeatures = [...mainDraftRef.current.features];
         nextFeatures.splice(idx, 1);
 
         const undoActions: UndoAction[] = [];
         const replayUndoAction = pruneReplaysForDeletedGeometryIds([feature.properties.id], `Xóa replay theo GEO #${feature.properties.id}`);
         if (replayUndoAction) undoActions.push(replayUndoAction);
+        for (let i = 0; i < nextFeatures.length; i += 1) {
+            if (normalizeFeatureBoundWith(nextFeatures[i]) !== deletedId) continue;
+            const prevProperties = deepClone(nextFeatures[i].properties);
+            nextFeatures[i] = {
+                ...nextFeatures[i],
+                properties: {
+                    ...nextFeatures[i].properties,
+                    bound_with: null,
+                },
+            };
+            undoActions.push({ type: "properties", id: nextFeatures[i].properties.id, prevProperties });
+        }
         undoActions.push({ type: "delete", feature: deepClone(feature), index: idx });
         pushMainUndo(
             undoActions.length === 1
@@ -574,28 +587,45 @@ export function useEditorState(
 
         const idsSet = new Set(ids.map(String));
         const nextFeatures: Feature[] = [];
-        const undoActions: UndoAction[] = [];
+        const deleteUndoActions: UndoAction[] = [];
+        const boundWithUndoActions: UndoAction[] = [];
 
         mainDraftRef.current.features.forEach((feature, index) => {
             if (idsSet.has(String(feature.properties.id))) {
-                undoActions.push({ type: "delete", feature: deepClone(feature), index });
+                deleteUndoActions.push({ type: "delete", feature: deepClone(feature), index });
             } else {
-                nextFeatures.push(feature);
+                const parentId = normalizeFeatureBoundWith(feature);
+                if (parentId && idsSet.has(parentId)) {
+                    boundWithUndoActions.push({
+                        type: "properties",
+                        id: feature.properties.id,
+                        prevProperties: deepClone(feature.properties),
+                    });
+                    nextFeatures.push({
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            bound_with: null,
+                        },
+                    });
+                } else {
+                    nextFeatures.push(feature);
+                }
             }
         });
 
-        if (undoActions.length === 0) return;
+        if (deleteUndoActions.length === 0) return;
 
-        const replayUndoAction = pruneReplaysForDeletedGeometryIds(ids, `Xóa replay theo ${undoActions.length} GEO`);
+        const replayUndoAction = pruneReplaysForDeletedGeometryIds(ids, `Xóa replay theo ${deleteUndoActions.length} GEO`);
         const groupedActions = replayUndoAction
-            ? [replayUndoAction, ...undoActions.slice().reverse()]
-            : undoActions.length === 1
-                ? undoActions
-                : undoActions.slice().reverse();
+            ? [replayUndoAction, ...boundWithUndoActions, ...deleteUndoActions.slice().reverse()]
+            : deleteUndoActions.length === 1 && boundWithUndoActions.length === 0
+                ? deleteUndoActions
+                : [...boundWithUndoActions, ...deleteUndoActions.slice().reverse()];
         pushMainUndo(
             groupedActions.length === 1
                 ? groupedActions[0]
-                : { type: "group", label: `Xóa ${undoActions.length} geometry`, actions: groupedActions }
+                : { type: "group", label: `Xóa ${deleteUndoActions.length} geometry`, actions: groupedActions }
         );
         commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
@@ -620,6 +650,21 @@ export function useEditorState(
         };
         nextFeatures[idx] = newFeature;
 
+        const boundWithUndoActions: UndoAction[] = [];
+        for (let i = 0; i < nextFeatures.length; i += 1) {
+            if (i === idx) continue;
+            if (normalizeFeatureBoundWith(nextFeatures[i]) !== String(oldId)) continue;
+            const prevProperties = deepClone(nextFeatures[i].properties);
+            nextFeatures[i] = {
+                ...nextFeatures[i],
+                properties: {
+                    ...nextFeatures[i].properties,
+                    bound_with: String(newId),
+                },
+            };
+            boundWithUndoActions.push({ type: "properties", id: nextFeatures[i].properties.id, prevProperties });
+        }
+
         // Cập nhật replays nếu có
         const prevReplays = replaysRef.current || [];
         const nextReplays = prevReplays.map((replay) => {
@@ -640,6 +685,7 @@ export function useEditorState(
             type: "group",
             label: `Đổi ID GEO #${oldId} -> #${newId}`,
             actions: [
+                ...boundWithUndoActions,
                 { type: "replays", label: "Phục hồi replay cũ", prevReplays: deepClone(prevReplays) },
                 { type: "create", id: newId },
                 { type: "delete", feature: deepClone(prevFeature), index: idx },
@@ -910,7 +956,7 @@ function createReplaySessionSeed(
         id: geometryId,
         geometry_id: geometryId,
         target_geometry_ids: buildReplaySeedTargetIds(
-            sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId),
+            sourceDraft,
             geometryId,
             selectedIds
         ),
@@ -926,8 +972,7 @@ function normalizeReplaySessionSeed(
 ): BattleReplay {
     const nextReplay = deepClone(replay);
     nextReplay.id = geometryId;
-    const triggerFeature = sourceDraft.features.find((feature) => String(feature.properties.id) === geometryId);
-    const seedTargetIds = buildReplaySeedTargetIds(triggerFeature, geometryId, selectedIds);
+    const seedTargetIds = buildReplaySeedTargetIds(sourceDraft, geometryId, selectedIds);
     nextReplay.target_geometry_ids = normalizeReplayTargetGeometryIds(
         nextReplay.target_geometry_ids,
         geometryId,
@@ -937,7 +982,7 @@ function normalizeReplaySessionSeed(
 }
 
 function buildReplaySeedTargetIds(
-    triggerFeature: Feature | undefined,
+    sourceDraft: FeatureCollection,
     featureId: string,
     selectedIds: (string | number)[]
 ) {
@@ -958,9 +1003,9 @@ function buildReplaySeedTargetIds(
         pushId(rawId);
     }
 
-    if (Array.isArray(triggerFeature?.properties?.binding)) {
-        for (const rawId of triggerFeature.properties.binding) {
-            pushId(rawId);
+    for (const feature of sourceDraft.features) {
+        if (normalizeFeatureBoundWith(feature) === featureId) {
+            pushId(feature.properties.id);
         }
     }
 
@@ -1020,7 +1065,7 @@ function sanitizeReplayFeature(feature: Feature): Feature {
         ...feature,
         properties: {
             ...feature.properties,
-            binding: [],
+            bound_with: null,
         },
     };
 }

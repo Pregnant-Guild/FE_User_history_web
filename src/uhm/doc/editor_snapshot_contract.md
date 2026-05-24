@@ -63,9 +63,11 @@ Mỗi feature trong `mainDraft.features` sinh một row:
 | `operation` | `"create"`, `"update"` hoặc `"reference"` theo baseline/diff |
 | `type` | FE type key trước `toApiEditorSnapshot()`, backend code string sau normalize API |
 | `draw_geometry` | `feature.geometry` |
-| `binding` | `normalizeFeatureBindingIds(feature)` |
+| `bound_with` | `normalizeFeatureBoundWith(feature)` |
 | `time_start` / `time_end` | `feature.properties.time_start/time_end ?? null` |
 | `bbox` | BBox tính từ geometry, hoặc `null` |
+
+Snapshot legacy có `binding: string[]` trên geometry cha được FE migrate khi load bằng cách invert sang `bound_with` trên từng geometry con.
 
 Geometry đã bị xóa sinh row:
 
@@ -93,7 +95,7 @@ Geometry đã bị xóa sinh row:
 - `type`
 - `time_start`
 - `time_end`
-- `binding`
+- `bound_with`
 - `entity_id`
 - `entity_ids`
 - `entity_name`
@@ -103,7 +105,7 @@ Geometry đã bị xóa sinh row:
 
 Các field này được lưu ở collection chuẩn hơn:
 
-- `type/time/binding` nằm ở `geometries[]`.
+- `type/time/bound_with` nằm ở `geometries[]`.
 - entity relation nằm ở `geometry_entity[]`.
 - entity label/name được hydrate lại từ `entities[]` và join table khi load.
 
@@ -125,7 +127,7 @@ Build rule:
 
 Rows được dedupe/sort theo `geometry_id`, rồi `entity_id`.
 
-Commit/submit hiện chặn nếu có geometry không có entity ids hợp lệ. Geometry-geometry `binding` không được tính là đã bind entity.
+Commit/submit hiện chặn nếu có geometry không có entity ids hợp lệ. Geometry-geometry `bound_with` không được tính là đã bind entity.
 
 ## 6. Entity contract
 

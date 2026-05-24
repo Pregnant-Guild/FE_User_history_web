@@ -21,7 +21,7 @@ export type FeatureProperties = {
     geometry_preset?: GeometryPreset | null;
     time_start?: number | null;
     time_end?: number | null;
-    binding?: string[];
+    bound_with?: string | null;
     entity_id?: string | null;
     entity_ids?: string[];
     entity_name?: string | null;
@@ -60,7 +60,7 @@ export type GeometrySnapshot = {
     type?: string | null;
     draw_geometry?: Geometry;
     geometry?: Geometry;
-    binding?: string[];
+    bound_with?: string | null;
     time_start?: number | null;
     time_end?: number | null;
     bbox?: {

@@ -58,10 +58,8 @@ export default function SelectedGeometryPanel({
             geometryMetaForm.type_key,
             geometryMetaForm.time_start,
             geometryMetaForm.time_end,
-            geometryMetaForm.binding,
         ].join("|");
     }, [
-        geometryMetaForm.binding,
         geometryMetaForm.time_end,
         geometryMetaForm.time_start,
         geometryMetaForm.type_key,

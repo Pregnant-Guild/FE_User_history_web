@@ -86,7 +86,7 @@ FE không còn export/persist cả `FeatureCollection` riêng của replay nữa
 
 - geo MAIN
 - các geo được đưa vào replay từ bulk select
-- binding của MAIN geo
+- các geometry con có `bound_with` trỏ tới MAIN geo
 
 Khi mở replay, FE sẽ hydrate lại `replayDraft` từ:
 
