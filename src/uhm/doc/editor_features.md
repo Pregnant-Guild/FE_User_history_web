@@ -159,8 +159,8 @@ Khi apply, editor patch trực tiếp `feature.properties` của geometry đang 
 - Slider + numeric input cùng điều khiển `timelineDraftYear`.
 - Có toggle `filterEnabled`.
 - Khi bật filter:
-  - geometry đã có trong baseline chỉ hiện nếu năm hiện tại nằm trong `[time_start, time_end]`
-  - geometry mới tạo trong session vẫn được giữ visible
+  - mọi geometry chỉ hiện nếu năm hiện tại nằm trong `[time_start, time_end]`
+  - geometry mới tạo trong session cũng tuân theo filter này
 
 Timeline hiện là filter phía client, không fetch lại dữ liệu project theo năm.
 
@@ -178,7 +178,7 @@ Panel phải có `UnifiedSearchBar` với 3 loại search:
   - tìm geometry theo tên entity
   - nút `Import` sẽ import geometry vào draft hiện tại
   - đồng thời thêm entity tương ứng vào `snapshotEntityRows` nếu chưa có
-  - import sẽ tự tắt timeline filter để geometry mới import không bị ẩn
+  - import giữ nguyên timeline filter; geometry mới import có thể bị ẩn nếu ngoài năm hiện tại
 
 ## 9. Entity và binding
 

@@ -98,7 +98,7 @@ Nguồn: `const editor = useEditorState(initialData)`
 
 - `editor.hasPersistedFeature(id)`
   - `true` nếu feature đã tồn tại trong baseline map nội bộ.
-  - Dùng cho timeline filter: feature mới tạo trong session vẫn luôn visible.
+  - Dùng để phân biệt geometry mới khi build snapshot và hiển thị trạng thái `new`.
 
 ### 2.2 Snapshot stores (persisted on commit)
 
@@ -240,7 +240,7 @@ Search GEO gọi:
 
 Khi bấm **Import** một geometry từ kết quả search:
 
-1. Tắt `timelineFilterEnabled` để geometry luôn nhìn thấy (không bị filter theo năm).
+1. Giữ nguyên `timelineFilterEnabled`; geometry import vẫn tuân theo filter năm hiện tại.
 2. Add entity tương ứng vào:
    - `snapshotEntities` (source:"ref", operation:"reference")
    - `entityCatalog` (để UI có name/description)

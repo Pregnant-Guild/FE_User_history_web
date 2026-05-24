@@ -229,7 +229,7 @@ Nó được cập nhật khi:
 - nguồn có thể là `mainDraft`, `replayDraft`, hoặc preview draft tùy mode
 - đã qua filter timeline nếu `timelineFilterEnabled = true`
 - đã qua replay preview hidden ids nếu đang preview
-- geometry mới tạo trong session không bị timeline filter ẩn
+- geometry mới tạo trong session cũng bị timeline filter xử lý như geometry baseline
 
 ### `labelContextBaseDraft` và `mapLabelContextDraft`
 

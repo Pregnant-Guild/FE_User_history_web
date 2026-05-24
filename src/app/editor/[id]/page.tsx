@@ -535,7 +535,6 @@ function EditorPageContent() {
 
     // Render draft is the only FeatureCollection that decides what appears on the map.
     // It may be timeline-filtered, replay-filtered, or preview-filtered, but it is not the edit source.
-    // New features created in the current session remain visible regardless of time range.
     const mapRenderDraft = useMemo(() => {
         const activeDraft = isReplayPreviewMode
             ? replayPreviewDraft
@@ -547,10 +546,7 @@ function EditorPageContent() {
         const year = clampYearToFixedRange(Math.trunc(activeTimelineYear));
         return {
             ...activeDraft,
-            features: activeDraft.features.filter((feature) => {
-                if (!editor.hasPersistedFeature(feature.properties.id)) return true;
-                return isFeatureVisibleAtYear(feature, year);
-            }),
+            features: activeDraft.features.filter((feature) => isFeatureVisibleAtYear(feature, year)),
         };
     }, [
         activeTimelineFilterEnabled,
@@ -1769,9 +1765,6 @@ function EditorPageContent() {
         const geoId = String(geo?.id || "").trim();
         if (!geoId) return;
 
-        // Ensure the geometry stays selectable even if it doesn't match the current timeline year.
-        setTimelineFilterEnabled(false);
-
         const importedEntity: Entity = {
             id: entityItem.entity_id,
             name: (entityItem.name || "").trim() || entityItem.entity_id,
@@ -1847,7 +1840,6 @@ function EditorPageContent() {
         handleAddEntityRefToProject,
         setEntityCatalog,
         setSelectedFeatureIds,
-        setTimelineFilterEnabled,
     ]);
 
     // Commands thao tác metadata/entity binding cho feature đang chọn.
