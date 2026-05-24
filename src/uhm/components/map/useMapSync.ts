@@ -15,6 +15,7 @@ import {
     fitMapToFeatureCollection,
     setSelectedFeatureState,
     splitDraftFeatures,
+    decorateFeaturesWithEntityColors,
 } from "./mapUtils";
 import { applyImageOverlay, type MapImageOverlay } from "./imageOverlay";
 
@@ -128,7 +129,8 @@ export function useMapSync({
         const bindingFilteredRenderDraft = applyGeometryBindingFilterRef.current
             ? filterDraftByBinding(renderFc, currentSelectedIds, highlightFeaturesVal)
             : renderFc;
-        const mapSourceDraft = filterDraftByGeometryVisibility(bindingFilteredRenderDraft, geometryVisibilityRef.current);
+        const visibilityFilteredDraft = filterDraftByGeometryVisibility(bindingFilteredRenderDraft, geometryVisibilityRef.current);
+        const mapSourceDraft = decorateFeaturesWithEntityColors(visibilityFilteredDraft);
         const labelTimelineYear = labelTimelineYearRef.current;
         const { polygons, points } = splitDraftFeatures(mapSourceDraft);
         const labeledGeometries = decorateLineFeaturesWithLabels(polygons, labelContext, labelTimelineYear);

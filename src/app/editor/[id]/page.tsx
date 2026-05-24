@@ -39,6 +39,7 @@ import {
     mergeEntitySearchResults,
 } from "@/uhm/lib/editor/entity/entityBinding";
 import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
+import { newId } from "@/uhm/lib/utils/id";
 import {
     loadBackgroundLayerVisibilityFromStorage,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
@@ -1862,6 +1863,58 @@ function EditorPageContent() {
         setEntityFormStatus,
     });
 
+    const handleRerollGeometryId = useCallback((oldId: string | number) => {
+        const nextId = newId();
+        editor.changeFeatureId(oldId, nextId);
+        setSelectedFeatureIds((prev) => prev.map((id) => String(id) === String(oldId) ? nextId : id));
+    }, [editor, setSelectedFeatureIds]);
+
+    const handleRerollEntityId = useCallback((oldId: string, nextId: string) => {
+        const activeEntity = entities.find(e => e.id === oldId);
+        if (!activeEntity) return;
+
+        // 1. Update snapshotEntityRows
+        editor.setSnapshotEntityRows((prev) => prev.map((e) => {
+            if (e && String(e.id) === oldId) {
+                return { ...e, id: nextId };
+            }
+            return e;
+        }), `Reroll Entity ID #${oldId} -> #${nextId}`);
+
+        // 2. Update entityCatalog
+        setEntityCatalog((prev) => prev.map((e) => {
+            if (e && String(e.id) === oldId) {
+                return { ...e, id: nextId };
+            }
+            return e;
+        }));
+
+        // 3. Update selectedGeometryEntityIds
+        setSelectedGeometryEntityIds((prev) => prev.map((id) => id === oldId ? nextId : id));
+
+        // 4. Update features bound to this entity ID
+        const featuresToPatch = editor.draft.features.filter((feature) => {
+            const entityIds = feature.properties.entity_ids || [];
+            return feature.properties.entity_id === oldId || entityIds.includes(oldId);
+        });
+        if (featuresToPatch.length > 0) {
+            editor.patchFeaturePropertiesBatch(
+                featuresToPatch.map((feature) => {
+                    const prevEntityIds = feature.properties.entity_ids || [];
+                    const nextEntityIds = prevEntityIds.map((id) => id === oldId ? nextId : id);
+                    return {
+                        id: feature.properties.id,
+                        patch: buildFeatureEntityPatch(feature, nextEntityIds, [
+                            ...entities.filter(e => e.id !== oldId),
+                            { id: nextId, name: activeEntity.name, time_start: activeEntity.time_start ?? null, time_end: activeEntity.time_end ?? null }
+                        ])
+                    };
+                }),
+                "Cập nhật entity ID mới cho các GEO"
+            );
+        }
+    }, [editor, entities, setEntityCatalog, setSelectedGeometryEntityIds]);
+
     // Tạo entity inline chỉ trong snapshot local, chưa gọi backend cho tới khi commit.
     const handleCreateEntityOnly = async () => {
         const name = entityForm.name.trim();
@@ -2311,6 +2364,7 @@ function EditorPageContent() {
                                     hasSelectedGeometry={Boolean(selectedFeature)}
                                     selectedGeometryTime={selectedGeometryTime}
                                     onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
+                                    onRerollEntityId={handleRerollEntityId}
                                 />
 
                                 <WikiSidebarPanel
@@ -2333,6 +2387,7 @@ function EditorPageContent() {
                                         onDeselectAll={() => setSelectedFeatureIds([])}
                                         changeCount={editor.changeCount}
                                         onReplayEdit={(id) => setMode("replay", id)}
+                                        onRerollGeometryId={handleRerollGeometryId}
                                     />
                                 ) : null}
                             </div>

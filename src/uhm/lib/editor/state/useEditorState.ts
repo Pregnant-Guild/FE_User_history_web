@@ -14,6 +14,7 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
+import { newId } from "@/uhm/lib/utils/id";
 
 export type { Feature, FeatureCollection, FeatureProperties, Geometry } from "@/uhm/types/geo";
 export type { Change, UndoAction } from "@/uhm/lib/editor/draft/editorTypes";
@@ -599,6 +600,55 @@ export function useEditorState(
         commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
     }
 
+    function changeFeatureId(oldId: FeatureProperties["id"], newId: FeatureProperties["id"]) {
+        if (mode === "replay") {
+            return;
+        }
+
+        const idx = mainDraftRef.current.features.findIndex((feature) => featureIdEquals(feature.properties.id, oldId));
+        if (idx === -1) return;
+
+        const nextFeatures = [...mainDraftRef.current.features];
+        const prevFeature = nextFeatures[idx];
+        const newFeature = {
+            ...prevFeature,
+            id: newId,
+            properties: {
+                ...prevFeature.properties,
+                id: newId,
+            },
+        };
+        nextFeatures[idx] = newFeature;
+
+        // Cập nhật replays nếu có
+        const prevReplays = replaysRef.current || [];
+        const nextReplays = prevReplays.map((replay) => {
+            if (replay.geometry_id === String(oldId)) {
+                return {
+                    ...deepClone(replay),
+                    id: String(newId),
+                    geometry_id: String(newId),
+                };
+            }
+            return replay;
+        });
+        if (JSON.stringify(prevReplays) !== JSON.stringify(nextReplays)) {
+            updateReplaysState(nextReplays);
+        }
+
+        pushMainUndo({
+            type: "group",
+            label: `Đổi ID GEO #${oldId} -> #${newId}`,
+            actions: [
+                { type: "replays", label: "Phục hồi replay cũ", prevReplays: deepClone(prevReplays) },
+                { type: "create", id: newId },
+                { type: "delete", feature: deepClone(prevFeature), index: idx },
+            ],
+        });
+
+        commitMainDraft({ ...mainDraftRef.current, features: nextFeatures });
+    }
+
     function pruneReplaysForDeletedGeometryIds(
         ids: Array<FeatureProperties["id"]>,
         label: string
@@ -822,6 +872,7 @@ export function useEditorState(
         updateFeature,
         deleteFeature,
         deleteFeatures,
+        changeFeatureId,
         undo,
         buildPayload,
         clearChanges,

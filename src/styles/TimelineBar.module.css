@@ -291,3 +291,48 @@
   cursor: not-allowed !important;
   pointer-events: none !important;
 }
+
+.numberWrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adjustGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.adjustBtn {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.adjustBtn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.adjustBtn:active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+
+.adjustBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

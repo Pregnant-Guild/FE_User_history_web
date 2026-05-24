@@ -20,6 +20,7 @@ export const POINT_GEOTYPE_ICON_PATHS: Partial<Record<PointGeotypeId, string>> =
     city: "/images/mapIcon/point/city.png",
     fortification: "/images/mapIcon/point/castle.png",
     ruin: "/images/mapIcon/point/ruin.png",
+    port: "/images/mapIcon/point/port.png",
 };
 
 type PointIconVariant = "default" | "draft";
@@ -442,50 +443,33 @@ function drawRuinGlyph(ctx: CanvasRenderingContext2D) {
 }
 
 function drawAnchorGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(32, 22.5, 3.5, 0, Math.PI * 2);
-    ctx.stroke();
+    const img = preloadedImages["port"];
+    if (img && loadedImageKeys.has("port")) {
+        ctx.drawImage(img, 0, 0, ICON_CANVAS_SIZE, ICON_CANVAS_SIZE);
+    } else {
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(32, 22.5, 3.5, 0, Math.PI * 2);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(32, 26.5);
-    ctx.lineTo(32, 41);
-    ctx.moveTo(24, 31.5);
-    ctx.lineTo(40, 31.5);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(32, 26.5);
+        ctx.lineTo(32, 41);
+        ctx.moveTo(24, 31.5);
+        ctx.lineTo(40, 31.5);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(32, 35.5, 9, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(32, 35.5, 9, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(24.5, 38);
-    ctx.lineTo(21.5, 34);
-    ctx.moveTo(39.5, 38);
-    ctx.lineTo(42.5, 34);
-    ctx.stroke();
-}
-
-function drawBridgeGlyph(ctx: CanvasRenderingContext2D) {
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(21, 31);
-    ctx.lineTo(43, 31);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(22, 40);
-    ctx.quadraticCurveTo(32, 26, 42, 40);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(26, 37);
-    ctx.lineTo(26, 31);
-    ctx.moveTo(32, 33.5);
-    ctx.lineTo(32, 31);
-    ctx.moveTo(38, 37);
-    ctx.lineTo(38, 31);
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(24.5, 38);
+        ctx.lineTo(21.5, 34);
+        ctx.moveTo(39.5, 38);
+        ctx.lineTo(42.5, 34);
+        ctx.stroke();
+    }
 }
 
 

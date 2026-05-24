@@ -169,7 +169,7 @@ function statusColor(normalColor: string): maplibregl.ExpressionSpecification {
         "case",
         SELECTED_EXPR,
         SELECTED_COLOR,
-        normalColor,
+        ["coalesce", ["get", "entity_color"], normalColor],
     ];
 }
 
@@ -178,12 +178,16 @@ function statusStroke(normalColor: string): maplibregl.ExpressionSpecification {
         "case",
         SELECTED_EXPR,
         SELECTED_COLOR,
-        normalColor,
+        ["coalesce", ["get", "entity_color"], normalColor],
     ];
 }
 
-function statusFillColor(normalColor: string): string {
-    return normalColor;
+function statusFillColor(normalColor: string): maplibregl.ExpressionSpecification {
+    return [
+        "coalesce",
+        ["get", "entity_color"],
+        normalColor,
+    ];
 }
 
 function lineFilter(typeId: string): maplibregl.ExpressionSpecification {

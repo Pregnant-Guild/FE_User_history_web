@@ -940,3 +940,56 @@ export function clampNumber(value: number, min: number, max: number): number {
     if (value > max) return max;
     return value;
 }
+
+export function hashStringToColor(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 50%)`;
+}
+
+export function decorateFeaturesWithEntityColors(fc: FeatureCollection): FeatureCollection {
+    return {
+        ...fc,
+        features: fc.features.map((feature) => {
+            const geomType = feature.geometry?.type;
+            if (geomType === "Point" || geomType === "MultiPoint") {
+                // Point - giữ nguyên màu của preset/icon
+                return feature;
+            }
+
+            if (geomType === "LineString" || geomType === "MultiLineString") {
+                const entityIds = getFeatureEntityIds(feature);
+                if (entityIds.length > 0) {
+                    const sortedCombined = [...entityIds].sort().join("+");
+                    return {
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            entity_color: hashStringToColor(sortedCombined),
+                        },
+                    };
+                }
+                return feature;
+            }
+
+            if (geomType === "Polygon" || geomType === "MultiPolygon") {
+                const geoId = String(feature.properties?.id || "");
+                if (geoId) {
+                    return {
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            entity_color: hashStringToColor(geoId),
+                        },
+                    };
+                }
+                return feature;
+            }
+
+            return feature;
+        }),
+    };
+}

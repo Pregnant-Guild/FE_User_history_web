@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FIXED_TIMELINE_END_YEAR, FIXED_TIMELINE_START_YEAR, clampYearValue } from "@/uhm/lib/utils/timeline";
 import styles from "@/styles/TimelineBar.module.css";
 
@@ -33,13 +34,94 @@ export default function TimelineBar({
     const effectiveDisabled = disabled;
     const safeYear = clampYearValue(year, lower, upper);
 
+    const [localYear, setLocalYear] = useState(safeYear);
+
+    // Đồng bộ prop year với localYear khi prop year thay đổi từ bên ngoài
+    useEffect(() => {
+        setLocalYear(safeYear);
+    }, [safeYear]);
+
+    const localYearRef = useRef(localYear);
+    localYearRef.current = localYear;
+
+    const onYearChangeRef = useRef(onYearChange);
+    onYearChangeRef.current = onYearChange;
+
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastTriggeredYearRef = useRef<number | null>(null);
+    const lastTriggerTimeRef = useRef<number>(0);
+
+    const commitYearChange = useCallback((nextVal: number) => {
+        if (nextVal === lastTriggeredYearRef.current) return;
+        lastTriggeredYearRef.current = nextVal;
+        lastTriggerTimeRef.current = Date.now();
+        onYearChangeRef.current(nextVal);
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+    }, []);
+
+    const handleLocalYearChange = useCallback((nextVal: number) => {
+        const clamped = clampYearValue(Math.trunc(nextVal), lower, upper);
+        setLocalYear(clamped);
+
+        const now = Date.now();
+        if (now - lastTriggerTimeRef.current >= 1000) {
+            commitYearChange(clamped);
+        } else {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            debounceTimerRef.current = setTimeout(() => {
+                commitYearChange(clamped);
+            }, 1000);
+        }
+    }, [lower, upper, commitYearChange]);
+
+    const startChangingYear = (direction: number) => {
+        if (effectiveDisabled) return;
+        const nextVal = localYearRef.current + direction;
+        handleLocalYearChange(nextVal);
+
+        timeoutRef.current = setTimeout(() => {
+            intervalRef.current = setInterval(() => {
+                const currentVal = localYearRef.current;
+                const targetVal = currentVal + direction;
+                if (targetVal < lower || targetVal > upper) {
+                    stopChangingYear();
+                    return;
+                }
+                handleLocalYearChange(targetVal);
+            }, 80);
+        }, 400);
+    };
+
+    const stopChangingYear = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        commitYearChange(localYearRef.current);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        };
+    }, []);
+
     const helperText = isLoading
         ? "Đang tải geometry theo mốc thời gian..."
         : statusText || null;
-
-    const handleYearChange = (nextYear: number) => {
-        onYearChange(clampYearValue(Math.trunc(nextYear), lower, upper));
-    };
 
     const handleTimeRangeChange = (nextValue: number) => {
         if (!onTimeRangeChange) return;
@@ -81,8 +163,10 @@ export default function TimelineBar({
                     min={lower}
                     max={upper}
                     step={1}
-                    value={safeYear}
-                    onChange={(event) => handleYearChange(Number(event.target.value))}
+                    value={localYear}
+                    onChange={(event) => handleLocalYearChange(Number(event.target.value))}
+                    onMouseUp={() => commitYearChange(localYearRef.current)}
+                    onTouchEnd={() => commitYearChange(localYearRef.current)}
                     disabled={effectiveDisabled}
                     className={styles.slider}
                     aria-label="Timeline year"
@@ -90,17 +174,55 @@ export default function TimelineBar({
                 <span className={styles.labelBoundsRight}>
                     {formatYear(upper)}
                 </span>
-                <input
-                    type="number"
-                    min={lower}
-                    max={upper}
-                    step={1}
-                    value={safeYear}
-                    onChange={(event) => handleYearChange(Number(event.target.value))}
-                    disabled={effectiveDisabled}
-                    className={styles.numberInput}
-                    aria-label="Timeline exact year"
-                />
+                <div className={styles.numberWrapper}>
+                    <input
+                        type="number"
+                        min={lower}
+                        max={upper}
+                        step={1}
+                        value={localYear}
+                        onChange={(event) => handleLocalYearChange(Number(event.target.value))}
+                        onBlur={() => commitYearChange(localYearRef.current)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                commitYearChange(localYearRef.current);
+                            }
+                        }}
+                        disabled={effectiveDisabled}
+                        className={styles.numberInput}
+                        aria-label="Timeline exact year"
+                    />
+                    <div className={styles.adjustGroup}>
+                        <button
+                            type="button"
+                            onMouseDown={() => startChangingYear(-1)}
+                            onMouseUp={stopChangingYear}
+                            onMouseLeave={stopChangingYear}
+                            onTouchStart={() => startChangingYear(-1)}
+                            onTouchEnd={stopChangingYear}
+                            disabled={effectiveDisabled}
+                            className={styles.adjustBtn}
+                            title="Giảm 1 năm"
+                            aria-label="Giảm 1 năm"
+                        >
+                            -
+                        </button>
+                        <button
+                            type="button"
+                            onMouseDown={() => startChangingYear(1)}
+                            onMouseUp={stopChangingYear}
+                            onMouseLeave={stopChangingYear}
+                            onTouchStart={() => startChangingYear(1)}
+                            onTouchEnd={stopChangingYear}
+                            disabled={effectiveDisabled}
+                            className={styles.adjustBtn}
+                            title="Tăng 1 năm"
+                            aria-label="Tăng 1 năm"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
                 {typeof timeRange === "number" && onTimeRangeChange ? (
                     <label
                         title="time_range (0-30)"

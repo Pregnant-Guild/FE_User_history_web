@@ -5,6 +5,7 @@ import type { EntitySnapshot } from "@/uhm/types/entities";
 import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
 import { useEditorStore } from "@/uhm/store/editorStore";
+import { newId } from "@/uhm/lib/utils/id";
 
 type Props = {
   onCreateEntityOnly: () => void;
@@ -12,6 +13,7 @@ type Props = {
   hasSelectedGeometry?: boolean;
   selectedGeometryTime?: { time_start: number | null; time_end: number | null } | null;
   onToggleBindEntityForSelectedGeometry?: (entityId: string, nextChecked: boolean) => void;
+  onRerollEntityId?: (oldId: string, nextId: string) => void;
 };
 
 export default function ProjectEntityRefsPanel({
@@ -20,6 +22,7 @@ export default function ProjectEntityRefsPanel({
   hasSelectedGeometry,
   selectedGeometryTime,
   onToggleBindEntityForSelectedGeometry,
+  onRerollEntityId,
 }: Props) {
   const {
     snapshotEntityRows,
@@ -282,8 +285,35 @@ export default function ProjectEntityRefsPanel({
             </div>
           </div>
 
-          <div style={{ fontSize: 11, color: "#94a3b8", overflowWrap: "anywhere" }}>
-            {String(activeEntity.id)}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", overflowWrap: "anywhere", minWidth: 0, flex: 1 }}>
+              {String(activeEntity.id)}
+            </div>
+            {activeEntity.source === "inline" && onRerollEntityId && (
+              <button
+                type="button"
+                onClick={() => {
+                  const nextId = newId();
+                  onRerollEntityId(String(activeEntity.id), nextId);
+                  setActiveEntityId(nextId);
+                }}
+                disabled={isEntitySubmitting}
+                title="Đổi mã ID để sinh ngẫu nhiên màu sắc mới cho thực thể này"
+                style={{
+                  border: "1px solid #0f766e",
+                  borderRadius: "4px",
+                  padding: "2px 6px",
+                  background: "transparent",
+                  color: "#14b8a6",
+                  fontSize: "11px",
+                  cursor: isEntitySubmitting ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                  flex: "0 0 auto",
+                }}
+              >
+                Đổi màu (Reroll ID)
+              </button>
+            )}
           </div>
           <input
             value={editName}

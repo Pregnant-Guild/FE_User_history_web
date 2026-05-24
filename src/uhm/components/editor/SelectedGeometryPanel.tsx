@@ -20,6 +20,7 @@ type Props = {
     onReplayEdit?: (id: string | number) => void;
     onDeleteFeatures?: (ids: (string | number)[]) => void;
     onDeselectAll?: () => void;
+    onRerollGeometryId?: (oldId: string | number) => void;
 };
 
 export default function SelectedGeometryPanel({
@@ -29,6 +30,7 @@ export default function SelectedGeometryPanel({
     onReplayEdit,
     onDeleteFeatures,
     onDeselectAll,
+    onRerollGeometryId,
 }: Props) {
     const {
         geometryMetaForm,
@@ -221,8 +223,30 @@ export default function SelectedGeometryPanel({
                         <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "12px" }}>
                             Thuộc tính GEO
                         </div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>
-                            Các giá trị này thuộc về GEO đang chọn, không phụ thuộc entity.
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <div style={{ color: "#94a3b8", fontSize: "11px", overflowWrap: "anywhere", minWidth: 0, flex: 1 }}>
+                                {isBulkMode ? `Đang chọn ${selectedFeatures.length} geometries` : `ID: ${representativeFeature.properties.id}`}
+                            </div>
+                            {!isBulkMode && onRerollGeometryId && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRerollGeometryId(representativeFeature.properties.id)}
+                                    title="Đổi mã ID để sinh ngẫu nhiên màu sắc mới cho hình học này"
+                                    style={{
+                                        border: "1px solid #0f766e",
+                                        borderRadius: "4px",
+                                        padding: "2px 6px",
+                                        background: "transparent",
+                                        color: "#14b8a6",
+                                        fontSize: "11px",
+                                        cursor: "pointer",
+                                        whiteSpace: "nowrap",
+                                        flex: "0 0 auto",
+                                    }}
+                                >
+                                    Đổi màu (Reroll ID)
+                                </button>
+                            )}
                         </div>
 
                         {!isMultiEditValid ? (
