@@ -1,20 +1,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type {
-    ReplayPreviewDialog,
-    ReplayPreviewImage,
-    ReplayPreviewToast,
-} from "@/uhm/lib/replay/useReplayPreview";
+import type { DialogState } from "@/uhm/types/projects";
+import type { ReplayPreviewToast } from "@/uhm/lib/replay/useReplayPreview";
 
 type Props = {
     isPreviewMode: boolean;
     isPlaying: boolean;
-    title: string;
-    descriptions: string;
-    subtitle: string | null;
-    dialog: ReplayPreviewDialog | null;
-    image: ReplayPreviewImage | null;
+    dialog: DialogState | null;
     toasts: ReplayPreviewToast[];
     sidebarOpen: boolean;
     playbackSpeed: number;
@@ -30,11 +23,7 @@ type Props = {
 export default function ReplayPreviewOverlay({
     isPreviewMode,
     isPlaying,
-    title,
-    descriptions,
-    subtitle,
     dialog,
-    image,
     toasts,
     sidebarOpen,
     playbackSpeed,
@@ -46,15 +35,11 @@ export default function ReplayPreviewOverlay({
     onResetPreview,
     onExitPreview,
 }: Props) {
-    const hasNarrativeCard = title.trim().length > 0 || descriptions.trim().length > 0;
     const hasWikiPreview = sidebarOpen;
     const shouldRender =
         isPreviewMode ||
         isPlaying ||
-        hasNarrativeCard ||
-        Boolean(subtitle) ||
         Boolean(dialog) ||
-        Boolean(image) ||
         Boolean(toasts.length);
 
     if (!shouldRender) {
@@ -70,49 +55,6 @@ export default function ReplayPreviewOverlay({
                 pointerEvents: "none",
             }}
         >
-            {hasNarrativeCard ? (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: 72,
-                        left: 18,
-                        maxWidth: 460,
-                        borderRadius: 18,
-                        border: "1px solid rgba(148, 163, 184, 0.26)",
-                        background: "linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88))",
-                        boxShadow: "0 14px 42px rgba(2, 6, 23, 0.42)",
-                        padding: "18px 20px",
-                    }}
-                >
-                    {title.trim().length ? (
-                        <div
-                            style={{
-                                fontSize: 26,
-                                lineHeight: 1.1,
-                                fontWeight: 900,
-                                color: "#f8fafc",
-                                overflowWrap: "anywhere",
-                            }}
-                        >
-                            {title}
-                        </div>
-                    ) : null}
-                    {descriptions.trim().length ? (
-                        <div
-                            style={{
-                                marginTop: title.trim().length ? 12 : 0,
-                                fontSize: 14,
-                                lineHeight: 1.55,
-                                color: "#dbeafe",
-                                whiteSpace: "pre-wrap",
-                            }}
-                        >
-                            {descriptions}
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
-
             {toasts.length ? (
                 <div
                     style={{
@@ -144,7 +86,7 @@ export default function ReplayPreviewOverlay({
                 </div>
             ) : null}
 
-            {image ? (
+            {dialog?.image_url ? (
                 <div
                     style={{
                         position: "absolute",
@@ -159,8 +101,8 @@ export default function ReplayPreviewOverlay({
                     }}
                 >
                     <img
-                        src={image.url}
-                        alt={image.caption || "Historical image"}
+                        src={dialog.image_url}
+                        alt={dialog.image_caption || "Historical image"}
                         style={{
                             width: "100%",
                             display: "block",
@@ -169,7 +111,7 @@ export default function ReplayPreviewOverlay({
                             background: "#020617",
                         }}
                     />
-                    {image.caption?.trim() ? (
+                    {dialog.image_caption?.trim() ? (
                         <div
                             style={{
                                 padding: "10px 12px",
@@ -178,30 +120,29 @@ export default function ReplayPreviewOverlay({
                                 color: "#cbd5e1",
                             }}
                         >
-                            {image.caption}
+                            {dialog.image_caption}
                         </div>
                     ) : null}
                 </div>
             ) : null}
 
-            {dialog ? (
-                <div
-                    style={{
-                        position: "absolute",
-                        left: dialog.side === "right" ? "auto" : 18,
-                        right: dialog.side === "right" ? 18 : "auto",
-                        bottom: subtitle ? 138 : 96,
-                        maxWidth: 420,
-                        display: "grid",
-                        gap: 10,
-                        gridTemplateColumns: dialog.avatar.trim().length ? "56px 1fr" : "1fr",
-                        alignItems: "start",
-                    }}
-                >
-                    {dialog.avatar.trim().length ? (
+            {dialog && dialog.text?.trim() ? (
+                dialog.avatar?.trim() ? (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: 18,
+                            bottom: 96,
+                            maxWidth: 420,
+                            display: "grid",
+                            gap: 10,
+                            gridTemplateColumns: "56px 1fr",
+                            alignItems: "start",
+                        }}
+                    >
                         <img
                             src={dialog.avatar}
-                            alt={dialog.speaker || "speaker"}
+                            alt="speaker"
                             style={{
                                 width: 56,
                                 height: 56,
@@ -211,65 +152,50 @@ export default function ReplayPreviewOverlay({
                                 background: "#0f172a",
                             }}
                         />
-                    ) : null}
-                    <div
-                        style={{
-                            borderRadius: 18,
-                            border: "1px solid rgba(148, 163, 184, 0.24)",
-                            background: "rgba(15, 23, 42, 0.92)",
-                            padding: "14px 16px",
-                            color: "#f8fafc",
-                            boxShadow: "0 14px 36px rgba(2, 6, 23, 0.38)",
-                        }}
-                    >
-                        {dialog.speaker?.trim() ? (
-                            <div
-                                style={{
-                                    marginBottom: 6,
-                                    fontSize: 11,
-                                    color: "#7dd3fc",
-                                    fontWeight: 900,
-                                    letterSpacing: 0.4,
-                                }}
-                            >
-                                {dialog.speaker}
-                            </div>
-                        ) : null}
                         <div
                             style={{
-                                fontSize: 15,
-                                lineHeight: 1.5,
-                                whiteSpace: "pre-wrap",
+                                borderRadius: 18,
+                                border: "1px solid rgba(148, 163, 184, 0.24)",
+                                background: "rgba(15, 23, 42, 0.92)",
+                                padding: "14px 16px",
+                                color: "#f8fafc",
+                                boxShadow: "0 14px 36px rgba(2, 6, 23, 0.38)",
                             }}
                         >
-                            {dialog.text}
+                            <div
+                                style={{
+                                    fontSize: 15,
+                                    lineHeight: 1.5,
+                                    whiteSpace: "pre-wrap",
+                                }}
+                            >
+                                {dialog.text}
+                            </div>
                         </div>
                     </div>
-                </div>
-            ) : null}
-
-            {subtitle?.trim() ? (
-                <div
-                    style={{
-                        position: "absolute",
-                        left: "50%",
-                        bottom: 90,
-                        transform: "translateX(-50%)",
-                        maxWidth: 720,
-                        borderRadius: 999,
-                        border: "1px solid rgba(148, 163, 184, 0.24)",
-                        background: "rgba(2, 6, 23, 0.84)",
-                        color: "#f8fafc",
-                        padding: "10px 18px",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        lineHeight: 1.45,
-                        textAlign: "center",
-                        boxShadow: "0 12px 32px rgba(2, 6, 23, 0.28)",
-                    }}
-                >
-                    {subtitle}
-                </div>
+                ) : (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: "50%",
+                            bottom: 90,
+                            transform: "translateX(-50%)",
+                            maxWidth: 720,
+                            borderRadius: 18,
+                            border: "1px solid rgba(148, 163, 184, 0.24)",
+                            background: "rgba(2, 6, 23, 0.84)",
+                            color: "#f8fafc",
+                            padding: "10px 18px",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            lineHeight: 1.45,
+                            textAlign: "center",
+                            boxShadow: "0 12px 32px rgba(2, 6, 23, 0.28)",
+                        }}
+                    >
+                        {dialog.text}
+                    </div>
+                )
             ) : null}
 
             {isPreviewMode ? (

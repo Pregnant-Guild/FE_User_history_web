@@ -10,6 +10,7 @@ import type {
     ReplayStage,
     ReplayStep,
     UIOptionName,
+    DialogState,
 } from "@/uhm/types/projects";
 import type { UndoAction } from "@/uhm/lib/editor/state/useEditorState";
 import { Panel } from "./Panel";
@@ -36,6 +37,51 @@ type Props = {
 };
 
 type ActionGroupKey = "use_UI_function" | "use_map_function" | "use_geo_function" | "use_narrow_function";
+type AnyStepAction =
+    | ReplayAction<UIOptionName>
+    | ReplayAction<MapFunctionName>
+    | ReplayAction<GeoFunctionName>
+    | ReplayAction<NarrativeFunctionName>;
+
+function validateReplayTimeFormat(value: string): boolean {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+
+    // 1. Check DD/MM/YYYY
+    const dmyRegex = /^(\d{2})\/(\d{2})\/(-?\d{4})$/;
+    const dmyMatch = trimmed.match(dmyRegex);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10);
+        const year = parseInt(dmyMatch[3], 10);
+        if (month < 1 || month > 12) return false;
+        if (day < 1 || day > 31) return false;
+        if (month === 2) {
+            const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+            if (day > (isLeap ? 29 : 28)) return false;
+        } else if ([4, 6, 9, 11].includes(month)) {
+            if (day > 30) return false;
+        }
+        return true;
+    }
+
+    // 2. Check MM/YYYY
+    const myRegex = /^(\d{2})\/(-?\d{4})$/;
+    const myMatch = trimmed.match(myRegex);
+    if (myMatch) {
+        const month = parseInt(myMatch[1], 10);
+        if (month < 1 || month > 12) return false;
+        return true;
+    }
+
+    // 3. Check YYYY
+    const yRegex = /^(-?\d{4})$/;
+    if (yRegex.test(trimmed)) {
+        return true;
+    }
+
+    return false;
+}
 
 type StageFormState = {
     title: string;
@@ -97,6 +143,13 @@ export default function ReplayTimelineSidebar({
         detail_time_stop: "",
     });
     const [createStagePanelKey, setCreateStagePanelKey] = useState(0);
+
+    const isStartValid = validateReplayTimeFormat(createStageForm.detail_time_start);
+    const isStopValid = validateReplayTimeFormat(createStageForm.detail_time_stop);
+    const isCreateFormValid = createStageForm.title.trim() !== "" && isStartValid && isStopValid;
+
+    const showStartError = createStageForm.detail_time_start.length > 0 && !isStartValid;
+    const showStopError = createStageForm.detail_time_stop.length > 0 && !isStopValid;
     const [openWeightEditorKey, setOpenWeightEditorKey] = useState<string | null>(null);
     const [openActionDetailKey, setOpenActionDetailKey] = useState<string | null>(null);
 
@@ -153,6 +206,10 @@ export default function ReplayTimelineSidebar({
 
     const handleCreateStage = () => {
         if (!replay) return;
+        if (!validateReplayTimeFormat(createStageForm.detail_time_start) ||
+            !validateReplayTimeFormat(createStageForm.detail_time_stop)) {
+            return;
+        }
         const nextId =
             stages.length > 0
                 ? Math.max(...stages.map((stage) => stage.id)) + 1
@@ -164,7 +221,7 @@ export default function ReplayTimelineSidebar({
             detail_time_stop: createStageForm.detail_time_stop.trim(),
             steps: [
                 {
-                    duration: 1000,
+                    duration: 5000,
                     use_UI_function: [],
                     use_map_function: [],
                     use_geo_function: [],
@@ -211,6 +268,26 @@ export default function ReplayTimelineSidebar({
         }
     };
 
+    const handleDuplicateStage = (stageId: number) => {
+        let nextStageId: number | null = null;
+        const changed = onMutateReplay(`Replay: nhân bản stage #${stageId}`, (draftReplay) => {
+            const index = draftReplay.detail.findIndex((item) => item.id === stageId);
+            if (index === -1) return;
+            nextStageId = draftReplay.detail.length > 0
+                ? Math.max(...draftReplay.detail.map((stage) => stage.id)) + 1
+                : 0;
+            const source = draftReplay.detail[index];
+            draftReplay.detail.splice(index + 1, 0, {
+                ...source,
+                id: nextStageId,
+                title: source.title ? `${source.title} copy` : undefined,
+                steps: source.steps.map(cloneReplayStep),
+            });
+        });
+        if (!changed || nextStageId == null) return;
+        onSelectStep(nextStageId, 0);
+    };
+
     const handleAddStep = (stageId: number) => {
         let nextStepIndex: number | null = null;
         const changed = onMutateReplay(`Replay: tạo step cho stage #${stageId}`, (draftReplay) => {
@@ -220,7 +297,7 @@ export default function ReplayTimelineSidebar({
             stage.steps = [
                 ...stage.steps,
                 {
-                    duration: 1000,
+                    duration: 5000,
                     use_UI_function: [],
                     use_map_function: [],
                     use_geo_function: [],
@@ -272,6 +349,21 @@ export default function ReplayTimelineSidebar({
         }
     };
 
+    const handleDuplicateStep = (stageId: number, stepIndex: number) => {
+        let nextSelectedIndex = stepIndex + 1;
+        const changed = onMutateReplay(
+            `Replay: nhân bản step ${stepIndex + 1} của stage #${stageId}`,
+            (draftReplay) => {
+                const stage = draftReplay.detail.find((item) => item.id === stageId);
+                if (!stage || stepIndex < 0 || stepIndex >= stage.steps.length) return;
+                stage.steps.splice(stepIndex + 1, 0, cloneReplayStep(stage.steps[stepIndex]));
+                nextSelectedIndex = stepIndex + 1;
+            }
+        );
+        if (!changed) return;
+        onSelectStep(stageId, nextSelectedIndex);
+    };
+
     const handleDeleteAction = (
         stageId: number,
         stepIndex: number,
@@ -305,6 +397,52 @@ export default function ReplayTimelineSidebar({
                         step.use_narrow_function = step.use_narrow_function.filter((_, idx) => idx !== actionIndex);
                         return;
                 }
+            }
+        );
+    };
+
+    const handleDuplicateAction = (
+        stageId: number,
+        stepIndex: number,
+        groupKey: ActionGroupKey,
+        actionIndex: number,
+        actionTitle: string
+    ) => {
+        onMutateReplay(
+            `Replay: nhân bản ${actionTitle} ở step ${stepIndex + 1} của stage #${stageId}`,
+            (draftReplay) => {
+                const stage = draftReplay.detail.find((item) => item.id === stageId);
+                if (!stage || stepIndex < 0 || stepIndex >= stage.steps.length) return;
+                const step = stage.steps[stepIndex];
+                const actions = [...getStepActionGroup(step, groupKey)];
+                if (actionIndex < 0 || actionIndex >= actions.length) return;
+                actions.splice(actionIndex + 1, 0, cloneReplayAction(actions[actionIndex]) as AnyStepAction);
+                setStepActionGroup(step, groupKey, actions);
+            }
+        );
+    };
+
+    const handleUpdateActionParams = (
+        stageId: number,
+        stepIndex: number,
+        groupKey: ActionGroupKey,
+        actionIndex: number,
+        actionTitle: string,
+        nextParams: unknown[]
+    ) => {
+        onMutateReplay(
+            `Replay: cập nhật params ${actionTitle} ở step ${stepIndex + 1} của stage #${stageId}`,
+            (draftReplay) => {
+                const stage = draftReplay.detail.find((item) => item.id === stageId);
+                if (!stage || stepIndex < 0 || stepIndex >= stage.steps.length) return;
+                const step = stage.steps[stepIndex];
+                const actions = [...getStepActionGroup(step, groupKey)];
+                if (actionIndex < 0 || actionIndex >= actions.length) return;
+                actions[actionIndex] = {
+                    ...actions[actionIndex],
+                    params: nextParams.map(cloneReplayParam),
+                } as AnyStepAction;
+                setStepActionGroup(step, groupKey, actions);
             }
         );
     };
@@ -452,7 +590,7 @@ export default function ReplayTimelineSidebar({
                             ) : null}
                         </div>
                         <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                            Preview sẽ mở trong mode riêng với snapshot replay tại thời điểm bấm play.
+                            Preview sẽ mở trong mode riêng với snapshot replay tại thời điểm bấm play. Speed {previewPlaybackSpeed}x.
                         </div>
                     </div>
                 </Panel>
@@ -465,37 +603,63 @@ export default function ReplayTimelineSidebar({
                         onChange={(event) =>
                             setCreateStageForm((prev) => ({ ...prev, title: event.target.value }))
                         }
-                        placeholder="Title"
+                        placeholder="Title (bắt buộc)"
                         style={inputStyle}
                     />
-                    <input
-                        value={createStageForm.detail_time_start}
-                        onChange={(event) =>
-                            setCreateStageForm((prev) => ({
-                                ...prev,
-                                detail_time_start: event.target.value,
-                            }))
-                        }
-                        placeholder="detail_time_start"
-                        style={inputStyle}
-                    />
-                    <input
-                        value={createStageForm.detail_time_stop}
-                        onChange={(event) =>
-                            setCreateStageForm((prev) => ({
-                                ...prev,
-                                detail_time_stop: event.target.value,
-                            }))
-                        }
-                        placeholder="detail_time_stop"
-                        style={inputStyle}
-                    />
+                    <div>
+                        <input
+                            value={createStageForm.detail_time_start}
+                            onChange={(event) =>
+                                setCreateStageForm((prev) => ({
+                                    ...prev,
+                                    detail_time_start: event.target.value,
+                                }))
+                            }
+                            placeholder="Thời gian bắt đầu (detail_time_start)"
+                            style={{
+                                ...inputStyle,
+                                borderColor: showStartError ? "#ef4444" : "#334155",
+                            }}
+                        />
+                        {showStartError ? (
+                            <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
+                                Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
+                            </div>
+                        ) : null}
+                    </div>
+                    <div>
+                        <input
+                            value={createStageForm.detail_time_stop}
+                            onChange={(event) =>
+                                setCreateStageForm((prev) => ({
+                                    ...prev,
+                                    detail_time_stop: event.target.value,
+                                }))
+                            }
+                            placeholder="Thời gian kết thúc (detail_time_stop)"
+                            style={{
+                                ...inputStyle,
+                                borderColor: showStopError ? "#ef4444" : "#334155",
+                            }}
+                        />
+                        {showStopError ? (
+                            <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
+                                Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
+                            </div>
+                        ) : null}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: "1.4" }}>
+                        Cấu trúc bắt buộc: <strong>DD/MM/YYYY</strong>, <strong>MM/YYYY</strong>, hoặc <strong>YYYY</strong>.
+                    </div>
                     <button
                         type="button"
+                        disabled={!isCreateFormValid}
                         onClick={handleCreateStage}
                         style={{
                             ...buttonStyle,
-                            background: "#1d4ed8",
+                            background: isCreateFormValid ? "#1d4ed8" : "#1e293b",
+                            color: isCreateFormValid ? "white" : "#64748b",
+                            cursor: isCreateFormValid ? "pointer" : "not-allowed",
                             border: "none",
                         }}
                     >
@@ -555,7 +719,7 @@ export default function ReplayTimelineSidebar({
                                             {stage.detail_time_start || "?"} → {stage.detail_time_stop || "?"}
                                         </div>
                                     </button>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 5 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 5 }}>
                                         <button
                                             type="button"
                                             onClick={() => handleMoveStage(stage.id, -1)}
@@ -582,6 +746,17 @@ export default function ReplayTimelineSidebar({
                                             }}
                                         >
                                             Thêm step
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDuplicateStage(stage.id)}
+                                            style={{
+                                                ...smallButtonStyle(false),
+                                                background: "#334155",
+                                                border: "none",
+                                            }}
+                                        >
+                                            Copy
                                         </button>
                                         <button
                                             type="button"
@@ -753,32 +928,38 @@ export default function ReplayTimelineSidebar({
                                                                                         </span>
                                                                                     </div>
                                                                                 </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        handleDeleteAction(
-                                                                                            stage.id,
-                                                                                            stepIndex,
-                                                                                            entry.groupKey,
-                                                                                            entry.actionIndex,
-                                                                                            entry.title
-                                                                                        )
-                                                                                    }
-                                                                                    style={{
-                                                                                        padding: "3px 6px",
-                                                                                        borderRadius: 6,
-                                                                                        border: "none",
-                                                                                        background: "#7f1d1d",
-                                                                                        color: "white",
-                                                                                        cursor: "pointer",
-                                                                                        fontSize: 10,
-                                                                                        fontWeight: 800,
-                                                                                        flex: "0 0 auto",
-                                                                                        alignSelf: "start",
-                                                                                    }}
-                                                                                >
-                                                                                    Xóa
-                                                                                </button>
+                                                                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, auto)", gap: 4 }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            handleDuplicateAction(
+                                                                                                stage.id,
+                                                                                                stepIndex,
+                                                                                                entry.groupKey,
+                                                                                                entry.actionIndex,
+                                                                                                entry.title
+                                                                                            )
+                                                                                        }
+                                                                                        style={actionButtonStyle(false, "#0f766e")}
+                                                                                    >
+                                                                                        Copy
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            handleDeleteAction(
+                                                                                                stage.id,
+                                                                                                stepIndex,
+                                                                                                entry.groupKey,
+                                                                                                entry.actionIndex,
+                                                                                                entry.title
+                                                                                            )
+                                                                                        }
+                                                                                        style={actionButtonStyle(false, "#7f1d1d")}
+                                                                                    >
+                                                                                        Xóa
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
                                                                             {isActionOpen ? (
                                                                                 <div
@@ -790,6 +971,20 @@ export default function ReplayTimelineSidebar({
                                                                                     }}
                                                                                 >
                                                                                     {entry.summary}
+                                                                                    <InlineActionParamsEditor
+                                                                                        key={actionKey}
+                                                                                        action={entry.action}
+                                                                                        onApply={(nextParams) =>
+                                                                                            handleUpdateActionParams(
+                                                                                                stage.id,
+                                                                                                stepIndex,
+                                                                                                entry.groupKey,
+                                                                                                entry.actionIndex,
+                                                                                                entry.title,
+                                                                                                nextParams
+                                                                                            )
+                                                                                        }
+                                                                                    />
                                                                                 </div>
                                                                             ) : null}
                                                                         </div>
@@ -801,8 +996,8 @@ export default function ReplayTimelineSidebar({
                                                                 style={{
                                                                     display: "grid",
                                                                     gridTemplateColumns: isSelectedStep
-                                                                        ? "repeat(4, minmax(0, 1fr))"
-                                                                        : "repeat(3, minmax(0, 1fr))",
+                                                                        ? "repeat(5, minmax(0, 1fr))"
+                                                                        : "repeat(4, minmax(0, 1fr))",
                                                                     gap: 5,
                                                                 }}
                                                             >
@@ -841,6 +1036,17 @@ export default function ReplayTimelineSidebar({
                                                                         Weight
                                                                     </button>
                                                                 ) : null}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDuplicateStep(stage.id, stepIndex)}
+                                                                    style={{
+                                                                        ...smallButtonStyle(false),
+                                                                        background: "#334155",
+                                                                        border: "none",
+                                                                    }}
+                                                                >
+                                                                    Copy
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleDeleteStep(stage.id, stepIndex)}
@@ -922,7 +1128,15 @@ function StageMetadataEditor({
         });
     }, [stage]);
 
+    const isStartValid = validateReplayTimeFormat(form.detail_time_start);
+    const isStopValid = validateReplayTimeFormat(form.detail_time_stop);
+    const isEditFormValid = form.title.trim() !== "" && isStartValid && isStopValid;
+
+    const showStartError = form.detail_time_start.length > 0 && !isStartValid;
+    const showStopError = form.detail_time_stop.length > 0 && !isStopValid;
+
     const handleApplyStageMetadata = () => {
+        if (!isEditFormValid) return;
         onMutateReplay(`Replay: cập nhật stage #${stage.id}`, (draftReplay) => {
             const targetStage = draftReplay.detail.find((item) => item.id === stage.id);
             if (!targetStage) return;
@@ -940,37 +1154,63 @@ function StageMetadataEditor({
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, title: event.target.value }))
                     }
-                    placeholder="Title"
+                    placeholder="Title (bắt buộc)"
                     style={inputStyle}
                 />
-                <input
-                    value={form.detail_time_start}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                            ...prev,
-                            detail_time_start: event.target.value,
-                        }))
-                    }
-                    placeholder="detail_time_start"
-                    style={inputStyle}
-                />
-                <input
-                    value={form.detail_time_stop}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                            ...prev,
-                            detail_time_stop: event.target.value,
-                        }))
-                    }
-                    placeholder="detail_time_stop"
-                    style={inputStyle}
-                />
+                <div>
+                    <input
+                        value={form.detail_time_start}
+                        onChange={(event) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                detail_time_start: event.target.value,
+                            }))
+                        }
+                        placeholder="Thời gian bắt đầu (detail_time_start)"
+                        style={{
+                            ...inputStyle,
+                            borderColor: showStartError ? "#ef4444" : "#334155",
+                        }}
+                    />
+                    {showStartError ? (
+                        <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
+                            Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
+                        </div>
+                    ) : null}
+                </div>
+                <div>
+                    <input
+                        value={form.detail_time_stop}
+                        onChange={(event) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                detail_time_stop: event.target.value,
+                            }))
+                        }
+                        placeholder="Thời gian kết thúc (detail_time_stop)"
+                        style={{
+                            ...inputStyle,
+                            borderColor: showStopError ? "#ef4444" : "#334155",
+                        }}
+                    />
+                    {showStopError ? (
+                        <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
+                            Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
+                        </div>
+                    ) : null}
+                </div>
+                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: "1.4" }}>
+                    Cấu trúc bắt buộc: <strong>DD/MM/YYYY</strong>, <strong>MM/YYYY</strong>, hoặc <strong>YYYY</strong>.
+                </div>
                 <button
                     type="button"
+                    disabled={!isEditFormValid}
                     onClick={handleApplyStageMetadata}
                     style={{
                         ...buttonStyle,
-                        background: "#0f766e",
+                        background: isEditFormValid ? "#0f766e" : "#1e293b",
+                        color: isEditFormValid ? "white" : "#64748b",
+                        cursor: isEditFormValid ? "pointer" : "not-allowed",
                         border: "none",
                     }}
                 >
@@ -1014,6 +1254,22 @@ function smallButtonStyle(disabled: boolean) {
         opacity: disabled ? 0.65 : 1,
         fontWeight: 700,
         fontSize: 11,
+    } as const;
+}
+
+function actionButtonStyle(disabled: boolean, background: string) {
+    return {
+        padding: "3px 6px",
+        borderRadius: 6,
+        border: "none",
+        background: disabled ? "#1e293b" : background,
+        color: "white",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.55 : 1,
+        fontSize: 10,
+        fontWeight: 800,
+        flex: "0 0 auto",
+        alignSelf: "start",
     } as const;
 }
 
@@ -1070,10 +1326,76 @@ function InlineStepDurationEditor({
     );
 }
 
+function InlineActionParamsEditor({
+    action,
+    onApply,
+}: {
+    action: AnyStepAction;
+    onApply: (params: unknown[]) => void;
+}) {
+    const [paramsText, setParamsText] = useState(() => JSON.stringify(action.params, null, 2));
+    const [error, setError] = useState<string | null>(null);
+
+    const handleApply = () => {
+        try {
+            const parsed = JSON.parse(paramsText);
+            if (!Array.isArray(parsed)) {
+                setError("Params phải là JSON array.");
+                return;
+            }
+            setError(null);
+            onApply(parsed);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "JSON không hợp lệ.");
+        }
+    };
+
+    return (
+        <div style={{ display: "grid", gap: 5, marginTop: 6 }}>
+            <textarea
+                value={paramsText}
+                onChange={(event) => {
+                    setParamsText(event.target.value);
+                    setError(null);
+                }}
+                rows={Math.min(8, Math.max(3, paramsText.split("\n").length))}
+                spellCheck={false}
+                style={{
+                    ...inputStyle,
+                    minHeight: 76,
+                    resize: "vertical",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    fontSize: 11,
+                    lineHeight: 1.35,
+                }}
+            />
+            {error ? (
+                <div style={{ color: "#fca5a5", fontSize: 10, lineHeight: 1.3 }}>
+                    {error}
+                </div>
+            ) : null}
+            <button
+                type="button"
+                onClick={handleApply}
+                style={{
+                    ...smallButtonStyle(false),
+                    background: "#0f766e",
+                    border: "none",
+                    justifySelf: "start",
+                    padding: "5px 10px",
+                }}
+            >
+                Apply params
+            </button>
+        </div>
+    );
+}
+
 type StepActionEntry = {
     group: "Narrative" | "Map" | "Geo" | "UI";
     groupKey: ActionGroupKey;
     actionIndex: number;
+    action: AnyStepAction;
     functionName: string;
     title: string;
     summary: string;
@@ -1084,55 +1406,30 @@ type StepActionEntry = {
 const uiOptionLabels: Record<UIOptionName, string> = {
     timeline: "Timeline",
     layer_panel: "Layer Panel",
-    wiki_panel: "Wiki Panel",
-    close_wiki_panel: "Đóng Wiki Panel",
     zoom_panel: "Zoom Panel",
     wiki: "Wiki",
     toast: "Toast",
-    wiki_header: "Wiki Header",
-    playback_speed: "Playback Speed",
 };
 
 const narrativeFunctionLabels: Record<NarrativeFunctionName, string> = {
-    set_title: "Tiêu đề step",
-    clear_title: "Xóa tiêu đề",
-    set_descriptions: "Mô tả",
-    clear_descriptions: "Xóa mô tả",
-    show_dialog_box: "Dialog box",
-    clear_dialog_box: "Đóng dialog box",
-    display_historical_image: "Ảnh lịch sử",
-    clear_historical_image: "Xóa ảnh lịch sử",
-    set_step_subtitle: "Phụ đề",
-    clear_step_subtitle: "Xóa phụ đề",
+    set_dialog: "Dialog box",
 };
 
 const mapFunctionLabels: Record<MapFunctionName, string> = {
     set_camera_view: "Camera view",
-    set_time_filter: "Lọc năm",
-    enable_timeline_filter: "Bật timeline filter",
-    disable_timeline_filter: "Tắt timeline filter",
-    toggle_labels: "Bật/tắt labels",
-    show_labels: "Hiện labels",
-    hide_labels: "Ẩn labels",
-    show_all_geometries: "Hiện tất cả geo",
-    reset_camera_north: "North up",
+    set_timeline_filter: "Lọc timeline",
+    set_labels_visible: "Hiện nhãn map",
 };
 
 const geoFunctionLabels: Record<GeoFunctionName, string> = {
-    fly_to_geometry: "Fly tới geo",
     fly_to_geometries: "Fly tới geo",
     set_geometry_visibility: "Ẩn/hiện geometry",
-    show_geometries: "Hiện geo",
-    hide_geometries: "Ẩn geo",
-    fit_to_geometries: "Fit nhiều geo",
-    orbit_camera_around_geometry: "Orbit quanh geo",
+    follow_geometries_path: "Follow path",
+    hide_others_geometries: "Ẩn geo khác",
     pulse_geometry: "Pulse geometry",
     animate_dashed_border: "Border nét đứt",
     set_geometry_style: "Style geometry",
-    show_geometry_label: "Label geometry",
-    follow_geometry_path: "Follow path",
-    follow_geometries_path: "Follow path",
-    dim_other_geometries: "Ẩn geo khác",
+    orbit_camera_around_geometry: "Orbit quanh geo",
 };
 
 function buildStepActionEntries(step: ReplayStep): StepActionEntry[] {
@@ -1159,50 +1456,30 @@ function buildNarrativeActionEntry(
     const params = Array.isArray(action.params) ? action.params : [];
     let summary = "Không có tham số.";
 
-    switch (action.function_name) {
-        case "set_title":
-            summary = summarizeValue(params[0], "Tiêu đề trống");
-            break;
-        case "clear_title":
-            summary = "title=null";
-            break;
-        case "set_descriptions":
-            summary = summarizeValue(params[0], "Mô tả trống");
-            break;
-        case "clear_descriptions":
-            summary = "descriptions=null";
-            break;
-        case "show_dialog_box":
-            summary = [
-                `speaker=${summarizeValue(params[3], "ẩn danh")}`,
-                `side=${summarizeValue(params[2], "left")}`,
-                `text=${summarizeValue(params[1], "trống")}`,
-            ].join(" | ");
-            break;
-        case "clear_dialog_box":
+    if (action.function_name === "set_dialog") {
+        const dialog = params[0] as DialogState | null;
+        if (dialog === null) {
             summary = "dialog=null";
-            break;
-        case "display_historical_image":
-            summary = [
-                `url=${summarizeValue(params[0], "trống")}`,
-                `caption=${summarizeValue(params[1], "trống")}`,
-            ].join(" | ");
-            break;
-        case "clear_historical_image":
-            summary = "image=null";
-            break;
-        case "set_step_subtitle":
-            summary = summarizeValue(params[0], "Ẩn subtitle");
-            break;
-        case "clear_step_subtitle":
-            summary = "subtitle=null";
-            break;
+        } else {
+            const parts: string[] = [];
+            if (dialog.text) {
+                parts.push(`text=${summarizeValue(dialog.text, "")}`);
+            }
+            if (dialog.avatar) {
+                parts.push(`avatar=${summarizeValue(dialog.avatar, "")}`);
+            }
+            if (dialog.image_url) {
+                parts.push(`image=${summarizeValue(dialog.image_url, "")}`);
+            }
+            summary = parts.join(" | ") || "trống";
+        }
     }
 
     return {
         group: "Narrative",
         groupKey: "use_narrow_function",
         actionIndex,
+        action,
         functionName: action.function_name,
         title: narrativeFunctionLabels[action.function_name],
         summary,
@@ -1219,32 +1496,14 @@ function buildMapActionEntry(
     let summary = "Không có tham số.";
 
     switch (action.function_name) {
-        case "set_time_filter":
-            summary = `year=${summarizeValue(params[0], "trống")}`;
+        case "set_timeline_filter":
+            summary = `enabled=${Boolean(params[0] ?? true) ? "true" : "false"}`;
             break;
-        case "enable_timeline_filter":
-            summary = "enabled=true";
-            break;
-        case "disable_timeline_filter":
-            summary = "enabled=false";
-            break;
-        case "toggle_labels":
+        case "set_labels_visible":
             summary = `visible=${Boolean(params[0] ?? true) ? "true" : "false"}`;
-            break;
-        case "show_labels":
-            summary = "visible=true";
-            break;
-        case "hide_labels":
-            summary = "visible=false";
-            break;
-        case "show_all_geometries":
-            summary = "hidden_ids=[]";
             break;
         case "set_camera_view":
             summary = summarizeCameraViewValue(params[0]);
-            break;
-        case "reset_camera_north":
-            summary = "bearing=0";
             break;
     }
 
@@ -1252,6 +1511,7 @@ function buildMapActionEntry(
         group: "Map",
         groupKey: "use_map_function",
         actionIndex,
+        action,
         functionName: action.function_name,
         title: mapFunctionLabels[action.function_name],
         summary,
@@ -1268,14 +1528,6 @@ function buildGeoActionEntry(
     let summary = "Không có tham số.";
 
     switch (action.function_name) {
-        case "fly_to_geometry":
-            summary = [
-                `geometry=${summarizeValue(params[0], "trống")}`,
-                `zoom=${summarizeValue(params[1], "mặc định")}`,
-                `padding=${summarizeValue(params[2], "mặc định")}`,
-                `duration=${summarizeValue(params[3], "mặc định")}`,
-            ].join(" | ");
-            break;
         case "fly_to_geometries":
             summary = `geometry=${summarizeGeometryIdsValue(params[0])}`;
             break;
@@ -1283,19 +1535,6 @@ function buildGeoActionEntry(
             summary = [
                 `geometry=${summarizeGeometryIdsValue(params[0])}`,
                 `visible=${Boolean(params[1] ?? true) ? "true" : "false"}`,
-            ].join(" | ");
-            break;
-        case "show_geometries":
-            summary = `geometry=${summarizeGeometryIdsValue(params[0])} | visible=true`;
-            break;
-        case "hide_geometries":
-            summary = `geometry=${summarizeGeometryIdsValue(params[0])} | visible=false`;
-            break;
-        case "fit_to_geometries":
-            summary = [
-                `geometry=${summarizeGeometryIdsValue(params[0])}`,
-                `padding=${summarizeValue(params[1], "mặc định")}`,
-                `duration=${summarizeValue(params[2], "mặc định")}`,
             ].join(" | ");
             break;
         case "orbit_camera_around_geometry":
@@ -1333,22 +1572,6 @@ function buildGeoActionEntry(
                 `line_width=${summarizeValue(params[4], "mặc định")}`,
             ].join(" | ");
             break;
-        case "show_geometry_label":
-            summary = [
-                `geometry=${summarizeValue(params[0], "trống")}`,
-                `text=${summarizeValue(params[1], "trống")}`,
-                `color=${summarizeValue(params[2], "#ffffff")}`,
-                `size=${summarizeValue(params[3], "mặc định")}`,
-            ].join(" | ");
-            break;
-        case "follow_geometry_path":
-            summary = [
-                `geometry=${summarizeValue(params[0], "trống")}`,
-                `duration=${summarizeValue(params[1], "mặc định")}`,
-                `zoom=${summarizeValue(params[2], "mặc định")}`,
-                `pitch=${summarizeValue(params[3], "mặc định")}`,
-            ].join(" | ");
-            break;
         case "follow_geometries_path":
             summary = [
                 `geometry=${summarizeGeometryIdsValue(params[0])}`,
@@ -1357,7 +1580,7 @@ function buildGeoActionEntry(
                 `pitch=${summarizeValue(params[3], "mặc định")}`,
             ].join(" | ");
             break;
-        case "dim_other_geometries":
+        case "hide_others_geometries":
             summary = [
                 `keep=${summarizeGeometryIdsValue(params[0])}`,
             ].join(" | ");
@@ -1368,6 +1591,7 @@ function buildGeoActionEntry(
         group: "Geo",
         groupKey: "use_geo_function",
         actionIndex,
+        action,
         functionName: action.function_name,
         title: geoFunctionLabels[action.function_name],
         summary,
@@ -1386,18 +1610,12 @@ function buildUiActionEntry(
     const optionLabel = option ? uiOptionLabels[option] : summarizeValue(action.function_name, "Unknown option");
     let summary = "Không có tham số.";
 
-    if (option === "timeline" || option === "layer_panel" || option === "wiki_panel" || option === "zoom_panel") {
+    if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
         summary = `visible=${Boolean(params[0]) ? "true" : "false"}`;
-    } else if (option === "close_wiki_panel") {
-        summary = "visible=false | active_wiki=null";
     } else if (option === "wiki") {
         summary = `wiki_id=${summarizeValue(params[0], "trống")}`;
     } else if (option === "toast") {
         summary = `message=${summarizeValue(params[0], "trống")}`;
-    } else if (option === "wiki_header") {
-        summary = `header_id=${summarizeValue(params[0], "trống")}`;
-    } else if (option === "playback_speed") {
-        summary = `speed=${summarizeValue(params[0], "1")}`;
     } else if (params.length > 0) {
         summary = summarizeValue(params, "Không có tham số");
     }
@@ -1406,6 +1624,7 @@ function buildUiActionEntry(
         group: "UI",
         groupKey: "use_UI_function",
         actionIndex,
+        action,
         functionName: action.function_name,
         title: optionLabel,
         summary,
@@ -1453,14 +1672,13 @@ function normalizeUiOptionValue(value: unknown): UIOptionName | null {
     switch (value) {
         case "timeline":
         case "layer_panel":
-        case "wiki_panel":
-        case "close_wiki_panel":
         case "zoom_panel":
         case "wiki":
         case "toast":
-        case "wiki_header":
-        case "playback_speed":
             return value;
+        case "wiki_panel":
+        case "close_wiki_panel":
+            return "wiki";
         default:
             return null;
     }
@@ -1487,6 +1705,66 @@ function getUiActionDescriptor(action: {
         option,
         payload: params,
     };
+}
+
+function getStepActionGroup(step: ReplayStep, groupKey: ActionGroupKey): AnyStepAction[] {
+    switch (groupKey) {
+        case "use_UI_function":
+            return step.use_UI_function;
+        case "use_map_function":
+            return step.use_map_function;
+        case "use_geo_function":
+            return step.use_geo_function;
+        case "use_narrow_function":
+            return step.use_narrow_function;
+    }
+}
+
+function setStepActionGroup(
+    step: ReplayStep,
+    groupKey: ActionGroupKey,
+    actions: AnyStepAction[]
+) {
+    switch (groupKey) {
+        case "use_UI_function":
+            step.use_UI_function = actions as ReplayStep["use_UI_function"];
+            return;
+        case "use_map_function":
+            step.use_map_function = actions as ReplayStep["use_map_function"];
+            return;
+        case "use_geo_function":
+            step.use_geo_function = actions as ReplayStep["use_geo_function"];
+            return;
+        case "use_narrow_function":
+            step.use_narrow_function = actions as ReplayStep["use_narrow_function"];
+            return;
+    }
+}
+
+function cloneReplayStep(step: ReplayStep): ReplayStep {
+    return {
+        duration: step.duration,
+        use_UI_function: step.use_UI_function.map(cloneReplayAction) as ReplayStep["use_UI_function"],
+        use_map_function: step.use_map_function.map(cloneReplayAction) as ReplayStep["use_map_function"],
+        use_geo_function: step.use_geo_function.map(cloneReplayAction) as ReplayStep["use_geo_function"],
+        use_narrow_function: step.use_narrow_function.map(cloneReplayAction) as ReplayStep["use_narrow_function"],
+    };
+}
+
+function cloneReplayAction<T>(action: ReplayAction<T>): ReplayAction<T> {
+    return {
+        function_name: action.function_name,
+        params: action.params.map(cloneReplayParam),
+    };
+}
+
+function cloneReplayParam(value: unknown): unknown {
+    if (value == null || typeof value !== "object") return value;
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch {
+        return value;
+    }
 }
 
 function summarizeValue(value: unknown, fallback = "trống") {

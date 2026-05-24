@@ -87,57 +87,37 @@ export type EditorSnapshot = {
     replays?: BattleReplay[];
 };
 
-// ---- Replay / Scripting System ----
+export type DialogState = {
+    avatar: string;        // Avatar image URL
+    text: string;          // Subtitle / spoken narrative text
+    image_url?: string;    // Optional image URL
+    image_caption?: string;// Optional caption
+};
 
 export type UIOptionName =
     | "timeline"                 // Ẩn/hiện timeline
     | "layer_panel"              // Ẩn/hiện panel layer
-    | "wiki_panel"               // Ẩn/hiện panel wiki
-    | "close_wiki_panel"         // Đóng panel wiki và xóa wiki đang active
     | "zoom_panel"               // Ẩn/hiện nút zoom
-    | "wiki"                     // Mở/chọn wiki
-    | "toast"                    // Hiển thị toast
-    | "wiki_header"              // Focus header trong wiki
-    | "playback_speed";          // Thay đổi tốc độ phát replay
+    | "wiki"                     // Mở/chọn wiki (null/rỗng để đóng)
+    | "toast";                   // Hiển thị toast
 
 export type MapFunctionName =
     | "set_camera_view"          // Đặt trạng thái camera (center, zoom, pitch, bearing)
-    | "set_time_filter"          // Thay đổi bộ lọc thời gian trên bản đồ
-    | "enable_timeline_filter"   // Bật timeline filter
-    | "disable_timeline_filter"  // Tắt timeline filter
-    | "toggle_labels"            // Legacy: bật/tắt hiển thị nhãn (labels) trên bản đồ
-    | "show_labels"              // Hiện labels
-    | "hide_labels"              // Ẩn labels
-    | "show_all_geometries"      // Hiện lại toàn bộ geometry đang có trong replay draft
-    | "reset_camera_north";      // Đưa camera về hướng bắc
+    | "set_timeline_filter"      // Bật/tắt lọc timeline
+    | "set_labels_visible";      // Ẩn/hiện nhãn (labels) trên bản đồ
 
 export type GeoFunctionName =
-    | "fly_to_geometry"          // Legacy: di chuyển mượt mà đến một geometry
     | "fly_to_geometries"        // Di chuyển mượt mà đến một hoặc nhiều geometry
-    | "set_geometry_visibility"  // Legacy: ẩn/hiện một hoặc nhiều geometry
-    | "show_geometries"          // Hiện một hoặc nhiều geometry
-    | "hide_geometries"          // Ẩn một hoặc nhiều geometry
-    | "fit_to_geometries"        // Legacy: fit camera theo nhiều geometry
-    | "orbit_camera_around_geometry" // Quay camera quanh một geometry
+    | "set_geometry_visibility"  // Ẩn/hiện một hoặc nhiều geometry
+    | "follow_geometries_path"   // Cho camera bám theo chuỗi path geometry
+    | "hide_others_geometries"   // Ẩn các geometry ngoài target set, chỉ giữ geo focus
     | "pulse_geometry"           // Hiệu ứng pulse/emphasis cho geometry
     | "animate_dashed_border"    // Hiệu ứng border nét đứt chuyển động
     | "set_geometry_style"       // Đổi style trực tiếp của geometry
-    | "show_geometry_label"      // Hiện label riêng cho geometry
-    | "follow_geometry_path"     // Legacy: cho camera bám theo một path geometry
-    | "follow_geometries_path"   // Cho camera bám theo chuỗi path geometry
-    | "dim_other_geometries";    // Ẩn các geometry ngoài target set, chỉ giữ geo focus
+    | "orbit_camera_around_geometry"; // Quay camera quanh một geometry
 
 export type NarrativeFunctionName =
-    | "set_title"                // Đặt tiêu đề cho bước replay
-    | "clear_title"              // Xóa tiêu đề hiện tại
-    | "set_descriptions"         // Đặt mô tả/nội dung diễn giải
-    | "clear_descriptions"       // Xóa mô tả hiện tại
-    | "show_dialog_box"          // Hiển thị hộp thoại dẫn chuyện (có avatar)
-    | "clear_dialog_box"         // Đóng/xóa dialog hiện tại
-    | "display_historical_image" // Hiển thị hình ảnh tư liệu đè lên bản đồ
-    | "clear_historical_image"   // Xóa ảnh lịch sử hiện tại
-    | "set_step_subtitle"        // Hiển thị phụ đề phía dưới màn hình
-    | "clear_step_subtitle";     // Xóa phụ đề hiện tại
+    | "set_dialog";              // Đặt kịch bản đối thoại/hình ảnh dẫn chuyện mới (hoặc null để xóa)
 
 export type ReplayAction<T> = {
     function_name: T;

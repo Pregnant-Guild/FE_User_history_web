@@ -143,55 +143,37 @@ export type EntityWikiLinkSnapshot = {
  * Canonical UI action names trong snapshot hiện tại.
  * Không còn wrapper `function_name: "UI"` trong shape mới.
  */
+export type DialogState = {
+    avatar: string;        // Avatar image URL
+    text: string;          // Subtitle / spoken narrative text
+    image_url?: string;    // Optional image URL
+    image_caption?: string;// Optional caption
+};
+
 export type UIOptionName =
     | "timeline"
     | "layer_panel"
-    | "wiki_panel"
-    | "close_wiki_panel"
     | "zoom_panel"
     | "wiki"
-    | "toast"
-    | "wiki_header"
-    | "playback_speed";
+    | "toast";
 
 export type MapFunctionName =
     | "set_camera_view"
-    | "set_time_filter"
-    | "enable_timeline_filter"
-    | "disable_timeline_filter"
-    | "toggle_labels"
-    | "show_labels"
-    | "hide_labels"
-    | "show_all_geometries"
-    | "reset_camera_north";
+    | "set_timeline_filter"
+    | "set_labels_visible";
 
 export type GeoFunctionName =
-    | "fly_to_geometry"
     | "fly_to_geometries"
     | "set_geometry_visibility"
-    | "show_geometries"
-    | "hide_geometries"
-    | "fit_to_geometries"
-    | "orbit_camera_around_geometry"
+    | "follow_geometries_path"
+    | "hide_others_geometries"
     | "pulse_geometry"
     | "animate_dashed_border"
     | "set_geometry_style"
-    | "show_geometry_label"
-    | "follow_geometry_path"
-    | "follow_geometries_path"
-    | "dim_other_geometries";
+    | "orbit_camera_around_geometry";
 
 export type NarrativeFunctionName =
-    | "set_title"
-    | "clear_title"
-    | "set_descriptions"
-    | "clear_descriptions"
-    | "show_dialog_box"
-    | "clear_dialog_box"
-    | "display_historical_image"
-    | "clear_historical_image"
-    | "set_step_subtitle"
-    | "clear_step_subtitle";
+    | "set_dialog";
 
 /**
  * Runtime thật hiện dùng positional array cho params.
@@ -243,13 +225,9 @@ export type ReplayCameraViewStateDoc = {
 export type ReplayUiParamTupleDocs = {
     timeline: [visible: boolean];
     layer_panel: [visible: boolean];
-    wiki_panel: [visible: boolean];
-    close_wiki_panel: [];
     zoom_panel: [visible: boolean];
-    wiki: [wiki_id: string];
+    wiki: [wiki_id: string | null];
     toast: [message: string];
-    wiki_header: [header_id: string];
-    playback_speed: [speed: number];
 };
 
 /**
@@ -259,34 +237,21 @@ export type ReplayUiParamTupleDocs = {
 
 export type ReplayMapFunctionParamTupleDocs = {
     set_camera_view: [state: ReplayCameraViewStateDoc];
-    set_time_filter: [year: number];
-    enable_timeline_filter: [];
-    disable_timeline_filter: [];
-    toggle_labels: [visible: boolean];
-    show_labels: [];
-    hide_labels: [];
-    show_all_geometries: [];
-    reset_camera_north: [];
+    set_timeline_filter: [enabled: boolean];
+    set_labels_visible: [visible: boolean];
 };
 
 export type ReplayGeoFunctionParamTupleDocs = {
-    fly_to_geometry: [
-        geometry_id: string,
-        zoom?: number,
-        padding?: number,
-        duration?: number,
-    ];
     fly_to_geometries: [geometry_ids: string[], duration?: number];
     set_geometry_visibility: [geometry_ids: string[], visible: boolean];
-    show_geometries: [geometry_ids: string[]];
-    hide_geometries: [geometry_ids: string[]];
-    fit_to_geometries: [geometry_ids: string[], duration?: number];
-    orbit_camera_around_geometry: [
-        geometry_id: string,
+    follow_geometries_path: [
+        geometry_ids: string[],
+        duration?: number,
         zoom?: number,
         pitch?: number,
-        revolutions?: number,
-        duration?: number,
+    ];
+    hide_others_geometries: [
+        geometry_ids: string[],
     ];
     pulse_geometry: [
         geometry_id: string,
@@ -308,48 +273,17 @@ export type ReplayGeoFunctionParamTupleDocs = {
         line_color?: string,
         line_width?: number,
     ];
-    show_geometry_label: [
+    orbit_camera_around_geometry: [
         geometry_id: string,
-        text?: string,
-        color?: string,
-        size?: number,
-    ];
-    follow_geometry_path: [
-        geometry_id: string,
-        duration?: number,
         zoom?: number,
         pitch?: number,
-    ];
-    follow_geometries_path: [
-        geometry_ids: string[],
+        revolutions?: number,
         duration?: number,
-        zoom?: number,
-        pitch?: number,
-    ];
-    dim_other_geometries: [
-        geometry_ids: string[],
     ];
 };
 
 export type ReplayNarrativeParamTupleDocs = {
-    set_title: [title: string];
-    clear_title: [];
-    set_descriptions: [text: string];
-    clear_descriptions: [];
-    show_dialog_box: [
-        avatar: string,
-        text: string,
-        side?: "left" | "right",
-        speaker?: string,
-    ];
-    clear_dialog_box: [];
-    display_historical_image: [
-        url: string,
-        caption?: string,
-    ];
-    clear_historical_image: [];
-    set_step_subtitle: [subtitle: string | null];
-    clear_step_subtitle: [];
+    set_dialog: [dialog: DialogState | null];
 };
 
 export type ReplayParamTupleDocs =

@@ -1,6 +1,6 @@
 # UHM Editor - replay actions catalog
 
-Cập nhật: 2026-05-22.
+Cập nhật: 2026-05-25.
 
 Tài liệu này mô tả action catalog của replay editor/preview hiện tại. Shape chuẩn nằm ở `src/uhm/types/projects.ts`; dispatcher runtime nằm ở `src/uhm/lib/replay/replayDispatcher.ts`.
 
@@ -54,22 +54,23 @@ Trong mỗi step, dispatcher chạy các group action từ step hiện tại. Du
 - hidden geometry ids
 - title/descriptions/subtitle/dialog/image/toast
 - wiki sidebar/open wiki
+- preview layer panel / zoom controls
+- temporary geometry effects
 - playback speed
 
-Stop/reset preview khôi phục presentation state và một phần map/timeline baseline.
+Stop/reset preview khôi phục presentation state, map/timeline baseline, label visibility và dọn toàn bộ temporary geometry effects.
 
 ## 3. UI actions
 
 | Action | Params | Runtime hiện tại |
 | --- | --- | --- |
 | `timeline` | `[visible: boolean]` | Ẩn/hiện TimelineBar trong preview |
-| `layer_panel` | `[visible: boolean]` | No-op hiện tại |
+| `layer_panel` | `[visible: boolean]` | Ẩn/hiện panel layer trong preview |
 | `wiki_panel` | `[visible: boolean]` | Mở/đóng wiki sidebar preview |
 | `close_wiki_panel` | `[]` | Đóng wiki sidebar và clear active wiki |
-| `zoom_panel` | `[visible: boolean]` | No-op hiện tại |
+| `zoom_panel` | `[visible: boolean]` | Ẩn/hiện cụm zoom/projection control trên map preview |
 | `wiki` | `[wikiId: string]` | Mở wiki sidebar và active wiki id |
 | `toast` | `[message: string]` | Hiện toast tạm thời |
-| `wiki_header` | `[headerId: string]` | No-op hiện tại |
 | `playback_speed` | `[speed: number]` | Đổi tốc độ phát preview |
 
 Legacy shape vẫn được dispatcher đọc:
@@ -111,15 +112,15 @@ Shape mới nên dùng trực tiếp:
 | `hide_geometries` | `[geometryIds]` | Thêm ids vào hidden set |
 | `fit_to_geometries` | `[geometryIds, duration?]` | Legacy: dùng fly/fit tới geometry |
 | `orbit_camera_around_geometry` | `[geometryId, zoom?, pitch?, turns?, duration?]` | Ease camera quanh bbox geometry |
-| `pulse_geometry` | `[geometryId, color?, repeat?, duration?]` | No-op trong dispatcher hiện tại |
-| `animate_dashed_border` | `[geometryId, color?, width?, speed?, duration?]` | No-op trong dispatcher hiện tại |
-| `set_geometry_style` | `[geometryIds, fill?, opacity?, stroke?, width?]` | No-op trong dispatcher hiện tại |
-| `show_geometry_label` | `[geometryId, text?, color?, size?]` | No-op trong dispatcher hiện tại |
-| `follow_geometry_path` | `[geometryId, duration?]` | Legacy: fly theo một path bằng fit/fly |
-| `follow_geometries_path` | `[geometryIds, duration?, zoom?, padding?]` | Hiện dùng fly/fit tới nhiều geometry |
+| `pulse_geometry` | `[geometryId, color?, repeat?, duration?]` | Pulse overlay tạm thời, tự cleanup |
+| `animate_dashed_border` | `[geometryId, color?, width?, speed?, duration?]` | Dashed border overlay tạm thời, tự cleanup |
+| `set_geometry_style` | `[geometryIds, fill?, opacity?, stroke?, width?]` | Style overlay trong preview tới khi stop/reset |
+| `show_geometry_label` | `[geometryId, text?, color?, size?]` | Hiện label riêng trong preview tới khi stop/reset |
+| `follow_geometry_path` | `[geometryId, duration?, zoom?, pitch?]` | Camera chạy theo tọa độ path geometry |
+| `follow_geometries_path` | `[geometryIds, duration?, zoom?, pitch?]` | Camera chạy theo chuỗi path geometry |
 | `dim_other_geometries` | `[geometryIds]` | Chỉ hiện target ids, ẩn các geometry khác |
 
-Các action visual effect no-op vẫn có trong composer để giữ schema và chuẩn bị cho runtime effect sau này.
+Các visual effect dùng overlay source/layer riêng và không mutate geometry draft.
 
 ## 6. Narrative actions
 
@@ -162,6 +163,8 @@ Geo shortcuts:
 - `set_geometry_style`
 
 Narrative composer hiện hỗ trợ đầy đủ các narrative actions ở mục 6.
+
+Timeline action list hỗ trợ reorder, duplicate, delete và edit `params` trực tiếp bằng JSON array có validate nhẹ. Composer bên phải vẫn là đường chính để tạo action mới.
 
 ## 8. Normalization và migration
 

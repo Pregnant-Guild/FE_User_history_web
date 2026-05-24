@@ -6,7 +6,6 @@ import { fitMapToFeatureCollection, getFeatureCollectionBBox } from "@/uhm/compo
  * Các hàm xử lý tương tác bản đồ cho hệ thống Replay.
  * Hầu hết các hàm yêu cầu instance của MapLibre GL.
  */
-
 export const mapActions = {
     // Đặt trạng thái camera toàn diện (center, zoom, pitch, bearing)
     set_camera_view: (
@@ -46,11 +45,6 @@ export const mapActions = {
         }
 
         map.easeTo(nextView);
-    },
-
-    // Di chuyển mượt mà đến một geometry dựa trên ID
-    fly_to_geometry: (map: maplibregl.Map, geometryId: string | number, draft: FeatureCollection) => {
-        mapActions.fly_to_geometries(map, [geometryId], draft);
     },
 
     // Di chuyển mượt mà đến một hoặc nhiều geometry dựa trên ID.
@@ -120,7 +114,7 @@ export const mapActions = {
     },
 
     // Ẩn/hiện nhãn (labels) trên bản đồ
-    toggle_labels: (map: maplibregl.Map, visible: boolean) => {
+    set_labels_visible: (map: maplibregl.Map, visible: boolean) => {
         const style = map.getStyle();
         if (!style) return;
         style.layers.forEach(layer => {
@@ -131,10 +125,26 @@ export const mapActions = {
         });
     },
 
-    // Thay đổi bộ lọc thời gian trên bản đồ
-    set_time_filter: (onYearChange: (year: number) => void, year: number) => {
-        onYearChange(year);
-    }
+    get_label_visibility: (map: maplibregl.Map): Record<string, "visible" | "none"> => {
+        const style = map.getStyle();
+        const state: Record<string, "visible" | "none"> = {};
+        if (!style) return state;
+        style.layers.forEach((layer) => {
+            const layout = "layout" in layer ? layer.layout : undefined;
+            if (layer.type !== "symbol" || !layout || typeof layout !== "object" || !("text-field" in layout)) {
+                return;
+            }
+            state[layer.id] = layout.visibility === "none" ? "none" : "visible";
+        });
+        return state;
+    },
+
+    restore_label_visibility: (map: maplibregl.Map, state: Record<string, "visible" | "none">) => {
+        for (const [layerId, visibility] of Object.entries(state)) {
+            if (!map.getLayer(layerId)) continue;
+            map.setLayoutProperty(layerId, "visibility", visibility);
+        }
+    },
 };
 
 function normalizeReplayCenter(

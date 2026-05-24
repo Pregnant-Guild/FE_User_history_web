@@ -61,6 +61,7 @@ type MapProps = {
     imageOverlay?: MapImageOverlay | null;
     onImageOverlayChange?: (overlay: MapImageOverlay) => void;
     onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void;
+    showViewportControls?: boolean;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -90,6 +91,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     imageOverlay = null,
     onImageOverlayChange,
     onBindGeometries,
+    showViewportControls = true,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
@@ -273,16 +275,17 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                 </div>
             ) : null}
 
-            <div
-                style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "16px",
-                    right: "16px",
-                    zIndex: 12,
-                    pointerEvents: "none",
-                }}
-            >
+            {showViewportControls ? (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "10px",
+                        left: "16px",
+                        right: "16px",
+                        zIndex: 12,
+                        pointerEvents: "none",
+                    }}
+                >
                 <div
                     style={{
                         maxWidth: "650px",
@@ -427,7 +430,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                         {zoomLevel.toFixed(1)}x
                     </div>
                 </div>
-            </div>
+                </div>
+            ) : null}
         </div>
     );
 });

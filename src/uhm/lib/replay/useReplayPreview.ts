@@ -2,21 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection } from "@/uhm/types/geo";
-import type { BattleReplay, ReplayStage, ReplayStep } from "@/uhm/types/projects";
+import type { BattleReplay, ReplayStage, ReplayStep, DialogState } from "@/uhm/types/projects";
 import { dispatchReplayAction } from "./replayDispatcher";
 import { mapActions } from "./mapActions";
-
-export type ReplayPreviewDialog = {
-    avatar: string;
-    text: string;
-    side: "left" | "right";
-    speaker?: string | null;
-};
-
-export type ReplayPreviewImage = {
-    url: string;
-    caption?: string | null;
-};
+import { createReplayMapEffects } from "./replayMapEffects";
 
 export type ReplayPreviewToast = {
     id: number;
@@ -27,6 +16,9 @@ type PreviewBaseline = {
     timelineYear: number;
     timelineFilterEnabled: boolean;
     timelineVisible: boolean;
+    layerPanelVisible: boolean;
+    zoomPanelVisible: boolean;
+    labelVisibility: Record<string, "visible" | "none">;
     mapViewState: {
         center: { lng: number; lat: number };
         zoom: number;
@@ -67,13 +59,16 @@ export function useReplayPreview({
     onSelectStep,
 }: UseReplayPreviewOptions) {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [title, setTitle] = useState("");
-    const [descriptions, setDescriptions] = useState("");
-    const [subtitle, setSubtitle] = useState<string | null>(null);
-    const [dialog, setDialog] = useState<ReplayPreviewDialog | null>(null);
-    const [image, setImage] = useState<ReplayPreviewImage | null>(null);
+    const [dialog, setDialog] = useState<DialogState | null>(null);
+    const dialogRef = useRef<DialogState | null>(null);
+    const setDialogWithRef = useCallback((d: DialogState | null) => {
+        dialogRef.current = d;
+        setDialog(d);
+    }, []);
     const [toasts, setToasts] = useState<ReplayPreviewToast[]>([]);
     const [timelineVisible, setTimelineVisible] = useState(true);
+    const [layerPanelVisible, setLayerPanelVisible] = useState(false);
+    const [zoomPanelVisible, setZoomPanelVisible] = useState(true);
     const [timelineYear, setTimelineYear] = useState(initialTimelineYear);
     const [timelineFilterEnabled, setTimelineFilterEnabled] = useState(initialTimelineFilterEnabled);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -94,6 +89,7 @@ export function useReplayPreview({
     const toastIdRef = useRef(0);
     const toastTimeoutsRef = useRef<number[]>([]);
     const baselineRef = useRef<PreviewBaseline | null>(null);
+    const effects = useMemo(() => createReplayMapEffects(), []);
 
     const flatSteps = useMemo(() => flattenReplaySteps(replay), [replay]);
 
@@ -102,24 +98,26 @@ export function useReplayPreview({
     }, [playbackSpeed]);
 
     useEffect(() => {
-        setTimelineYear(initialTimelineYear);
-        setTimelineFilterEnabled(initialTimelineFilterEnabled);
-        setTimelineVisible(true);
+        const map = getMapInstance();
         baselineRef.current = {
             timelineYear: initialTimelineYear,
             timelineFilterEnabled: initialTimelineFilterEnabled,
             timelineVisible: true,
+            layerPanelVisible: false,
+            zoomPanelVisible: true,
+            labelVisibility: map ? mapActions.get_label_visibility(map) : {},
             mapViewState: initialMapViewState,
         };
-    }, [initialMapViewState, initialTimelineFilterEnabled, initialTimelineYear, replay?.id]);
+    }, [getMapInstance, initialMapViewState, initialTimelineFilterEnabled, initialTimelineYear, replay?.id]);
 
     useEffect(() => {
         return () => {
             runIdRef.current += 1;
+            effects.clear(getMapInstance());
             toastTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
             toastTimeoutsRef.current = [];
         };
-    }, []);
+    }, [effects, getMapInstance]);
 
     const clearToasts = useCallback(() => {
         toastTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -128,18 +126,17 @@ export function useReplayPreview({
     }, []);
 
     const resetPresentation = useCallback(() => {
-        setTitle("");
-        setDescriptions("");
-        setSubtitle(null);
-        setDialog(null);
-        setImage(null);
+        setDialogWithRef(null);
         setSidebarOpen(false);
         setActiveWikiId(null);
+        setLayerPanelVisible(false);
+        setZoomPanelVisible(true);
         playbackSpeedRef.current = 1;
         setPlaybackSpeed(1);
         setHiddenGeometryIds([]);
+        effects.clear(getMapInstance());
         clearToasts();
-    }, [clearToasts]);
+    }, [clearToasts, effects, getMapInstance, setDialogWithRef]);
 
     const addToast = useCallback((message: string) => {
         const text = String(message || "").trim();
@@ -167,12 +164,17 @@ export function useReplayPreview({
         }
 
         setTimelineVisible(baseline.timelineVisible);
+        setLayerPanelVisible(baseline.layerPanelVisible);
+        setZoomPanelVisible(baseline.zoomPanelVisible);
         setTimelineYear(baseline.timelineYear);
         setTimelineFilterEnabled(baseline.timelineFilterEnabled);
         const map = getMapInstance();
         if (map) {
-            mapActions.toggle_labels(map, true);
+            mapActions.restore_label_visibility(map, baseline.labelVisibility);
             if (baseline.mapViewState) {
+                map.setProjection({
+                    type: baseline.mapViewState.projection === "globe" ? "globe" : "mercator",
+                });
                 mapActions.set_camera_view(map, {
                     center: baseline.mapViewState.center,
                     zoom: baseline.mapViewState.zoom,
@@ -195,62 +197,65 @@ export function useReplayPreview({
     }, [restorePreviewState]);
 
     const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
-    controllersRef.current = {
-        map: getMapInstance(),
-        draft,
-        setTimelineVisible,
-        setTimelineFilterEnabled,
-        setSidebarOpen,
-        onSelectWiki: (id) => {
-            const nextId = String(id || "").trim();
-            setActiveWikiId(nextId || null);
-        },
-        addToast,
-        setPlaybackSpeed: (nextSpeed) => {
-            const safe = Number.isFinite(nextSpeed) && nextSpeed > 0 ? nextSpeed : 1;
-            playbackSpeedRef.current = safe;
-            setPlaybackSpeed(safe);
-        },
-        onYearChange: setTimelineYear,
-        showGeometries: (ids) => {
-            const nextIds = normalizeIdList(ids);
-            if (!nextIds.length) return;
-            setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
-        },
-        hideGeometries: (ids) => {
-            const nextIds = normalizeIdList(ids);
-            if (!nextIds.length) return;
-            setHiddenGeometryIds((prev) => {
-                const seen = new Set(prev);
-                for (const id of nextIds) {
-                    seen.add(id);
-                }
-                return Array.from(seen);
-            });
-        },
-        showOnlyGeometries: (ids) => {
-            const keepIds = new Set(normalizeIdList(ids));
-            if (!keepIds.size) return;
-            setHiddenGeometryIds(
-                draft.features
-                    .map((feature) => String(feature.properties.id))
-                    .filter((id) => !keepIds.has(id))
-            );
-        },
-        showAllGeometries: () => {
-            setHiddenGeometryIds([]);
-        },
-        setTitle,
-        setDescriptions,
-        setDialog,
-        setImage,
-        setSubtitle,
-    };
+    useEffect(() => {
+        controllersRef.current = {
+            map: getMapInstance(),
+            draft,
+            effects,
+            setTimelineVisible,
+            setTimelineFilterEnabled,
+            setLayerPanelVisible,
+            setZoomPanelVisible,
+            setSidebarOpen,
+            onSelectWiki: (id) => {
+                const nextId = String(id || "").trim();
+                setActiveWikiId(nextId || null);
+            },
+            addToast,
+            setPlaybackSpeed: (nextSpeed) => {
+                const safe = Number.isFinite(nextSpeed) && nextSpeed > 0 ? nextSpeed : 1;
+                playbackSpeedRef.current = safe;
+                setPlaybackSpeed(safe);
+            },
+            onYearChange: setTimelineYear,
+            showGeometries: (ids) => {
+                const nextIds = normalizeIdList(ids);
+                if (!nextIds.length) return;
+                setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
+            },
+            hideGeometries: (ids) => {
+                const nextIds = normalizeIdList(ids);
+                if (!nextIds.length) return;
+                setHiddenGeometryIds((prev) => {
+                    const seen = new Set(prev);
+                    for (const id of nextIds) {
+                        seen.add(id);
+                    }
+                    return Array.from(seen);
+                });
+            },
+            showOnlyGeometries: (ids) => {
+                const keepIds = new Set(normalizeIdList(ids));
+                if (!keepIds.size) return;
+                setHiddenGeometryIds(
+                    draft.features
+                        .map((feature) => String(feature.properties.id))
+                        .filter((id) => !keepIds.has(id))
+                );
+            },
+            showAllGeometries: () => {
+                setHiddenGeometryIds([]);
+            },
+            setDialog: setDialogWithRef,
+            getDialog: () => dialogRef.current,
+        };
+    }, [addToast, draft, effects, getMapInstance]);
 
     const playFromIndex = useCallback(async (startIndex: number) => {
         if (!flatSteps.length) return;
         const safeStartIndex = Math.max(0, Math.min(flatSteps.length - 1, startIndex));
         resetPresentation();
+        effects.clear(getMapInstance());
         setTimelineVisible(true);
         setTimelineYear(initialTimelineYear);
         setTimelineFilterEnabled(initialTimelineFilterEnabled);
@@ -272,6 +277,8 @@ export function useReplayPreview({
 
             const controllers = controllersRef.current;
             if (!controllers) return;
+            controllers.map = getMapInstance();
+            controllers.draft = draft;
 
             const actions = [
                 ...current.step.use_narrow_function,
@@ -294,6 +301,9 @@ export function useReplayPreview({
         restorePreviewState();
     }, [
         flatSteps,
+        draft,
+        effects,
+        getMapInstance,
         initialTimelineFilterEnabled,
         initialTimelineYear,
         onSelectStep,
@@ -312,13 +322,11 @@ export function useReplayPreview({
 
     return {
         isPlaying,
-        title,
-        descriptions,
-        subtitle,
         dialog,
-        image,
         toasts,
         timelineVisible,
+        layerPanelVisible,
+        zoomPanelVisible,
         timelineYear,
         timelineFilterEnabled,
         sidebarOpen,

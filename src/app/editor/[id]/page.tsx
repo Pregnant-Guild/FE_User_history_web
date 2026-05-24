@@ -11,6 +11,7 @@ import SelectedGeometryPanel from "@/uhm/components/editor/SelectedGeometryPanel
 import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar";
 import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
+import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
@@ -46,7 +47,10 @@ import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
 import { newId } from "@/uhm/lib/utils/id";
 import {
     loadBackgroundLayerVisibilityFromStorage,
+    persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
+import { BACKGROUND_LAYER_OPTIONS } from "@/uhm/lib/map/styles/backgroundLayers";
+import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
 import { deepClone } from "@/uhm/lib/editor/draft/draftDiff";
 import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
 import { useReplayPreview } from "@/uhm/lib/replay/useReplayPreview";
@@ -2231,6 +2235,7 @@ function EditorPageContent() {
                         imageOverlay={imageOverlay}
                         onImageOverlayChange={setImageOverlay}
                         onBindGeometries={handleBindGeometries}
+                        showViewportControls={!isReplayPreviewMode || replayPreview.zoomPanelVisible}
                     />
                 ) : (
                     <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -2239,11 +2244,7 @@ function EditorPageContent() {
                     <ReplayPreviewOverlay
                         isPreviewMode={true}
                         isPlaying={replayPreview.isPlaying}
-                        title={replayPreview.title}
-                        descriptions={replayPreview.descriptions}
-                        subtitle={replayPreview.subtitle}
                         dialog={replayPreview.dialog}
-                        image={replayPreview.image}
                         toasts={replayPreview.toasts}
                         sidebarOpen={replayPreview.sidebarOpen}
                         playbackSpeed={replayPreview.playbackSpeed}
@@ -2278,6 +2279,36 @@ function EditorPageContent() {
                                 replayPreview.closeWikiPanel();
                             }}
                             onWikiLinkRequest={handleReplayPreviewWikiLinkRequest}
+                        />
+                    </aside>
+                ) : null}
+                {isReplayPreviewMode ? (
+                    <aside
+                        style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: 18,
+                            transform: "translateY(-50%)",
+                            zIndex: 16,
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        <ReplayPreviewLayerPanel
+                            backgroundVisibility={backgroundVisibility}
+                            geometryVisibility={effectiveGeometryVisibility}
+                            onToggleBackground={(id) =>
+                                setBackgroundVisibility((prev) => {
+                                    const next = { ...prev, [id]: !prev[id] };
+                                    persistBackgroundLayerVisibility(next);
+                                    return next;
+                                })
+                            }
+                            onToggleGeometry={(typeKey) =>
+                                setGeometryVisibility((prev) => ({
+                                    ...prev,
+                                    [typeKey]: prev[typeKey] === false,
+                                }))
+                            }
                         />
                     </aside>
                 ) : null}
@@ -2431,6 +2462,8 @@ function readImageAspectRatio(url: string): Promise<number> {
         image.src = url;
     });
 }
+
+// ReplayPreviewLayerPanel is imported from "@/uhm/components/editor/ReplayPreviewLayerPanel"
 
 function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;

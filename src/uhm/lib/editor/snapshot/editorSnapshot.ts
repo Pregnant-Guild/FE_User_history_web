@@ -922,45 +922,50 @@ function normalizeReplayTargetGeometryIds(replay: unknown, geometryId: string): 
 function normalizeReplayUiActions(actions: unknown): ReplayAction<UIOptionName>[] {
     if (!Array.isArray(actions)) return [];
 
-    return actions.flatMap((action) => {
-        if (!isRecord(action)) return [];
+    const normalized: ReplayAction<UIOptionName>[] = [];
 
-        const functionName = action.function_name;
-        const params = Array.isArray(action.params) ? action.params : [];
+    for (const action of actions) {
+        if (!isRecord(action)) continue;
+
+        let functionName = action.function_name;
+        let params = Array.isArray(action.params) ? action.params : [];
 
         if (functionName === "UI") {
-            const option = normalizeReplayUiOption(params[0]);
-            if (!option) return [];
-            return [{
-                function_name: option,
-                params: params.slice(1),
-            }];
+            functionName = params[0];
+            params = params.slice(1);
         }
 
-        const option = normalizeReplayUiOption(functionName);
-        if (!option) return [];
-        return [{
-            function_name: option,
-            params,
-        }];
-    });
-}
-
-function normalizeReplayUiOption(value: unknown): UIOptionName | null {
-    switch (value) {
-        case "timeline":
-        case "layer_panel":
-        case "wiki_panel":
-        case "close_wiki_panel":
-        case "zoom_panel":
-        case "wiki":
-        case "toast":
-        case "wiki_header":
-        case "playback_speed":
-            return value;
-        default:
-            return null;
+        switch (functionName) {
+            case "timeline":
+            case "layer_panel":
+            case "zoom_panel":
+            case "toast":
+                normalized.push({
+                    function_name: functionName,
+                    params: [params[0]],
+                });
+                break;
+            case "wiki":
+                normalized.push({
+                    function_name: "wiki",
+                    params: [params[0] || null],
+                });
+                break;
+            case "close_wiki_panel":
+            case "wiki_panel":
+                if (functionName === "close_wiki_panel" || (functionName === "wiki_panel" && !params[0])) {
+                    normalized.push({
+                        function_name: "wiki",
+                        params: [null],
+                    });
+                }
+                break;
+            default:
+                break;
+        }
     }
+
+    return normalized;
 }
 
 function normalizeReplayMapAndGeoActions(
@@ -983,21 +988,180 @@ function normalizeReplayMapAndGeoActions(
 
         const functionName = action.function_name;
         const params = Array.isArray(action.params) ? action.params : [];
-        const mapFunctionName = normalizeReplayMapFunctionName(functionName);
-        if (mapFunctionName) {
-            normalizedMapActions.push({
-                function_name: mapFunctionName,
-                params,
-            });
-            continue;
-        }
 
-        const geoFunctionName = normalizeReplayGeoFunctionName(functionName);
-        if (geoFunctionName) {
-            normalizedGeoActions.push({
-                function_name: geoFunctionName,
-                params,
-            });
+        switch (functionName) {
+            // --- Map Functions ---
+            case "set_camera_view":
+                normalizedMapActions.push({
+                    function_name: "set_camera_view",
+                    params: [params[0]],
+                });
+                break;
+            case "set_timeline_filter":
+                normalizedMapActions.push({
+                    function_name: "set_timeline_filter",
+                    params: [Boolean(params[0])],
+                });
+                break;
+            case "enable_timeline_filter":
+            case "disable_timeline_filter":
+                normalizedMapActions.push({
+                    function_name: "set_timeline_filter",
+                    params: [functionName === "enable_timeline_filter"],
+                });
+                break;
+            case "set_labels_visible":
+                normalizedMapActions.push({
+                    function_name: "set_labels_visible",
+                    params: [Boolean(params[0])],
+                });
+                break;
+            case "toggle_labels":
+                normalizedMapActions.push({
+                    function_name: "set_labels_visible",
+                    params: [Boolean(params[0])],
+                });
+                break;
+            case "show_labels":
+            case "hide_labels":
+                normalizedMapActions.push({
+                    function_name: "set_labels_visible",
+                    params: [functionName === "show_labels"],
+                });
+                break;
+            case "reset_camera_north":
+                normalizedMapActions.push({
+                    function_name: "set_camera_view",
+                    params: [{ bearing: 0 }],
+                });
+                break;
+
+            // --- Geo Functions ---
+            case "fly_to_geometry": {
+                const id = String(params[0] || "");
+                if (id) {
+                    const duration = typeof params[3] === "number" ? params[3] : undefined;
+                    normalizedGeoActions.push({
+                        function_name: "fly_to_geometries",
+                        params: [[id], duration],
+                    });
+                }
+                break;
+            }
+            case "fly_to_geometries": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                if (ids.length > 0) {
+                    const duration = typeof params[1] === "number" ? params[1] : undefined;
+                    normalizedGeoActions.push({
+                        function_name: "fly_to_geometries",
+                        params: [ids, duration],
+                    });
+                }
+                break;
+            }
+            case "fit_to_geometries": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                if (ids.length > 0) {
+                    const duration = typeof params[1] === "number" ? params[1] : undefined;
+                    normalizedGeoActions.push({
+                        function_name: "fly_to_geometries",
+                        params: [ids, duration],
+                    });
+                }
+                break;
+            }
+            case "set_geometry_visibility": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                const visible = params[1] !== undefined ? Boolean(params[1]) : true;
+                if (ids.length > 0) {
+                    normalizedGeoActions.push({
+                        function_name: "set_geometry_visibility",
+                        params: [ids, visible],
+                    });
+                }
+                break;
+            }
+            case "show_geometries": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                if (ids.length > 0) {
+                    normalizedGeoActions.push({
+                        function_name: "set_geometry_visibility",
+                        params: [ids, true],
+                    });
+                }
+                break;
+            }
+            case "hide_geometries": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                if (ids.length > 0) {
+                    normalizedGeoActions.push({
+                        function_name: "set_geometry_visibility",
+                        params: [ids, false],
+                    });
+                }
+                break;
+            }
+            case "follow_geometry_path": {
+                const id = String(params[0] || "");
+                if (id) {
+                    const duration = typeof params[1] === "number" ? params[1] : undefined;
+                    const zoom = typeof params[2] === "number" ? params[2] : undefined;
+                    const pitch = typeof params[3] === "number" ? params[3] : undefined;
+                    normalizedGeoActions.push({
+                        function_name: "follow_geometries_path",
+                        params: [[id], duration, zoom, pitch],
+                    });
+                }
+                break;
+            }
+            case "follow_geometries_path": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                if (ids.length > 0) {
+                    const duration = typeof params[1] === "number" ? params[1] : undefined;
+                    const zoom = typeof params[2] === "number" ? params[2] : undefined;
+                    const pitch = typeof params[3] === "number" ? params[3] : undefined;
+                    normalizedGeoActions.push({
+                        function_name: "follow_geometries_path",
+                        params: [ids, duration, zoom, pitch],
+                    });
+                }
+                break;
+            }
+            case "dim_other_geometries":
+            case "hide_others_geometries": {
+                const ids = Array.isArray(params[0]) ? params[0].map(String) : [];
+                normalizedGeoActions.push({
+                    function_name: "hide_others_geometries",
+                    params: [ids],
+                });
+                break;
+            }
+            case "pulse_geometry":
+                normalizedGeoActions.push({
+                    function_name: "pulse_geometry",
+                    params,
+                });
+                break;
+            case "animate_dashed_border":
+                normalizedGeoActions.push({
+                    function_name: "animate_dashed_border",
+                    params,
+                });
+                break;
+            case "set_geometry_style":
+                normalizedGeoActions.push({
+                    function_name: "set_geometry_style",
+                    params,
+                });
+                break;
+            case "orbit_camera_around_geometry":
+                normalizedGeoActions.push({
+                    function_name: "orbit_camera_around_geometry",
+                    params,
+                });
+                break;
+            default:
+                break;
         }
     }
 
@@ -1007,77 +1171,103 @@ function normalizeReplayMapAndGeoActions(
     };
 }
 
-function normalizeReplayMapFunctionName(value: unknown): MapFunctionName | null {
-    switch (value) {
-        case "set_camera_view":
-        case "set_time_filter":
-        case "enable_timeline_filter":
-        case "disable_timeline_filter":
-        case "toggle_labels":
-        case "show_labels":
-        case "hide_labels":
-        case "show_all_geometries":
-        case "reset_camera_north":
-            return value;
-        default:
-            return null;
-    }
-}
-
-function normalizeReplayGeoFunctionName(value: unknown): GeoFunctionName | null {
-    switch (value) {
-        case "fly_to_geometry":
-        case "fly_to_geometries":
-        case "set_geometry_visibility":
-        case "show_geometries":
-        case "hide_geometries":
-        case "fit_to_geometries":
-        case "orbit_camera_around_geometry":
-        case "pulse_geometry":
-        case "animate_dashed_border":
-        case "set_geometry_style":
-        case "show_geometry_label":
-        case "follow_geometry_path":
-        case "follow_geometries_path":
-        case "dim_other_geometries":
-            return value;
-        default:
-            return null;
-    }
-}
-
 function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<NarrativeFunctionName>[] {
     if (!Array.isArray(actions)) return [];
 
-    return actions.flatMap((action) => {
-        if (!isRecord(action)) return [];
+    let avatar = "";
+    let text = "";
+    let image_url = "";
+    let image_caption = "";
+    let hasDialog = false;
+    let isCleared = false;
 
-        const functionName = normalizeReplayNarrativeFunctionName(action.function_name);
-        if (!functionName) return [];
+    for (const action of actions) {
+        if (!isRecord(action)) continue;
 
-        return [{
-            function_name: functionName,
-            params: Array.isArray(action.params) ? action.params : [],
-        }];
-    });
-}
+        const functionName = action.function_name;
+        const params = Array.isArray(action.params) ? action.params : [];
 
-function normalizeReplayNarrativeFunctionName(value: unknown): NarrativeFunctionName | null {
-    switch (value) {
-        case "set_title":
-        case "clear_title":
-        case "set_descriptions":
-        case "clear_descriptions":
-        case "show_dialog_box":
-        case "clear_dialog_box":
-        case "display_historical_image":
-        case "clear_historical_image":
-        case "set_step_subtitle":
-        case "clear_step_subtitle":
-            return value;
-        default:
-            return null;
+        switch (functionName) {
+            case "set_dialog": {
+                const data = params[0];
+                if (data && typeof data === "object") {
+                    hasDialog = true;
+                    avatar = String((data as any).avatar || avatar);
+                    text = String((data as any).text || text);
+                    image_url = String((data as any).image_url || image_url);
+                    image_caption = String((data as any).image_caption || image_caption);
+                } else if (data === null) {
+                    isCleared = true;
+                }
+                break;
+            }
+            case "show_dialog_box":
+                hasDialog = true;
+                avatar = String(params[0] || avatar);
+                text = String(params[1] || text);
+                break;
+            case "set_title":
+                hasDialog = true;
+                if (!text) {
+                    text = String(params[0] || "");
+                }
+                break;
+            case "set_descriptions":
+                hasDialog = true;
+                if (!text) {
+                    text = String(params[0] || "");
+                } else if (params[0]) {
+                    text = text + "\n" + String(params[0]);
+                }
+                break;
+            case "set_step_subtitle":
+                hasDialog = true;
+                if (!text) {
+                    text = String(params[0] || "");
+                }
+                break;
+            case "display_historical_image":
+                hasDialog = true;
+                image_url = String(params[0] || image_url);
+                image_caption = String(params[1] || image_caption);
+                break;
+            case "clear_dialog_box":
+            case "clear_title":
+            case "clear_descriptions":
+            case "clear_historical_image":
+            case "clear_step_subtitle":
+                isCleared = true;
+                break;
+            default:
+                break;
+        }
     }
+
+    if (hasDialog) {
+        const dialogData: any = {
+            avatar,
+            text,
+        };
+        if (image_url) {
+            dialogData.image_url = image_url;
+        }
+        if (image_caption) {
+            dialogData.image_caption = image_caption;
+        }
+        return [{
+            function_name: "set_dialog",
+            params: [dialogData],
+        }];
+    }
+
+    if (isCleared) {
+        return [{
+            function_name: "set_dialog",
+            params: [null],
+        }];
+    }
+
+    return [];
 }
 
 function dedupeAndSortGeometryEntity(rows: GeometryEntitySnapshot[]): GeometryEntitySnapshot[] {

@@ -62,12 +62,12 @@ type ActionDefinition<T extends string> = {
 };
 
 type NarrativeActionDefinitionMap = Record<NarrativeFunctionName, ActionDefinition<NarrativeFunctionName>>;
+type UiVisibleOptionName = "timeline" | "layer_panel" | "zoom_panel";
 type UiEffectsDraftState = {
     selected: Record<UIOptionName, boolean>;
+    visible: Record<UiVisibleOptionName, boolean>;
     wiki_id: string;
     message: string;
-    header_id: string;
-    speed: string;
 };
 type MapCameraOptionName = "center" | "zoom" | "bearing" | "pitch";
 type MapCameraDraftState = {
@@ -84,28 +84,20 @@ type CurrentMapViewState = {
 const uiOptionChoices: Array<{ label: string; value: UIOptionName }> = [
     { label: "Timeline", value: "timeline" },
     { label: "Layer Panel", value: "layer_panel" },
-    { label: "Wiki Panel", value: "wiki_panel" },
-    { label: "Close Wiki Panel", value: "close_wiki_panel" },
     { label: "Zoom Panel", value: "zoom_panel" },
     { label: "Wiki", value: "wiki" },
     { label: "Toast", value: "toast" },
-    { label: "Wiki Header", value: "wiki_header" },
-    { label: "Playback Speed", value: "playback_speed" },
 ];
 
 const uiSimpleOptionValues: UIOptionName[] = [
     "timeline",
     "layer_panel",
-    "wiki_panel",
-    "close_wiki_panel",
     "zoom_panel",
 ];
 
 const uiInputOptionValues: UIOptionName[] = [
     "wiki",
     "toast",
-    "wiki_header",
-    "playback_speed",
 ];
 
 const mapCameraOptionChoices: Array<{ label: string; value: MapCameraOptionName }> = [
@@ -148,107 +140,51 @@ const buttonStyle = {
 };
 
 const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
-    set_title: {
-        label: "Tiêu đề step",
-        fields: [{ name: "title", label: "Title", kind: "text", placeholder: "Tiêu đề" }],
-        create: () => ({ function_name: "set_title", params: [""] }),
-        deserialize: (params) => ({ title: asString(params[0]) }),
-        serialize: (values) => [asString(values.title)],
-    },
-    clear_title: {
-        label: "Xóa tiêu đề",
-        fields: [],
-        create: () => ({ function_name: "clear_title", params: [] }),
-        deserialize: () => ({}),
-        serialize: () => [],
-    },
-    set_descriptions: {
-        label: "Mô tả",
-        fields: [{ name: "text", label: "Text", kind: "textarea", placeholder: "Nội dung diễn giải" }],
-        create: () => ({ function_name: "set_descriptions", params: [""] }),
-        deserialize: (params) => ({ text: asString(params[0]) }),
-        serialize: (values) => [asString(values.text)],
-    },
-    clear_descriptions: {
-        label: "Xóa mô tả",
-        fields: [],
-        create: () => ({ function_name: "clear_descriptions", params: [] }),
-        deserialize: () => ({}),
-        serialize: () => [],
-    },
-    show_dialog_box: {
+    set_dialog: {
         label: "Dialog box",
         fields: [
-            { name: "avatar", label: "Avatar", kind: "text", placeholder: "avatar url" },
-            { name: "text", label: "Text", kind: "textarea", placeholder: "Lời thoại" },
-            {
-                name: "side",
-                label: "Side",
-                kind: "select",
-                options: [
-                    { label: "Left", value: "left" },
-                    { label: "Right", value: "right" },
-                ],
-            },
-            { name: "speaker", label: "Speaker", kind: "text", placeholder: "Tên nhân vật" },
+            { name: "clear", label: "Ẩn dialog (Clear)", kind: "boolean" },
+            { name: "avatar", label: "Avatar URL", kind: "text", placeholder: "https://... (avatar)" },
+            { name: "text", label: "Nội dung", kind: "textarea", placeholder: "Lời thoại / Dẫn chuyện" },
+            { name: "image_url", label: "Ảnh tư liệu", kind: "text", placeholder: "https://... (ảnh đè)" },
+            { name: "image_caption", label: "Chú thích ảnh", kind: "text", placeholder: "Chú thích ảnh" },
         ],
-        create: () => ({ function_name: "show_dialog_box", params: ["", "", "left", ""] }),
-        deserialize: (params) => ({
-            avatar: asString(params[0]),
-            text: asString(params[1]),
-            side: normalizeSelectValue(asString(params[2]), "left"),
-            speaker: asString(params[3]),
-        }),
-        serialize: (values) => [
-            asString(values.avatar),
-            asString(values.text),
-            normalizeSelectValue(asString(values.side), "left"),
-            asString(values.speaker),
-        ],
-    },
-    clear_dialog_box: {
-        label: "Đóng dialog box",
-        fields: [],
-        create: () => ({ function_name: "clear_dialog_box", params: [] }),
-        deserialize: () => ({}),
-        serialize: () => [],
-    },
-    display_historical_image: {
-        label: "Ảnh lịch sử",
-        fields: [
-            { name: "url", label: "URL", kind: "text", placeholder: "https://..." },
-            { name: "caption", label: "Caption", kind: "textarea", placeholder: "Chú thích" },
-        ],
-        create: () => ({ function_name: "display_historical_image", params: ["", ""] }),
-        deserialize: (params) => ({
-            url: asString(params[0]),
-            caption: asString(params[1]),
-        }),
-        serialize: (values) => compactTrailingUndefined([
-            asString(values.url),
-            emptyToUndefined(asString(values.caption)),
-        ]),
-    },
-    clear_historical_image: {
-        label: "Xóa ảnh lịch sử",
-        fields: [],
-        create: () => ({ function_name: "clear_historical_image", params: [] }),
-        deserialize: () => ({}),
-        serialize: () => [],
-    },
-    set_step_subtitle: {
-        label: "Phụ đề",
-        fields: [{ name: "subtitle", label: "Subtitle", kind: "textarea", placeholder: "Để trống để ẩn subtitle" }],
-        create: () => ({ function_name: "set_step_subtitle", params: [""] }),
-        deserialize: (params) => ({ subtitle: params[0] == null ? "" : asString(params[0]) }),
-        serialize: (values) => [emptyToNull(asString(values.subtitle))],
-    },
-    clear_step_subtitle: {
-        label: "Xóa phụ đề",
-        fields: [],
-        create: () => ({ function_name: "clear_step_subtitle", params: [] }),
-        deserialize: () => ({}),
-        serialize: () => [],
+        create: () => ({ function_name: "set_dialog", params: [{ avatar: "", text: "", image_url: "", image_caption: "" }] }),
+        deserialize: (params) => {
+            const data: any = params[0];
+            if (data === null) {
+                return {
+                    clear: true,
+                    avatar: "",
+                    text: "",
+                    image_url: "",
+                    image_caption: "",
+                };
+            }
+            return {
+                clear: false,
+                avatar: asString(data?.avatar),
+                text: asString(data?.text),
+                image_url: asString(data?.image_url),
+                image_caption: asString(data?.image_caption),
+            };
+        },
+        serialize: (values) => {
+            if (values.clear) {
+                return [null];
+            }
+            const data: any = {
+                avatar: asString(values.avatar),
+                text: asString(values.text),
+            };
+            if (values.image_url) {
+                data.image_url = asString(values.image_url);
+            }
+            if (values.image_caption) {
+                data.image_caption = asString(values.image_caption);
+            }
+            return [data];
+        },
     },
 };
 
@@ -306,11 +242,6 @@ export default function ReplayEffectsSidebar({
             })
             .map((id) => byId.get(id) || { id, label: id });
     }, [geometryChoices, selectedFeatureIds]);
-    const selectedGeometryIds = useMemo(
-        () => selectedGeometryItems.map((item) => item.id),
-        [selectedGeometryItems]
-    );
-
     const updateStep = (label: string, updater: (step: ReplayStep) => void) => {
         if (!selectedStage || selectedStepIndex == null) return;
         onMutateReplay(label, (draftReplay) => {
@@ -362,7 +293,6 @@ export default function ReplayEffectsSidebar({
                 <>
                     <ActionGroupEditor
                         title="Narrative"
-                        groupKey="use_narrow_function"
                         groupLabel={`Replay: cập nhật narrative step ${selectedStepIndex + 1} của stage #${selectedStage.id}`}
                         actions={selectedStep.use_narrow_function}
                         definitions={narrativeActionDefinitions}
@@ -433,7 +363,7 @@ function MapFunctionShortcutPanel({
                         tone="blue"
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "show_labels", params: [] }],
+                                [{ function_name: "set_labels_visible", params: [true] }],
                                 "Map: show labels"
                             )
                         }
@@ -443,7 +373,7 @@ function MapFunctionShortcutPanel({
                         tone="slate"
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "hide_labels", params: [] }],
+                                [{ function_name: "set_labels_visible", params: [false] }],
                                 "Map: hide labels"
                             )
                         }
@@ -453,7 +383,7 @@ function MapFunctionShortcutPanel({
                         tone="green"
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "enable_timeline_filter", params: [] }],
+                                [{ function_name: "set_timeline_filter", params: [true] }],
                                 "Map: enable timeline filter"
                             )
                         }
@@ -463,38 +393,8 @@ function MapFunctionShortcutPanel({
                         tone="slate"
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "disable_timeline_filter", params: [] }],
+                                [{ function_name: "set_timeline_filter", params: [false] }],
                                 "Map: disable timeline filter"
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Lấy Timeline"
-                        tone="teal"
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "set_time_filter", params: [safeYear] }],
-                                `Map: set timeline ${safeYear}`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="North Up"
-                        tone="amber"
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "reset_camera_north", params: [] }],
-                                "Map: reset camera north"
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Show All Geo"
-                        tone="green"
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "show_all_geometries", params: [] }],
-                                "Map: show all geometries"
                             )
                         }
                     />
@@ -553,7 +453,7 @@ function GeoFunctionShortcutPanel({
                         disabled={!hasSelection}
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "show_geometries", params: [selectedIds] }],
+                                [{ function_name: "set_geometry_visibility", params: [selectedIds, true] }],
                                 `Geo: show ${selectedCount} geo`
                             )
                         }
@@ -564,61 +464,8 @@ function GeoFunctionShortcutPanel({
                         disabled={!hasSelection}
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "hide_geometries", params: [selectedIds] }],
+                                [{ function_name: "set_geometry_visibility", params: [selectedIds, false] }],
                                 `Geo: hide ${selectedCount} geo`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Pulse"
-                        tone="amber"
-                        disabled={!hasSelection}
-                        onClick={() =>
-                            onAppendActions(
-                                selectedIds.map((id) => ({
-                                    function_name: "pulse_geometry",
-                                    params: [id, "#f59e0b", 2, 1800],
-                                })),
-                                `Geo: pulse ${selectedCount} geo`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Dash Border"
-                        tone="blue"
-                        disabled={!hasSelection}
-                        onClick={() =>
-                            onAppendActions(
-                                selectedIds.map((id) => ({
-                                    function_name: "animate_dashed_border",
-                                    params: [id, "#38bdf8", 2, 1, 3000],
-                                })),
-                                `Geo: dashed border ${selectedCount} geo`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Orbit"
-                        tone="teal"
-                        disabled={!hasSelection}
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "orbit_camera_around_geometry", params: [firstId, 8, 45, 1, 5000] }],
-                                `Geo: orbit ${firstId || "main"}`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Label Geo"
-                        tone="green"
-                        disabled={!hasSelection}
-                        onClick={() =>
-                            onAppendActions(
-                                selectedIds.map((id) => ({
-                                    function_name: "show_geometry_label",
-                                    params: [id, "", "#ffffff", 14],
-                                })),
-                                `Geo: label ${selectedCount} geo`
                             )
                         }
                     />
@@ -628,22 +475,8 @@ function GeoFunctionShortcutPanel({
                         disabled={!hasSelection}
                         onClick={() =>
                             onAppendActions(
-                                [{ function_name: "dim_other_geometries", params: [selectedIds] }],
+                                [{ function_name: "hide_others_geometries", params: [selectedIds] }],
                                 `Geo: hide others ngoài ${selectedCount} geo`
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Style Geo"
-                        tone="amber"
-                        disabled={!hasSelection}
-                        onClick={() =>
-                            onAppendActions(
-                                [{
-                                    function_name: "set_geometry_style",
-                                    params: [selectedIds, "#f97316", 0.35, "#fdba74", 2],
-                                }],
-                                `Geo: style ${selectedCount} geo`
                             )
                         }
                     />
@@ -849,36 +682,6 @@ function UiInputEffectsPanel({
                     />
                 ) : null}
 
-                {draft.selected.wiki_header ? (
-                    <FieldInput
-                        field={{
-                            name: "header_id",
-                            label: "Header ID",
-                            kind: "text",
-                            placeholder: "heading-id",
-                        }}
-                        value={draft.header_id}
-                        geometryChoices={[]}
-                        wikiChoices={wikiChoices}
-                        onChange={(nextValue) => onChangeDraft({ header_id: asString(nextValue) })}
-                    />
-                ) : null}
-
-                {draft.selected.playback_speed ? (
-                    <FieldInput
-                        field={{
-                            name: "speed",
-                            label: "Speed",
-                            kind: "number",
-                            placeholder: "1",
-                        }}
-                        value={draft.speed}
-                        geometryChoices={[]}
-                        wikiChoices={wikiChoices}
-                        onChange={(nextValue) => onChangeDraft({ speed: asString(nextValue) })}
-                    />
-                ) : null}
-
                 <button
                     type="button"
                     onClick={onApply}
@@ -915,6 +718,8 @@ function UiOptionToggleRow({
         />
     );
 }
+
+// UiVisibilityOptions removed since toggles are evaluated directly
 
 function SimpleOptionToggleRow<T extends string>({
     options,
@@ -1022,7 +827,6 @@ function UiEffectsEditor({
 
 function ActionGroupEditor<T extends string>({
     title,
-    groupKey,
     groupLabel,
     actions,
     definitions,
@@ -1033,7 +837,6 @@ function ActionGroupEditor<T extends string>({
     onUpdateActions,
 }: {
     title: string;
-    groupKey: ActionGroupKey;
     groupLabel: string;
     actions: ReplayAction<T>[];
     definitions: Record<T, ActionDefinition<T>>;
@@ -1045,10 +848,13 @@ function ActionGroupEditor<T extends string>({
 }) {
     const functionNames = useMemo(() => Object.keys(definitions) as T[], [definitions]);
     const [composerFunctionName, setComposerFunctionName] = useState<T | "">(
-        createOnSelect ? "" : (functionNames[0] as T)
+        createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T)
     );
     const [composerDraftValues, setComposerDraftValues] = useState<ActionFormValues>(() =>
-        buildActionComposerDraft(definitions, createOnSelect ? "" : (functionNames[0] as T))
+        buildActionComposerDraft(
+            definitions,
+            createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T)
+        )
     );
 
     const composerDefinition = composerFunctionName
@@ -1076,7 +882,7 @@ function ActionGroupEditor<T extends string>({
             `${groupLabel}: thêm ${definition.label}`
         );
 
-        if (createOnSelect) {
+        if (createOnSelect && functionNames.length > 1) {
             setComposerFunctionName("");
             setComposerDraftValues(buildActionComposerDraft(definitions, ""));
             return;
@@ -1088,32 +894,34 @@ function ActionGroupEditor<T extends string>({
     return (
         <Panel title={title} badge={`${actions.length}`} defaultOpen>
             <div style={{ display: "grid", gap: 10 }}>
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr",
-                        gap: 8,
-                        alignItems: "center",
-                    }}
-                >
-                    <select
-                        value={composerFunctionName}
-                        onChange={(event) => {
-                            const nextValue = event.target.value as T | "";
-                            handleComposerFunctionChange(nextValue);
+                {functionNames.length > 1 ? (
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr",
+                            gap: 8,
+                            alignItems: "center",
                         }}
-                        style={inputStyle}
                     >
-                        {createOnSelect ? (
-                            <option value="">{emptyOptionLabel || "Chọn option"}</option>
-                        ) : null}
-                        {functionNames.map((functionName) => (
-                            <option key={functionName} value={functionName}>
-                                {definitions[functionName].label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                        <select
+                            value={composerFunctionName}
+                            onChange={(event) => {
+                                const nextValue = event.target.value as T | "";
+                                handleComposerFunctionChange(nextValue);
+                            }}
+                            style={inputStyle}
+                        >
+                            {createOnSelect ? (
+                                <option value="">{emptyOptionLabel || "Chọn option"}</option>
+                            ) : null}
+                            {functionNames.map((functionName) => (
+                                <option key={functionName} value={functionName}>
+                                    {definitions[functionName].label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ) : null}
 
                 {composerDefinition ? (
                     <div
@@ -1396,39 +1204,34 @@ function compactTrailingUndefined(values: unknown[]) {
     return next;
 }
 
-function normalizeColorValue(value: unknown, fallback: string) {
-    const raw = asString(value).trim();
-    return raw.length > 0 ? raw : fallback;
-}
-
 function normalizeSelectValue(value: string, fallback: string) {
     return value.trim().length ? value : fallback;
 }
 
 function buildUiEffectsDraftState(actions: ReplayAction<UIOptionName>[]): UiEffectsDraftState {
     const selected = buildEmptyUiOptionSelection();
+    const visible = buildDefaultUiVisibilityState();
     let wiki_id = "";
     let message = "";
-    let header_id = "";
-    let speed = "1";
 
     for (const action of actions) {
         const descriptor = getUiActionDescriptor(action);
         if (!descriptor) continue;
-        selected[descriptor.option] = true;
 
         switch (descriptor.option) {
+            case "timeline":
+            case "layer_panel":
+            case "zoom_panel":
+                selected[descriptor.option] = Boolean(descriptor.payload[0] ?? false);
+                visible[descriptor.option] = Boolean(descriptor.payload[0] ?? false);
+                break;
             case "wiki":
+                selected[descriptor.option] = true;
                 wiki_id = asString(descriptor.payload[0]);
                 break;
             case "toast":
+                selected[descriptor.option] = true;
                 message = asString(descriptor.payload[0]);
-                break;
-            case "wiki_header":
-                header_id = asString(descriptor.payload[0]);
-                break;
-            case "playback_speed":
-                speed = toInputNumber(descriptor.payload[0], "1");
                 break;
             default:
                 break;
@@ -1437,10 +1240,9 @@ function buildUiEffectsDraftState(actions: ReplayAction<UIOptionName>[]): UiEffe
 
     return {
         selected,
+        visible,
         wiki_id,
         message,
-        header_id,
-        speed,
     };
 }
 
@@ -1448,13 +1250,17 @@ function buildEmptyUiOptionSelection(): Record<UIOptionName, boolean> {
     return {
         timeline: false,
         layer_panel: false,
-        wiki_panel: false,
-        close_wiki_panel: false,
         zoom_panel: false,
         wiki: false,
         toast: false,
-        wiki_header: false,
-        playback_speed: false,
+    };
+}
+
+function buildDefaultUiVisibilityState(): Record<UiVisibleOptionName, boolean> {
+    return {
+        timeline: false,
+        layer_panel: false,
+        zoom_panel: false,
     };
 }
 
@@ -1538,7 +1344,12 @@ function replaceUiActionsByGroup(
     });
 
     const nextGroupActions = groupOptions
-        .filter((option) => draft.selected[option])
+        .filter((option) => {
+            if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
+                return true;
+            }
+            return draft.selected[option];
+        })
         .map((option) => buildUiOptionAction(option, draft));
 
     return [...preserved, ...nextGroupActions];
@@ -1550,11 +1361,22 @@ function buildUiEffectsApplyLabel(
     groupOptions: UIOptionName[]
 ) {
     const activeLabels = groupOptions
-        .filter((option) => draft.selected[option])
-        .map((option) => uiOptionChoices.find((choice) => choice.value === option)?.label || option);
+        .filter((option) => {
+            if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
+                return true;
+            }
+            return draft.selected[option];
+        })
+        .map((option) => {
+            const label = uiOptionChoices.find((choice) => choice.value === option)?.label || option;
+            if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
+                return draft.selected[option] ? `Show ${label}` : `Hide ${label}`;
+            }
+            return label;
+        });
 
     return activeLabels.length > 0
-        ? `${prefix}: apply ${activeLabels.join(", ")}`
+        ? `${prefix}: ${activeLabels.join(", ")}`
         : `${prefix}: clear`;
 }
 
@@ -1565,36 +1387,20 @@ function buildUiOptionAction(
     switch (option) {
         case "timeline":
         case "layer_panel":
-        case "wiki_panel":
         case "zoom_panel":
             return {
                 function_name: option,
-                params: [false],
-            };
-        case "close_wiki_panel":
-            return {
-                function_name: option,
-                params: [],
+                params: [draft.selected[option]],
             };
         case "wiki":
             return {
                 function_name: option,
-                params: [draft.wiki_id],
+                params: [draft.wiki_id || null],
             };
         case "toast":
             return {
                 function_name: option,
                 params: [draft.message],
-            };
-        case "wiki_header":
-            return {
-                function_name: option,
-                params: [draft.header_id],
-            };
-        case "playback_speed":
-            return {
-                function_name: option,
-                params: [toNumberOr(draft.speed, 1)],
             };
     }
 }
@@ -1626,14 +1432,13 @@ function normalizeUiOptionValue(value: unknown): UIOptionName | null {
     switch (value) {
         case "timeline":
         case "layer_panel":
-        case "wiki_panel":
-        case "close_wiki_panel":
         case "zoom_panel":
         case "wiki":
         case "toast":
-        case "wiki_header":
-        case "playback_speed":
             return value;
+        case "wiki_panel":
+        case "close_wiki_panel":
+            return "wiki";
         default:
             return null;
     }
