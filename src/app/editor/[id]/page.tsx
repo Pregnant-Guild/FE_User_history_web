@@ -53,7 +53,7 @@ import {
     type MapImageOverlay,
 } from "@/uhm/components/map/imageOverlay";
 import { FIXED_TIMELINE_RANGE, clampYearToFixedRange, normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
-import { useFeatureCommands } from "./featureCommands";
+import { useFeatureCommands } from "@/uhm/lib/editor/geometry/useFeatureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
@@ -62,8 +62,8 @@ import {
     useEditorStore,
     useEditorStoreApi,
 } from "@/uhm/store/editorStore";
-import { EditorSearchResults } from "./EditorSearchResults";
-import { ResizeHandle } from "./ResizeHandle";
+import { EditorSearchResults } from "@/uhm/components/editor/EditorSearchResults";
+import { ResizeHandle } from "@/uhm/components/ui/ResizeHandle";
 import {
     clampNumber,
     formatCommitTitle,
@@ -74,7 +74,7 @@ import {
     normalizeGeoSearchGeometry,
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
-} from "./editorPageUtils";
+} from "@/uhm/lib/editor/editorPageUtils";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";

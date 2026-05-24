@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { Entity } from "@/uhm/types/entities";
+import type { Entity } from "@/uhm/api/entities";
 import type { Feature, FeatureProperties } from "@/uhm/types/geo";
 import { ApiError } from "@/uhm/api/http";
 import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
