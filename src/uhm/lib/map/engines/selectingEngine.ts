@@ -1,6 +1,12 @@
 import maplibregl from "maplibre-gl";
 import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
 
+export type SelectFeatureClickPayload = {
+    featureId: string | number;
+    point: { x: number; y: number };
+    lngLat: { lng: number; lat: number };
+};
+
 // Khởi tạo engine chọn feature và context menu edit/delete.
 export function initSelect(
     map: maplibregl.Map,
@@ -12,7 +18,8 @@ export function initSelect(
     onSelectIds?: (ids: (string | number)[]) => void,
     onReplayEdit?: (id: string | number) => void,
     isEditSessionActive?: () => boolean,
-    onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void
+    onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void,
+    onFeatureClick?: (payload: SelectFeatureClickPayload | null) => void
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -24,6 +31,8 @@ export function initSelect(
     const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit || onBindGeometries);
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
+    let cursorTimer: number | null = null;
+    let pendingCursorPoint: { x: number; y: number } | null = null;
 
     // Bỏ highlight feature-state của toàn bộ đối tượng đang chọn.
     function clearSelection(emit = true) {
@@ -38,7 +47,7 @@ export function initSelect(
     // Chọn hoặc toggle đối tượng; giữ Alt để chọn cộng dồn/tắt chọn.
     function selectFeature(feature: maplibregl.MapGeoJSONFeature, additive: boolean) {
         const id = feature.id ?? feature.properties?.id;
-        if (id === undefined || id === null) return;
+        if (id === undefined || id === null) return false;
 
         if (!additive) {
             clearSelection();
@@ -52,17 +61,19 @@ export function initSelect(
             setSelectionStateForId(idToRemove, false);
             selectedIds.delete(idToRemove);
             onSelectIds?.(Array.from(selectedIds));
-            return;
+            return false;
         }
 
         setSelectionStateForId(id, true);
         selectedIds.add(id);
         onSelectIds?.(Array.from(selectedIds));
+        return true;
     }
 
     // Chọn feature theo click trái, hỗ trợ additive bằng Alt.
     function onClick(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select" && getMode() !== "replay") return;
+        const mode = getMode();
+        if (mode !== "select" && mode !== "replay" && mode !== "preview" && mode !== "replay_preview") return;
         if (isEditSessionActive?.()) return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) return;
@@ -73,22 +84,37 @@ export function initSelect(
 
         if (!features.length) {
             clearSelection();
+            onFeatureClick?.(null);
             return;
         }
 
         const additive = !!e.originalEvent?.altKey;
-        selectFeature(pickPreferredFeature(features), additive);
+        const feature = pickPreferredFeature(features);
+        const didSelect = selectFeature(feature, additive);
+        if (!didSelect) {
+            onFeatureClick?.(null);
+            return;
+        }
+
+        const id = feature.id ?? feature.properties?.id;
+        if (id === undefined || id === null) return;
+        onFeatureClick?.({
+            featureId: id,
+            point: { x: e.point.x, y: e.point.y },
+            lngLat: { lng: e.lngLat.lng, lat: e.lngLat.lat },
+        });
     }
 
     // Hiển thị menu ngữ cảnh (sửa/xóa) khi click chuột phải.
     // Mở menu thao tác khi click phải lên feature.
     function onRightClick(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select" && getMode() !== "replay") return;
+        const mode = getMode();
+        if (mode !== "select" && mode !== "replay" && mode !== "preview" && mode !== "replay_preview") return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) return;
 
         e.preventDefault(); // block browser menu
-        if (getMode() === "replay") return;
+        if (mode === "replay" || mode === "preview" || mode === "replay_preview") return;
         if (isEditSessionActive?.()) return;
 
         const features = map.queryRenderedFeatures(e.point, {
@@ -122,19 +148,28 @@ export function initSelect(
     }
 
     // Đổi cursor pointer khi hover lên đối tượng có thể chọn.
-    function onMove(e: maplibregl.MapLayerMouseEvent) {
-        if (getMode() !== "select" && getMode() !== "replay") return;
+    function updateCursorFromPendingPoint() {
+        cursorTimer = null;
+        const mode = getMode();
+        if (mode !== "select" && mode !== "replay" && mode !== "preview" && mode !== "replay_preview") return;
         const selectableLayers = getSelectableLayers();
         if (!selectableLayers.length) {
             map.getCanvas().style.cursor = "";
             return;
         }
+        if (!pendingCursorPoint) return;
 
-        const features = map.queryRenderedFeatures(e.point, {
+        const features = map.queryRenderedFeatures([pendingCursorPoint.x, pendingCursorPoint.y], {
             layers: selectableLayers,
         });
 
         map.getCanvas().style.cursor = features.length ? "pointer" : "";
+    }
+
+    function onMove(e: maplibregl.MapLayerMouseEvent) {
+        pendingCursorPoint = { x: e.point.x, y: e.point.y };
+        if (cursorTimer !== null) return;
+        cursorTimer = window.setTimeout(updateCursorFromPendingPoint, 40);
     }
 
     function getSelectableLayers(): string[] {
@@ -198,6 +233,10 @@ export function initSelect(
         try {
             map.off("click", onClick);
             map.off("mousemove", onMove);
+            if (cursorTimer !== null) {
+                window.clearTimeout(cursorTimer);
+                cursorTimer = null;
+            }
             if (hasContextActions) {
                 map.off("contextmenu", onRightClick);
             }

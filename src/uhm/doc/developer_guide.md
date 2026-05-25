@@ -166,6 +166,7 @@ Một số nguyên tắc nên giữ:
 - khi cần undo cho entity/wiki/link, đi qua `editor.setSnapshot*()` để undo stack biết
 - khi cần undo cho replay script, đi qua `editor.mutateActiveReplay()` hoặc replay collection helper hiện có
 - hạn chế thêm `JSON.stringify` compare ở chỗ nóng nếu chưa đo hiệu năng
+- khi thiết kế các chế độ preview, đảm bảo khôi phục camera view state & projection (Globe/Flat) về trạng thái gốc của editor bằng cách dùng `editorOriginalMapViewStateRef` và calling `restoreEditorOriginalMapState()`.
 
 ## 12. Chỗ dễ gây hiểu nhầm khi debug
 

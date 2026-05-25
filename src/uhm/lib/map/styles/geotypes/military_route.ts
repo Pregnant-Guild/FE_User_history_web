@@ -9,5 +9,6 @@ export function getMilitaryRouteLayers(sourceId: string, pathArrowSourceId?: str
         strokeColor: "#7f1d1d",
         width: { z1: 2.6, z4: 3.8, z6: 5 },
         arrowOpacity: 0.9,
+        showLine: false,
     });
 }

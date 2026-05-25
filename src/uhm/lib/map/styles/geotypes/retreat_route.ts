@@ -10,5 +10,6 @@ export function getRetreatRouteLayers(sourceId: string, pathArrowSourceId?: stri
         dasharray: [6, 3],
         opacity: 0.82,
         arrowOpacity: 0.68,
+        showLine: false,
     });
 }

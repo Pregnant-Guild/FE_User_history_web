@@ -150,18 +150,16 @@ export function filterDraftByBinding(
     }
 
     const childIds = new Set<string>();
-    const selectedChildren = new Set<string>();
-    const selectedParents = new Set<string>();
+    const parentIds = new Set<string>();
+    const featureParentMap = new Map<string, string>(); // childId -> parentId
+
     for (const feature of fc.features) {
         const featureId = String(feature.properties.id);
         const parentId = normalizeFeatureBoundWith(feature);
-        if (!parentId) continue;
-        childIds.add(featureId);
-        if (selectedIds.has(parentId)) {
-            selectedChildren.add(featureId);
-        }
-        if (selectedIds.has(featureId)) {
-            selectedParents.add(parentId);
+        if (parentId) {
+            childIds.add(featureId);
+            parentIds.add(parentId);
+            featureParentMap.set(featureId, parentId);
         }
     }
 
@@ -169,13 +167,35 @@ export function filterDraftByBinding(
         return { ...fc, features: fc.features.filter((f) => !childIds.has(String(f.properties.id))) };
     }
 
+    const activeParents = new Set<string>();
+    for (const id of selectedIds) {
+        if (parentIds.has(id)) {
+            activeParents.add(id);
+        } else {
+            const parentId = featureParentMap.get(id);
+            if (parentId) {
+                activeParents.add(parentId);
+            }
+        }
+    }
+
     return {
         ...fc,
         features: fc.features.filter((feature) => {
             const featureId = String(feature.properties.id);
-            if (selectedIds.has(featureId)) return true;
-            if (selectedChildren.has(featureId)) return true;
-            if (selectedParents.has(featureId)) return true;
+            const parentId = featureParentMap.get(featureId);
+
+            // 1. If this feature is a parent and its hierarchy is active, hide it
+            if (activeParents.has(featureId)) {
+                return false;
+            }
+
+            // 2. If this feature is a child of an active parent, show it
+            if (parentId && activeParents.has(parentId)) {
+                return true;
+            }
+
+            // 3. By default, hide all child geometries that are not part of the active hierarchy
             return !childIds.has(featureId);
         }),
     };

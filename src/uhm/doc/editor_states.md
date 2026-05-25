@@ -133,7 +133,7 @@ Replay state nằm trong `useEditorState()`:
   - `replays` cộng overlay của `activeReplayDraft` nếu session hiện tại đã đổi nhưng chưa flush
 
 Undo của replay session dùng stack riêng khi `mode === "replay"`.
-`replay_preview` là session preview trong page, dùng `previewSession`/`useReplayPreview()` và không persist.
+`replay_preview` là session preview trong page, dùng `previewSession`/`useReplayPreview()` và không persist. Khi thoát các chế độ preview, editor sẽ dọn dẹp hoàn toàn các map effects, highlight, và khôi phục camera view state & projection (Globe/Flat) ban đầu trước khi vào preview.
 
 ### 4.4. Project/session task state
 
@@ -184,6 +184,27 @@ Giá trị thật được load từ `localStorage` key `uhm.backgroundLayerVisi
 - `snapshotEntityWikiLinks`
 
 Đây là single source of truth cho phần wiki trong snapshot commit.
+
+### 4.8. Preview session states và refs (Viewer / Replay Preview)
+
+Các states và refs điều khiển preview được khai báo trực tiếp trong `page.tsx`:
+
+- `previewSession: ReplayPreviewSession | null`
+  - Đóng băng toàn bộ snapshot collections (replays, draft, entities, wikis, links) cùng timeline, filter và camera view state khi chạy preview.
+- `previewAutoplayMode: "start" | "selection" | null`
+  - Trạng thái autoplay (bắt đầu từ đầu hay từ step được chọn) của Replay Preview.
+- `previewWikiCache`, `previewWikiError`, `isPreviewWikiLoading`
+  - Cache và status để hiển thị nội dung Wiki tương tác trong sidebar preview.
+- `previewFeaturePopupAnchor: MapFeaturePayload | null`
+  - Neo tọa độ/payload của popup hiển thị thông tin geometry khi click trên map ở preview mode.
+- `previewActiveEntityId`, `isPreviewEntitySidebarOpen`
+  - Sidebar hiển thị chi tiết entity được chọn trong preview.
+- `previewLinkEntityPopup: PreviewLinkEntityPopupState | null`
+  - Trạng thái popup điều hướng sang entity khác khi click vào link wiki trong preview.
+- `editorOriginalMapViewStateRef: ReturnType<MapHandle["getViewState"]> | null`
+  - Ref lưu giữ camera view state và projection (Globe/Flat) ban đầu của editor trước khi bắt đầu preview, phục vụ việc khôi phục hoàn toàn bản đồ khi exit.
+- `replayPreviewReturnRef: { mode: "replay" | "preview"; session: ReplayPreviewSession | null }`
+  - Ref ghi nhận session và mode trước đó khi chuyển tiếp từ Viewer Preview sang Replay Preview, cho phép quay trở lại đúng Viewer Preview khi click thoát Replay Preview.
 
 ## 5. Snapshot state
 

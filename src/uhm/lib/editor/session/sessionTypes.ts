@@ -8,6 +8,7 @@ export type EditorMode =
     | "add-line"
     | "add-path"
     | "add-circle"
+    | "preview"
     | "replay"
     | "replay_preview";
 

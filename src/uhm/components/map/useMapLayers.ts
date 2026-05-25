@@ -30,9 +30,7 @@ export function getBaseMapStyle(): maplibregl.StyleSpecification {
 
 export function setupMapLayers(
     map: maplibregl.Map,
-    backgroundVisibility: BackgroundLayerVisibility,
-    highlightFeatures: FeatureCollection | null,
-    applyHighlightToMap: (fc: FeatureCollection) => void
+    backgroundVisibility: BackgroundLayerVisibility
 ) {
     applyBackgroundLayerVisibility(map, backgroundVisibility);
     void replaceBackgroundLayersWithGoong(map, backgroundVisibility).catch((error) => {
@@ -211,62 +209,6 @@ export function setupMapLayers(
         },
     });
 
-    map.addSource("entity-focus", {
-        type: "geojson",
-        data: EMPTY_FEATURE_COLLECTION,
-    });
-
-    map.addLayer({
-        id: "entity-focus-fill",
-        type: "fill",
-        source: "entity-focus",
-        filter: [
-            "any",
-            ["==", ["geometry-type"], "Polygon"],
-            ["==", ["geometry-type"], "MultiPolygon"],
-        ],
-        paint: {
-            "fill-color": "#fde047",
-            "fill-opacity": 0.2,
-        },
-    });
-
-    map.addLayer({
-        id: "entity-focus-line",
-        type: "line",
-        source: "entity-focus",
-        paint: {
-            "line-color": "#f59e0b",
-            "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                1, 2.4,
-                4, 4,
-                6, 5.5,
-            ],
-            "line-opacity": 0.98,
-        },
-    });
-
-    map.addLayer({
-        id: "entity-focus-points",
-        type: "circle",
-        source: "entity-focus",
-        filter: [
-            "any",
-            ["==", ["geometry-type"], "Point"],
-            ["==", ["geometry-type"], "MultiPoint"],
-        ],
-        paint: {
-            "circle-color": "#f8fafc",
-            "circle-radius": 8,
-            "circle-stroke-color": "#f59e0b",
-            "circle-stroke-width": 3,
-            "circle-opacity": 1,
-        },
-    });
-    applyHighlightToMap(highlightFeatures || EMPTY_FEATURE_COLLECTION);
 }
 
 async function replaceBackgroundLayersWithGoong(

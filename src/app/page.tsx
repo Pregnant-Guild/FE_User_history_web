@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import Map, { type MapHoverPayload } from "@/uhm/components/Map";
+import Map, { type MapFeaturePayload } from "@/uhm/components/Map";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import mapLayersStyles from "@/styles/MapLayers.module.css";
@@ -82,7 +82,7 @@ export default function Page() {
         completed: 0,
         total: 0,
     });
-    const [hoverAnchor, setHoverAnchor] = useState<MapHoverPayload | null>(null);
+    const [hoverAnchor, setHoverAnchor] = useState<MapFeaturePayload | null>(null);
     const [isMapLayersCollapsed, setIsMapLayersCollapsed] = useState(false);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
@@ -369,7 +369,7 @@ export default function Page() {
         });
     }, [activeEntityId, relations.geometryEntityIds, selectEntity, selectedFeatureIds]);
 
-    const handleMapHoverChange = useCallback((payload: MapHoverPayload | null) => {
+    const handleMapHoverChange = useCallback((payload: MapFeaturePayload | null) => {
         clearHoverHideTimer();
 
         if (payload) {
@@ -529,8 +529,8 @@ export default function Page() {
                         geometryVisibility={geometryVisibility}
                         allowGeometryEditing={false}
                         applyGeometryBindingFilter={true}
-                        onHoverFeatureChange={handleMapHoverChange}
-                        highlightFeatures={activeEntityGeometries}
+                        onFeatureClick={handleMapHoverChange}
+
                         focusFeatureCollection={activeEntityGeometries}
                         focusRequestKey={entityFocusToken}
                         focusPadding={activeEntityId && isLargeScreen ? { top: 84, right: sidebarWidth + 80, bottom: 116, left: 84 } : { top: 84, right: 84, bottom: 116, left: 84 }}

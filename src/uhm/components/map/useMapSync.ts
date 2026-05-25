@@ -34,7 +34,6 @@ type UseMapSyncProps = {
     applyGeometryBindingFilter: boolean;
     fitToDraftBounds: boolean;
     fitBoundsKey?: string | number | null;
-    highlightFeatures?: FeatureCollection | null;
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | maplibregl.PaddingOptions;
@@ -58,7 +57,6 @@ export function useMapSync({
     applyGeometryBindingFilter,
     fitToDraftBounds,
     fitBoundsKey,
-    highlightFeatures,
     focusFeatureCollection,
     focusRequestKey,
     focusPadding,
@@ -75,7 +73,6 @@ export function useMapSync({
     const selectedFeatureIdsRef = useRef<(string | number)[]>(selectedFeatureIds);
     const applyGeometryBindingFilterRef = useRef(applyGeometryBindingFilter);
     const fitToDraftBoundsRef = useRef(fitToDraftBounds);
-    const highlightFeaturesRef = useRef<FeatureCollection | null>(highlightFeatures || null);
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay || null);
     const focusFeatureCollectionRef = useRef<FeatureCollection | null | undefined>(focusFeatureCollection);
     const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
@@ -90,7 +87,6 @@ export function useMapSync({
     useEffect(() => { selectedFeatureIdsRef.current = selectedFeatureIds; }, [selectedFeatureIds]);
     useEffect(() => { applyGeometryBindingFilterRef.current = applyGeometryBindingFilter; }, [applyGeometryBindingFilter]);
     useEffect(() => { fitToDraftBoundsRef.current = fitToDraftBounds; }, [fitToDraftBounds]);
-    useEffect(() => { highlightFeaturesRef.current = highlightFeatures || null; }, [highlightFeatures]);
     useEffect(() => { imageOverlayRef.current = imageOverlay || null; }, [imageOverlay]);
     useEffect(() => { focusFeatureCollectionRef.current = focusFeatureCollection; }, [focusFeatureCollection]);
     useEffect(() => { focusPaddingRef.current = focusPadding; }, [focusPadding]);
@@ -102,8 +98,7 @@ export function useMapSync({
     const applyRenderDraftToMap = useCallback((
         renderFc: FeatureCollection,
         labelContextOverride?: FeatureCollection,
-        selectedIdsOverride?: (string | number)[],
-        highlightFeaturesOverride?: FeatureCollection | null
+        selectedIdsOverride?: (string | number)[]
     ) => {
         const map = mapRef.current;
         if (!map) return;
@@ -122,12 +117,9 @@ export function useMapSync({
 
         const labelContext = labelContextOverride || labelContextDraftRef.current || renderFc;
         const currentSelectedIds = selectedIdsOverride || selectedFeatureIdsRef.current;
-        const highlightFeaturesVal = highlightFeaturesOverride !== undefined
-            ? highlightFeaturesOverride
-            : highlightFeaturesRef.current;
 
         const bindingFilteredRenderDraft = applyGeometryBindingFilterRef.current
-            ? filterDraftByBinding(renderFc, currentSelectedIds, highlightFeaturesVal)
+            ? filterDraftByBinding(renderFc, currentSelectedIds)
             : renderFc;
         const visibilityFilteredDraft = filterDraftByGeometryVisibility(bindingFilteredRenderDraft, geometryVisibilityRef.current);
         const mapSourceDraft = decorateFeaturesWithEntityColors(visibilityFilteredDraft);
@@ -157,15 +149,7 @@ export function useMapSync({
         }
     }, [mapRef]);
 
-    const applyHighlightToMap = useCallback((fc: FeatureCollection) => {
-        const map = mapRef.current;
-        if (!map) return;
 
-        const source = map.getSource("entity-focus") as maplibregl.GeoJSONSource | undefined;
-        if (!source) return;
-        source.setData(fc);
-        moveHighlightLayersToTop(map);
-    }, [mapRef]);
 
     const tryCenterToUserLocation = useCallback(() => {
         if (geolocationCenteredRef.current) return;
@@ -198,12 +182,7 @@ export function useMapSync({
         applyBackgroundLayerVisibility(map, backgroundVisibility);
     }, [backgroundVisibility, mapRef]);
 
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || !map.isStyleLoaded()) return;
-        const source = map.getSource("entity-focus") as maplibregl.GeoJSONSource | undefined;
-        source?.setData(highlightFeatures || EMPTY_FEATURE_COLLECTION);
-    }, [highlightFeatures, mapRef]);
+
 
     useEffect(() => {
         const map = mapRef.current;
@@ -212,7 +191,7 @@ export function useMapSync({
     }, [imageOverlay, mapRef]);
 
     useEffect(() => {
-        applyRenderDraftToMap(renderDraft, labelContextDraft, selectedFeatureIds, highlightFeatures);
+        applyRenderDraftToMap(renderDraft, labelContextDraft, selectedFeatureIds);
         const editingId = editingEngineRef.current?.editingRef?.current?.id;
         if (allowGeometryEditing && editingId !== undefined && editingId !== null) {
             const stillExists = renderDraft.features.some((f) => f.properties.id === editingId);
@@ -228,7 +207,6 @@ export function useMapSync({
         selectedFeatureIds,
         applyGeometryBindingFilter,
         geometryVisibility,
-        highlightFeatures,
         applyRenderDraftToMap,
         editingEngineRef,
     ]);
@@ -266,7 +244,6 @@ export function useMapSync({
 
     return {
         applyRenderDraftToMap,
-        applyHighlightToMap,
         tryCenterToUserLocation,
         applyImageOverlayToMap: () => {
             const map = mapRef.current;
@@ -276,11 +253,4 @@ export function useMapSync({
     };
 }
 
-function moveHighlightLayersToTop(map: maplibregl.Map) {
-    const layerIds = ["entity-focus-fill", "entity-focus-line", "entity-focus-points"];
-    for (const layerId of layerIds) {
-        if (map.getLayer(layerId)) {
-            map.moveLayer(layerId);
-        }
-    }
-}
+

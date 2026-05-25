@@ -22,6 +22,7 @@ type LineGeotypeStyle = {
     arrowOpacity?: number;
     arrowOutlineColor?: string;
     arrowOutlineWidth?: ZoomStops;
+    showLine?: boolean;
 };
 
 type PolygonGeotypeStyle = {
@@ -64,7 +65,7 @@ export function buildLineGeotypeLayers(
         paint: {
             "line-color": statusColor(style.color),
             "line-width": widthStops(style.width ?? DEFAULT_LINE_WIDTH),
-            "line-opacity": style.opacity ?? 0.9,
+            "line-opacity": style.showLine === false ? 0 : (style.opacity ?? 0.9),
             ...(style.dasharray ? { "line-dasharray": style.dasharray } : {}),
         },
     };

@@ -13,7 +13,7 @@ import { useMapInteraction } from "./map/useMapInteraction";
 import { useMapSync } from "./map/useMapSync";
 import { bindImageOverlayInteractions, type MapImageOverlay } from "./map/imageOverlay";
 
-export type MapHoverPayload = {
+export type MapFeaturePayload = {
     featureId: string | number;
     feature: Feature | null;
     point: { x: number; y: number };
@@ -29,6 +29,7 @@ export type MapHandle = {
         projection: string;
     } | null;
     getMap: () => import("maplibre-gl").Map | null;
+    setGlobeProjection: (isGlobe: boolean) => void;
 };
 
 type MapProps = {
@@ -53,8 +54,7 @@ type MapProps = {
     height?: CSSProperties["height"];
     fitToDraftBounds?: boolean;
     fitBoundsKey?: string | number | null;
-    onHoverFeatureChange?: ((payload: MapHoverPayload | null) => void) | undefined;
-    highlightFeatures?: FeatureCollection | null;
+    onFeatureClick?: ((payload: MapFeaturePayload | null) => void) | undefined;
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
@@ -62,6 +62,10 @@ type MapProps = {
     onImageOverlayChange?: (overlay: MapImageOverlay) => void;
     onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void;
     showViewportControls?: boolean;
+    isPreviewMode?: boolean;
+    onEnterPreview?: () => void;
+    onExitPreview?: () => void;
+    onPlayPreviewReplay?: () => void;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -83,8 +87,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     height = "100vh",
     fitToDraftBounds = false,
     fitBoundsKey = null,
-    onHoverFeatureChange,
-    highlightFeatures = null,
+    onFeatureClick,
     focusFeatureCollection = null,
     focusRequestKey = null,
     focusPadding,
@@ -92,6 +95,10 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     onImageOverlayChange,
     onBindGeometries,
     showViewportControls = true,
+    isPreviewMode = false,
+    onEnterPreview,
+    onExitPreview,
+    onPlayPreviewReplay,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
@@ -101,8 +108,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     const onSelectFeatureIdsRef = useRef(onSelectFeatureIds);
     // Ref callback đổi mode mới nhất, dùng khi map interaction chuyển sang replay/select.
     const onSetModeRef = useRef(onSetMode);
-    // Ref callback hover mới nhất cho tooltip/panel ngoài map.
-    const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
+    // Ref callback click feature mới nhất cho tooltip/panel ngoài map.
+    const onFeatureClickRef = useRef<MapProps["onFeatureClick"]>(onFeatureClick);
     // Ref callback create mới nhất khi drawing engine tạo feature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
     // Ref callback delete mới nhất khi editing engine xóa feature.
@@ -122,7 +129,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
     useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
-    useEffect(() => { onHoverFeatureChangeRef.current = onHoverFeatureChange; }, [onHoverFeatureChange]);
+    useEffect(() => { onFeatureClickRef.current = onFeatureClick; }, [onFeatureClick]);
     useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
     useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
     useEffect(() => { onHideRef.current = onHideFeature; }, [onHideFeature]);
@@ -153,7 +160,10 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     useImperativeHandle(ref, () => ({
         getViewState,
         getMap: () => mapRef.current,
-    }), [getViewState, mapRef]);
+        setGlobeProjection: (isGlobe: boolean) => {
+            setIsGlobeProjection(isGlobe);
+        },
+    }), [getViewState, mapRef, setIsGlobeProjection]);
 
     // Hook gắn/dọn các interaction vẽ, chọn, sửa geometry.
     const {
@@ -173,14 +183,13 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         onDeleteRef,
         onHideRef,
         onUpdateRef,
-        onHoverFeatureChangeRef,
+        onFeatureClickRef,
         onBindGeometriesRef,
     });
 
     // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.
     const {
         applyRenderDraftToMap,
-        applyHighlightToMap,
         applyImageOverlayToMap,
         tryCenterToUserLocation,
     } = useMapSync({
@@ -194,7 +203,6 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         applyGeometryBindingFilter,
         fitToDraftBounds,
         fitBoundsKey,
-        highlightFeatures,
         focusFeatureCollection,
         focusRequestKey,
         focusPadding,
@@ -208,7 +216,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         const map = mapRef.current;
         if (!map || !isMapLoaded) return;
 
-        setupMapLayers(map, backgroundVisibility, highlightFeatures, applyHighlightToMap);
+        setupMapLayers(map, backgroundVisibility);
         applyImageOverlayToMap();
         setupMapInteractions(map);
         applyRenderDraftToMap(renderDraftRef.current);
@@ -363,9 +371,62 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                         >
                             {isGlobeProjection ? "Globe" : "Flat"}
                         </span>
-                    </label>
+	                    </label>
 
-                    <button
+	                    {onEnterPreview || onExitPreview ? (
+	                        <button
+	                            type="button"
+	                            onClick={isPreviewMode ? onExitPreview : onEnterPreview}
+	                            style={{
+	                                ...zoomButtonStyle,
+	                                width: "auto",
+	                                minWidth: "76px",
+	                                padding: "0 12px",
+	                                background: isPreviewMode ? "#334155" : "#166534",
+	                                fontWeight: 800,
+	                            }}
+	                            aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
+	                            title={isPreviewMode ? "Thoat preview" : "Xem nhu nguoi dung"}
+	                        >
+	                            {isPreviewMode ? "Editor" : "Preview"}
+	                        </button>
+	                    ) : null}
+
+	                    {onPlayPreviewReplay ? (
+	                        <button
+	                            type="button"
+	                            onClick={onPlayPreviewReplay}
+	                            style={{
+	                                ...zoomButtonStyle,
+	                                width: "auto",
+	                                minWidth: "64px",
+	                                padding: "0 12px",
+	                                display: "inline-flex",
+	                                alignItems: "center",
+	                                justifyContent: "center",
+	                                gap: "7px",
+	                                background: "#2563eb",
+	                                fontSize: "13px",
+	                                fontWeight: 800,
+	                            }}
+	                            aria-label="Play selected replay"
+	                            title="Play replay của geometry đang chọn"
+	                        >
+	                            <span
+	                                aria-hidden="true"
+	                                style={{
+	                                    width: 0,
+	                                    height: 0,
+	                                    borderTop: "5px solid transparent",
+	                                    borderBottom: "5px solid transparent",
+	                                    borderLeft: "8px solid currentColor",
+	                                }}
+	                            />
+	                            Play
+	                        </button>
+	                    ) : null}
+
+	                    <button
                         type="button"
                         onClick={() => handleZoomByStep(-0.8)}
                         style={zoomButtonStyle}

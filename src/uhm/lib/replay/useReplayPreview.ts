@@ -45,6 +45,7 @@ type UseReplayPreviewOptions = {
     selectedStageId: number | null;
     selectedStepIndex: number | null;
     onSelectStep: (stageId: number | null, stepIndex: number | null) => void;
+    setMapProjection?: (type: "globe" | "mercator") => void;
 };
 
 export function useReplayPreview({
@@ -57,6 +58,7 @@ export function useReplayPreview({
     selectedStageId,
     selectedStepIndex,
     onSelectStep,
+    setMapProjection,
 }: UseReplayPreviewOptions) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -172,9 +174,13 @@ export function useReplayPreview({
         if (map) {
             mapActions.restore_label_visibility(map, baseline.labelVisibility);
             if (baseline.mapViewState) {
-                map.setProjection({
-                    type: baseline.mapViewState.projection === "globe" ? "globe" : "mercator",
-                });
+                if (setMapProjection) {
+                    setMapProjection(baseline.mapViewState.projection === "globe" ? "globe" : "mercator");
+                } else {
+                    map.setProjection({
+                        type: baseline.mapViewState.projection === "globe" ? "globe" : "mercator",
+                    });
+                }
                 mapActions.set_camera_view(map, {
                     center: baseline.mapViewState.center,
                     zoom: baseline.mapViewState.zoom,
@@ -184,7 +190,7 @@ export function useReplayPreview({
                 });
             }
         }
-    }, [getMapInstance, resetPresentation]);
+    }, [getMapInstance, resetPresentation, setMapProjection]);
 
     const resetPreview = useCallback(() => {
         runIdRef.current += 1;

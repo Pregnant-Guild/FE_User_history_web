@@ -9,8 +9,8 @@ import { initCircle } from "@/uhm/lib/map/engines/circleEngine";
 import { createEditingEngine } from "@/uhm/lib/map/engines/editingEngine";
 import { FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
-import { buildClientFeatureId, getSelectableLayers } from "./mapUtils";
-import { MapHoverPayload } from "../Map";
+import { buildClientFeatureId } from "./mapUtils";
+import type { MapFeaturePayload } from "../Map";
 
 type EngineBinding = {
     cleanup: () => void;
@@ -34,7 +34,7 @@ type UseMapInteractionProps = {
     onDeleteRef: React.MutableRefObject<((id: string | number | (string | number)[]) => void) | undefined>;
     onHideRef: React.MutableRefObject<((id: string | number) => void) | undefined>;
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
-    onHoverFeatureChangeRef: React.MutableRefObject<((payload: MapHoverPayload | null) => void) | undefined>;
+    onFeatureClickRef: React.MutableRefObject<((payload: MapFeaturePayload | null) => void) | undefined>;
     onBindGeometriesRef?: React.MutableRefObject<((targetId: string | number, sourceIds: (string | number)[]) => void) | undefined>;
 };
 
@@ -51,7 +51,7 @@ export function useMapInteraction({
     onDeleteRef,
     onHideRef,
     onUpdateRef,
-    onHoverFeatureChangeRef,
+    onFeatureClickRef,
     onBindGeometriesRef,
 }: UseMapInteractionProps) {
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
@@ -69,7 +69,7 @@ export function useMapInteraction({
     }, [mapRef, onUpdateRef]);
 
     useEffect(() => {
-        const allowsSelectionMode = mode === "select" || mode === "replay";
+        const allowsSelectionMode = mode === "select" || mode === "replay" || mode === "preview" || mode === "replay_preview";
         if (!allowsSelectionMode || !selectedFeatureIds || selectedFeatureIds.length === 0) {
             editingEngineRef.current?.clearEditing();
             // Clear the internal selection state of the select engine to stay in sync with React state
@@ -183,7 +183,23 @@ export function useMapInteraction({
             (ids) => onSelectFeatureIdsRef.current?.(ids),
             (id: string | number) => onSetModeRef.current?.("replay", id),
             () => Boolean(editingEngineRef.current?.editingRef.current),
-            (targetId, sourceIds) => onBindGeometriesRef?.current?.(targetId, sourceIds)
+            (targetId, sourceIds) => onBindGeometriesRef?.current?.(targetId, sourceIds),
+            (payload) => {
+                if (!payload) {
+                    onFeatureClickRef.current?.(null);
+                    return;
+                }
+
+                const currentFeature =
+                    renderDraftRef.current.features.find(
+                        (item) => String(item.properties.id) === String(payload.featureId)
+                    ) || null;
+
+                onFeatureClickRef.current?.({
+                    ...payload,
+                    feature: currentFeature,
+                });
+            }
         );
 
         const cleanupPoint = initPoint(
@@ -277,7 +293,9 @@ export function useMapInteraction({
         engineBindingsRef.current = {
             draw: drawingEngine,
             select: selectEngine,
+            preview: selectEngine,
             replay: selectEngine,
+            replay_preview: selectEngine,
             "add-line": lineEngine,
             "add-path": pathEngine,
             "add-circle": circleEngine,
@@ -291,52 +309,6 @@ export function useMapInteraction({
             selectEngine.cleanup,
             drawingEngine.cleanup
         );
-
-        const handleHoverMove = (event: maplibregl.MapMouseEvent) => {
-            const callback = onHoverFeatureChangeRef.current;
-            if (!callback) return;
-
-            const selectableLayers = getSelectableLayers(map);
-            if (!selectableLayers.length) {
-                callback(null);
-                return;
-            }
-
-            const features = map.queryRenderedFeatures(event.point, {
-                layers: selectableLayers,
-            }) as maplibregl.MapGeoJSONFeature[];
-
-            const feature = features[0];
-            const rawFeatureId = feature?.id ?? feature?.properties?.id;
-            if (rawFeatureId === undefined || rawFeatureId === null) {
-                callback(null);
-                return;
-            }
-
-            const currentFeature =
-                renderDraftRef.current.features.find(
-                    (item) => String(item.properties.id) === String(rawFeatureId)
-                ) || null;
-
-            callback({
-                featureId: rawFeatureId,
-                feature: currentFeature,
-                point: { x: event.point.x, y: event.point.y },
-                lngLat: { lng: event.lngLat.lng, lat: event.lngLat.lat },
-            });
-        };
-
-        const handleCanvasMouseLeave = () => {
-            onHoverFeatureChangeRef.current?.(null);
-        };
-
-        map.on("mousemove", handleHoverMove);
-        mapCleanupFnsRef.current.push(() => map.off("mousemove", handleHoverMove));
-
-        map.getCanvasContainer().addEventListener("mouseleave", handleCanvasMouseLeave);
-        mapCleanupFnsRef.current.push(() => {
-            map.getCanvasContainer().removeEventListener("mouseleave", handleCanvasMouseLeave);
-        });
 
         if (allowGeometryEditing) {
             editingEngineRef.current?.bindEditEvents(map);

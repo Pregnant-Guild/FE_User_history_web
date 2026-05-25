@@ -9,5 +9,6 @@ export function getTradeRouteLayers(sourceId: string, pathArrowSourceId?: string
         strokeColor: "#854d0e",
         dasharray: [5, 3],
         arrowOpacity: 0.78,
+        showLine: false,
     });
 }

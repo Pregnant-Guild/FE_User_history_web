@@ -77,7 +77,7 @@ Checklist này dùng sau mỗi lần sửa editor. Không thay thế typecheck/l
 - Undo trong replay mode chỉ undo replay session, không undo main geometry.
 - Play preview:
   - Step selection chạy đúng thứ tự.
-  - Stop/reset khôi phục title/dialog/image/hidden geometry/timeline/map camera cơ bản.
+  - Stop/reset khôi phục title/dialog/image/hidden geometry/timeline/map camera cơ bản và projection (Globe/Flat) ban đầu.
 - Thoát replay rồi vào lại, detail vẫn còn nếu chưa undo.
 
 ## 8. Import GEO từ search
@@ -121,7 +121,7 @@ Các thao tác sau không được thêm undo action và không làm tăng pendi
 - Resize panel.
 - Search query.
 - Pick/paste/remove image overlay trace.
-- Replay preview play/stop/reset.
+- Replay preview play/stop/reset (khôi phục hoàn toàn camera view state và projection của editor ban đầu).
 
 ## 12. Final smoke
 

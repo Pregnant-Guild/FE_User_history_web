@@ -194,41 +194,21 @@ export default function ReplayPreviewLayerPanel({
         outline: "none",
     });
 
-    const renderTooltipStyles = () => (
+    const renderStyles = () => (
         <style dangerouslySetInnerHTML={{ __html: `
-            .${buttonClassName} {
-                position: relative;
+            .replay-preview-layer-panel::-webkit-scrollbar {
+                display: none;
             }
-            .${buttonClassName}::after {
-                content: attr(data-tooltip);
-                position: absolute;
-                left: 100%;
-                top: 50%;
-                transform: translateY(-50%) scale(0.9);
-                margin-left: 10px;
-                padding: 6px 10px;
-                background: rgba(15, 23, 42, 0.95);
-                border: 1px solid rgba(148, 163, 184, 0.25);
-                color: #f8fafc;
-                font-size: 11px;
-                font-weight: 800;
-                white-space: nowrap;
-                border-radius: 8px;
-                box-shadow: 0 10px 25px rgba(2, 6, 23, 0.5);
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.15s ease, transform 0.15s ease;
-                z-index: 999;
-            }
-            .${buttonClassName}:hover::after {
-                opacity: 1;
-                transform: translateY(-50%) scale(1);
+            .replay-preview-layer-panel {
+                scrollbar-width: none;
+                -ms-overflow-style: none;
             }
         `}} />
     );
 
     return (
         <div
+            className="replay-preview-layer-panel"
             style={{
                 display: "flex",
                 flexDirection: "column",
@@ -237,15 +217,16 @@ export default function ReplayPreviewLayerPanel({
                 border: "1px solid rgba(148, 163, 184, 0.22)",
                 borderRadius: 20,
                 padding: "14px 10px",
-                width: 100,
+                width: 58,
                 alignItems: "center",
                 boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
                 backdropFilter: "blur(12px)",
                 maxHeight: "calc(100vh - 180px)",
                 overflowY: "auto",
+                overflowX: "hidden",
             }}
         >
-            {renderTooltipStyles()}
+            {renderStyles()}
 
             {/* Background layers */}
             <div style={groupHeaderStyle}>Map</div>
@@ -256,8 +237,7 @@ export default function ReplayPreviewLayerPanel({
                         <button
                             key={layer.id}
                             type="button"
-                            className={buttonClassName}
-                            data-tooltip={layer.label}
+                            title={layer.label}
                             onClick={() => onToggleBackground(layer.id)}
                             style={getButtonStyles(active, "56, 189, 248")} // sky-400
                         >
@@ -279,8 +259,7 @@ export default function ReplayPreviewLayerPanel({
                         <button
                             key={typeKey}
                             type="button"
-                            className={buttonClassName}
-                            data-tooltip={label}
+                            title={label}
                             onClick={() => onToggleGeometry(typeKey)}
                             style={getButtonStyles(active, "249, 115, 22")} // orange-500
                         >
@@ -302,8 +281,7 @@ export default function ReplayPreviewLayerPanel({
                         <button
                             key={typeKey}
                             type="button"
-                            className={buttonClassName}
-                            data-tooltip={label}
+                            title={label}
                             onClick={() => onToggleGeometry(typeKey)}
                             style={getButtonStyles(active, "192, 132, 252")} // purple-400
                         >
@@ -325,8 +303,7 @@ export default function ReplayPreviewLayerPanel({
                         <button
                             key={typeKey}
                             type="button"
-                            className={buttonClassName}
-                            data-tooltip={label}
+                            title={label}
                             onClick={() => onToggleGeometry(typeKey)}
                             style={getButtonStyles(active, "245, 158, 11")} // amber-500
                         >
@@ -352,7 +329,7 @@ const groupHeaderStyle: React.CSSProperties = {
 
 const gridStyle: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "1fr",
     gap: 8,
     width: "100%",
 };

@@ -9,5 +9,6 @@ export function getMigrationRouteLayers(sourceId: string, pathArrowSourceId?: st
         strokeColor: "#065f46",
         dasharray: [4, 3],
         arrowOpacity: 0.76,
+        showLine: false,
     });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import "react-quill-new/dist/quill.snow.css";
 
 import type { Entity } from "@/uhm/api/entities";
 import type { Wiki } from "@/uhm/api/wikis";
@@ -238,34 +239,101 @@ export default function PublicWikiSidebar({
 
     return (
         <div
-            style={{ width: `${width}px` }}
-            className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+            style={{
+                width: `${width}px`,
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+                minHeight: 0,
+                overflow: "hidden",
+                borderRadius: 20,
+                border: "1px solid rgba(148, 163, 184, 0.22)",
+                background: "linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85))",
+                boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
+                backdropFilter: "blur(12px)",
+                position: "relative",
+            }}
         >
             {/* Drag Handle on the left edge */}
             <div
                 onPointerDown={handlePointerDown}
-                className="absolute left-0 top-0 bottom-0 w-[6px] cursor-col-resize z-50 group select-none hover:bg-black/[0.03] dark:hover:bg-white/[0.02]"
+                style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 6,
+                    cursor: "col-resize",
+                    zIndex: 50,
+                    userSelect: "none",
+                }}
+                className="group"
                 title="Kéo để chỉnh kích thước"
             >
                 {/* Visual drag line overlay */}
-                <div className="absolute left-[2px] top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-brand-500/50 group-active:bg-brand-500 transition-colors" />
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 2,
+                        top: 0,
+                        bottom: 0,
+                        width: 2,
+                        background: "transparent",
+                        transition: "background-color 0.2s",
+                    }}
+                    className="group-hover:bg-sky-500/50 group-active:bg-sky-500"
+                />
             </div>
-            <div className="border-b border-gray-200 px-4 py-4 dark:border-gray-800">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+            <div
+                style={{
+                    borderBottom: "1px solid rgba(148, 163, 184, 0.15)",
+                    padding: "16px",
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                        <div
+                            style={{
+                                fontSize: 10,
+                                textTransform: "uppercase",
+                                letterSpacing: "1.2px",
+                                fontWeight: 900,
+                                color: "#94a3b8",
+                            }}
+                        >
                             Wiki
                         </div>
-                        <div className="mt-1 text-lg font-semibold leading-tight text-gray-900 dark:text-gray-100">
+                        <div
+                            style={{
+                                marginTop: 4,
+                                fontSize: 18,
+                                fontWeight: 700,
+                                lineHeight: 1.3,
+                                color: "#f8fafc",
+                            }}
+                        >
                             {entity?.name?.trim() || wiki?.title?.trim() || "Wiki"}
                         </div>
                         {entity?.description?.trim() ? (
-                            <div className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                            <div
+                                style={{
+                                    marginTop: 8,
+                                    fontSize: 13,
+                                    lineHeight: 1.5,
+                                    color: "#cbd5e1",
+                                }}
+                            >
                                 {entity.description.trim()}
                             </div>
                         ) : null}
                         {wiki?.title?.trim() && wiki.title.trim() !== entity?.name?.trim() ? (
-                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <div
+                                style={{
+                                    marginTop: 6,
+                                    fontSize: 12,
+                                    color: "#94a3b8",
+                                }}
+                            >
                                 {wiki.title.trim()}
                             </div>
                         ) : null}
@@ -274,7 +342,22 @@ export default function PublicWikiSidebar({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-sm text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-100"
+                        style={{
+                            display: "inline-flex",
+                            height: 28,
+                            width: 28,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: "50%",
+                            border: "1px solid rgba(148, 163, 184, 0.25)",
+                            background: "rgba(30, 41, 59, 0.4)",
+                            color: "#94a3b8",
+                            cursor: "pointer",
+                            fontSize: 12,
+                            transition: "all 0.2s",
+                            outline: "none",
+                        }}
+                        className="hover:bg-slate-700/50 hover:text-slate-100"
                         aria-label="Close wiki sidebar"
                     >
                         x
@@ -283,18 +366,44 @@ export default function PublicWikiSidebar({
             </div>
 
             {toc.length ? (
-                <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-800">
-                    <div className="flex gap-2 overflow-x-auto pb-1">
+                <div
+                    style={{
+                        borderBottom: "1px solid rgba(148, 163, 184, 0.15)",
+                        padding: "8px 12px",
+                    }}
+                >
+                    <div
+                        className="uhm-public-wiki-toc-list"
+                        style={{
+                            display: "flex",
+                            gap: 8,
+                            overflowX: "auto",
+                            paddingBottom: 4,
+                        }}
+                    >
                         {toc.slice(0, 8).map((item) => {
                             const isActive = effectiveActiveHeadingId === item.id;
                             return (
                                 <a
                                     key={item.id}
                                     href={`#${item.id}`}
-                                    className={`shrink-0 rounded-full px-3 py-1 text-xs transition ${isActive
-                                            ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
-                                            : "bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                                        }`}
+                                    style={{
+                                        flexShrink: 0,
+                                        borderRadius: 9999,
+                                        padding: "4px 10px",
+                                        fontSize: 11,
+                                        fontWeight: 650,
+                                        textDecoration: "none",
+                                        transition: "all 0.2s",
+                                        background: isActive
+                                            ? "rgba(56, 189, 248, 0.15)"
+                                            : "rgba(30, 41, 59, 0.4)",
+                                        color: isActive ? "#38bdf8" : "#94a3b8",
+                                        border: isActive
+                                            ? "1px solid rgba(56, 189, 248, 0.3)"
+                                            : "1px solid rgba(148, 163, 184, 0.1)",
+                                    }}
+                                    className={isActive ? "" : "hover:bg-slate-700/40 hover:text-slate-200"}
                                 >
                                     {item.text}
                                 </a>
@@ -304,31 +413,74 @@ export default function PublicWikiSidebar({
                 </div>
             ) : null}
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                className="uhm-public-wiki-sidebar-content"
+                style={{
+                    minHeight: 0,
+                    flex: 1,
+                    overflowY: "auto",
+                }}
+            >
                 {isLoading ? (
-                    <div className="space-y-3 px-4 py-4">
-                        <div className="h-4 w-28 animate-pulse rounded bg-gray-100 dark:bg-white/[0.06]" />
-                        <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-white/[0.06]" />
-                        <div className="h-4 w-4/5 animate-pulse rounded bg-gray-100 dark:bg-white/[0.06]" />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+                        <div
+                            style={{ height: 16, width: 110, borderRadius: 4, background: "rgba(148, 163, 184, 0.15)" }}
+                            className="animate-pulse"
+                        />
+                        <div
+                            style={{ height: 16, width: "100%", borderRadius: 4, background: "rgba(148, 163, 184, 0.15)" }}
+                            className="animate-pulse"
+                        />
+                        <div
+                            style={{ height: 16, width: "80%", borderRadius: 4, background: "rgba(148, 163, 184, 0.15)" }}
+                            className="animate-pulse"
+                        />
                     </div>
                 ) : error ? (
-                    <div className="px-4 py-4 text-sm text-red-600 dark:text-red-300">
+                    <div style={{ padding: 16, fontSize: 14, color: "#f87171" }}>
                         {error}
                     </div>
                 ) : wiki ? (
                     <div
                         ref={contentRootRef}
-                        className="uhm-wiki-sidebar-view ql-editor text-sm text-gray-900 dark:text-gray-100"
+                        className="uhm-wiki-sidebar-view ql-editor"
+                        style={{ fontSize: 14, color: "#cbd5e1" }}
                         dangerouslySetInnerHTML={{ __html: renderHtml }}
                     />
                 ) : (
-                    <div className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                    <div style={{ padding: 16, fontSize: 14, color: "#94a3b8" }}>
                         Entity này chưa có wiki liên kết.
                     </div>
                 )}
             </div>
 
             <style jsx global>{`
+                .uhm-public-wiki-sidebar-content::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .uhm-public-wiki-sidebar-content::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .uhm-public-wiki-sidebar-content::-webkit-scrollbar-thumb {
+                    background: rgba(148, 163, 184, 0.22);
+                    border-radius: 3px;
+                }
+                .uhm-public-wiki-sidebar-content::-webkit-scrollbar-thumb:hover {
+                    background: rgba(148, 163, 184, 0.4);
+                }
+                .uhm-public-wiki-toc-list::-webkit-scrollbar {
+                    height: 4px;
+                }
+                .uhm-public-wiki-toc-list::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .uhm-public-wiki-toc-list::-webkit-scrollbar-thumb {
+                    background: rgba(148, 163, 184, 0.22);
+                    border-radius: 2px;
+                }
+                .uhm-public-wiki-toc-list::-webkit-scrollbar-thumb:hover {
+                    background: rgba(148, 163, 184, 0.4);
+                }
                 .uhm-wiki-sidebar-view.ql-editor {
                     height: auto;
                     overflow-y: visible;
@@ -338,6 +490,7 @@ export default function PublicWikiSidebar({
                     word-wrap: break-word;
                     word-break: break-word;
                     overflow-wrap: break-word;
+                    color: #cbd5e1 !important;
                 }
                 .uhm-wiki-sidebar-view.ql-editor p {
                     margin: 0 0 0.75em;
@@ -347,12 +500,14 @@ export default function PublicWikiSidebar({
                     font-size: 1.6em;
                     font-weight: 800;
                     line-height: 1.2;
+                    color: #f8fafc !important;
                 }
                 .uhm-wiki-sidebar-view.ql-editor h2 {
                     margin: 1.05em 0 0.55em;
                     font-size: 1.3em;
                     font-weight: 800;
                     line-height: 1.25;
+                    color: #f8fafc !important;
                 }
                 .uhm-wiki-sidebar-view.ql-editor h3,
                 .uhm-wiki-sidebar-view.ql-editor h4,
@@ -362,6 +517,7 @@ export default function PublicWikiSidebar({
                     font-size: 1.05em;
                     font-weight: 700;
                     line-height: 1.3;
+                    color: #f8fafc !important;
                 }
                 .uhm-wiki-sidebar-view.ql-editor ul,
                 .uhm-wiki-sidebar-view.ql-editor ol {
@@ -371,45 +527,53 @@ export default function PublicWikiSidebar({
                 .uhm-wiki-sidebar-view.ql-editor blockquote {
                     margin: 0 0 0.75em;
                     padding-left: 12px;
-                    border-left: 3px solid rgba(148, 163, 184, 0.6);
-                    color: rgba(71, 85, 105, 1);
-                }
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor blockquote {
-                    border-left-color: rgba(100, 116, 139, 0.6);
+                    border-left: 3px solid rgba(148, 163, 184, 0.4);
                     color: rgba(203, 213, 225, 0.95);
                 }
                 .uhm-wiki-sidebar-view.ql-editor pre {
                     margin: 0 0 0.75em;
                     padding: 12px 14px;
-                    border: 1px solid rgba(226, 232, 240, 1);
+                    border: 1px solid rgba(148, 163, 184, 0.22);
                     border-radius: 10px;
-                    background: rgba(248, 250, 252, 1);
+                    background: rgba(15, 23, 42, 0.4);
                     overflow-x: auto;
                     white-space: pre-wrap;
                     word-break: break-all;
+                    color: #cbd5e1;
                 }
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor pre {
-                    border-color: rgba(51, 65, 85, 1);
-                    background: rgba(2, 6, 23, 0.4);
-                }
-                .uhm-wiki-sidebar-view.ql-editor img {
-                    display: block !important;
-                    max-width: 100% !important;
-                    height: auto !important;
-                    border-radius: 8px;
-                    float: none !important;
-                    margin: 1.25em auto !important;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                }
+                 .uhm-wiki-sidebar-view.ql-editor img {
+                     max-width: 100%;
+                     height: auto;
+                     border-radius: 8px;
+                     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                 }
+                 .uhm-wiki-sidebar-view.ql-editor img[style*="float: left"],
+                 .uhm-wiki-sidebar-view.ql-editor img.ql-align-left {
+                     float: left !important;
+                     margin: 4px 14px 14px 0px !important;
+                     display: inline !important;
+                 }
+                 .uhm-wiki-sidebar-view.ql-editor img[style*="float: right"],
+                 .uhm-wiki-sidebar-view.ql-editor img.ql-align-right {
+                     float: right !important;
+                     margin: 4px 0px 14px 14px !important;
+                     display: inline !important;
+                 }
+                 .uhm-wiki-sidebar-view.ql-editor img[style*="display: block"],
+                 .uhm-wiki-sidebar-view.ql-editor img.ql-align-center {
+                     display: block !important;
+                     margin: 1.25em auto !important;
+                 }
                 .uhm-wiki-sidebar-view.ql-editor a {
                     text-decoration: underline;
                     text-underline-offset: 2px;
                 }
                 .uhm-wiki-sidebar-view.ql-editor a[href]:not([href=""]):not([href="__missing__"]) {
-                    color: #2563eb;
+                    color: #38bdf8 !important;
+                    transition: color 0.15s ease;
                 }
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a[href]:not([href=""]):not([href="__missing__"]) {
-                    color: #60a5fa;
+                .uhm-wiki-sidebar-view.ql-editor a[href]:not([href=""]):not([href="__missing__"]):hover {
+                    color: #7dd3fc !important;
                 }
                 .uhm-wiki-sidebar-view.ql-editor a[href="__missing__"] {
                     cursor: default;
@@ -418,12 +582,7 @@ export default function PublicWikiSidebar({
                 .uhm-wiki-sidebar-view.ql-editor a:not([href]),
                 .uhm-wiki-sidebar-view.ql-editor a[href=""],
                 .uhm-wiki-sidebar-view.ql-editor a[href="__missing__"] {
-                    color: #dc2626;
-                }
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a:not([href]),
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a[href=""],
-                :is(.dark *) .uhm-wiki-sidebar-view.ql-editor a[href="__missing__"] {
-                    color: #f87171;
+                    color: #f87171 !important;
                 }
                 @media (max-width: 640px) {
                     .uhm-wiki-sidebar-view.ql-editor {
