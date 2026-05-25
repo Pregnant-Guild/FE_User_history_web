@@ -44,6 +44,7 @@ type UseMapSyncProps = {
         clearEditing: () => void;
     } | null>;
     geolocationCenteredRef: React.MutableRefObject<boolean>;
+    isPreviewMode?: boolean;
 };
 
 export function useMapSync({
@@ -64,6 +65,7 @@ export function useMapSync({
     allowGeometryEditing,
     editingEngineRef,
     geolocationCenteredRef,
+    isPreviewMode,
 }: UseMapSyncProps) {
     const renderDraftRef = useRef<FeatureCollection>(renderDraft);
     const labelContextDraftRef = useRef<FeatureCollection | undefined>(labelContextDraft);
@@ -76,6 +78,7 @@ export function useMapSync({
     const imageOverlayRef = useRef<MapImageOverlay | null>(imageOverlay || null);
     const focusFeatureCollectionRef = useRef<FeatureCollection | null | undefined>(focusFeatureCollection);
     const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
+    const isPreviewModeRef = useRef(isPreviewMode);
 
     const fitBoundsAppliedRef = useRef(false);
 
@@ -90,6 +93,7 @@ export function useMapSync({
     useEffect(() => { imageOverlayRef.current = imageOverlay || null; }, [imageOverlay]);
     useEffect(() => { focusFeatureCollectionRef.current = focusFeatureCollection; }, [focusFeatureCollection]);
     useEffect(() => { focusPaddingRef.current = focusPadding; }, [focusPadding]);
+    useEffect(() => { isPreviewModeRef.current = isPreviewMode; }, [isPreviewMode]);
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;
@@ -119,7 +123,7 @@ export function useMapSync({
         const currentSelectedIds = selectedIdsOverride || selectedFeatureIdsRef.current;
 
         const bindingFilteredRenderDraft = applyGeometryBindingFilterRef.current
-            ? filterDraftByBinding(renderFc, currentSelectedIds)
+            ? filterDraftByBinding(renderFc, currentSelectedIds, null, isPreviewModeRef.current)
             : renderFc;
         const visibilityFilteredDraft = filterDraftByGeometryVisibility(bindingFilteredRenderDraft, geometryVisibilityRef.current);
         const mapSourceDraft = decorateFeaturesWithEntityColors(visibilityFilteredDraft);

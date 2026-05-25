@@ -14,6 +14,7 @@ type Props = {
   selectedGeometryTime?: { time_start: number | null; time_end: number | null } | null;
   onToggleBindEntityForSelectedGeometry?: (entityId: string, nextChecked: boolean) => void;
   onRerollEntityId?: (oldId: string, nextId: string) => void;
+  onDeleteEntity?: (entityId: string) => void;
 };
 
 export default function ProjectEntityRefsPanel({
@@ -23,6 +24,7 @@ export default function ProjectEntityRefsPanel({
   selectedGeometryTime,
   onToggleBindEntityForSelectedGeometry,
   onRerollEntityId,
+  onDeleteEntity,
 }: Props) {
   const {
     snapshotEntityRows,
@@ -234,6 +236,28 @@ export default function ProjectEntityRefsPanel({
                     )}
                   </button>
                 ) : null}
+                {typeof onDeleteEntity === "function" ? (
+                  <button
+                    type="button"
+                    title="Xóa thực thể khỏi dự án"
+                    onClick={() => onDeleteEntity(entityId)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      border: "1px solid #334155",
+                      background: "#0b1220",
+                      cursor: "pointer",
+                      flex: "0 0 auto",
+                    }}
+                    aria-label={`Xóa thực thể ${entityId}`}
+                  >
+                    <TrashIcon />
+                  </button>
+                ) : null}
               </div>
             );
           })}
@@ -346,28 +370,53 @@ export default function ProjectEntityRefsPanel({
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => onUpdateEntity!(String(activeEntity.id), {
-              name: editName,
-              description: editDescription.trim().length ? editDescription : null,
-              time_start: editTimeStart,
-              time_end: editTimeEnd,
-            })}
-            disabled={isEntitySubmitting}
-            style={{
-              border: "none",
-              borderRadius: "6px",
-              padding: "7px 8px",
-              cursor: isEntitySubmitting ? "not-allowed" : "pointer",
-              background: "#0f766e",
-              color: "#ffffff",
-              opacity: isEntitySubmitting ? 0.7 : 1,
-              fontWeight: 600,
-            }}
-          >
-            Luu entity
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={() => onUpdateEntity!(String(activeEntity.id), {
+                name: editName,
+                description: editDescription.trim().length ? editDescription : null,
+                time_start: editTimeStart,
+                time_end: editTimeEnd,
+              })}
+              disabled={isEntitySubmitting}
+              style={{
+                flex: 1,
+                border: "none",
+                borderRadius: "6px",
+                padding: "7px 8px",
+                cursor: isEntitySubmitting ? "not-allowed" : "pointer",
+                background: "#0f766e",
+                color: "#ffffff",
+                opacity: isEntitySubmitting ? 0.7 : 1,
+                fontWeight: 600,
+              }}
+            >
+              Luu entity
+            </button>
+            {typeof onDeleteEntity === "function" && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteEntity(String(activeEntity.id));
+                  setActiveEntityId(null);
+                }}
+                disabled={isEntitySubmitting}
+                style={{
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "7px 8px",
+                  cursor: isEntitySubmitting ? "not-allowed" : "pointer",
+                  background: "#7f1d1d",
+                  color: "#fecaca",
+                  opacity: isEntitySubmitting ? 0.7 : 1,
+                  fontWeight: 600,
+                }}
+              >
+                Xóa
+              </button>
+            )}
+          </div>
         </div>
       ) : null}
 
@@ -607,6 +656,20 @@ function ClockIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="8" stroke="#fbbf24" strokeWidth="2" />
       <path d="M12 7v5l3 2" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"
+        stroke="#f87171"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

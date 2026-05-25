@@ -140,7 +140,8 @@ export function getSelectableLayers(map: maplibregl.Map): string[] {
 export function filterDraftByBinding(
     fc: FeatureCollection,
     selectedFeatureIds: (string | number)[],
-    highlightFeatures?: FeatureCollection | null
+    highlightFeatures?: FeatureCollection | null,
+    isPreviewMode?: boolean
 ): FeatureCollection {
     const selectedIds = new Set(selectedFeatureIds.map(String));
     if (highlightFeatures?.features) {
@@ -185,8 +186,8 @@ export function filterDraftByBinding(
             const featureId = String(feature.properties.id);
             const parentId = featureParentMap.get(featureId);
 
-            // 1. If this feature is a parent and its hierarchy is active, hide it
-            if (activeParents.has(featureId)) {
+            // 1. If this feature is a parent and its hierarchy is active, hide it (only in preview/replay modes)
+            if (isPreviewMode && activeParents.has(featureId)) {
                 return false;
             }
 

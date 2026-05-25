@@ -676,17 +676,21 @@ export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: 
                 type="button"
                 onClick={() => removeWiki(w.id)}
                 style={{
-                  border: "none",
-                  background: "#111827",
-                  color: "#fca5a5",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  border: "1px solid #334155",
+                  background: "#0b1220",
                   cursor: "pointer",
-                  borderRadius: "6px",
-                  padding: "6px 8px",
-                  fontSize: "12px",
+                  flex: "0 0 auto",
                 }}
-                title="Remove"
+                title="Xóa wiki khỏi dự án"
+                aria-label={`Xóa wiki ${w.id}`}
               >
-                Del
+                <TrashIcon />
               </button>
             </div>
           ))}
@@ -1059,6 +1063,20 @@ function CloseIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" stroke="#e2e8f0" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"
+        stroke="#f87171"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

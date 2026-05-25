@@ -22,7 +22,8 @@ import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities"
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
 import { fetchWikiById, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
-import { searchGeometriesByEntityName, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
+import { searchGeometriesByEntityName, fetchGeometriesByBBox, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
+import { WORLD_BBOX } from "@/uhm/lib/map/geo/constants";
 import {
     Feature,
     FeatureCollection,
@@ -409,6 +410,13 @@ function EditorPageContent() {
     const [previewExpandedEntityId, setPreviewExpandedEntityId] = useState<string | null>(null);
     const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
     const [isPreviewEntitySidebarOpen, setIsPreviewEntitySidebarOpen] = useState(false);
+
+    const [viewMode, setViewMode] = useState<"local" | "global">("local");
+    const [globalGeometries, setGlobalGeometries] = useState<FeatureCollection>({
+        type: "FeatureCollection",
+        features: [],
+    });
+    const [isGlobalLoading, setIsGlobalLoading] = useState(false);
     const [previewLinkEntityPopup, setPreviewLinkEntityPopup] = useState<PreviewLinkEntityPopupState | null>(null);
     const [previewEntityFocusToken, setPreviewEntityFocusToken] = useState(0);
     const [previewSidebarWidth, setPreviewSidebarWidth] = useState<number>(() => {
@@ -634,6 +642,119 @@ function EditorPageContent() {
 
     // Render draft is the only FeatureCollection that decides what appears on the map.
     // It may be timeline-filtered, replay-filtered, or preview-filtered, but it is not the edit source.
+    // Fetch global geometries when viewMode is "global", timeline year changes, or timeline filter state changes
+    useEffect(() => {
+        if (viewMode !== "global") {
+            return;
+        }
+
+        let disposed = false;
+        setIsGlobalLoading(true);
+
+        const timeVal = activeTimelineFilterEnabled
+            ? clampYearToFixedRange(Math.trunc(activeTimelineYear))
+            : undefined;
+
+        const loadGlobalData = async () => {
+            try {
+                // 1. Fetch all geometries in a single fast query
+                const baseFc = await fetchGeometriesByBBox({
+                    ...WORLD_BBOX,
+                    time: timeVal,
+                    timeRange: activeTimelineFilterEnabled ? 0 : undefined,
+                });
+
+                if (disposed) return;
+                setGlobalGeometries(baseFc);
+
+                // 2. Concurrently fetch per-entity to build the geometry-to-entity mapping
+                const geoToEntities: Record<string, { entity_id: string; entity_name: string; entity_ids: string[] }> = {};
+                
+                const concurrency = 6;
+                const items = [...entities];
+                let nextIndex = 0;
+
+                await Promise.all(
+                    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+                        while (true) {
+                            if (disposed) return;
+                            const idx = nextIndex++;
+                            if (idx >= items.length) return;
+                            const entity = items[idx];
+
+                            try {
+                                const fc = await fetchGeometriesByBBox({
+                                    ...WORLD_BBOX,
+                                    entity_id: entity.id,
+                                    time: timeVal,
+                                    timeRange: activeTimelineFilterEnabled ? 0 : undefined,
+                                });
+
+                                if (disposed) return;
+
+                                for (const feature of fc.features) {
+                                    const gid = String(feature.properties?.id);
+                                    if (!geoToEntities[gid]) {
+                                        geoToEntities[gid] = {
+                                            entity_id: entity.id,
+                                            entity_name: entity.name,
+                                            entity_ids: [entity.id],
+                                        };
+                                    } else {
+                                        if (!geoToEntities[gid].entity_ids.includes(entity.id)) {
+                                            geoToEntities[gid].entity_ids.push(entity.id);
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                console.error(`Error loading geometry mapping for entity ${entity.id}`, e);
+                            }
+                        }
+                    })
+                );
+
+                if (disposed) return;
+
+                // 3. Update the global geometries with the enriched properties
+                setGlobalGeometries((prev) => {
+                    return {
+                        ...prev,
+                        features: prev.features.map((feature) => {
+                            const gid = String(feature.properties?.id);
+                            const mapping = geoToEntities[gid];
+                            if (mapping) {
+                                return {
+                                    ...feature,
+                                    properties: {
+                                        ...feature.properties,
+                                        entity_id: mapping.entity_id,
+                                        entity_name: mapping.entity_name,
+                                        entity_ids: mapping.entity_ids,
+                                    },
+                                };
+                            }
+                            return feature;
+                        }),
+                    };
+                });
+            } catch (err) {
+                console.error("Load global geometries failed", err);
+            } finally {
+                if (!disposed) {
+                    setIsGlobalLoading(false);
+                }
+            }
+        };
+
+        loadGlobalData();
+
+        return () => {
+            disposed = true;
+        };
+    }, [viewMode, activeTimelineYear, activeTimelineFilterEnabled, entities]);
+
+    // Render draft is the only FeatureCollection that decides what appears on the map.
+    // It may be timeline-filtered, replay-filtered, or preview-filtered, but it is not the edit source.
     const mapRenderDraft = useMemo(() => {
         const activeDraft = isReplayPreviewMode
             ? replayPreviewDraft
@@ -643,11 +764,46 @@ function EditorPageContent() {
                     ? editor.replayDraft
                     : editor.mainDraft;
 
-        if (!activeTimelineFilterEnabled) return activeDraft;
-        const year = clampYearToFixedRange(Math.trunc(activeTimelineYear));
+        const filteredDraft = activeTimelineFilterEnabled
+            ? {
+                  ...activeDraft,
+                  features: activeDraft.features.filter((feature) =>
+                      isFeatureVisibleAtYear(feature, clampYearToFixedRange(Math.trunc(activeTimelineYear)))
+                  ),
+              }
+            : activeDraft;
+
+        if (viewMode === "local") {
+            return filteredDraft;
+        }
+
+        // We want to ignore any database geometries whose IDs are present in either the active local features
+        // or the baseline features (since those are owned by the local session/commit context).
+        const localFeatureIds = new Set<string>();
+        for (const f of filteredDraft.features) {
+            if (f.properties?.id != null) {
+                localFeatureIds.add(String(f.properties.id));
+            }
+        }
+        for (const f of baselineFeatureCollection.features) {
+            if (f.properties?.id != null) {
+                localFeatureIds.add(String(f.properties.id));
+            }
+        }
+
+        const mergedFeatures = [...filteredDraft.features];
+
+        // Add global features that are not owned/modified/deleted by the local session
+        for (const globalFeature of globalGeometries.features) {
+            const globalId = globalFeature.properties?.id != null ? String(globalFeature.properties.id) : null;
+            if (globalId === null || !localFeatureIds.has(globalId)) {
+                mergedFeatures.push(globalFeature);
+            }
+        }
+
         return {
-            ...activeDraft,
-            features: activeDraft.features.filter((feature) => isFeatureVisibleAtYear(feature, year)),
+            ...filteredDraft,
+            features: mergedFeatures,
         };
     }, [
         activeTimelineFilterEnabled,
@@ -658,6 +814,9 @@ function EditorPageContent() {
         isViewerPreviewMode,
         previewSession?.draft,
         replayPreviewDraft,
+        viewMode,
+        baselineFeatureCollection.features,
+        globalGeometries.features,
     ]);
 
     // Danh sách feature đang chọn, map từ selectedFeatureIds sang draft hiện tại.
@@ -1913,6 +2072,16 @@ function EditorPageContent() {
         setSelectedGeometryEntityIds,
     ]);
 
+    const handleDeleteEntity = useCallback((entityId: string) => {
+        const id = String(entityId || "").trim();
+        if (!id) return;
+        const confirmed = window.confirm(`Bạn có chắc chắn muốn xóa thực thể này khỏi dự án? Hành động này cũng sẽ gỡ bỏ tất cả liên kết hình học và wiki của thực thể.`);
+        if (!confirmed) return;
+        editor.deleteEntityAndRelations(id, `Xóa thực thể #${id}`);
+        setSelectedGeometryEntityIds((prev) => prev.filter((x) => x !== id));
+        flashEntityFormStatus(`Đã xóa thực thể #${id}.`, 3000);
+    }, [editor, flashEntityFormStatus, setSelectedGeometryEntityIds]);
+
     // Bind/unbind geometry con vào selected geometry qua field child.bound_with.
     const handleToggleBindGeometryForSelectedGeometry = useCallback((geoId: string, nextChecked: boolean) => {
         if (!selectedFeatures || selectedFeatures.length === 0) {
@@ -2398,9 +2567,41 @@ function EditorPageContent() {
     };
 
     // Base draft for label lookup only. It must not decide which geometry is rendered.
-    const labelContextBaseDraft = isAnyPreviewMode
-        ? previewSession?.draft || EMPTY_FEATURE_COLLECTION
-        : editor.draft;
+    const labelContextBaseDraft = useMemo(() => {
+        const baseDraft = isAnyPreviewMode
+            ? previewSession?.draft || EMPTY_FEATURE_COLLECTION
+            : editor.draft;
+
+        if (viewMode === "local") {
+            return baseDraft;
+        }
+
+        const localFeatureIds = new Set<string>();
+        for (const f of baseDraft.features) {
+            if (f.properties?.id != null) {
+                localFeatureIds.add(String(f.properties.id));
+            }
+        }
+        for (const f of baselineFeatureCollection.features) {
+            if (f.properties?.id != null) {
+                localFeatureIds.add(String(f.properties.id));
+            }
+        }
+
+        const mergedFeatures = [...baseDraft.features];
+        for (const globalFeature of globalGeometries.features) {
+            const globalId = globalFeature.properties?.id != null ? String(globalFeature.properties.id) : null;
+            if (globalId === null || !localFeatureIds.has(globalId)) {
+                mergedFeatures.push(globalFeature);
+            }
+        }
+
+        return {
+            ...baseDraft,
+            features: mergedFeatures,
+        };
+    }, [viewMode, isAnyPreviewMode, previewSession?.draft, editor.draft, baselineFeatureCollection.features, globalGeometries.features]);
+
     // Enriched label context may contain geometries that mapRenderDraft filtered out.
     // Map rendering must still use mapRenderDraft above.
     const mapLabelContextDraft = useMemo(() => {
@@ -2657,6 +2858,8 @@ function EditorPageContent() {
                         onEnterPreview={!isReplayEditMode && !isAnyPreviewMode ? openViewerPreview : undefined}
                         onExitPreview={isReplayPreviewMode ? exitReplayPreview : isViewerPreviewMode ? exitViewerPreview : undefined}
                         onPlayPreviewReplay={isViewerPreviewMode && viewerPreviewSelectedReplay ? openSelectedViewerReplayPreview : undefined}
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
                     />
                 ) : (
                     <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
@@ -3078,6 +3281,7 @@ function EditorPageContent() {
                                     selectedGeometryTime={selectedGeometryTime}
                                     onToggleBindEntityForSelectedGeometry={handleToggleBindEntityForSelectedGeometry}
                                     onRerollEntityId={handleRerollEntityId}
+                                    onDeleteEntity={handleDeleteEntity}
                                 />
 
                                 <WikiSidebarPanel

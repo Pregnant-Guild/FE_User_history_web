@@ -134,6 +134,7 @@ export default function PublicWikiSidebar({
     maxDragWidth,
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
+    const tocContainerRef = useRef<HTMLDivElement | null>(null);
 
     const [localWidth, setLocalWidth] = useState<number>(() => {
         if (typeof window !== "undefined") {
@@ -203,6 +204,7 @@ export default function PublicWikiSidebar({
             .filter((item): item is HTMLElement => Boolean(item));
         if (!headings.length) return;
 
+        const scrollContainer = root.parentElement;
         const observer = new IntersectionObserver(
             (entries) => {
                 const visible = entries
@@ -211,11 +213,28 @@ export default function PublicWikiSidebar({
                 const top = visible[0]?.target as HTMLElement | undefined;
                 if (top?.id) setActiveHeadingId(top.id);
             },
-            { root: null, rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] }
+            { root: scrollContainer || null, rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] }
         );
 
         for (const heading of headings) observer.observe(heading);
         return () => observer.disconnect();
+    }, [toc]);
+
+    useEffect(() => {
+        const container = tocContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                container.scrollLeft += e.deltaY;
+            }
+        };
+
+        container.addEventListener("wheel", handleWheel, { passive: false });
+        return () => {
+            container.removeEventListener("wheel", handleWheel);
+        };
     }, [toc]);
 
     useEffect(() => {
@@ -373,6 +392,7 @@ export default function PublicWikiSidebar({
                     }}
                 >
                     <div
+                        ref={tocContainerRef}
                         className="uhm-public-wiki-toc-list"
                         style={{
                             display: "flex",
@@ -387,6 +407,24 @@ export default function PublicWikiSidebar({
                                 <a
                                     key={item.id}
                                     href={`#${item.id}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setActiveHeadingId(item.id);
+                                        const root = contentRootRef.current;
+                                        if (root) {
+                                            const targetElement = root.querySelector(`#${CSS.escape(item.id)}`) as HTMLElement | null;
+                                            const scrollContainer = root.parentElement;
+                                            if (targetElement && scrollContainer) {
+                                                const containerTop = scrollContainer.getBoundingClientRect().top;
+                                                const targetTop = targetElement.getBoundingClientRect().top;
+                                                const scrollOffset = targetTop - containerTop + scrollContainer.scrollTop;
+                                                scrollContainer.scrollTo({
+                                                    top: scrollOffset - 12,
+                                                    behavior: "smooth"
+                                                });
+                                            }
+                                        }
+                                    }}
                                     style={{
                                         flexShrink: 0,
                                         borderRadius: 9999,

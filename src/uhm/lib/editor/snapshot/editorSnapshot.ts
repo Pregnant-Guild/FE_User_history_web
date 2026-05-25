@@ -482,12 +482,59 @@ export function buildEditorSnapshot(options: {
     // Persist inline entity records across commits even when they're not currently bound.
     // Without this, "create entity" can disappear on the next commit unless the entity is referenced
     // by geometry_entity/entity_wiki or pinned via projectEntityRefs.
+    const activeEntityIds = new Set<string>();
+    for (const row of options.snapshotEntityRows || []) {
+        if (!row) continue;
+        const id = typeof row.id === "string" || typeof row.id === "number" ? String(row.id) : "";
+        if (!id) continue;
+        const cloned = JSON.parse(JSON.stringify(row)) as EntitySnapshot;
+        const opRaw = sanitizeEntitySnapshotOperation((cloned as RawEntityRow).operation);
+        if (opRaw === "delete") {
+            entityRows.set(id, {
+                id,
+                source: cloned.source === "inline" ? "inline" : "ref",
+                operation: "delete",
+            });
+            continue;
+        }
+        activeEntityIds.add(id);
+        const name =
+            typeof cloned?.name === "string" && cloned.name.trim().length
+                ? cloned.name.trim()
+                : id;
+        const source: "inline" | "ref" = cloned.source === "inline" ? "inline" : "ref";
+        const operation: EntitySnapshot["operation"] = source === "ref" ? "reference" : opRaw;
+        entityRows.set(id, {
+            id,
+            source,
+            name,
+            operation,
+            description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
+            time_start: normalizeTimelineYearValue(cloned.time_start) ?? undefined,
+            time_end: normalizeTimelineYearValue(cloned.time_end) ?? undefined,
+        });
+    }
+
+    // Persist inline entity records across commits even when they're not currently bound.
+    // If they were present in previous snapshot but are no longer in snapshotEntityRows, emit as delete.
     for (const prev of options.previousSnapshot?.entities || []) {
         if (!prev) continue;
         const id = typeof prev.id === "string" || typeof prev.id === "number" ? String(prev.id) : "";
-        if (!id || entityRows.has(id)) continue;
+        if (!id) continue;
         if (prev.operation === "delete") continue;
+
+        if (!activeEntityIds.has(id)) {
+            entityRows.set(id, {
+                id,
+                source: prev.source === "inline" ? "inline" : "ref",
+                operation: "delete",
+            });
+            continue;
+        }
+
+        if (entityRows.has(id)) continue;
         if (prev.source !== "inline") continue;
+
         // Carry forward as current-state inline entity; operation is a per-commit delta signal.
         const cloned = JSON.parse(JSON.stringify(prev)) as EntitySnapshot;
         delete cloned.operation;
@@ -496,31 +543,6 @@ export function buildEditorSnapshot(options: {
             source: "inline",
             operation: "reference",
             name: typeof cloned.name === "string" ? cloned.name : undefined,
-            description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
-            time_start: normalizeTimelineYearValue(cloned.time_start) ?? undefined,
-            time_end: normalizeTimelineYearValue(cloned.time_end) ?? undefined,
-        });
-    }
-    for (const row of options.snapshotEntityRows || []) {
-        if (!row) continue;
-        const id = typeof row.id === "string" || typeof row.id === "number" ? String(row.id) : "";
-        if (!id) continue;
-        const cloned = JSON.parse(JSON.stringify(row)) as EntitySnapshot;
-        const name =
-            typeof cloned?.name === "string" && cloned.name.trim().length
-                ? cloned.name.trim()
-                : id;
-        const source: "inline" | "ref" = cloned.source === "inline" ? "inline" : "ref";
-        const opRaw = sanitizeEntitySnapshotOperation((cloned as RawEntityRow).operation);
-        // Editor state should delete objects by removing them from the list.
-        // Keep this defensive guard to avoid emitting delete markers unexpectedly.
-        if (opRaw === "delete") continue;
-        const operation: EntitySnapshot["operation"] = source === "ref" ? "reference" : opRaw;
-        entityRows.set(id, {
-            id,
-            source,
-            name,
-            operation,
             description: typeof cloned.description === "string" ? cloned.description : cloned.description ?? null,
             time_start: normalizeTimelineYearValue(cloned.time_start) ?? undefined,
             time_end: normalizeTimelineYearValue(cloned.time_end) ?? undefined,

@@ -66,6 +66,8 @@ type MapProps = {
     onEnterPreview?: () => void;
     onExitPreview?: () => void;
     onPlayPreviewReplay?: () => void;
+    viewMode?: "local" | "global";
+    onViewModeChange?: (mode: "local" | "global") => void;
 };
 
 const Map = forwardRef<MapHandle, MapProps>(function Map({
@@ -99,6 +101,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     onEnterPreview,
     onExitPreview,
     onPlayPreviewReplay,
+    viewMode = "local",
+    onViewModeChange,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
@@ -210,6 +214,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         allowGeometryEditing,
         editingEngineRef,
         geolocationCenteredRef,
+        isPreviewMode: isPreviewMode || mode === "preview" || mode === "replay" || mode === "replay_preview",
     });
 
     useEffect(() => {
@@ -372,6 +377,45 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
                             {isGlobeProjection ? "Globe" : "Flat"}
                         </span>
 	                    </label>
+
+	                    {onViewModeChange ? (
+	                        <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px" }}>
+	                            <button
+	                                type="button"
+	                                onClick={() => onViewModeChange("local")}
+	                                style={{
+	                                    padding: "4px 10px",
+	                                    borderRadius: "999px",
+	                                    fontSize: "12px",
+	                                    fontWeight: 700,
+	                                    background: viewMode === "local" ? "#2563eb" : "transparent",
+	                                    color: viewMode === "local" ? "white" : "#94a3b8",
+	                                    border: "none",
+	                                    cursor: "pointer",
+	                                    transition: "background 150ms, color 150ms",
+	                                }}
+	                            >
+	                                LOCAL
+	                            </button>
+	                            <button
+	                                type="button"
+	                                onClick={() => onViewModeChange("global")}
+	                                style={{
+	                                    padding: "4px 10px",
+	                                    borderRadius: "999px",
+	                                    fontSize: "12px",
+	                                    fontWeight: 700,
+	                                    background: viewMode === "global" ? "#2563eb" : "transparent",
+	                                    color: viewMode === "global" ? "white" : "#94a3b8",
+	                                    border: "none",
+	                                    cursor: "pointer",
+	                                    transition: "background 150ms, color 150ms",
+	                                }}
+	                            >
+	                                GLOBAL
+	                            </button>
+	                        </div>
+	                    ) : null}
 
 	                    {onEnterPreview || onExitPreview ? (
 	                        <button

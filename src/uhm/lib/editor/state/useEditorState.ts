@@ -883,6 +883,112 @@ export function useEditorState(
         }
     }, [pushMainUndo, snapshotUndo]);
 
+    const deleteEntityAndRelations = useCallback((
+        entityId: string,
+        label = "Xóa entity"
+    ) => {
+        if (!snapshotUndo) return;
+        const id = String(entityId || "").trim();
+        if (!id) return;
+
+        const prevEntities = snapshotUndo.snapshotEntityRowsRef.current || [];
+        const prevEntitiesClone = deepClone(prevEntities);
+
+        const prevWikiLinks = snapshotUndo.snapshotEntityWikiLinksRef.current || [];
+        const prevWikiLinksClone = deepClone(prevWikiLinks);
+
+        const prevFeatures = mainDraftRef.current.features;
+
+        // 1. Cập nhật snapshotEntityRows
+        const nextEntities = prevEntities.map((e) => {
+            if (String(e.id) !== id) return e;
+            return {
+                ...e,
+                operation: "delete" as const,
+            };
+        }).filter((e) => {
+            // Loại bỏ hoàn toàn nếu là inline & create chưa commit
+            return !(String(e.id) === id && e.source === "inline" && e.operation === "create");
+        });
+
+        // 2. Cập nhật snapshotEntityWikiLinks
+        const nextWikiLinks = prevWikiLinks.filter((link) => String(link.entity_id) !== id);
+
+        // 3. Cập nhật draft features
+        const nextFeatures = prevFeatures.map((feature) => {
+            const properties = feature.properties;
+            const entityIds: string[] = Array.isArray(properties.entity_ids)
+                ? properties.entity_ids.map(String)
+                : properties.entity_id
+                    ? [String(properties.entity_id)]
+                    : [];
+
+            if (entityIds.includes(id)) {
+                const nextEntityIds = entityIds.filter((eid) => eid !== id);
+                return {
+                    ...feature,
+                    properties: {
+                        ...feature.properties,
+                        entity_ids: nextEntityIds,
+                        entity_id: nextEntityIds[0] || null,
+                        entity_name: nextEntityIds[0] || null,
+                    }
+                };
+            }
+            return feature;
+        });
+
+        const entitiesChanged = !jsonEquals(prevEntities, nextEntities);
+        const linksChanged = !jsonEquals(prevWikiLinks, nextWikiLinks);
+        const featuresChanged = !jsonEquals(prevFeatures, nextFeatures);
+
+        if (!entitiesChanged && !linksChanged && !featuresChanged) return;
+
+        const undoActions: UndoAction[] = [];
+        if (entitiesChanged) {
+            undoActions.push({ type: "snapshot_entities", label: "Cập nhật entities", prev: prevEntitiesClone });
+        }
+        if (linksChanged) {
+            undoActions.push({ type: "snapshot_entity_wiki", label: "Cập nhật entity-wiki", prev: prevWikiLinksClone });
+        }
+        if (featuresChanged) {
+            for (let i = 0; i < prevFeatures.length; i++) {
+                const prevF = prevFeatures[i];
+                const nextF = nextFeatures[i];
+                if (!jsonEquals(prevF.properties, nextF.properties)) {
+                    undoActions.push({
+                        type: "properties",
+                        id: prevF.properties.id,
+                        prevProperties: deepClone(prevF.properties),
+                    });
+                }
+            }
+        }
+
+        pushMainUndo(
+            undoActions.length === 1
+                ? undoActions[0]
+                : { type: "group", label, actions: undoActions }
+        );
+
+        if (entitiesChanged) {
+            const nextEntitiesClone = deepClone(nextEntities);
+            snapshotUndo.snapshotEntityRowsRef.current = nextEntitiesClone;
+            snapshotUndo.setSnapshotEntityRows(nextEntitiesClone);
+        }
+        if (linksChanged) {
+            const nextWikiLinksClone = deepClone(nextWikiLinks);
+            snapshotUndo.snapshotEntityWikiLinksRef.current = nextWikiLinksClone;
+            snapshotUndo.setSnapshotEntityWikiLinks(nextWikiLinksClone);
+        }
+        if (featuresChanged) {
+            commitMainDraft({
+                ...mainDraftRef.current,
+                features: nextFeatures,
+            });
+        }
+    }, [pushMainUndo, snapshotUndo, mainDraftRef, commitMainDraft]);
+
     const undo = useCallback(() => {
         if (mode === "replay") {
             undoReplay();
@@ -928,6 +1034,7 @@ export function useEditorState(
         setSnapshotWikis: setSnapshotWikisUndoable,
         setSnapshotEntityWikiLinks: setSnapshotEntityWikiLinksUndoable,
         setSnapshotWikisAndEntityWikiLinks: setSnapshotWikisAndEntityWikiLinksUndoable,
+        deleteEntityAndRelations,
     };
 }
 
