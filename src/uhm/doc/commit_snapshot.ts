@@ -43,6 +43,7 @@ export type FeatureId = string | number;
 
 export type FeatureProperties = {
     id: FeatureId;
+    source?: SnapshotSource;
     type?: string | null;
     geometry_preset?: GeometryPreset | null;
     time_start?: number | null;

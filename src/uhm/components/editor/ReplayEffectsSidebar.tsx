@@ -39,15 +39,15 @@ type ActionFieldConfig = {
     name: string;
     label: string;
     kind:
-        | "text"
-        | "textarea"
-        | "number"
-        | "boolean"
-        | "color"
-        | "select"
-        | "geometry"
-        | "geometry-multi"
-        | "wiki";
+    | "text"
+    | "textarea"
+    | "number"
+    | "boolean"
+    | "color"
+    | "select"
+    | "geometry"
+    | "geometry-multi"
+    | "wiki";
     placeholder?: string;
     options?: Array<{ label: string; value: string }>;
     visibleWhen?: (values: ActionFormValues) => boolean;
@@ -207,9 +207,9 @@ export default function ReplayEffectsSidebar({
         null;
     const selectedStep =
         selectedStage &&
-        selectedStepIndex != null &&
-        selectedStepIndex >= 0 &&
-        selectedStepIndex < selectedStage.steps.length
+            selectedStepIndex != null &&
+            selectedStepIndex >= 0 &&
+            selectedStepIndex < selectedStage.steps.length
             ? selectedStage.steps[selectedStepIndex]
             : null;
     const mapCameraActions = useMemo(

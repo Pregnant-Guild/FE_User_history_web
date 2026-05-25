@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
     BattleReplay,
     GeoFunctionName,
@@ -42,46 +42,6 @@ type AnyStepAction =
     | ReplayAction<MapFunctionName>
     | ReplayAction<GeoFunctionName>
     | ReplayAction<NarrativeFunctionName>;
-
-function validateReplayTimeFormat(value: string): boolean {
-    const trimmed = value.trim();
-    if (!trimmed) return false;
-
-    // 1. Check DD/MM/YYYY
-    const dmyRegex = /^(\d{2})\/(\d{2})\/(-?\d{4})$/;
-    const dmyMatch = trimmed.match(dmyRegex);
-    if (dmyMatch) {
-        const day = parseInt(dmyMatch[1], 10);
-        const month = parseInt(dmyMatch[2], 10);
-        const year = parseInt(dmyMatch[3], 10);
-        if (month < 1 || month > 12) return false;
-        if (day < 1 || day > 31) return false;
-        if (month === 2) {
-            const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-            if (day > (isLeap ? 29 : 28)) return false;
-        } else if ([4, 6, 9, 11].includes(month)) {
-            if (day > 30) return false;
-        }
-        return true;
-    }
-
-    // 2. Check MM/YYYY
-    const myRegex = /^(\d{2})\/(-?\d{4})$/;
-    const myMatch = trimmed.match(myRegex);
-    if (myMatch) {
-        const month = parseInt(myMatch[1], 10);
-        if (month < 1 || month > 12) return false;
-        return true;
-    }
-
-    // 3. Check YYYY
-    const yRegex = /^(-?\d{4})$/;
-    if (yRegex.test(trimmed)) {
-        return true;
-    }
-
-    return false;
-}
 
 type StageFormState = {
     title: string;
@@ -143,13 +103,6 @@ export default function ReplayTimelineSidebar({
         detail_time_stop: "",
     });
     const [createStagePanelKey, setCreateStagePanelKey] = useState(0);
-
-    const isStartValid = validateReplayTimeFormat(createStageForm.detail_time_start);
-    const isStopValid = validateReplayTimeFormat(createStageForm.detail_time_stop);
-    const isCreateFormValid = createStageForm.title.trim() !== "" && isStartValid && isStopValid;
-
-    const showStartError = createStageForm.detail_time_start.length > 0 && !isStartValid;
-    const showStopError = createStageForm.detail_time_stop.length > 0 && !isStopValid;
     const [openWeightEditorKey, setOpenWeightEditorKey] = useState<string | null>(null);
     const [openActionDetailKey, setOpenActionDetailKey] = useState<string | null>(null);
 
@@ -401,26 +354,7 @@ export default function ReplayTimelineSidebar({
         );
     };
 
-    const handleDuplicateAction = (
-        stageId: number,
-        stepIndex: number,
-        groupKey: ActionGroupKey,
-        actionIndex: number,
-        actionTitle: string
-    ) => {
-        onMutateReplay(
-            `Replay: nhân bản ${actionTitle} ở step ${stepIndex + 1} của stage #${stageId}`,
-            (draftReplay) => {
-                const stage = draftReplay.detail.find((item) => item.id === stageId);
-                if (!stage || stepIndex < 0 || stepIndex >= stage.steps.length) return;
-                const step = stage.steps[stepIndex];
-                const actions = [...getStepActionGroup(step, groupKey)];
-                if (actionIndex < 0 || actionIndex >= actions.length) return;
-                actions.splice(actionIndex + 1, 0, cloneReplayAction(actions[actionIndex]) as AnyStepAction);
-                setStepActionGroup(step, groupKey, actions);
-            }
-        );
-    };
+
 
     const handleUpdateActionParams = (
         stageId: number,
@@ -603,63 +537,66 @@ export default function ReplayTimelineSidebar({
                         onChange={(event) =>
                             setCreateStageForm((prev) => ({ ...prev, title: event.target.value }))
                         }
-                        placeholder="Title (bắt buộc)"
+                        placeholder="Title"
                         style={inputStyle}
                     />
-                    <div>
-                        <input
-                            value={createStageForm.detail_time_start}
-                            onChange={(event) =>
-                                setCreateStageForm((prev) => ({
-                                    ...prev,
-                                    detail_time_start: event.target.value,
-                                }))
-                            }
-                            placeholder="Thời gian bắt đầu (detail_time_start)"
-                            style={{
-                                ...inputStyle,
-                                borderColor: showStartError ? "#ef4444" : "#334155",
-                            }}
-                        />
-                        {showStartError ? (
-                            <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
-                                Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
-                            </div>
-                        ) : null}
-                    </div>
-                    <div>
-                        <input
-                            value={createStageForm.detail_time_stop}
-                            onChange={(event) =>
-                                setCreateStageForm((prev) => ({
-                                    ...prev,
-                                    detail_time_stop: event.target.value,
-                                }))
-                            }
-                            placeholder="Thời gian kết thúc (detail_time_stop)"
-                            style={{
-                                ...inputStyle,
-                                borderColor: showStopError ? "#ef4444" : "#334155",
-                            }}
-                        />
-                        {showStopError ? (
-                            <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
-                                Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
-                            </div>
-                        ) : null}
-                    </div>
-                    <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: "1.4" }}>
-                        Cấu trúc bắt buộc: <strong>DD/MM/YYYY</strong>, <strong>MM/YYYY</strong>, hoặc <strong>YYYY</strong>.
+                    <input
+                        value={createStageForm.detail_time_start}
+                        onChange={(event) =>
+                            setCreateStageForm((prev) => ({
+                                ...prev,
+                                detail_time_start: event.target.value,
+                            }))
+                        }
+                        placeholder="detail_time_start (DD/MM/YYYY hoặc MM/YYYY hoặc YYYY)"
+                        style={{
+                            ...inputStyle,
+                            border: createStageForm.detail_time_start && !validateReplayTimeFormat(createStageForm.detail_time_start)
+                                ? "1px solid #ef4444"
+                                : undefined,
+                        }}
+                    />
+                    <input
+                        value={createStageForm.detail_time_stop}
+                        onChange={(event) =>
+                            setCreateStageForm((prev) => ({
+                                ...prev,
+                                detail_time_stop: event.target.value,
+                            }))
+                        }
+                        placeholder="detail_time_stop (DD/MM/YYYY hoặc MM/YYYY hoặc YYYY)"
+                        style={{
+                            ...inputStyle,
+                            border: createStageForm.detail_time_stop && !validateReplayTimeFormat(createStageForm.detail_time_stop)
+                                ? "1px solid #ef4444"
+                                : undefined,
+                        }}
+                    />
+                    <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.3 }}>
+                        * Định dạng bắt buộc: <strong>ngày/tháng/năm</strong> (00/00/0000), <strong>tháng/năm</strong> (00/0000) hoặc <strong>năm</strong> (0000).
                     </div>
                     <button
                         type="button"
-                        disabled={!isCreateFormValid}
                         onClick={handleCreateStage}
+                        disabled={
+                            !createStageForm.title.trim() ||
+                            !validateReplayTimeFormat(createStageForm.detail_time_start) ||
+                            !validateReplayTimeFormat(createStageForm.detail_time_stop)
+                        }
                         style={{
                             ...buttonStyle,
-                            background: isCreateFormValid ? "#1d4ed8" : "#1e293b",
-                            color: isCreateFormValid ? "white" : "#64748b",
-                            cursor: isCreateFormValid ? "pointer" : "not-allowed",
+                            background:
+                                createStageForm.title.trim() &&
+                                validateReplayTimeFormat(createStageForm.detail_time_start) &&
+                                validateReplayTimeFormat(createStageForm.detail_time_stop)
+                                    ? "#1d4ed8"
+                                    : "#475569",
+                            cursor:
+                                createStageForm.title.trim() &&
+                                validateReplayTimeFormat(createStageForm.detail_time_start) &&
+                                validateReplayTimeFormat(createStageForm.detail_time_stop)
+                                    ? "pointer"
+                                    : "not-allowed",
                             border: "none",
                         }}
                     >
@@ -838,157 +775,142 @@ export default function ReplayTimelineSidebar({
                                                                         const actionKey = `${stage.id}:${stepIndex}:${entry.groupKey}:${entry.actionIndex}:${entry.functionName}`;
                                                                         const isActionOpen = openActionDetailKey === actionKey;
                                                                         return (
-                                                                        <div
-                                                                            key={actionKey}
-                                                                            style={{
-                                                                                display: "grid",
-                                                                                gap: 3,
-                                                                                padding: "5px 6px",
-                                                                                borderRadius: 6,
-                                                                                background: "rgba(15, 23, 42, 0.92)",
-                                                                                border: "1px solid rgba(51, 65, 85, 0.8)",
-                                                                            }}
-                                                                        >
-                                                                            <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        setOpenActionDetailKey((prev) =>
-                                                                                            prev === actionKey ? null : actionKey
-                                                                                        )
-                                                                                    }
-                                                                                    style={{
-                                                                                        flex: 1,
-                                                                                        border: "none",
-                                                                                        background: "transparent",
-                                                                                        padding: 0,
-                                                                                        margin: 0,
-                                                                                        textAlign: "left",
-                                                                                        color: "inherit",
-                                                                                        cursor: "pointer",
-                                                                                    }}
-                                                                                >
-                                                                                    <div
+                                                                            <div
+                                                                                key={actionKey}
+                                                                                style={{
+                                                                                    display: "grid",
+                                                                                    gap: 3,
+                                                                                    padding: "5px 6px",
+                                                                                    borderRadius: 6,
+                                                                                    background: "rgba(15, 23, 42, 0.92)",
+                                                                                    border: "1px solid rgba(51, 65, 85, 0.8)",
+                                                                                }}
+                                                                            >
+                                                                                <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            setOpenActionDetailKey((prev) =>
+                                                                                                prev === actionKey ? null : actionKey
+                                                                                            )
+                                                                                        }
                                                                                         style={{
-                                                                                            display: "flex",
-                                                                                            alignItems: "center",
-                                                                                            justifyContent: "space-between",
-                                                                                            gap: 8,
+                                                                                            flex: 1,
+                                                                                            border: "none",
+                                                                                            background: "transparent",
+                                                                                            padding: 0,
+                                                                                            margin: 0,
+                                                                                            textAlign: "left",
+                                                                                            color: "inherit",
+                                                                                            cursor: "pointer",
                                                                                         }}
                                                                                     >
-                                                                                        <div style={{ display: "grid", gap: 3, minWidth: 0 }}>
-                                                                                            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                                                                                <span
-                                                                                                    style={{
-                                                                                                        display: "inline-flex",
-                                                                                                        alignItems: "center",
-                                                                                                        padding: "1px 6px",
-                                                                                                        borderRadius: 999,
-                                                                                                        background: entry.badgeBackground,
-                                                                                                        color: entry.badgeColor,
-                                                                                                        fontSize: 10,
-                                                                                                        fontWeight: 900,
-                                                                                                        letterSpacing: 0.3,
-                                                                                                        textTransform: "uppercase",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {entry.group}
-                                                                                                </span>
-                                                                                                <span
+                                                                                        <div
+                                                                                            style={{
+                                                                                                display: "flex",
+                                                                                                alignItems: "center",
+                                                                                                justifyContent: "space-between",
+                                                                                                gap: 8,
+                                                                                            }}
+                                                                                        >
+                                                                                            <div style={{ display: "grid", gap: 3, minWidth: 0 }}>
+                                                                                                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                                                                                    <span
+                                                                                                        style={{
+                                                                                                            display: "inline-flex",
+                                                                                                            alignItems: "center",
+                                                                                                            padding: "1px 6px",
+                                                                                                            borderRadius: 999,
+                                                                                                            background: entry.badgeBackground,
+                                                                                                            color: entry.badgeColor,
+                                                                                                            fontSize: 10,
+                                                                                                            fontWeight: 900,
+                                                                                                            letterSpacing: 0.3,
+                                                                                                            textTransform: "uppercase",
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {entry.group}
+                                                                                                    </span>
+                                                                                                    <span
+                                                                                                        style={{
+                                                                                                            fontSize: 11,
+                                                                                                            color: "#93c5fd",
+                                                                                                            fontWeight: 800,
+                                                                                                            overflowWrap: "anywhere",
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {entry.functionName}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <div
                                                                                                     style={{
                                                                                                         fontSize: 11,
-                                                                                                        color: "#93c5fd",
-                                                                                                        fontWeight: 800,
+                                                                                                        color: "white",
+                                                                                                        fontWeight: 700,
                                                                                                         overflowWrap: "anywhere",
                                                                                                     }}
                                                                                                 >
-                                                                                                    {entry.functionName}
-                                                                                                </span>
+                                                                                                    {entry.title}
+                                                                                                </div>
                                                                                             </div>
-                                                                                            <div
+                                                                                            <span
                                                                                                 style={{
                                                                                                     fontSize: 11,
-                                                                                                    color: "white",
-                                                                                                    fontWeight: 700,
-                                                                                                    overflowWrap: "anywhere",
+                                                                                                    color: "#94a3b8",
+                                                                                                    fontWeight: 800,
+                                                                                                    flex: "0 0 auto",
                                                                                                 }}
                                                                                             >
-                                                                                                {entry.title}
-                                                                                            </div>
+                                                                                                {isActionOpen ? "−" : "+"}
+                                                                                            </span>
                                                                                         </div>
-                                                                                        <span
-                                                                                            style={{
-                                                                                                fontSize: 11,
-                                                                                                color: "#94a3b8",
-                                                                                                fontWeight: 800,
-                                                                                                flex: "0 0 auto",
-                                                                                            }}
+                                                                                    </button>
+                                                                                    <div style={{ display: "grid", gridTemplateColumns: "auto", gap: 4 }}>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() =>
+                                                                                                handleDeleteAction(
+                                                                                                    stage.id,
+                                                                                                    stepIndex,
+                                                                                                    entry.groupKey,
+                                                                                                    entry.actionIndex,
+                                                                                                    entry.title
+                                                                                                )
+                                                                                            }
+                                                                                            style={actionButtonStyle(false, "#7f1d1d")}
                                                                                         >
-                                                                                            {isActionOpen ? "−" : "+"}
-                                                                                        </span>
+                                                                                            Xóa
+                                                                                        </button>
                                                                                     </div>
-                                                                                </button>
-                                                                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, auto)", gap: 4 }}>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() =>
-                                                                                            handleDuplicateAction(
-                                                                                                stage.id,
-                                                                                                stepIndex,
-                                                                                                entry.groupKey,
-                                                                                                entry.actionIndex,
-                                                                                                entry.title
-                                                                                            )
-                                                                                        }
-                                                                                        style={actionButtonStyle(false, "#0f766e")}
-                                                                                    >
-                                                                                        Copy
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() =>
-                                                                                            handleDeleteAction(
-                                                                                                stage.id,
-                                                                                                stepIndex,
-                                                                                                entry.groupKey,
-                                                                                                entry.actionIndex,
-                                                                                                entry.title
-                                                                                            )
-                                                                                        }
-                                                                                        style={actionButtonStyle(false, "#7f1d1d")}
-                                                                                    >
-                                                                                        Xóa
-                                                                                    </button>
                                                                                 </div>
+                                                                                {isActionOpen ? (
+                                                                                    <div
+                                                                                        style={{
+                                                                                            fontSize: 11,
+                                                                                            color: "#94a3b8",
+                                                                                            lineHeight: 1.3,
+                                                                                            overflowWrap: "anywhere",
+                                                                                        }}
+                                                                                    >
+                                                                                        {entry.summary}
+                                                                                        <InlineActionParamsEditor
+                                                                                            key={actionKey}
+                                                                                            action={entry.action}
+                                                                                            onApply={(nextParams) =>
+                                                                                                handleUpdateActionParams(
+                                                                                                    stage.id,
+                                                                                                    stepIndex,
+                                                                                                    entry.groupKey,
+                                                                                                    entry.actionIndex,
+                                                                                                    entry.title,
+                                                                                                    nextParams
+                                                                                                )
+                                                                                            }
+                                                                                        />
+                                                                                    </div>
+                                                                                ) : null}
                                                                             </div>
-                                                                            {isActionOpen ? (
-                                                                                <div
-                                                                                    style={{
-                                                                                        fontSize: 11,
-                                                                                        color: "#94a3b8",
-                                                                                        lineHeight: 1.3,
-                                                                                        overflowWrap: "anywhere",
-                                                                                    }}
-                                                                                >
-                                                                                    {entry.summary}
-                                                                                    <InlineActionParamsEditor
-                                                                                        key={actionKey}
-                                                                                        action={entry.action}
-                                                                                        onApply={(nextParams) =>
-                                                                                            handleUpdateActionParams(
-                                                                                                stage.id,
-                                                                                                stepIndex,
-                                                                                                entry.groupKey,
-                                                                                                entry.actionIndex,
-                                                                                                entry.title,
-                                                                                                nextParams
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                </div>
-                                                                            ) : null}
-                                                                        </div>
-                                                                    );
+                                                                        );
                                                                     })}
                                                                 </div>
                                                             ) : null}
@@ -1120,23 +1042,13 @@ function StageMetadataEditor({
         detail_time_stop: stage.detail_time_stop || "",
     });
 
-    useEffect(() => {
-        setForm({
-            title: stage.title || "",
-            detail_time_start: stage.detail_time_start || "",
-            detail_time_stop: stage.detail_time_stop || "",
-        });
-    }, [stage]);
-
     const isStartValid = validateReplayTimeFormat(form.detail_time_start);
     const isStopValid = validateReplayTimeFormat(form.detail_time_stop);
-    const isEditFormValid = form.title.trim() !== "" && isStartValid && isStopValid;
-
-    const showStartError = form.detail_time_start.length > 0 && !isStartValid;
-    const showStopError = form.detail_time_stop.length > 0 && !isStopValid;
+    const isTitleValid = form.title.trim().length > 0;
+    const isFormValid = isStartValid && isStopValid && isTitleValid;
 
     const handleApplyStageMetadata = () => {
-        if (!isEditFormValid) return;
+        if (!isFormValid) return;
         onMutateReplay(`Replay: cập nhật stage #${stage.id}`, (draftReplay) => {
             const targetStage = draftReplay.detail.find((item) => item.id === stage.id);
             if (!targetStage) return;
@@ -1147,70 +1059,55 @@ function StageMetadataEditor({
     };
 
     return (
-            <Panel title="Stage Metadata" badge={`#${stage.id}`} defaultOpen={false}>
-                <div style={{ display: "grid", gap: 8 }}>
+        <Panel title="Stage Metadata" badge={`#${stage.id}`} defaultOpen={false}>
+            <div style={{ display: "grid", gap: 8 }}>
                 <input
                     value={form.title}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, title: event.target.value }))
                     }
-                    placeholder="Title (bắt buộc)"
+                    placeholder="Title"
                     style={inputStyle}
                 />
-                <div>
-                    <input
-                        value={form.detail_time_start}
-                        onChange={(event) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                detail_time_start: event.target.value,
-                            }))
-                        }
-                        placeholder="Thời gian bắt đầu (detail_time_start)"
-                        style={{
-                            ...inputStyle,
-                            borderColor: showStartError ? "#ef4444" : "#334155",
-                        }}
-                    />
-                    {showStartError ? (
-                        <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
-                            Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
-                        </div>
-                    ) : null}
-                </div>
-                <div>
-                    <input
-                        value={form.detail_time_stop}
-                        onChange={(event) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                detail_time_stop: event.target.value,
-                            }))
-                        }
-                        placeholder="Thời gian kết thúc (detail_time_stop)"
-                        style={{
-                            ...inputStyle,
-                            borderColor: showStopError ? "#ef4444" : "#334155",
-                        }}
-                    />
-                    {showStopError ? (
-                        <div style={{ color: "#ef4444", fontSize: 10, marginTop: 3 }}>
-                            Định dạng không hợp lệ (DD/MM/YYYY, MM/YYYY, hoặc YYYY)
-                        </div>
-                    ) : null}
-                </div>
-                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: "1.4" }}>
-                    Cấu trúc bắt buộc: <strong>DD/MM/YYYY</strong>, <strong>MM/YYYY</strong>, hoặc <strong>YYYY</strong>.
+                <input
+                    value={form.detail_time_start}
+                    onChange={(event) =>
+                        setForm((prev) => ({
+                            ...prev,
+                            detail_time_start: event.target.value,
+                        }))
+                    }
+                    placeholder="detail_time_start (DD/MM/YYYY hoặc MM/YYYY hoặc YYYY)"
+                    style={{
+                        ...inputStyle,
+                        border: form.detail_time_start && !isStartValid ? "1px solid #ef4444" : undefined,
+                    }}
+                />
+                <input
+                    value={form.detail_time_stop}
+                    onChange={(event) =>
+                        setForm((prev) => ({
+                            ...prev,
+                            detail_time_stop: event.target.value,
+                        }))
+                    }
+                    placeholder="detail_time_stop (DD/MM/YYYY hoặc MM/YYYY hoặc YYYY)"
+                    style={{
+                        ...inputStyle,
+                        border: form.detail_time_stop && !isStopValid ? "1px solid #ef4444" : undefined,
+                    }}
+                />
+                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.3 }}>
+                    * Định dạng bắt buộc: <strong>ngày/tháng/năm</strong> (00/00/0000), <strong>tháng/năm</strong> (00/0000) hoặc <strong>năm</strong> (0000).
                 </div>
                 <button
                     type="button"
-                    disabled={!isEditFormValid}
                     onClick={handleApplyStageMetadata}
+                    disabled={!isFormValid}
                     style={{
                         ...buttonStyle,
-                        background: isEditFormValid ? "#0f766e" : "#1e293b",
-                        color: isEditFormValid ? "white" : "#64748b",
-                        cursor: isEditFormValid ? "pointer" : "not-allowed",
+                        background: isFormValid ? "#0f766e" : "#475569",
+                        cursor: isFormValid ? "pointer" : "not-allowed",
                         border: "none",
                     }}
                 >
@@ -1787,4 +1684,35 @@ function truncateText(value: string, maxLength: number) {
     return value.length > maxLength
         ? `${value.slice(0, Math.max(0, maxLength - 1))}…`
         : value;
+}
+
+export function validateReplayTimeFormat(value: string): boolean {
+    const val = value.trim();
+    if (!val) return false;
+
+    // YYYY (e.g. 1945)
+    if (/^\d{4}$/.test(val)) {
+        return true;
+    }
+
+    // MM/YYYY (e.g. 05/1945)
+    if (/^(0[1-9]|1[0-2])\/\d{4}$/.test(val)) {
+        return true;
+    }
+
+    // DD/MM/YYYY (e.g. 15/05/1945)
+    if (/^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/.test(val)) {
+        const parts = val.split("/");
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+
+        const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) {
+            monthLengths[1] = 29;
+        }
+        return d <= monthLengths[m - 1];
+    }
+
+    return false;
 }

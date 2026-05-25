@@ -395,6 +395,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
 
             // Generate geometry metadata onto feature properties (optional in persisted snapshot).
             const geo = geometryById.get(gid) || null;
+            const existingSource = p.source === "inline" || p.source === "ref" ? p.source : undefined;
             if (geo) {
                 const geoRecord = geo as unknown as UnknownRecord;
                 // type can arrive as numeric geo_type, numeric string, or semantic key depending on backend version.
@@ -406,6 +407,7 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 if (geo.bound_with !== undefined) {
                     p.bound_with = geo.bound_with;
                 }
+                p.source = geo.source || existingSource || "inline";
                 const timeStart = normalizeTimelineYearValue(geo.time_start);
                 const timeEnd = normalizeTimelineYearValue(geo.time_end);
                 if (timeStart !== null) {
@@ -418,8 +420,11 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 } else {
                     delete p.time_end;
                 }
-            } else if (!existingTypeKey) {
-                p.type = fallbackTypeKey;
+            } else {
+                p.source = existingSource || "inline";
+                if (!existingTypeKey) {
+                    p.type = fallbackTypeKey;
+                }
             }
         }
         return cloned;
@@ -570,7 +575,7 @@ export function buildEditorSnapshot(options: {
         return {
             id,
             operation,
-            source: "inline",
+            source: feature.properties.source || "inline",
             type: typeKey,
             draw_geometry: feature.geometry,
             bound_with: normalizeFeatureBoundWith(feature),
@@ -644,6 +649,7 @@ export function buildEditorSnapshot(options: {
         delete p.time_end;
         delete p.bound_with;
         delete p.binding;
+        delete p.source;
         delete p.entity_id;
         delete p.entity_ids;
         delete p.entity_name;

@@ -1801,6 +1801,7 @@ function EditorPageContent() {
             type: "Feature",
             properties: {
                 id: geoId,
+                source: "ref",
                 type: typeKey,
                 time_start: normalizeTimelineYearValue(geo.time_start),
                 time_end: normalizeTimelineYearValue(geo.time_end),
