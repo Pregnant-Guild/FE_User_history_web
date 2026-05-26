@@ -311,249 +311,248 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         pointerEvents: "none",
                     }}
                 >
-                <div
-                    style={{
-                        width: "fit-content",
-                        maxWidth: "95%",
-                        margin: "0 auto",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        background: "rgba(15, 23, 42, 0.88)",
-                        border: "1px solid rgba(148, 163, 184, 0.38)",
-                        borderRadius: "999px",
-                        padding: "8px 12px",
-                        color: "#e2e8f0",
-                        backdropFilter: "blur(3px)",
-                        pointerEvents: "auto",
-                    }}
-                >
-                    <label
-                        title={
-                            isGlobeProjection
-                                ? "Dang o che do hinh cau (globe)"
-                                : "Dang o che do trai phang (flat)"
-                        }
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            padding: "0 6px",
-                            userSelect: "none",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                        }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={isGlobeProjection}
-                            onChange={(e) => setIsGlobeProjection(e.target.checked)}
-                            aria-label="Toggle globe projection"
-                            style={{ display: "none" }}
-                        />
-                        <span
-                            aria-hidden="true"
-                            style={{
-                                position: "relative",
-                                width: "42px",
-                                height: "22px",
-                                borderRadius: "999px",
-                                border: "1px solid rgba(148, 163, 184, 0.45)",
-                                background: isGlobeProjection
-                                    ? "rgba(56, 189, 248, 0.30)"
-                                    : "rgba(148, 163, 184, 0.18)",
-                                boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
-                                transition: "background 160ms ease",
-                            }}
-                        >
-                            <span
-                                style={{
-                                    position: "absolute",
-                                    top: "2px",
-                                    left: isGlobeProjection ? "22px" : "2px",
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "999px",
-                                    background: isGlobeProjection ? "#38bdf8" : "#e2e8f0",
-                                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
-                                    transition: "left 160ms ease, background 160ms ease",
-                                }}
-                            />
-                        </span>
-                        <span
-                            style={{
-                                fontSize: "12px",
-                                color: isGlobeProjection ? "#7dd3fc" : "#cbd5e1",
-                                fontWeight: 700,
-                                minWidth: "40px",
-                            }}
-                        >
-                            {isGlobeProjection ? "Globe" : "Flat"}
-                        </span>
-	                    </label>
-
-	                    {onViewModeChange ? (
-	                        <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px", flexShrink: 0 }}>
-	                            <button
-	                                type="button"
-	                                onClick={() => onViewModeChange("local")}
-	                                style={{
-	                                    padding: "4px 10px",
-	                                    borderRadius: "999px",
-	                                    fontSize: "12px",
-	                                    fontWeight: 700,
-	                                    background: viewMode === "local" ? "#2563eb" : "transparent",
-	                                    color: viewMode === "local" ? "white" : "#94a3b8",
-	                                    border: "none",
-	                                    cursor: "pointer",
-	                                    transition: "background 150ms, color 150ms",
-	                                }}
-	                            >
-	                                LOCAL
-	                            </button>
-	                            <button
-	                                type="button"
-	                                onClick={() => onViewModeChange("global")}
-	                                style={{
-	                                    padding: "4px 10px",
-	                                    borderRadius: "999px",
-	                                    fontSize: "12px",
-	                                    fontWeight: 700,
-	                                    background: viewMode === "global" ? "#2563eb" : "transparent",
-	                                    color: viewMode === "global" ? "white" : "#94a3b8",
-	                                    border: "none",
-	                                    cursor: "pointer",
-	                                    transition: "background 150ms, color 150ms",
-	                                }}
-	                            >
-	                                GLOBAL
-	                            </button>
-	                        </div>
-	                    ) : null}
- 
-	                    {onEnterPreview || onExitPreview ? (
-	                        <button
-	                            type="button"
-	                            onClick={isPreviewMode ? onExitPreview : onEnterPreview}
-	                            style={{
-	                                ...zoomButtonStyle,
-	                                width: "auto",
-	                                minWidth: "76px",
-	                                padding: "0 12px",
-	                                background: isPreviewMode ? "#334155" : "#166534",
-	                                fontWeight: 800,
-	                                flexShrink: 0,
-	                            }}
-	                            aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
-	                            title={isPreviewMode ? "Thoat preview" : "Xem nhu nguoi dung"}
-	                        >
-	                            {isPreviewMode ? "Editor" : "Preview"}
-	                        </button>
-	                    ) : null}
-
- 
-	                    <button
-                        type="button"
-                        onClick={() => handleZoomByStep(-0.8)}
-                        style={{ ...zoomButtonStyle, flexShrink: 0 }}
-                        aria-label="Zoom out"
-                    >
-                        -
-                    </button>
- 
-                    <input
-                        type="range"
-                        min={zoomBounds.min}
-                        max={zoomBounds.max}
-                        step={0.1}
-                        value={zoomLevel}
-                        onPointerDown={(event) => {
-                            event.stopPropagation();
-                            try {
-                                event.currentTarget.setPointerCapture(event.pointerId);
-                            } catch {
-                                // Browser may reject capture for non-primary pointers; drag lock still works.
-                            }
-                            beginZoomSliderDrag();
-                        }}
-                        onPointerUp={(event) => {
-                            event.stopPropagation();
-                            try {
-                                event.currentTarget.releasePointerCapture(event.pointerId);
-                            } catch {
-                                // Ignore if capture was already released.
-                            }
-                            endZoomSliderDrag();
-                        }}
-                        onPointerCancel={endZoomSliderDrag}
-                        onBlur={endZoomSliderDrag}
-                        onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
-                        style={{
-                            flex: 1,
-                            minWidth: "60px",
-                            accentColor: "#38bdf8",
-                            cursor: "pointer",
-                        }}
-                        aria-label="Map zoom"
-                    />
- 
-                    <button
-                        type="button"
-                        onClick={() => handleZoomByStep(0.8)}
-                        style={{ ...zoomButtonStyle, flexShrink: 0 }}
-                        aria-label="Zoom in"
-                    >
-                        +
-                    </button>
- 
                     <div
                         style={{
-                            minWidth: "56px",
-                            textAlign: "right",
-                            fontSize: "12px",
-                            color: "#cbd5e1",
-                            fontVariantNumeric: "tabular-nums",
-                            flexShrink: 0,
+                            width: "fit-content",
+                            maxWidth: "95%",
+                            margin: "0 auto",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            background: "rgba(15, 23, 42, 0.88)",
+                            border: "1px solid rgba(148, 163, 184, 0.38)",
+                            borderRadius: "999px",
+                            padding: "8px 12px",
+                            color: "#e2e8f0",
+                            backdropFilter: "blur(3px)",
+                            pointerEvents: "auto",
                         }}
                     >
-                        {zoomLevel.toFixed(1)}x
-                    </div>
+                        <label
+                            title={
+                                isGlobeProjection
+                                    ? "Dang o che do hinh cau (globe)"
+                                    : "Dang o che do trai phang (flat)"
+                            }
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                padding: "0 6px",
+                                userSelect: "none",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={isGlobeProjection}
+                                onChange={(e) => setIsGlobeProjection(e.target.checked)}
+                                aria-label="Toggle globe projection"
+                                style={{ display: "none" }}
+                            />
+                            <span
+                                aria-hidden="true"
+                                style={{
+                                    position: "relative",
+                                    width: "42px",
+                                    height: "22px",
+                                    borderRadius: "999px",
+                                    border: "1px solid rgba(148, 163, 184, 0.45)",
+                                    background: isGlobeProjection
+                                        ? "rgba(56, 189, 248, 0.30)"
+                                        : "rgba(148, 163, 184, 0.18)",
+                                    boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+                                    transition: "background 160ms ease",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        position: "absolute",
+                                        top: "2px",
+                                        left: isGlobeProjection ? "22px" : "2px",
+                                        width: "18px",
+                                        height: "18px",
+                                        borderRadius: "999px",
+                                        background: isGlobeProjection ? "#38bdf8" : "#e2e8f0",
+                                        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
+                                        transition: "left 160ms ease, background 160ms ease",
+                                    }}
+                                />
+                            </span>
+                            <span
+                                style={{
+                                    fontSize: "12px",
+                                    color: isGlobeProjection ? "#7dd3fc" : "#cbd5e1",
+                                    fontWeight: 700,
+                                    minWidth: "40px",
+                                }}
+                            >
+                                {isGlobeProjection ? "Globe" : "Flat"}
+                            </span>
+                        </label>
 
-	                    {onPlayPreviewReplay ? (
-	                        <button
-	                            type="button"
-	                            onClick={onPlayPreviewReplay}
-	                            style={{
-	                                ...zoomButtonStyle,
-	                                width: "auto",
-	                                minWidth: "64px",
-	                                padding: "0 12px",
-	                                display: "inline-flex",
-	                                alignItems: "center",
-	                                justifyContent: "center",
-	                                gap: "7px",
-	                                background: "#2563eb",
-	                                fontSize: "13px",
-	                                fontWeight: 800,
-	                                flexShrink: 0,
-	                            }}
-	                            aria-label="Play selected replay"
-	                            title="Play replay của geometry đang chọn"
-	                        >
-	                            <span
-	                                aria-hidden="true"
-	                                style={{
-	                                    width: 0,
-	                                    height: 0,
-	                                    borderTop: "5px solid transparent",
-	                                    borderBottom: "5px solid transparent",
-	                                    borderLeft: "8px solid currentColor",
-	                                }}
-	                            />
-	                            Play
-	                        </button>
-	                    ) : null}
-                </div>
+                        {onViewModeChange ? (
+                            <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px", flexShrink: 0 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => onViewModeChange("local")}
+                                    style={{
+                                        padding: "4px 10px",
+                                        borderRadius: "999px",
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        background: viewMode === "local" ? "#2563eb" : "transparent",
+                                        color: viewMode === "local" ? "white" : "#94a3b8",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        transition: "background 150ms, color 150ms",
+                                    }}
+                                >
+                                    LOCAL
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onViewModeChange("global")}
+                                    style={{
+                                        padding: "4px 10px",
+                                        borderRadius: "999px",
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        background: viewMode === "global" ? "#2563eb" : "transparent",
+                                        color: viewMode === "global" ? "white" : "#94a3b8",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        transition: "background 150ms, color 150ms",
+                                    }}
+                                >
+                                    GLOBAL
+                                </button>
+                            </div>
+                        ) : null}
+
+                        {onEnterPreview || onExitPreview ? (
+                            <button
+                                type="button"
+                                onClick={isPreviewMode ? onExitPreview : onEnterPreview}
+                                style={{
+                                    ...zoomButtonStyle,
+                                    width: "auto",
+                                    minWidth: "76px",
+                                    padding: "0 12px",
+                                    background: isPreviewMode ? "#334155" : "#166534",
+                                    fontWeight: 800,
+                                    flexShrink: 0,
+                                }}
+                                aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
+                                title={isPreviewMode ? "Thoat preview" : "Xem nhu nguoi dung"}
+                            >
+                                {isPreviewMode ? "Editor" : "Preview"}
+                            </button>
+                        ) : null}
+
+                        {onPlayPreviewReplay ? (
+                            <button
+                                type="button"
+                                onClick={onPlayPreviewReplay}
+                                style={{
+                                    ...zoomButtonStyle,
+                                    width: "auto",
+                                    minWidth: "64px",
+                                    padding: "0 12px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "7px",
+                                    background: "#2563eb",
+                                    fontSize: "13px",
+                                    fontWeight: 800,
+                                    flexShrink: 0,
+                                }}
+                                aria-label="Play selected replay"
+                                title="Play replay của geometry đang chọn"
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    style={{
+                                        width: 0,
+                                        height: 0,
+                                        borderTop: "5px solid transparent",
+                                        borderBottom: "5px solid transparent",
+                                        borderLeft: "8px solid currentColor",
+                                    }}
+                                />
+                                Play
+                            </button>
+                        ) : null}
+
+                        <button
+                            type="button"
+                            onClick={() => handleZoomByStep(-0.8)}
+                            style={{ ...zoomButtonStyle, flexShrink: 0 }}
+                            aria-label="Zoom out"
+                        >
+                            -
+                        </button>
+
+                        <input
+                            type="range"
+                            min={zoomBounds.min}
+                            max={zoomBounds.max}
+                            step={0.1}
+                            value={zoomLevel}
+                            onPointerDown={(event) => {
+                                event.stopPropagation();
+                                try {
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                } catch {
+                                    // Browser may reject capture for non-primary pointers; drag lock still works.
+                                }
+                                beginZoomSliderDrag();
+                            }}
+                            onPointerUp={(event) => {
+                                event.stopPropagation();
+                                try {
+                                    event.currentTarget.releasePointerCapture(event.pointerId);
+                                } catch {
+                                    // Ignore if capture was already released.
+                                }
+                                endZoomSliderDrag();
+                            }}
+                            onPointerCancel={endZoomSliderDrag}
+                            onBlur={endZoomSliderDrag}
+                            onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
+                            style={{
+                                flex: 1,
+                                minWidth: "60px",
+                                accentColor: "#38bdf8",
+                                cursor: "pointer",
+                            }}
+                            aria-label="Map zoom"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() => handleZoomByStep(0.8)}
+                            style={{ ...zoomButtonStyle, flexShrink: 0 }}
+                            aria-label="Zoom in"
+                        >
+                            +
+                        </button>
+
+                        <div
+                            style={{
+                                minWidth: "56px",
+                                textAlign: "right",
+                                fontSize: "12px",
+                                color: "#cbd5e1",
+                                fontVariantNumeric: "tabular-nums",
+                                flexShrink: 0,
+                            }}
+                        >
+                            {zoomLevel.toFixed(1)}x
+                        </div>
+                    </div>
                 </div>
             ) : null}
         </div>

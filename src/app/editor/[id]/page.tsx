@@ -696,7 +696,7 @@ function EditorPageContent() {
 
                 // 2. Concurrently fetch per-entity to build the geometry-to-entity mapping
                 const geoToEntities: Record<string, { entity_id: string; entity_name: string; entity_ids: string[] }> = {};
-                
+
                 const concurrency = 6;
                 const items = [...entities];
                 let nextIndex = 0;
@@ -793,11 +793,11 @@ function EditorPageContent() {
 
         const filteredDraft = activeTimelineFilterEnabled
             ? {
-                  ...activeDraft,
-                  features: activeDraft.features.filter((feature) =>
-                      isFeatureVisibleAtYear(feature, clampYearToFixedRange(Math.trunc(activeTimelineYear)))
-                  ),
-              }
+                ...activeDraft,
+                features: activeDraft.features.filter((feature) =>
+                    isFeatureVisibleAtYear(feature, clampYearToFixedRange(Math.trunc(activeTimelineYear)))
+                ),
+            }
             : activeDraft;
 
         if (viewMode === "local") {
@@ -2968,6 +2968,13 @@ function EditorPageContent() {
                         changesCount={pendingSaveCount}
                         undoStack={editor.undoStack}
                         width={leftPanelWidth}
+                        imageOverlay={imageOverlay}
+                        onPickImageOverlay={handlePickImageOverlay}
+                        onPasteImageOverlay={handlePasteImageOverlay}
+                        imageOverlayKeyboardEnabled={imageOverlayKeyboardEnabled}
+                        onImageOverlayKeyboardEnabledChange={setImageOverlayKeyboardEnabled}
+                        onImageOverlayOpacityChange={handleImageOverlayOpacityChange}
+                        onRemoveImageOverlay={handleRemoveImageOverlay}
                     />
 
                     <ResizeHandle

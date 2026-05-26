@@ -82,12 +82,6 @@ export default function TimelineBar({
         }
     }, [lower, upper, commitYearChange]);
 
-    const handleDragYearChange = useCallback((nextVal: number) => {
-        const clamped = clampYearValue(Math.trunc(nextVal), lower, upper);
-        localYearRef.current = clamped;
-        setLocalYear(clamped);
-    }, [lower, upper]);
-
     const finishLocalYearChange = useCallback(() => {
         commitYearChange(localYearRef.current);
         setLocalYear(null);
@@ -169,14 +163,23 @@ export default function TimelineBar({
                         </span>
                     </button>
                 ) : null}
-                <CanvasTimelineRuler
-                    year={displayYear}
-                    onYearChange={handleDragYearChange}
-                    onYearCommit={finishLocalYearChange}
-                    minYear={lower}
-                    maxYear={upper}
+                <span className={styles.labelBounds}>{formatYear(lower)}</span>
+                <input
+                    type="range"
+                    min={lower}
+                    max={upper}
+                    step={1}
+                    value={displayYear}
+                    onChange={(event) => handleLocalYearChange(Number(event.target.value))}
+                    onMouseUp={finishLocalYearChange}
+                    onTouchEnd={finishLocalYearChange}
                     disabled={effectiveDisabled}
+                    className={styles.slider}
+                    aria-label="Timeline year"
                 />
+                <span className={styles.labelBoundsRight}>
+                    {formatYear(upper)}
+                </span>
                 <div className={styles.numberWrapper}>
                     <input
                         type="number"
@@ -255,305 +258,4 @@ function formatYear(year: number): string {
         return `${Math.abs(year)} TCN`;
     }
     return `${year}`;
-}
-
-interface CanvasRulerProps {
-    year: number;
-    onYearChange: (year: number) => void;
-    onYearCommit: () => void;
-    minYear: number;
-    maxYear: number;
-    disabled?: boolean;
-}
-
-function CanvasTimelineRuler({
-    year,
-    onYearChange,
-    onYearCommit,
-    minYear,
-    maxYear,
-    disabled = false,
-}: CanvasRulerProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-
-    // Visible span (in years)
-    const [span, setSpan] = useState(400); // default show 400 years
-
-    // Dimensions
-    const [dimensions, setDimensions] = useState({ width: 0, height: 48 });
-
-    // Dragging state
-    const dragRef = useRef<{
-        isDragging: boolean;
-        startX: number;
-        startYear: number;
-        hasDragged: boolean;
-    } | null>(null);
-
-    // Sync dimensions using ResizeObserver
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        const observer = new ResizeObserver((entries) => {
-            if (!entries || !entries[0]) return;
-            const { width, height } = entries[0].contentRect;
-            setDimensions({ width, height: height || 48 });
-        });
-
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, []);
-
-    // Draw the ruler on canvas
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas || dimensions.width === 0) return;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        // Support High DPI / Retina screens
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = dimensions.width * dpr;
-        canvas.height = dimensions.height * dpr;
-        ctx.scale(dpr, dpr);
-
-        const width = dimensions.width;
-        const height = dimensions.height;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
-
-        // Center year is the selected year
-        const centerYear = year;
-        const startYear = centerYear - span / 2;
-        const endYear = centerYear + span / 2;
-
-        const yearToX = (y: number) => {
-            return ((y - startYear) / span) * width;
-        };
-
-        // Determine tick step based on span
-        let majorStep = 100;
-        let mediumStep = 10;
-        let minorStep = 1;
-
-        if (span > 3000) {
-            majorStep = 1000;
-            mediumStep = 100;
-            minorStep = 10;
-        } else if (span > 1500) {
-            majorStep = 500;
-            mediumStep = 50;
-            minorStep = 10;
-        } else if (span > 600) {
-            majorStep = 100;
-            mediumStep = 20;
-            minorStep = 5;
-        } else if (span > 200) {
-            majorStep = 100;
-            mediumStep = 10;
-            minorStep = 1;
-        } else if (span > 60) {
-            majorStep = 50;
-            mediumStep = 10;
-            minorStep = 1;
-        } else {
-            majorStep = 10;
-            mediumStep = 5;
-            minorStep = 1;
-        }
-
-        // Ticks drawing bounds
-        const firstMajor = Math.floor(startYear / majorStep) * majorStep;
-        const lastMajor = Math.ceil(endYear / majorStep) * majorStep;
-
-        const pixelsPerYear = width / span;
-        const showMinor = pixelsPerYear * minorStep >= 3;
-        const showMedium = pixelsPerYear * mediumStep >= 5;
-
-        // Draw ruler track baseline
-        ctx.beginPath();
-        ctx.moveTo(0, height - 8);
-        ctx.lineTo(width, height - 8);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // 1. Draw minor & medium ticks
-        ctx.beginPath();
-        for (let y = Math.floor(startYear); y <= Math.ceil(endYear); y++) {
-            if (y < minYear || y > maxYear) continue;
-
-            const isMajor = y % majorStep === 0;
-            const isMedium = y % mediumStep === 0;
-            const isMinor = y % minorStep === 0;
-
-            if (isMajor) continue;
-
-            let tickHeight = 0;
-            if (isMedium && showMedium) {
-                tickHeight = 7;
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-            } else if (isMinor && showMinor) {
-                tickHeight = 4;
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-            }
-
-            if (tickHeight > 0) {
-                const x = yearToX(y);
-                ctx.moveTo(x, height - 8);
-                ctx.lineTo(x, height - 8 - tickHeight);
-            }
-        }
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // 2. Draw major ticks and labels
-        ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-        ctx.font = "600 10px system-ui, -apple-system, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-
-        for (let y = firstMajor; y <= lastMajor; y += majorStep) {
-            if (y < minYear || y > maxYear) continue;
-
-            const x = yearToX(y);
-
-            // Draw tick line
-            ctx.beginPath();
-            ctx.moveTo(x, height - 8);
-            ctx.lineTo(x, height - 20);
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
-            ctx.lineWidth = 1.25;
-            ctx.stroke();
-
-            // Draw label
-            const label = formatYear(y);
-            ctx.fillText(label, x, height - 33);
-        }
-
-        // 3. Draw needle indicator in the center
-        const needleX = width / 2;
-        ctx.beginPath();
-        ctx.moveTo(needleX, 0);
-        ctx.lineTo(needleX, height - 4);
-        ctx.strokeStyle = "#10b981";
-        ctx.lineWidth = 2;
-        ctx.shadowColor = "rgba(16, 185, 129, 0.6)";
-        ctx.shadowBlur = 6;
-        ctx.stroke();
-
-        // Draw needle head triangle
-        ctx.fillStyle = "#10b981";
-        ctx.beginPath();
-        ctx.moveTo(needleX - 5, 0);
-        ctx.lineTo(needleX + 5, 0);
-        ctx.lineTo(needleX, 6);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.shadowBlur = 0;
-    }, [year, span, dimensions, minYear, maxYear]);
-
-    const handleWheel = (e: React.WheelEvent) => {
-        if (disabled) return;
-        e.preventDefault();
-
-        const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85;
-        const nextSpan = Math.max(10, Math.min(10000, span * zoomFactor));
-        setSpan(Math.round(nextSpan));
-    };
-
-    const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (disabled) return;
-        e.preventDefault();
-        try {
-            e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {}
-
-        dragRef.current = {
-            isDragging: true,
-            startX: e.clientX,
-            startYear: year,
-            hasDragged: false,
-        };
-    };
-
-    const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!dragRef.current || !dragRef.current.isDragging) return;
-        e.preventDefault();
-
-        const dx = e.clientX - dragRef.current.startX;
-        if (Math.abs(dx) > 3) {
-            dragRef.current.hasDragged = true;
-        }
-
-        const yearsPerPixel = span / dimensions.width;
-        const deltaYears = -dx * yearsPerPixel;
-        const nextYear = clampYearValue(Math.round(dragRef.current.startYear + deltaYears), minYear, maxYear);
-
-        onYearChange(nextYear);
-    };
-
-    const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!dragRef.current) return;
-        e.preventDefault();
-        try {
-            e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {}
-
-        const dragInfo = dragRef.current;
-        dragRef.current = null;
-
-        if (!dragInfo.hasDragged) {
-            // Click to jump
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const rect = canvas.getBoundingClientRect();
-                const clickedX = e.clientX - rect.left;
-                const centerYear = year;
-                const startYear = centerYear - span / 2;
-                const clickedYear = clampYearValue(
-                    Math.round(startYear + (clickedX / rect.width) * span),
-                    minYear,
-                    maxYear
-                );
-                onYearChange(clickedYear);
-            }
-        }
-        onYearCommit();
-    };
-
-    return (
-        <div
-            ref={containerRef}
-            style={{
-                flex: 1,
-                height: 44,
-                position: "relative",
-                background: "rgba(255, 255, 255, 0.04)",
-                borderRadius: 22,
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                overflow: "hidden",
-                cursor: disabled ? "not-allowed" : "ew-resize",
-            }}
-            onWheel={handleWheel}
-        >
-            <canvas
-                ref={canvasRef}
-                style={{
-                    display: "block",
-                    width: "100%",
-                    height: "100%",
-                }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-            />
-        </div>
-    );
 }

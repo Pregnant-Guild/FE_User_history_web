@@ -10,6 +10,8 @@ import { CommitPanel } from "./editor/CommitPanel";
 import { CommitHistoryPanel } from "./editor/CommitHistoryPanel";
 import { UndoListPanel } from "./editor/UndoListPanel";
 import { SubmitModal } from "./editor/SubmitModal";
+import ImageOverlayPanel from "./editor/ImageOverlayPanel";
+import type { MapImageOverlay } from "@/uhm/components/map/imageOverlay";
 
 type Props = {
     mode: EditorMode;
@@ -38,6 +40,13 @@ type Props = {
     changesCount: number;
     undoStack: UndoAction[];
     width?: number;
+    imageOverlay: MapImageOverlay | null;
+    onPickImageOverlay: (file: File | null) => void;
+    onPasteImageOverlay: () => void;
+    imageOverlayKeyboardEnabled: boolean;
+    onImageOverlayKeyboardEnabledChange: (enabled: boolean) => void;
+    onImageOverlayOpacityChange: (opacity: number) => void;
+    onRemoveImageOverlay: () => void;
 };
 
 export default function Editor({
@@ -61,7 +70,14 @@ export default function Editor({
     commits,
     changesCount,
     undoStack,
-    width = 280,
+    width = 350,
+    imageOverlay,
+    onPickImageOverlay,
+    onPasteImageOverlay,
+    imageOverlayKeyboardEnabled,
+    onImageOverlayKeyboardEnabledChange,
+    onImageOverlayOpacityChange,
+    onRemoveImageOverlay,
 }: Props) {
     // State đóng/mở modal submit project.
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -106,6 +122,18 @@ export default function Editor({
                     commitCount={commitCount}
                     latestCommitLabel={latestCommitLabel}
                 />
+
+                <div style={{ marginTop: 10 }}>
+                    <ImageOverlayPanel
+                        overlay={imageOverlay}
+                        onPickImage={onPickImageOverlay}
+                        onPasteImage={onPasteImageOverlay}
+                        keyboardEnabled={imageOverlayKeyboardEnabled}
+                        onKeyboardEnabledChange={onImageOverlayKeyboardEnabledChange}
+                        onOpacityChange={onImageOverlayOpacityChange}
+                        onRemove={onRemoveImageOverlay}
+                    />
+                </div>
 
                 <ToolsPanel
                     mode={mode}

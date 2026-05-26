@@ -276,7 +276,7 @@ export function createEditorStore(options: EditorStoreOptions): EditorStoreApi {
             geoSearchResults: [],
             isGeoSearching: false,
             requestedActiveWikiId: null,
-            leftPanelWidth: 280,
+            leftPanelWidth: 320,
             rightPanelWidth: 420,
             timelineFilterEnabled: true,
             geometryBindingFilterEnabled: true,
