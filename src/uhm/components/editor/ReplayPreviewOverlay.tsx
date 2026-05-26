@@ -86,116 +86,53 @@ export default function ReplayPreviewOverlay({
                 </div>
             ) : null}
 
-            {dialog?.image_url ? (
+            {dialog && (dialog.text?.trim() || dialog.image_url?.trim()) ? (
                 <div
                     style={{
                         position: "absolute",
-                        right: 18,
+                        right: hasWikiPreview ? 472 : 18,
                         bottom: 96,
-                        width: 320,
-                        borderRadius: 18,
+                        width: 380,
+                        borderRadius: 20,
                         overflow: "hidden",
-                        border: "1px solid rgba(148, 163, 184, 0.22)",
-                        background: "rgba(15, 23, 42, 0.9)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        background: "rgba(11, 18, 32, 0.85)",
+                        backdropFilter: "blur(12px)",
                         boxShadow: "0 16px 44px rgba(2, 6, 23, 0.42)",
+                        pointerEvents: "auto",
+                        display: "flex",
+                        flexDirection: "column",
                     }}
                 >
-                    <img
-                        src={dialog.image_url}
-                        alt={dialog.image_caption || "Historical image"}
-                        style={{
-                            width: "100%",
-                            display: "block",
-                            maxHeight: 240,
-                            objectFit: "cover",
-                            background: "#020617",
-                        }}
-                    />
-                    {dialog.image_caption?.trim() ? (
-                        <div
-                            style={{
-                                padding: "10px 12px",
-                                fontSize: 12,
-                                lineHeight: 1.45,
-                                color: "#cbd5e1",
-                            }}
-                        >
-                            {dialog.image_caption}
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
-
-            {dialog && dialog.text?.trim() ? (
-                dialog.avatar?.trim() ? (
-                    <div
-                        style={{
-                            position: "absolute",
-                            left: 18,
-                            bottom: 96,
-                            maxWidth: 420,
-                            display: "grid",
-                            gap: 10,
-                            gridTemplateColumns: "56px 1fr",
-                            alignItems: "start",
-                        }}
-                    >
+                    {dialog.image_url?.trim() ? (
                         <img
-                            src={dialog.avatar}
-                            alt="speaker"
+                            src={dialog.image_url}
+                            alt="Historical"
                             style={{
-                                width: 56,
-                                height: 56,
-                                borderRadius: "50%",
+                                width: "100%",
+                                display: "block",
+                                maxHeight: 220,
                                 objectFit: "cover",
-                                border: "2px solid rgba(125, 211, 252, 0.55)",
-                                background: "#0f172a",
+                                background: "#020617",
                             }}
                         />
+                    ) : null}
+                    {dialog.text?.trim() ? (
                         <div
+                            className="ql-editor"
                             style={{
-                                borderRadius: 18,
-                                border: "1px solid rgba(148, 163, 184, 0.24)",
-                                background: "rgba(15, 23, 42, 0.92)",
-                                padding: "14px 16px",
+                                padding: "16px",
                                 color: "#f8fafc",
-                                boxShadow: "0 14px 36px rgba(2, 6, 23, 0.38)",
+                                fontSize: "14px",
+                                lineHeight: "1.6",
+                                overflowY: "auto",
+                                maxHeight: "250px",
+                                background: "transparent",
                             }}
-                        >
-                            <div
-                                style={{
-                                    fontSize: 15,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                }}
-                            >
-                                {dialog.text}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div
-                        style={{
-                            position: "absolute",
-                            left: "50%",
-                            bottom: 90,
-                            transform: "translateX(-50%)",
-                            maxWidth: 720,
-                            borderRadius: 18,
-                            border: "1px solid rgba(148, 163, 184, 0.24)",
-                            background: "rgba(2, 6, 23, 0.84)",
-                            color: "#f8fafc",
-                            padding: "10px 18px",
-                            fontSize: 14,
-                            fontWeight: 700,
-                            lineHeight: 1.45,
-                            textAlign: "center",
-                            boxShadow: "0 12px 32px rgba(2, 6, 23, 0.28)",
-                        }}
-                    >
-                        {dialog.text}
-                    </div>
-                )
+                            dangerouslySetInnerHTML={{ __html: dialog.text }}
+                        />
+                    ) : null}
+                </div>
             ) : null}
 
             {isPreviewMode ? (

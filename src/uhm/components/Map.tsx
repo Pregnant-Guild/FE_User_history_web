@@ -313,7 +313,8 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                 >
                 <div
                     style={{
-                        maxWidth: "650px",
+                        width: "fit-content",
+                        maxWidth: "95%",
                         margin: "0 auto",
                         display: "flex",
                         alignItems: "center",
@@ -340,6 +341,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             padding: "0 6px",
                             userSelect: "none",
                             cursor: "pointer",
+                            flexShrink: 0,
                         }}
                     >
                         <input
@@ -391,7 +393,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                    </label>
 
 	                    {onViewModeChange ? (
-	                        <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px" }}>
+	                        <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px", flexShrink: 0 }}>
 	                            <button
 	                                type="button"
 	                                onClick={() => onViewModeChange("local")}
@@ -428,7 +430,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                            </button>
 	                        </div>
 	                    ) : null}
-
+ 
 	                    {onEnterPreview || onExitPreview ? (
 	                        <button
 	                            type="button"
@@ -440,6 +442,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                                padding: "0 12px",
 	                                background: isPreviewMode ? "#334155" : "#166534",
 	                                fontWeight: 800,
+	                                flexShrink: 0,
 	                            }}
 	                            aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
 	                            title={isPreviewMode ? "Thoat preview" : "Xem nhu nguoi dung"}
@@ -447,7 +450,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                            {isPreviewMode ? "Editor" : "Preview"}
 	                        </button>
 	                    ) : null}
-
+ 
 	                    {onPlayPreviewReplay ? (
 	                        <button
 	                            type="button"
@@ -464,6 +467,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                                background: "#2563eb",
 	                                fontSize: "13px",
 	                                fontWeight: 800,
+	                                flexShrink: 0,
 	                            }}
 	                            aria-label="Play selected replay"
 	                            title="Play replay của geometry đang chọn"
@@ -481,16 +485,16 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                            Play
 	                        </button>
 	                    ) : null}
-
+ 
 	                    <button
                         type="button"
                         onClick={() => handleZoomByStep(-0.8)}
-                        style={zoomButtonStyle}
+                        style={{ ...zoomButtonStyle, flexShrink: 0 }}
                         aria-label="Zoom out"
                     >
                         -
                     </button>
-
+ 
                     <input
                         type="range"
                         min={zoomBounds.min}
@@ -520,21 +524,22 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
                         style={{
                             flex: 1,
+                            minWidth: "60px",
                             accentColor: "#38bdf8",
                             cursor: "pointer",
                         }}
                         aria-label="Map zoom"
                     />
-
+ 
                     <button
                         type="button"
                         onClick={() => handleZoomByStep(0.8)}
-                        style={zoomButtonStyle}
+                        style={{ ...zoomButtonStyle, flexShrink: 0 }}
                         aria-label="Zoom in"
                     >
                         +
                     </button>
-
+ 
                     <div
                         style={{
                             minWidth: "56px",
@@ -542,6 +547,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             fontSize: "12px",
                             color: "#cbd5e1",
                             fontVariantNumeric: "tabular-nums",
+                            flexShrink: 0,
                         }}
                     >
                         {zoomLevel.toFixed(1)}x

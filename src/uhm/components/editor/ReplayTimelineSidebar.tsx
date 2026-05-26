@@ -1361,7 +1361,8 @@ function buildNarrativeActionEntry(
         } else {
             const parts: string[] = [];
             if (dialog.text) {
-                parts.push(`text=${summarizeValue(dialog.text, "")}`);
+                const plainText = dialog.text.replace(/<[^>]*>/g, "");
+                parts.push(`text=${summarizeValue(plainText, "")}`);
             }
             if (dialog.avatar) {
                 parts.push(`avatar=${summarizeValue(dialog.avatar, "")}`);

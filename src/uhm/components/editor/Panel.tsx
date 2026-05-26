@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 type PanelProps = {
     title: string;
@@ -13,9 +13,12 @@ export function Panel({
     defaultOpen,
     children,
 }: PanelProps) {
+    const [open, setOpen] = useState(Boolean(defaultOpen));
+
     return (
         <details
-            open={Boolean(defaultOpen)}
+            open={open}
+            onToggle={(e) => setOpen(e.currentTarget.open)}
             style={{
                 marginTop: 10,
                 padding: 10,
@@ -39,23 +42,33 @@ export function Panel({
                 }}
             >
                 <span>{title}</span>
-                {badge ? (
-                    <span
-                        style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            border: "1px solid #334155",
-                            background: "#0b1220",
-                            color: "#cbd5e1",
-                            fontSize: 12,
-                            fontWeight: 850,
-                            flex: "0 0 auto",
-                        }}
-                    >
-                        {badge}
-                    </span>
-                ) : null}
+                <span
+                    style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 6,
+                        border: "1px solid #334155",
+                        background: "#0b1220",
+                        color: "#cbd5e1",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        flex: "0 0 auto",
+                    }}
+                >
+                    {open ? "−" : "+"}
+                </span>
             </summary>
+            <style>{`
+                summary::-webkit-details-marker {
+                    display: none !important;
+                }
+                summary {
+                    list-style: none !important;
+                }
+            `}</style>
             <div style={{ marginTop: 10 }}>{children}</div>
         </details>
     );

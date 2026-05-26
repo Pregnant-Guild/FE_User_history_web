@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css";
 import type {
     BattleReplay,
     GeoFunctionName,
@@ -11,6 +13,16 @@ import type {
     UIOptionName,
 } from "@/uhm/types/projects";
 import { Panel } from "./Panel";
+import { Modal } from "@/components/ui/modal";
+import Button from "@/components/ui/button/Button";
+import Label from "@/components/form/Label";
+import { fetchWikiBySlug, searchWikisByTitle } from "@/uhm/api/wikis";
+import { useEditorStore } from "@/uhm/store/editorStore";
+
+const ReactQuillEditor = dynamic<any>(() => import("react-quill-new"), {
+    ssr: false,
+    loading: () => <div style={{ height: "120px", background: "#0b1220", borderRadius: "8px" }} className="animate-pulse" />,
+});
 
 type Choice = {
     id: string;
@@ -41,6 +53,7 @@ type ActionFieldConfig = {
     kind:
     | "text"
     | "textarea"
+    | "rich-text"
     | "number"
     | "boolean"
     | "color"
@@ -141,13 +154,11 @@ const buttonStyle = {
 
 const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
     set_dialog: {
-        label: "Dialog box",
+        label: "Narrative Box",
         fields: [
-            { name: "clear", label: "Ẩn dialog (Clear)", kind: "boolean" },
-            { name: "avatar", label: "Avatar URL", kind: "text", placeholder: "https://... (avatar)" },
-            { name: "text", label: "Nội dung", kind: "textarea", placeholder: "Lời thoại / Dẫn chuyện" },
-            { name: "image_url", label: "Ảnh tư liệu", kind: "text", placeholder: "https://... (ảnh đè)" },
-            { name: "image_caption", label: "Chú thích ảnh", kind: "text", placeholder: "Chú thích ảnh" },
+            { name: "clear", label: "Ẩn narrative (Clear)", kind: "boolean" },
+            { name: "image_url", label: "Ảnh tư liệu", kind: "text", placeholder: "https://... (URL ảnh)" },
+            { name: "text", label: "Nội dung", kind: "rich-text", placeholder: "Nội dung dẫn chuyện..." },
         ],
         create: () => ({ function_name: "set_dialog", params: [{ avatar: "", text: "", image_url: "", image_caption: "" }] }),
         deserialize: (params) => {
@@ -155,18 +166,14 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
             if (data === null) {
                 return {
                     clear: true,
-                    avatar: "",
-                    text: "",
                     image_url: "",
-                    image_caption: "",
+                    text: "",
                 };
             }
             return {
                 clear: false,
-                avatar: asString(data?.avatar),
-                text: asString(data?.text),
                 image_url: asString(data?.image_url),
-                image_caption: asString(data?.image_caption),
+                text: asString(data?.text),
             };
         },
         serialize: (values) => {
@@ -174,14 +181,12 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
                 return [null];
             }
             const data: any = {
-                avatar: asString(values.avatar),
+                avatar: "",
                 text: asString(values.text),
+                image_caption: "",
             };
             if (values.image_url) {
                 data.image_url = asString(values.image_url);
-            }
-            if (values.image_caption) {
-                data.image_caption = asString(values.image_caption);
             }
             return [data];
         },
@@ -200,6 +205,236 @@ export default function ReplayEffectsSidebar({
     getCurrentMapViewState,
     onMutateReplay,
 }: Props) {
+    const wikis = useEditorStore((state) => state.snapshotWikis);
+
+    // Quill: custom link UI (link-to-wiki by slug).
+    const wikiLinkIntentRef = useRef<{
+        quill: any;
+        range: any;
+        existingHref: string | null;
+    } | null>(null);
+
+    const [isWikiLinkOpen, setIsWikiLinkOpen] = useState(false);
+    const [wikiLinkQuery, setWikiLinkQuery] = useState("");
+    const [wikiLinkSearchMode, setWikiLinkSearchMode] = useState<"title" | "slug">("title");
+    const [wikiLinkError, setWikiLinkError] = useState<string | null>(null);
+    const [globalWikiResults, setGlobalWikiResults] = useState<any[]>([]);
+    const [isGlobalWikiSearching, setIsGlobalWikiSearching] = useState(false);
+    const [globalWikiSearchError, setGlobalWikiSearchError] = useState<string | null>(null);
+    const globalWikiSearchRequestRef = useRef(0);
+
+    const handleLinkClick = useCallback((quill: any) => {
+        if (!quill) return;
+        const range = quill.getSelection?.() ?? null;
+        const existingHref =
+            range && (quill.getFormat?.(range)?.link ?? quill.getFormat?.(range.index, range.length)?.link) || null;
+
+        wikiLinkIntentRef.current = {
+            quill,
+            range,
+            existingHref: typeof existingHref === "string" ? existingHref : null,
+        };
+
+        const selectedText =
+            range && range.length > 0 ? String(quill.getText?.(range.index, range.length) || "").trim() : "";
+        setWikiLinkQuery(selectedText.slice(0, 80));
+        setWikiLinkError(null);
+        setIsWikiLinkOpen(true);
+    }, []);
+
+    const localWikiLinkCandidates = useMemo(() => {
+        if (!isWikiLinkOpen) return [];
+        const q = wikiLinkQuery.trim().toLowerCase();
+
+        const base = (wikis || [])
+            .filter((w) => w && typeof w.id === "string" && w.operation !== "delete")
+            .filter((w) => typeof w.slug === "string" && w.slug.trim().length > 0);
+
+        const filtered = (() => {
+            if (!q.length) return base;
+            if (wikiLinkSearchMode === "slug") {
+                return base.filter((w) => String(w.slug || "").toLowerCase().includes(q));
+            }
+            return base.filter((w) => (w.title || "").toLowerCase().includes(q));
+        })();
+
+        return filtered.slice(0, 20).map((w) => ({
+            key: `local:${w.id}`,
+            title: (w.title || "").trim() || "Untitled wiki",
+            slug: String(w.slug).trim(),
+            source: "local" as const,
+        }));
+    }, [isWikiLinkOpen, wikiLinkQuery, wikiLinkSearchMode, wikis]);
+
+    useEffect(() => {
+        if (!isWikiLinkOpen) return;
+
+        const keyword = wikiLinkQuery.trim();
+        if (!keyword.length) {
+            setGlobalWikiResults([]);
+            setIsGlobalWikiSearching(false);
+            setGlobalWikiSearchError(null);
+            return;
+        }
+
+        let disposed = false;
+        const requestId = ++globalWikiSearchRequestRef.current;
+        const timeoutId = window.setTimeout(async () => {
+            setIsGlobalWikiSearching(true);
+            setGlobalWikiSearchError(null);
+            try {
+                const rows =
+                    wikiLinkSearchMode === "slug"
+                        ? (() => fetchWikiBySlug(keyword))()
+                        : (() => searchWikisByTitle(keyword, { limit: 12 }))();
+
+                const resolved = await rows;
+                if (disposed || requestId !== globalWikiSearchRequestRef.current) return;
+
+                const list = Array.isArray(resolved) ? resolved : resolved ? [resolved] : [];
+                setGlobalWikiResults(list);
+            } catch (err) {
+                if (disposed || requestId !== globalWikiSearchRequestRef.current) return;
+                console.error("Search global wikis failed", err);
+                setGlobalWikiResults([]);
+                setGlobalWikiSearchError("Không search được wiki trên server.");
+            } finally {
+                if (!disposed && requestId === globalWikiSearchRequestRef.current) {
+                    setIsGlobalWikiSearching(false);
+                }
+            }
+        }, 260);
+
+        return () => {
+            disposed = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [isWikiLinkOpen, wikiLinkQuery, wikiLinkSearchMode]);
+
+    const globalWikiLinkCandidates = useMemo(() => {
+        if (!isWikiLinkOpen) return [];
+        const out: any[] = [];
+        for (const row of globalWikiResults || []) {
+            const slug = typeof row?.slug === "string" ? row.slug.trim() : "";
+            if (!slug.length) continue;
+            out.push({
+                key: `global:${row.id || slug}`,
+                title: (row.title || "").trim() || "Untitled wiki",
+                slug,
+                source: "global",
+            });
+        }
+        return out.slice(0, 20);
+    }, [globalWikiResults, isWikiLinkOpen]);
+
+    const wikiLinkCandidates = useMemo(() => {
+        const localSlugs = new Set(localWikiLinkCandidates.map((w) => w.slug));
+        const dedupedGlobal = globalWikiLinkCandidates.filter((w) => !localSlugs.has(w.slug));
+        return [...localWikiLinkCandidates, ...dedupedGlobal];
+    }, [globalWikiLinkCandidates, localWikiLinkCandidates]);
+
+    const closeWikiLinkModal = useCallback(() => {
+        setIsWikiLinkOpen(false);
+    }, []);
+
+    const applyWikiLink = useCallback((target: { title: string; slug: string }) => {
+        const intent = wikiLinkIntentRef.current;
+        const quill = intent?.quill;
+        if (!quill) return;
+
+        const slug = target.slug.trim();
+        const range = intent?.range ?? quill.getSelection?.() ?? null;
+        if (!range) {
+            setWikiLinkError("Không lấy được vị trí selection trong editor.");
+            return;
+        }
+
+        quill.setSelection?.(range.index, range.length, "silent");
+
+        if (range.length > 0) {
+            quill.formatText?.(range.index, range.length, "link", slug, "user");
+            closeWikiLinkModal();
+            return;
+        }
+
+        const label = (target.title || "").trim() || slug;
+        quill.insertText?.(range.index, label, { link: slug }, "user");
+        quill.setSelection?.(range.index + label.length, 0, "silent");
+        closeWikiLinkModal();
+    }, [closeWikiLinkModal]);
+
+    const applyMissingWikiLink = useCallback(() => {
+        const intent = wikiLinkIntentRef.current;
+        const quill = intent?.quill;
+        if (!quill) return;
+
+        const href = "__missing__";
+        const range = intent?.range ?? quill.getSelection?.() ?? null;
+        if (!range) {
+            setWikiLinkError("Không lấy được vị trí selection trong editor.");
+            return;
+        }
+
+        quill.setSelection?.(range.index, range.length, "silent");
+
+        if (range.length > 0) {
+            quill.formatText?.(range.index, range.length, "link", href, "user");
+            closeWikiLinkModal();
+            return;
+        }
+
+        const label = wikiLinkQuery.trim().slice(0, 120) || "link";
+        quill.insertText?.(range.index, label, { link: href }, "user");
+        quill.setSelection?.(range.index + label.length, 0, "silent");
+        closeWikiLinkModal();
+    }, [closeWikiLinkModal, wikiLinkQuery]);
+
+    const removeWikiLink = useCallback(() => {
+        const intent = wikiLinkIntentRef.current;
+        const quill = intent?.quill;
+        if (!quill) return;
+        const range = intent?.range ?? quill.getSelection?.() ?? null;
+        if (!range) return;
+        quill.setSelection?.(range.index, range.length, "silent");
+        if (range.length > 0) {
+            quill.formatText?.(range.index, range.length, "link", false, "user");
+        } else {
+            quill.format?.("link", false, "user");
+        }
+        closeWikiLinkModal();
+    }, [closeWikiLinkModal]);
+
+    const isUrlQuery = useMemo(() => {
+        const q = wikiLinkQuery.trim();
+        return q.startsWith("http://") || q.startsWith("https://") || q.includes("/");
+    }, [wikiLinkQuery]);
+
+    const applyExternalLink = useCallback(() => {
+        const intent = wikiLinkIntentRef.current;
+        const quill = intent?.quill;
+        if (!quill) return;
+
+        const href = wikiLinkQuery.trim();
+        const range = intent?.range ?? quill.getSelection?.() ?? null;
+        if (!range) {
+            setWikiLinkError("Không lấy được vị trí selection trong editor.");
+            return;
+        }
+
+        quill.setSelection?.(range.index, range.length, "silent");
+
+        if (range.length > 0) {
+            quill.formatText?.(range.index, range.length, "link", href, "user");
+            closeWikiLinkModal();
+            return;
+        }
+
+        const label = href;
+        quill.insertText?.(range.index, label, { link: href }, "user");
+        quill.setSelection?.(range.index + label.length, 0, "silent");
+        closeWikiLinkModal();
+    }, [closeWikiLinkModal, wikiLinkQuery]);
+
     const stages = useMemo(() => replay?.detail || [], [replay?.detail]);
     const selectedStage =
         stages.find((stage) => stage.id === selectedStageId) ||
@@ -303,6 +538,7 @@ export default function ReplayEffectsSidebar({
                         onUpdateActions={(nextActions, label) =>
                             updateActionGroup("use_narrow_function", nextActions, label)
                         }
+                        onLinkClick={handleLinkClick}
                     />
                     <MapFunctionShortcutPanel
                         currentTimelineYear={currentTimelineYear}
@@ -341,6 +577,176 @@ export default function ReplayEffectsSidebar({
                     Chọn một step ở panel trái để chỉnh hiệu ứng.
                 </div>
             )}
+            <Modal
+                isOpen={isWikiLinkOpen}
+                onClose={closeWikiLinkModal}
+                className="max-w-[620px] p-6 !bg-[#0f172a] border border-[#1e293b] text-slate-100 rounded-xl dark"
+            >
+                <div style={{ display: "grid", gap: 16 }}>
+                    <div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: "#ffffff" }}>Chèn Link Wiki</div>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                        <Label className="!text-slate-300">Tìm kiếm wiki hoặc nhập URL</Label>
+                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                            <input
+                                value={wikiLinkQuery}
+                                onChange={(e) => setWikiLinkQuery(e.target.value)}
+                                style={{
+                                    height: 44,
+                                    flex: 1,
+                                    minWidth: 0,
+                                    borderRadius: 12,
+                                    border: "1px solid #334155",
+                                    backgroundColor: "transparent",
+                                    paddingLeft: 16,
+                                    paddingRight: 16,
+                                    fontSize: 14,
+                                    color: "#f1f5f9",
+                                    outline: "none"
+                                }}
+                                placeholder={wikiLinkSearchMode === "slug" ? "Nhập slug..." : "Nhập tiêu đề hoặc URL..."}
+                                autoFocus
+                            />
+                            <select
+                                value={wikiLinkSearchMode}
+                                onChange={(e) => setWikiLinkSearchMode(e.target.value === "slug" ? "slug" : "title")}
+                                style={{
+                                    height: 44,
+                                    borderRadius: 12,
+                                    border: "1px solid #334155",
+                                    backgroundColor: "#0f172a",
+                                    paddingLeft: 12,
+                                    paddingRight: 12,
+                                    fontSize: 14,
+                                    color: "#f1f5f9",
+                                    outline: "none"
+                                }}
+                                aria-label="Search mode"
+                            >
+                                <option value="title">Tiêu đề</option>
+                                <option value="slug">Slug</option>
+                            </select>
+                        </div>
+                        {wikiLinkError ? (
+                            <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>{wikiLinkError}</div>
+                        ) : null}
+                        {globalWikiSearchError ? (
+                            <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>{globalWikiSearchError}</div>
+                        ) : null}
+                    </div>
+
+                    <div style={{ maxHeight: 280, overflowY: "auto", borderRadius: 12, border: "1px solid #1e293b", backgroundColor: "#0b1220" }}>
+                        <div style={{ padding: 8, display: "grid", gap: 4 }}>
+                            {isGlobalWikiSearching ? (
+                                <div style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 8, fontSize: 12, color: "#94a3b8" }}>
+                                    Đang tìm kiếm…
+                                </div>
+                            ) : null}
+                            {wikiLinkCandidates.map((w) => (
+                                <button
+                                    key={w.key}
+                                    type="button"
+                                    onClick={() => applyWikiLink(w)}
+                                    style={{
+                                        width: "100%",
+                                        textAlign: "left",
+                                        borderRadius: 8,
+                                        border: "1px solid transparent",
+                                        backgroundColor: "transparent",
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        transition: "all 0.2s",
+                                        cursor: "pointer",
+                                        color: "#f1f5f9"
+                                    }}
+                                    className="hover-link-item"
+                                    title={w.slug || undefined}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 500, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {(w.title || "").trim() || "Untitled wiki"}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {String(w.slug)}
+                                            </div>
+                                        </div>
+                                        <span
+                                            style={{
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                                paddingLeft: 8,
+                                                paddingRight: 8,
+                                                paddingTop: 2,
+                                                paddingBottom: 2,
+                                                borderRadius: 9999,
+                                                border: w.source === "local" ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(59, 130, 246, 0.3)",
+                                                color: w.source === "local" ? "#34d399" : "#60a5fa"
+                                            }}
+                                        >
+                                            {w.source}
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
+                            {wikiLinkCandidates.length === 0 ? (
+                                <div style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 16, paddingBottom: 16, fontSize: 14, color: "#94a3b8" }}>
+                                    Không tìm thấy wiki phù hợp (hoặc các wiki khác chưa có slug).
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                        {isUrlQuery ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={applyExternalLink}
+                                className="!bg-[#0284c7] hover:!bg-[#0369a1] !text-white !ring-0 !border-0"
+                            >
+                                Chèn Link ngoài
+                            </Button>
+                        ) : null}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={applyMissingWikiLink}
+                            className="!bg-[#334155] hover:!bg-[#475569] !text-slate-100 !ring-0 !border-0"
+                        >
+                            Link trống
+                        </Button>
+                        {wikiLinkIntentRef.current?.existingHref ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={removeWikiLink}
+                                className="!bg-[#b91c1c] hover:!bg-[#991b1b] !text-white !ring-0 !border-0"
+                            >
+                                Xóa Link
+                            </Button>
+                        ) : null}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={closeWikiLinkModal}
+                            className="!bg-[#1e293b] hover:!bg-[#334155] !text-slate-300 !ring-0 !border-0"
+                        >
+                            Hủy
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+            <style>{`
+                .hover-link-item:hover {
+                    border-color: #334155 !important;
+                    background-color: rgba(30, 41, 59, 0.5) !important;
+                }
+            `}</style>
         </aside>
     );
 }
@@ -598,106 +1004,6 @@ function MapCameraViewPanel({
     );
 }
 
-function UiSimpleEffectsPanel({
-    draft,
-    onToggleOption,
-    onApply,
-}: {
-    draft: UiEffectsDraftState;
-    onToggleOption: (option: UIOptionName) => void;
-    onApply: () => void;
-}) {
-    const activeCount = uiSimpleOptionValues.filter((option) => draft.selected[option]).length;
-
-    return (
-        <Panel title="UI Effects" badge={`${activeCount}`} defaultOpen>
-            <div style={{ display: "grid", gap: 12 }}>
-                <UiOptionToggleRow
-                    optionValues={uiSimpleOptionValues}
-                    draft={draft}
-                    onToggleOption={onToggleOption}
-                />
-                <button
-                    type="button"
-                    onClick={onApply}
-                    style={{
-                        ...buttonStyle,
-                        background: "#0f766e",
-                        border: "none",
-                    }}
-                >
-                    Apply
-                </button>
-            </div>
-        </Panel>
-    );
-}
-
-function UiInputEffectsPanel({
-    draft,
-    wikiChoices,
-    onToggleOption,
-    onChangeDraft,
-    onApply,
-}: {
-    draft: UiEffectsDraftState;
-    wikiChoices: Choice[];
-    onToggleOption: (option: UIOptionName) => void;
-    onChangeDraft: (patch: Partial<UiEffectsDraftState>) => void;
-    onApply: () => void;
-}) {
-    const activeCount = uiInputOptionValues.filter((option) => draft.selected[option]).length;
-
-    return (
-        <Panel title="UI Input Effects" badge={`${activeCount}`} defaultOpen>
-            <div style={{ display: "grid", gap: 12 }}>
-                <UiOptionToggleRow
-                    optionValues={uiInputOptionValues}
-                    draft={draft}
-                    onToggleOption={onToggleOption}
-                />
-
-                {draft.selected.wiki ? (
-                    <FieldInput
-                        field={{ name: "wiki_id", label: "Wiki", kind: "wiki" }}
-                        value={draft.wiki_id}
-                        geometryChoices={[]}
-                        wikiChoices={wikiChoices}
-                        onChange={(nextValue) => onChangeDraft({ wiki_id: asString(nextValue) })}
-                    />
-                ) : null}
-
-                {draft.selected.toast ? (
-                    <FieldInput
-                        field={{
-                            name: "message",
-                            label: "Message",
-                            kind: "textarea",
-                            placeholder: "Nội dung thông báo",
-                        }}
-                        value={draft.message}
-                        geometryChoices={[]}
-                        wikiChoices={wikiChoices}
-                        onChange={(nextValue) => onChangeDraft({ message: asString(nextValue) })}
-                    />
-                ) : null}
-
-                <button
-                    type="button"
-                    onClick={onApply}
-                    style={{
-                        ...buttonStyle,
-                        background: "#0f766e",
-                        border: "none",
-                    }}
-                >
-                    Apply
-                </button>
-            </div>
-        </Panel>
-    );
-}
-
 function UiOptionToggleRow({
     optionValues,
     draft,
@@ -718,8 +1024,6 @@ function UiOptionToggleRow({
         />
     );
 }
-
-// UiVisibilityOptions removed since toggles are evaluated directly
 
 function SimpleOptionToggleRow<T extends string>({
     options,
@@ -776,52 +1080,66 @@ function UiEffectsEditor({
         setDraft(buildUiEffectsDraftState(actions));
     }, [actions]);
 
+    const handleApply = () => {
+        const evaluatedOptions: UIOptionName[] = ["timeline", "layer_panel", "zoom_panel", "wiki"];
+        const updatedDraft = {
+            ...draft,
+            selected: {
+                ...draft.selected,
+                wiki: Boolean(draft.wiki_id),
+            },
+        };
+
+        const nextActions = replaceUiActionsByGroup(actions, evaluatedOptions, updatedDraft);
+        const label = buildUiEffectsApplyLabel("UI Effects", updatedDraft, evaluatedOptions);
+        onApplyActions(nextActions, label);
+    };
+
     return (
-        <>
-            <UiSimpleEffectsPanel
-                draft={draft}
-                onToggleOption={(option) =>
-                    setDraft((prev) => ({
-                        ...prev,
-                        selected: {
-                            ...prev.selected,
-                            [option]: !prev.selected[option],
-                        },
-                    }))
-                }
-                onApply={() =>
-                    onApplyActions(
-                        replaceUiActionsByGroup(actions, uiSimpleOptionValues, draft),
-                        buildUiEffectsApplyLabel("UI Effects", draft, uiSimpleOptionValues)
-                    )
-                }
-            />
-            <UiInputEffectsPanel
-                draft={draft}
-                wikiChoices={wikiChoices}
-                onToggleOption={(option) =>
-                    setDraft((prev) => ({
-                        ...prev,
-                        selected: {
-                            ...prev.selected,
-                            [option]: !prev.selected[option],
-                        },
-                    }))
-                }
-                onChangeDraft={(patch) =>
-                    setDraft((prev) => ({
-                        ...prev,
-                        ...patch,
-                    }))
-                }
-                onApply={() =>
-                    onApplyActions(
-                        replaceUiActionsByGroup(actions, uiInputOptionValues, draft),
-                        buildUiEffectsApplyLabel("UI Inputs", draft, uiInputOptionValues)
-                    )
-                }
-            />
-        </>
+        <Panel title="UI Effects" defaultOpen>
+            <div style={{ display: "grid", gap: 12 }}>
+                <UiOptionToggleRow
+                    optionValues={uiSimpleOptionValues}
+                    draft={draft}
+                    onToggleOption={(option) =>
+                        setDraft((prev) => ({
+                            ...prev,
+                            selected: {
+                                ...prev.selected,
+                                [option]: !prev.selected[option],
+                            },
+                        }))
+                    }
+                />
+
+                <div style={{ borderTop: "1px solid #1f2937", margin: "8px 0" }} />
+
+                <FieldInput
+                    field={{ name: "wiki_id", label: "Mở Wiki", kind: "wiki" }}
+                    value={draft.wiki_id}
+                    geometryChoices={[]}
+                    wikiChoices={wikiChoices}
+                    onChange={(nextValue) =>
+                        setDraft((prev) => ({
+                            ...prev,
+                            wiki_id: asString(nextValue),
+                        }))
+                    }
+                />
+
+                <button
+                    type="button"
+                    onClick={handleApply}
+                    style={{
+                        ...buttonStyle,
+                        background: "#0f766e",
+                        border: "none",
+                    }}
+                >
+                    Apply
+                </button>
+            </div>
+        </Panel>
     );
 }
 
@@ -835,6 +1153,7 @@ function ActionGroupEditor<T extends string>({
     createOnSelect = false,
     emptyOptionLabel,
     onUpdateActions,
+    onLinkClick,
 }: {
     title: string;
     groupLabel: string;
@@ -845,6 +1164,7 @@ function ActionGroupEditor<T extends string>({
     createOnSelect?: boolean;
     emptyOptionLabel?: string;
     onUpdateActions: (nextActions: ReplayAction<T>[], label: string) => void;
+    onLinkClick?: (quill: any) => void;
 }) {
     const functionNames = useMemo(() => Object.keys(definitions) as T[], [definitions]);
     const [composerFunctionName, setComposerFunctionName] = useState<T | "">(
@@ -856,6 +1176,28 @@ function ActionGroupEditor<T extends string>({
             createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T)
         )
     );
+
+    const lastLoadedActionsRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (JSON.stringify(actions) === JSON.stringify(lastLoadedActionsRef.current)) {
+            return;
+        }
+        lastLoadedActionsRef.current = actions;
+
+        if (actions.length > 0) {
+            const first = actions[0];
+            setComposerFunctionName(first.function_name);
+            const def = definitions[first.function_name];
+            if (def) {
+                setComposerDraftValues(def.deserialize(first.params));
+            }
+        } else {
+            const defaultFun = createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T);
+            setComposerFunctionName(defaultFun);
+            setComposerDraftValues(buildActionComposerDraft(definitions, defaultFun));
+        }
+    }, [actions, definitions, createOnSelect, functionNames]);
 
     const composerDefinition = composerFunctionName
         ? definitions[composerFunctionName]
@@ -955,6 +1297,7 @@ function ActionGroupEditor<T extends string>({
                                             value={composerDraftValues[field.name]}
                                             geometryChoices={geometryChoices}
                                             wikiChoices={wikiChoices}
+                                            onLinkClick={onLinkClick}
                                             onChange={(nextValue) =>
                                                 setComposerDraftValues((prev) => ({
                                                     ...prev,
@@ -1001,18 +1344,50 @@ function FieldInput({
     geometryChoices,
     wikiChoices,
     onChange,
+    onLinkClick,
 }: {
     field: ActionFieldConfig;
     value: ActionValue | undefined;
     geometryChoices: Choice[];
     wikiChoices: Choice[];
     onChange: (nextValue: ActionValue) => void;
+    onLinkClick?: (quill: any) => void;
 }) {
     const baseLabel = (
         <div style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 700 }}>
             {field.label}
         </div>
     );
+
+    if (field.kind === "rich-text") {
+        return (
+            <label style={{ display: "grid", gap: 6 }}>
+                {baseLabel}
+                <div style={{ background: "#0b1220", borderRadius: 6, border: "1px solid #334155" }} className="dark">
+                    <ReactQuillEditor
+                        theme="snow"
+                        value={asString(value)}
+                        onChange={(content: string) => onChange(content)}
+                        modules={{
+                            toolbar: {
+                                container: [
+                                    ["bold", "italic", "underline", "strike"],
+                                    [{ list: "ordered" }, { list: "bullet" }],
+                                    ["link"],
+                                    ["clean"],
+                                ],
+                                handlers: {
+                                    link: function (this: { quill?: any }) {
+                                        onLinkClick?.(this?.quill);
+                                    },
+                                },
+                            },
+                        }}
+                    />
+                </div>
+            </label>
+        );
+    }
 
     if (field.kind === "textarea") {
         return (

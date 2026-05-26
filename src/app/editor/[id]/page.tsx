@@ -947,7 +947,7 @@ function EditorPageContent() {
             .filter((wiki) => wiki && wiki.operation !== "delete")
             .map((wiki) => ({
                 id: String(wiki.id || ""),
-                label: `${(wiki.title || "").trim() || "Untitled wiki"} (${String(wiki.id || "")})`,
+                label: (wiki.title || "").trim() || "Untitled wiki",
             }))
             .filter((wiki) => wiki.id.length > 0);
     }, [snapshotWikis]);
