@@ -178,6 +178,10 @@ const preloadedImages: Record<string, HTMLImageElement> = {};
 const loadedImageKeys = new Set<string>();
 const mapsToUpdate = new Set<maplibregl.Map>();
 
+export function unregisterMapFromIconUpdates(map: maplibregl.Map) {
+    mapsToUpdate.delete(map);
+}
+
 function preloadPointIcons() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     for (const [typeId, path] of Object.entries(POINT_GEOTYPE_ICON_PATHS)) {

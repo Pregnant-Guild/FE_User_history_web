@@ -1,6 +1,6 @@
 import maplibregl from "maplibre-gl";
 export const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get", "type"], ["get", "entity_type_id"], ""];
-export { ensurePointGeotypeIcons } from "./shared/pointStyle";
+export { ensurePointGeotypeIcons, unregisterMapFromIconUpdates } from "./shared/pointStyle";
 
 import { getDefenseLineLayers } from "./geotypes/defense_line";
 import { getMilitaryRouteLayers } from "./geotypes/military_route";

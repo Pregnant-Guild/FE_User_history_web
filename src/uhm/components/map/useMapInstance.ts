@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM } from "@/uhm/lib/map/constants";
 import { clampNumber, roundZoom } from "./mapUtils";
 import { getBaseMapStyle } from "./useMapLayers";
+import { unregisterMapFromIconUpdates } from "@/uhm/lib/map/styles/geotypeLayers";
 
 const MAP_PROJECTION_STORAGE_KEY = "uhm:mapProjection";
 
@@ -79,6 +80,7 @@ export function useMapInstance() {
                 if (mapRef.current === map) {
                     mapRef.current = null;
                 }
+                unregisterMapFromIconUpdates(map);
                 map.remove();
             };
         } catch (err) {
