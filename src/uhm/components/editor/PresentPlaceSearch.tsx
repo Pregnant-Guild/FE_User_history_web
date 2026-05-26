@@ -34,7 +34,7 @@ type Props = {
     onFocusPlace: (place: PresentPlaceSelection) => void;
     onFocusHistoricalGeometry: (payload: HistoricalGeometryFocusPayload) => void;
     onClearFocus: () => void;
-    rightOffset?: number;
+    leftOffset?: number;
 };
 
 export default function PresentPlaceSearch({
@@ -42,7 +42,7 @@ export default function PresentPlaceSearch({
     onFocusPlace,
     onFocusHistoricalGeometry,
     onClearFocus,
-    rightOffset = 18,
+    leftOffset = 18,
 }: Props) {
     const [mode, setMode] = useState<SearchMode>("present");
     const [query, setQuery] = useState("");
@@ -280,7 +280,7 @@ export default function PresentPlaceSearch({
             style={{
                 position: "absolute",
                 top: 10,
-                right: rightOffset,
+                left: leftOffset,
                 zIndex: 18,
                 width: "min(392px, calc(100vw - 36px))",
                 pointerEvents: "auto",

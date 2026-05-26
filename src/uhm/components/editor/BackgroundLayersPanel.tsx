@@ -62,6 +62,7 @@ export default function BackgroundLayersPanel({
 
     return (
         <aside
+            className="no-scrollbar"
             style={{
                 width,
                 background: "#111827",

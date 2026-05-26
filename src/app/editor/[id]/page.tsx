@@ -2935,6 +2935,15 @@ function EditorPageContent() {
 
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
+            <style>{`
+                html, body {
+                    overflow: hidden !important;
+                    scrollbar-width: none !important;
+                }
+                html::-webkit-scrollbar, body::-webkit-scrollbar {
+                    display: none !important;
+                }
+            `}</style>
             {!isReplayEditMode && !isAnyPreviewMode ? (
                 <>
                     <Editor
@@ -3058,7 +3067,7 @@ function EditorPageContent() {
                         onFocusPlace={handleFocusPresentPlace}
                         onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
                         onClearFocus={clearPresentPlaceFocus}
-                        rightOffset={isReplayPreviewWikiSidebarOpen ? previewSidebarWidth + 48 : 18}
+                        leftOffset={18}
                     />
                 ) : null}
                 {isReplayPreviewMode ? (
