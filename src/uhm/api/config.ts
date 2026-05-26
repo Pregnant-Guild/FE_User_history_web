@@ -33,7 +33,10 @@ export function buildGoongProxyUrl(rawUrl: string): string {
         .replace(/^https?:\/\//i, "")
         .replace(/^\/+/, "");
 
-    return `${GOONG_PROXY_BASE_PATH}/${proxyTarget}`;
+    const isMapProxy = !proxyTarget.startsWith("rsapi.goong.io");
+    const proxyPrefix = isMapProxy ? `${API_BASE_URL}/map/proxy` : `${API_BASE_URL}/api/proxy`;
+
+    return `${proxyPrefix}/${proxyTarget}`;
 }
 
 export const GOONG_GLYPHS_PROXY_URL = buildGoongProxyUrl(GOONG_GLYPHS_UPSTREAM_URL);

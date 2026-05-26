@@ -255,9 +255,15 @@ export function normalizeEditorSnapshot(raw: unknown): EditorSnapshot | null {
                 const row = r as RawGeometryEntityRow;
                 const geometry_id = getStringId(row.geometry_id);
                 const entity_id = typeof row.entity_id === "string" ? row.entity_id : "";
+                const opRaw = typeof row.operation === "string" ? row.operation.trim() : "";
+                const operation: GeometryEntitySnapshot["operation"] =
+                    opRaw === "delete" || opRaw === "binding" || opRaw === "reference"
+                        ? opRaw
+                        : undefined;
                 return {
                     geometry_id,
                     entity_id,
+                    operation,
                 };
             })
             .filter((r) => r.geometry_id.length > 0 && r.entity_id.length > 0)

@@ -187,13 +187,21 @@ Kết luận:
 
 ### 4.3. Các REST API khác của Goong
 
-Không dùng:
+Preview search hiện có dùng trực tiếp các REST API này từ browser:
 
-- geocoding
-- autocomplete
+- `Place/AutoComplete`
+- `Place/Detail`
+- `Geocode` reverse geocoding với `latlng=lat,lng`
+
+Nguồn trong code:
+
+- [goongPlaces.ts](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/goongPlaces.ts:1)
+- [PresentPlaceSearch.tsx](/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/PresentPlaceSearch.tsx:1)
+
+Chưa dùng:
+
 - directions
 - distance matrix
-- place details
 - static map
 
 ## 5. Backend cần làm gì

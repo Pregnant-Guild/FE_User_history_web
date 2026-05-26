@@ -419,6 +419,39 @@ export function collectCoordinatePairs(value: unknown): Array<[number, number]> 
     return value.flatMap((item) => collectCoordinatePairs(item));
 }
 
+export function getGeometryRepresentativePoint(geometry: Geometry): Coordinate | null {
+    if (geometry.type === "Point") {
+        return normalizeCoordinate(geometry.coordinates);
+    }
+
+    if (geometry.type === "MultiPoint") {
+        return getAverageCoordinate(geometry.coordinates);
+    }
+
+    if (geometry.type === "LineString") {
+        return getLineMidpointCoordinate(geometry.coordinates);
+    }
+
+    if (geometry.type === "MultiLineString") {
+        let bestLine: Coordinate[] | null = null;
+        let bestLength = -1;
+        for (const line of geometry.coordinates) {
+            const length = getLineLength(line);
+            if (length > bestLength) {
+                bestLength = length;
+                bestLine = line;
+            }
+        }
+        return bestLine ? getLineMidpointCoordinate(bestLine) : null;
+    }
+
+    if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+        return getPolygonLabelPoint(geometry);
+    }
+
+    return null;
+}
+
 export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureCollection {
     const features: Feature[] = [];
 
@@ -875,6 +908,76 @@ function getSingleEntityName(feature: Feature): string | null {
 
 function isLineGeometry(geometry: Geometry): boolean {
     return geometry.type === "LineString" || geometry.type === "MultiLineString";
+}
+
+function normalizeCoordinate(value: unknown): Coordinate | null {
+    if (!Array.isArray(value) || value.length < 2) return null;
+    const lng = Number(value[0]);
+    const lat = Number(value[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+    return [lng, lat];
+}
+
+function getAverageCoordinate(coordinates: Coordinate[]): Coordinate | null {
+    const valid = coordinates
+        .map((coordinate) => normalizeCoordinate(coordinate))
+        .filter((coordinate): coordinate is Coordinate => Boolean(coordinate));
+    if (!valid.length) return null;
+
+    const sum = valid.reduce(
+        (acc, coordinate) => ({
+            lng: acc.lng + coordinate[0],
+            lat: acc.lat + coordinate[1],
+        }),
+        { lng: 0, lat: 0 }
+    );
+    return [sum.lng / valid.length, sum.lat / valid.length];
+}
+
+function getLineMidpointCoordinate(coordinates: Coordinate[]): Coordinate | null {
+    const valid = coordinates
+        .map((coordinate) => normalizeCoordinate(coordinate))
+        .filter((coordinate): coordinate is Coordinate => Boolean(coordinate));
+    if (!valid.length) return null;
+    if (valid.length === 1) return valid[0];
+
+    const totalLength = getLineLength(valid);
+    if (totalLength <= 0) return valid[Math.floor(valid.length / 2)];
+
+    const halfway = totalLength / 2;
+    let travelled = 0;
+    for (let i = 1; i < valid.length; i += 1) {
+        const prev = valid[i - 1];
+        const next = valid[i];
+        const segmentLength = getCoordinateDistance(prev, next);
+        if (travelled + segmentLength >= halfway) {
+            const ratio = segmentLength > 0 ? (halfway - travelled) / segmentLength : 0;
+            return [
+                prev[0] + (next[0] - prev[0]) * ratio,
+                prev[1] + (next[1] - prev[1]) * ratio,
+            ];
+        }
+        travelled += segmentLength;
+    }
+
+    return valid[valid.length - 1];
+}
+
+function getLineLength(coordinates: Coordinate[]): number {
+    let total = 0;
+    for (let i = 1; i < coordinates.length; i += 1) {
+        const prev = normalizeCoordinate(coordinates[i - 1]);
+        const next = normalizeCoordinate(coordinates[i]);
+        if (!prev || !next) continue;
+        total += getCoordinateDistance(prev, next);
+    }
+    return total;
+}
+
+function getCoordinateDistance(a: Coordinate, b: Coordinate): number {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    return Math.sqrt(dx * dx + dy * dy);
 }
 
 function getLineCoordinateGroups(geometry: Geometry): Coordinate[][] {

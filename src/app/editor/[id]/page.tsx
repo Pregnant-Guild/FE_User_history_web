@@ -18,6 +18,7 @@ import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPan
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
 import GeometryBindingPanel from "@/uhm/components/editor/GeometryBindingPanel";
 import ImageOverlayPanel from "@/uhm/components/editor/ImageOverlayPanel";
+import PresentPlaceSearch, { type HistoricalGeometryFocusPayload, type PresentPlaceSelection } from "@/uhm/components/editor/PresentPlaceSearch";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
@@ -84,6 +85,7 @@ import {
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
 } from "@/uhm/lib/editor/editorPageUtils";
+import { fitMapToFeatureCollection } from "@/uhm/components/map/mapUtils";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
@@ -411,6 +413,7 @@ function EditorPageContent() {
     const [previewExpandedEntityId, setPreviewExpandedEntityId] = useState<string | null>(null);
     const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
     const [isPreviewEntitySidebarOpen, setIsPreviewEntitySidebarOpen] = useState(false);
+    const [focusedPresentPlace, setFocusedPresentPlace] = useState<PresentPlaceSelection | null>(null);
 
     const [viewMode, setViewMode] = useState<"local" | "global">("local");
     const [globalGeometries, setGlobalGeometries] = useState<FeatureCollection>({
@@ -466,6 +469,23 @@ function EditorPageContent() {
     const isViewerPreviewMode = mode === "preview";
     const isReplayPreviewMode = mode === "replay_preview";
     const isAnyPreviewMode = isViewerPreviewMode || isReplayPreviewMode;
+    const clearPresentPlaceFocus = useCallback(() => {
+        setFocusedPresentPlace(null);
+    }, []);
+    const handleFocusPresentPlace = useCallback((place: PresentPlaceSelection) => {
+        const map = getCurrentMapInstance();
+        if (!map) return;
+
+        map.flyTo({
+            center: [place.lng, place.lat],
+            zoom: Math.max(map.getZoom(), 13.5),
+            duration: 900,
+            essential: true,
+        });
+        setFocusedPresentPlace(place);
+        setPreviewFeaturePopupAnchor(null);
+        setPreviewLinkEntityPopup(null);
+    }, [getCurrentMapInstance]);
     const previewReturnModeRef = useRef<EditorMode>("select");
     const replayPreviewReturnRef = useRef<{
         mode: "replay" | "preview";
@@ -485,6 +505,12 @@ function EditorPageContent() {
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (!isAnyPreviewMode) {
+            clearPresentPlaceFocus();
+        }
+    }, [clearPresentPlaceFocus, isAnyPreviewMode]);
 
     useEffect(() => {
         if (!imageOverlayKeyboardEnabled) return;
@@ -1430,6 +1456,71 @@ function EditorPageContent() {
         : EMPTY_FEATURE_COLLECTION;
     const isReplayPreviewWikiSidebarOpen = isAnyPreviewMode && (replayPreviewSidebarOpen || isPreviewEntitySidebarOpen);
 
+    const handleFocusHistoricalGeometry = useCallback((payload: HistoricalGeometryFocusPayload) => {
+        const map = getCurrentMapInstance();
+        const geometryId = String(payload.geometry.id || "").trim();
+        if (!geometryId) return;
+
+        const feature: Feature = {
+            type: "Feature",
+            properties: {
+                id: geometryId,
+                source: "ref",
+                type: payload.geometry.type,
+                time_start: normalizeTimelineYearValue(payload.geometry.time_start),
+                time_end: normalizeTimelineYearValue(payload.geometry.time_end),
+                bound_with: normalizeGeoSearchBoundWith(payload.geometry.bound_with),
+                entity_id: payload.entity.entity_id,
+                entity_ids: [payload.entity.entity_id],
+                entity_name: payload.entity.name,
+                entity_names: [payload.entity.name],
+            },
+            geometry: payload.geometry.draw_geometry,
+        };
+
+        if (activeTimelineFilterEnabled && payload.geometry.time_start != null) {
+            const nextYear = clampYearToFixedRange(Math.trunc(payload.geometry.time_start));
+            if (isReplayPreviewMode) {
+                replayPreview.setTimelineYear(nextYear);
+            } else if (isViewerPreviewMode) {
+                handleViewerPreviewTimelineYearChange(nextYear);
+            }
+        }
+
+        if (map) {
+            fitMapToFeatureCollection(
+                map,
+                { type: "FeatureCollection", features: [feature] },
+                isReplayPreviewWikiSidebarOpen
+                    ? {
+                        top: 96,
+                        right: previewSidebarWidth + 96,
+                        bottom: 120,
+                        left: 96,
+                    }
+                    : 96,
+                { duration: 900, maxZoom: 10, pointZoom: 13 }
+            );
+        }
+
+        const renderedFeature = mapRenderDraft.features.find((item) => String(item.properties.id) === geometryId) || null;
+        setSelectedFeatureIds(renderedFeature ? [renderedFeature.properties.id] : []);
+        setFocusedPresentPlace(null);
+        setPreviewFeaturePopupAnchor(null);
+        setPreviewLinkEntityPopup(null);
+    }, [
+        activeTimelineFilterEnabled,
+        getCurrentMapInstance,
+        handleViewerPreviewTimelineYearChange,
+        isReplayPreviewMode,
+        isReplayPreviewWikiSidebarOpen,
+        isViewerPreviewMode,
+        mapRenderDraft.features,
+        previewSidebarWidth,
+        replayPreview,
+        setSelectedFeatureIds,
+    ]);
+
     const closeReplayPreviewSidebar = useCallback(() => {
         closeReplayPreviewWikiPanel();
         setPreviewActiveEntityId(null);
@@ -1885,13 +1976,16 @@ function EditorPageContent() {
 
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
+        const renderedFeatureIds = new Set(
+            mapRenderDraft.features.map((feature) => String(feature.properties.id))
+        );
         const stillExistIds = selectedFeatureIds.filter(id =>
-            editor.draft.features.some(feature => String(feature.properties.id) === String(id))
+            renderedFeatureIds.has(String(id))
         );
         if (stillExistIds.length !== selectedFeatureIds.length) {
             setSelectedFeatureIds(stillExistIds);
         }
-    }, [editor.draft.features, selectedFeatureIds, setSelectedFeatureIds]);
+    }, [mapRenderDraft.features, selectedFeatureIds, setSelectedFeatureIds]);
 
     useEffect(() => {
         if (!selectedFeature) {
@@ -2955,6 +3049,15 @@ function EditorPageContent() {
                 ) : (
                     <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
                 )}
+                {isAnyPreviewMode ? (
+                    <PresentPlaceSearch
+                        focusedPlace={focusedPresentPlace}
+                        onFocusPlace={handleFocusPresentPlace}
+                        onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                        onClearFocus={clearPresentPlaceFocus}
+                        rightOffset={isReplayPreviewWikiSidebarOpen ? previewSidebarWidth + 48 : 18}
+                    />
+                ) : null}
                 {isReplayPreviewMode ? (
                     <ReplayPreviewOverlay
                         isPreviewMode={true}
