@@ -17,35 +17,9 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes borderPulse {
-  0% {
-    border-color: rgba(255, 255, 255, 0.6);
-    box-shadow:
-      0 10px 30px -10px rgba(0, 0, 0, 0.15),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.7),
-      inset 0 -1px 1px 0 rgba(255, 255, 255, 0.2);
-  }
-
-  50% {
-    border-color: rgba(16, 185, 129, 0.55);
-    box-shadow:
-      0 10px 30px -10px rgba(0, 0, 0, 0.15),
-      0 0 12px rgba(16, 185, 129, 0.25),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.75),
-      inset 0 -1px 1px 0 rgba(255, 255, 255, 0.2);
-  }
-
-  100% {
-    border-color: rgba(255, 255, 255, 0.6);
-    box-shadow:
-      0 10px 30px -10px rgba(0, 0, 0, 0.15),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.7),
-      inset 0 -1px 1px 0 rgba(255, 255, 255, 0.2);
-  }
-}
 
 .containerLoading {
-  animation: borderPulse 2s infinite ease-in-out;
+  border-color: rgba(16, 185, 129, 0.45);
 }
 
 .flexWrapper {

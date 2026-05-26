@@ -450,41 +450,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 	                            {isPreviewMode ? "Editor" : "Preview"}
 	                        </button>
 	                    ) : null}
- 
-	                    {onPlayPreviewReplay ? (
-	                        <button
-	                            type="button"
-	                            onClick={onPlayPreviewReplay}
-	                            style={{
-	                                ...zoomButtonStyle,
-	                                width: "auto",
-	                                minWidth: "64px",
-	                                padding: "0 12px",
-	                                display: "inline-flex",
-	                                alignItems: "center",
-	                                justifyContent: "center",
-	                                gap: "7px",
-	                                background: "#2563eb",
-	                                fontSize: "13px",
-	                                fontWeight: 800,
-	                                flexShrink: 0,
-	                            }}
-	                            aria-label="Play selected replay"
-	                            title="Play replay của geometry đang chọn"
-	                        >
-	                            <span
-	                                aria-hidden="true"
-	                                style={{
-	                                    width: 0,
-	                                    height: 0,
-	                                    borderTop: "5px solid transparent",
-	                                    borderBottom: "5px solid transparent",
-	                                    borderLeft: "8px solid currentColor",
-	                                }}
-	                            />
-	                            Play
-	                        </button>
-	                    ) : null}
+
  
 	                    <button
                         type="button"
@@ -552,6 +518,41 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                     >
                         {zoomLevel.toFixed(1)}x
                     </div>
+
+	                    {onPlayPreviewReplay ? (
+	                        <button
+	                            type="button"
+	                            onClick={onPlayPreviewReplay}
+	                            style={{
+	                                ...zoomButtonStyle,
+	                                width: "auto",
+	                                minWidth: "64px",
+	                                padding: "0 12px",
+	                                display: "inline-flex",
+	                                alignItems: "center",
+	                                justifyContent: "center",
+	                                gap: "7px",
+	                                background: "#2563eb",
+	                                fontSize: "13px",
+	                                fontWeight: 800,
+	                                flexShrink: 0,
+	                            }}
+	                            aria-label="Play selected replay"
+	                            title="Play replay của geometry đang chọn"
+	                        >
+	                            <span
+	                                aria-hidden="true"
+	                                style={{
+	                                    width: 0,
+	                                    height: 0,
+	                                    borderTop: "5px solid transparent",
+	                                    borderBottom: "5px solid transparent",
+	                                    borderLeft: "8px solid currentColor",
+	                                }}
+	                            />
+	                            Play
+	                        </button>
+	                    ) : null}
                 </div>
                 </div>
             ) : null}

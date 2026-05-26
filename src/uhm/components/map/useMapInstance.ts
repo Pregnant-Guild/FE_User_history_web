@@ -58,6 +58,10 @@ export function useMapInstance() {
                 style: getBaseMapStyle(),
                 center: [0, 20],
                 zoom: 2,
+                maxTileCacheSize: 150,
+                fadeDuration: 0,
+                collectResourceTiming: false,
+                crossSourceCollisions: false,
             });
 
             mapRef.current = map;
