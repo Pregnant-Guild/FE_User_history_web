@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import type { EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { useShallow } from "zustand/react/shallow";
@@ -28,7 +28,7 @@ function wikiTitle(w: WikiSnapshot): string {
   return t.length ? t : "Untitled wiki";
 }
 
-export default function EntityWikiBindingsPanel({ setLinks }: Props) {
+function EntityWikiBindingsPanel({ setLinks }: Props) {
   const {
     entityCatalog,
     snapshotEntityRows,
@@ -476,3 +476,5 @@ function MinusIcon() {
     </svg>
   );
 }
+
+export default memo(EntityWikiBindingsPanel);

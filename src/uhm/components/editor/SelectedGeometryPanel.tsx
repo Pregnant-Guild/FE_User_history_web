@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, memo, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Feature } from "@/uhm/lib/editor/state/useEditorState";
 import {
@@ -23,7 +23,7 @@ type Props = {
     onRerollGeometryId?: (oldId: string | number) => void;
 };
 
-export default function SelectedGeometryPanel({
+function SelectedGeometryPanel({
     selectedFeatures,
     onApplyGeometryMetadata,
     changeCount,
@@ -466,3 +466,5 @@ function getAllowedGroupIdsForPreset(
 
     return ["polygon"];
 }
+
+export default memo(SelectedGeometryPanel);

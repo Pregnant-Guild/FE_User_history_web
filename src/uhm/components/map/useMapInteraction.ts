@@ -38,6 +38,7 @@ type UseMapInteractionProps = {
     onBindGeometriesRef?: React.MutableRefObject<((targetId: string | number, sourceIds: (string | number)[]) => void) | undefined>;
     localFeatureIdsRef?: React.MutableRefObject<(string | number)[] | undefined>;
     onAddFeatureToProjectRef?: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
+    allowFeatureSelection?: boolean;
 };
 
 export function useMapInteraction({
@@ -57,6 +58,7 @@ export function useMapInteraction({
     onBindGeometriesRef,
     localFeatureIdsRef,
     onAddFeatureToProjectRef,
+    allowFeatureSelection = true,
 }: UseMapInteractionProps) {
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
     const engineBindingsRef = useRef<Partial<Record<EditorMode, EngineBinding>>>({});
@@ -223,7 +225,8 @@ export function useMapInteraction({
                     if (!Array.isArray(localIds)) return true;
                     return localIds.some((localId) => String(localId) === String(id));
                 }
-                : undefined
+                : undefined,
+            () => allowFeatureSelection
         );
 
         const cleanupPoint = initPoint(

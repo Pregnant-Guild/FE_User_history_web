@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, memo, type CSSProperties } from "react";
 import type { EntitySnapshot } from "@/uhm/types/entities";
 import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
@@ -17,7 +17,7 @@ type Props = {
   onDeleteEntity?: (entityId: string) => void;
 };
 
-export default function ProjectEntityRefsPanel({
+function ProjectEntityRefsPanel({
   onCreateEntityOnly,
   onUpdateEntity,
   hasSelectedGeometry,
@@ -673,3 +673,5 @@ function TrashIcon() {
     </svg>
   );
 }
+
+export default memo(ProjectEntityRefsPanel);

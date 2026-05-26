@@ -409,8 +409,7 @@ function EditorPageContent() {
     const [previewWikiError, setPreviewWikiError] = useState<string | null>(null);
     // State loading riêng cho wiki preview sidebar.
     const [isPreviewWikiLoading, setIsPreviewWikiLoading] = useState(false);
-    const [previewFeaturePopupAnchor, setPreviewFeaturePopupAnchor] = useState<MapFeaturePayload | null>(null);
-    const [previewExpandedEntityId, setPreviewExpandedEntityId] = useState<string | null>(null);
+    const [previewPinnedWikiPopupAnchor, setPreviewPinnedWikiPopupAnchor] = useState<MapFeaturePayload | null>(null);
     const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
     const [isPreviewEntitySidebarOpen, setIsPreviewEntitySidebarOpen] = useState(false);
     const [focusedPresentPlace, setFocusedPresentPlace] = useState<PresentPlaceSelection | null>(null);
@@ -422,7 +421,7 @@ function EditorPageContent() {
     });
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
     const [previewLinkEntityPopup, setPreviewLinkEntityPopup] = useState<PreviewLinkEntityPopupState | null>(null);
-    const [previewEntityFocusToken, setPreviewEntityFocusToken] = useState(0);
+    const [previewEntityFocusToken, setPreviewEntityFocusToken] = useState<number | null>(null);
     const [previewSidebarWidth, setPreviewSidebarWidth] = useState<number>(() => {
         if (typeof window !== "undefined") {
             const saved = localStorage.getItem("public-wiki-sidebar-width");
@@ -442,6 +441,7 @@ function EditorPageContent() {
     // Ref giữ object URL hiện tại để revoke khi đổi/xóa ảnh, tránh leak bộ nhớ.
     const imageOverlayObjectUrlRef = useRef<string | null>(null);
     const previewLinkEntityPopupRef = useRef<HTMLDivElement | null>(null);
+    const previewPinnedWikiPopupRef = useRef<HTMLDivElement | null>(null);
     // Cập nhật stage/step được chọn trong sidebar replay.
     const handleReplaySelectionChange = useCallback((stageId: number | null, stepIndex: number | null) => {
         setReplaySelection({ stageId, stepIndex });
@@ -483,7 +483,7 @@ function EditorPageContent() {
             essential: true,
         });
         setFocusedPresentPlace(place);
-        setPreviewFeaturePopupAnchor(null);
+        setPreviewPinnedWikiPopupAnchor(null);
         setPreviewLinkEntityPopup(null);
     }, [getCurrentMapInstance]);
     const previewReturnModeRef = useRef<EditorMode>("select");
@@ -1026,7 +1026,8 @@ function EditorPageContent() {
     const clearPreviewViewerState = useCallback(() => {
         setPreviewActiveEntityId(null);
         setIsPreviewEntitySidebarOpen(false);
-        setPreviewFeaturePopupAnchor(null);
+        setPreviewEntityFocusToken(null);
+        setPreviewPinnedWikiPopupAnchor(null);
         setPreviewLinkEntityPopup(null);
         setPreviewWikiError(null);
         closeReplayPreviewWikiPanel();
@@ -1335,20 +1336,6 @@ function EditorPageContent() {
             replayPreviewWikiRows,
         ]
     );
-    const previewFeaturePopupEntityIds = useMemo(() => {
-        if (!previewFeaturePopupAnchor) return [];
-        return previewRelations.geometryEntityIds[String(previewFeaturePopupAnchor.featureId)] || [];
-    }, [previewFeaturePopupAnchor, previewRelations.geometryEntityIds]);
-    const previewFeaturePopupEntities = useMemo(
-        () => previewFeaturePopupEntityIds
-            .map((entityId) => previewRelations.entitiesById[entityId] || null)
-            .filter((entity): entity is Entity => Boolean(entity)),
-        [previewFeaturePopupEntityIds, previewRelations.entitiesById]
-    );
-
-    useEffect(() => {
-        setPreviewExpandedEntityId(null);
-    }, [previewFeaturePopupAnchor]);
     // Wiki snapshot đang được step preview yêu cầu mở.
     const replayPreviewActiveWikiSnapshot = useMemo(() => {
         if (!replayPreviewActiveWikiId) return null;
@@ -1516,7 +1503,7 @@ function EditorPageContent() {
         const renderedFeature = mapRenderDraft.features.find((item) => String(item.properties.id) === geometryId) || null;
         setSelectedFeatureIds(renderedFeature ? [renderedFeature.properties.id] : []);
         setFocusedPresentPlace(null);
-        setPreviewFeaturePopupAnchor(null);
+        setPreviewPinnedWikiPopupAnchor(null);
         setPreviewLinkEntityPopup(null);
     }, [
         activeTimelineFilterEnabled,
@@ -1566,10 +1553,11 @@ function EditorPageContent() {
         setPreviewActiveEntityId(id);
         setIsPreviewEntitySidebarOpen(true);
         setPreviewWikiError(null);
+        setPreviewPinnedWikiPopupAnchor(null);
         setPreviewLinkEntityPopup(null);
 
-        if (options?.focusMap !== false) {
-            setPreviewEntityFocusToken((prev) => prev + 1);
+        if (options?.focusMap === true) {
+            setPreviewEntityFocusToken((prev) => (prev ?? 0) + 1);
         }
         if (options?.selectGeometry && options.sourceFeatureId != null) {
             setSelectedFeatureIds([options.sourceFeatureId]);
@@ -1584,11 +1572,103 @@ function EditorPageContent() {
         setSelectedFeatureIds,
     ]);
 
+    const previewPinnedWikiPopupRows = useMemo(() => {
+        if (!previewPinnedWikiPopupAnchor) return [];
+
+        const entityIds = previewRelations.geometryEntityIds[String(previewPinnedWikiPopupAnchor.featureId)] || [];
+        return entityIds.flatMap((entityId) => {
+            const entity = previewRelations.entitiesById[entityId] || null;
+            if (!entity) return [];
+
+            const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
+            if (!linkedWikis.length) {
+                return [{ entity, wiki: null as Wiki | null, quote: "" }];
+            }
+
+            return linkedWikis.map((wiki) => ({
+                entity,
+                wiki,
+                quote: extractWikiBlockquoteText(wiki.content),
+            }));
+        });
+    }, [
+        previewPinnedWikiPopupAnchor,
+        previewRelations.entitiesById,
+        previewRelations.entityWikisById,
+        previewRelations.geometryEntityIds,
+    ]);
+
     const handlePreviewMapFeatureClick = useCallback((payload: MapFeaturePayload | null) => {
         if (!isAnyPreviewMode) return;
-        setPreviewFeaturePopupAnchor(payload);
         setPreviewLinkEntityPopup(null);
-    }, [isAnyPreviewMode]);
+
+        if (!payload) {
+            setPreviewPinnedWikiPopupAnchor(null);
+            return;
+        }
+
+        const entityIds = previewRelations.geometryEntityIds[String(payload.featureId)] || [];
+        const rows = entityIds.flatMap((entityId) => {
+            const entity = previewRelations.entitiesById[entityId] || null;
+            if (!entity) return [];
+
+            const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
+            if (!linkedWikis.length) {
+                return [{ entity, wiki: null as Wiki | null }];
+            }
+
+            return linkedWikis.map((wiki) => ({ entity, wiki }));
+        });
+
+        if (!rows.length) {
+            setPreviewPinnedWikiPopupAnchor(null);
+            return;
+        }
+
+        if (rows.length === 1) {
+            const row = rows[0];
+            selectReplayPreviewEntity(row.entity.id, {
+                sourceFeatureId: payload.featureId,
+                preferredWikiId: row.wiki?.id,
+                focusMap: false,
+                selectGeometry: false,
+            });
+            setPreviewPinnedWikiPopupAnchor(null);
+            return;
+        }
+
+        setPreviewPinnedWikiPopupAnchor(payload);
+    }, [
+        isAnyPreviewMode,
+        previewRelations.entitiesById,
+        previewRelations.entityWikisById,
+        previewRelations.geometryEntityIds,
+        selectReplayPreviewEntity,
+    ]);
+
+    const getPreviewHoverPopupContent = useCallback((feature: Feature) => {
+        if (!isAnyPreviewMode) return null;
+
+        const entityIds = normalizeFeatureEntityIds(feature);
+        const entitiesForFeature = entityIds
+            .map((entityId) => previewRelations.entitiesById[entityId] || null)
+            .filter((entity): entity is Entity => Boolean(entity));
+        if (!entitiesForFeature.length) return null;
+
+        return {
+            rows: entitiesForFeature.flatMap((entity) => {
+                const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
+                if (!linkedWikis.length) {
+                    return [{ title: entity.name || String(entity.id), quote: "" }];
+                }
+
+                return linkedWikis.map((wiki) => ({
+                    title: entity.name || String(entity.id),
+                    quote: extractWikiBlockquoteText(wiki.content),
+                }));
+            }),
+        };
+    }, [isAnyPreviewMode, previewRelations.entitiesById, previewRelations.entityWikisById]);
 
     useEffect(() => {
         if (!previewLinkEntityPopup) return;
@@ -1610,6 +1690,26 @@ function EditorPageContent() {
         };
     }, [previewLinkEntityPopup]);
 
+    useEffect(() => {
+        if (!previewPinnedWikiPopupAnchor) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setPreviewPinnedWikiPopupAnchor(null);
+        };
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (target && previewPinnedWikiPopupRef.current?.contains(target)) return;
+            setPreviewPinnedWikiPopupAnchor(null);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("pointerdown", handlePointerDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("pointerdown", handlePointerDown);
+        };
+    }, [previewPinnedWikiPopupAnchor]);
+
     // Điều hướng link wiki nội bộ trong preview nhưng chỉ trong phạm vi snapshot preview.
     const handleReplayPreviewWikiLinkRequest = useCallback(({ slug, rect }: { slug: string; rect: DOMRect }) => {
         const nextSlug = String(slug || "").trim();
@@ -1629,6 +1729,7 @@ function EditorPageContent() {
             selectReplayPreviewEntity(linkedEntities[0].id, {
                 preferredWikiId: match.id,
                 preferredWikiSlug: nextSlug,
+                focusMap: false,
             });
             return;
         }
@@ -3031,6 +3132,7 @@ function EditorPageContent() {
                         onHideFeature={handleHideGeometryLocal}
                         onUpdateFeature={editor.updateFeature}
                         allowGeometryEditing={!isAnyPreviewMode}
+                        allowFeatureSelection={!isAnyPreviewMode}
                         backgroundVisibility={backgroundVisibility}
                         geometryVisibility={effectiveGeometryVisibility}
                         applyGeometryBindingFilter={
@@ -3041,6 +3143,8 @@ function EditorPageContent() {
                                     : geometryBindingFilterEnabled
                         }
                         onFeatureClick={isAnyPreviewMode ? handlePreviewMapFeatureClick : undefined}
+                        hoverPopupEnabled={isAnyPreviewMode}
+                        getHoverPopupContent={getPreviewHoverPopupContent}
 
                         focusFeatureCollection={
                             isAnyPreviewMode
@@ -3084,6 +3188,7 @@ function EditorPageContent() {
                         dialog={replayPreview.dialog}
                         toasts={replayPreview.toasts}
                         sidebarOpen={isReplayPreviewWikiSidebarOpen}
+                        sidebarWidth={previewSidebarWidth}
                         playbackSpeed={replayPreview.playbackSpeed}
                         activeStepLabel={replayPreviewActiveStepLabel}
                         activeStepNumber={replayPreview.activeStepNumber}
@@ -3115,6 +3220,7 @@ function EditorPageContent() {
                             sidebarWidth={previewSidebarWidth}
                             onSidebarWidthChange={setPreviewSidebarWidth}
                             maxDragWidth={typeof window !== "undefined" ? Math.min(800, window.innerWidth - 340) : 800}
+                            compactHeader
                         />
                     </aside>
                 ) : null}
@@ -3148,102 +3254,38 @@ function EditorPageContent() {
                         />
                     </aside>
                 ) : null}
-                {isAnyPreviewMode && previewFeaturePopupAnchor && previewFeaturePopupEntities.length > 0 ? (
+                {isAnyPreviewMode && previewPinnedWikiPopupAnchor && previewPinnedWikiPopupRows.length > 0 ? (
                     <div
+                        ref={previewPinnedWikiPopupRef}
                         className="absolute z-30 w-[320px] max-w-[calc(100vw-2rem)]"
                         style={{
-                            left: clampNumber(previewFeaturePopupAnchor.point.x + 18, 16, typeof window !== "undefined" ? window.innerWidth - 340 : previewFeaturePopupAnchor.point.x + 18),
-                            top: clampNumber(previewFeaturePopupAnchor.point.y - 8, 16, typeof window !== "undefined" ? window.innerHeight - 280 : previewFeaturePopupAnchor.point.y - 8),
+                            left: clampNumber(previewPinnedWikiPopupAnchor.point.x + 18, 16, typeof window !== "undefined" ? window.innerWidth - 340 : previewPinnedWikiPopupAnchor.point.x + 18),
+                            top: clampNumber(previewPinnedWikiPopupAnchor.point.y - 8, 16, typeof window !== "undefined" ? window.innerHeight - 280 : previewPinnedWikiPopupAnchor.point.y - 8),
                         }}
                     >
                         <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 shadow-xl backdrop-blur">
-                            {(() => {
-                                // 1. Expanded entity (nested wiki selection)
-                                if (previewExpandedEntityId) {
-                                    const entity = previewRelations.entitiesById[previewExpandedEntityId];
-                                    if (!entity) return null;
-                                    const wikis = previewRelations.entityWikisById[previewExpandedEntityId] || [];
-                                    return (
-                                        <div className="p-3">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPreviewExpandedEntityId(null)}
-                                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-xs text-slate-300 hover:bg-white/[0.08]"
-                                                >
-                                                    &larr;
-                                                </button>
-                                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[180px]">
-                                                    {entity.name}
-                                                </span>
+                            <div className="max-h-[300px] overflow-y-auto p-3">
+                                <div className="grid gap-2">
+                                    {previewPinnedWikiPopupRows.map(({ entity, wiki, quote }) => (
+                                        <button
+                                            key={`${entity.id}:${wiki?.id || "entity-only"}`}
+                                            type="button"
+                                            onClick={() => {
+                                                selectReplayPreviewEntity(entity.id, {
+                                                    sourceFeatureId: previewPinnedWikiPopupAnchor.featureId,
+                                                    preferredWikiId: wiki?.id,
+                                                    focusMap: false,
+                                                    selectGeometry: false,
+                                                });
+                                            }}
+                                            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
+                                        >
+                                            <div className="truncate text-sm font-semibold text-white">
+                                                {entity.name || String(entity.id)}
                                             </div>
-                                            <div className="text-sm font-bold text-white mb-2">Chọn Wiki bài viết:</div>
-                                            <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-1">
-                                                {wikis.map((wiki) => (
-                                                    <button
-                                                        key={wiki.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            selectReplayPreviewEntity(entity.id, {
-                                                                sourceFeatureId: previewFeaturePopupAnchor.featureId,
-                                                                preferredWikiId: wiki.id,
-                                                                focusMap: true,
-                                                                selectGeometry: true,
-                                                            });
-                                                            setPreviewFeaturePopupAnchor(null);
-                                                            setPreviewExpandedEntityId(null);
-                                                        }}
-                                                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-sm text-slate-200 transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                                                    >
-                                                        📄 {wiki.title}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                }
-
-                                // 2. Case 1: Exactly 1 entity bound to geometry
-                                if (previewFeaturePopupEntities.length === 1) {
-                                    const singleEntity = previewFeaturePopupEntities[0];
-                                    const entityWikis = previewRelations.entityWikisById[singleEntity.id] || [];
-                                    if (entityWikis.length === 1) {
-                                        const singleWiki = entityWikis[0];
-                                        const blockquoteMatch = singleWiki.content
-                                            ? singleWiki.content.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)
-                                            : null;
-                                        let previewSummary = blockquoteMatch ? blockquoteMatch[1].trim() : "";
-
-                                        if (!previewSummary) {
-                                            const pMatch = singleWiki.content
-                                                ? singleWiki.content.match(/<p[^>]*>([\s\S]*?)<\/p>/)
-                                                : null;
-                                            previewSummary = pMatch ? pMatch[1].trim() : "";
-                                        }
-
-                                        if (!previewSummary) {
-                                            previewSummary = singleEntity.description || "Không có mô tả hay tóm tắt.";
-                                        }
-                                        const cleanSummaryText = previewSummary
-                                            .replace(/<[^>]*>/g, "")
-                                            .replace(/&nbsp;/gi, " ")
-                                            .replace(/\u00a0/g, " ")
-                                            .replace(/&amp;/gi, "&")
-                                            .replace(/&lt;/gi, "<")
-                                            .replace(/&gt;/gi, ">")
-                                            .replace(/&quot;/gi, '"')
-                                            .replace(/&#39;/g, "'")
-                                            .trim();
-
-                                        return (
-                                            <div className="p-4 flex flex-col gap-3">
-                                                <div>
-                                                    <div className="text-base font-bold text-white mt-1">
-                                                        {singleEntity.name}
-                                                    </div>
-                                                </div>
+                                            {quote ? (
                                                 <div
-                                                    className="text-sm text-slate-300 italic pl-3 leading-relaxed pr-1"
+                                                    className="mt-2 pl-3 pr-1 text-sm italic leading-relaxed text-slate-300"
                                                     style={{
                                                         borderLeft: "3px solid rgba(56, 189, 248, 0.4)",
                                                         display: "-webkit-box",
@@ -3253,123 +3295,13 @@ function EditorPageContent() {
                                                         whiteSpace: "normal",
                                                     }}
                                                 >
-                                                    {cleanSummaryText}
+                                                    {quote}
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        selectReplayPreviewEntity(singleEntity.id, {
-                                                            sourceFeatureId: previewFeaturePopupAnchor.featureId,
-                                                            focusMap: true,
-                                                            selectGeometry: true,
-                                                        });
-                                                        setPreviewFeaturePopupAnchor(null);
-                                                    }}
-                                                    className="w-full rounded-lg bg-sky-500 hover:bg-sky-600 px-3 py-2 text-center text-xs font-semibold text-white transition shadow-lg shadow-sky-500/20"
-                                                >
-                                                    Xem chi tiết Wiki &rarr;
-                                                </button>
-                                            </div>
-                                        );
-                                    } else if (entityWikis.length > 1) {
-                                        return (
-                                            <div className="p-3">
-                                                <div className="border-b border-white/10 pb-2 mb-2">
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                        Entity
-                                                    </div>
-                                                    <div className="text-base font-bold text-white">
-                                                        {singleEntity.name}
-                                                    </div>
-                                                    <div className="text-xs text-slate-400 mt-1">
-                                                        Thực thể này có nhiều Wiki liên kết. Chọn để đọc:
-                                                    </div>
-                                                </div>
-                                                <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-1">
-                                                    {entityWikis.map((wiki) => (
-                                                        <button
-                                                            key={wiki.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                selectReplayPreviewEntity(singleEntity.id, {
-                                                                    sourceFeatureId: previewFeaturePopupAnchor.featureId,
-                                                                    preferredWikiId: wiki.id,
-                                                                    focusMap: true,
-                                                                    selectGeometry: true,
-                                                                });
-                                                                setPreviewFeaturePopupAnchor(null);
-                                                            }}
-                                                            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-sm text-slate-200 transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                                                        >
-                                                            📄 {wiki.title}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                }
-
-                                // 3. Case 2: Multiple entities bound to geometry
-                                return (
-                                    <div>
-                                        <div className="border-b border-white/10 px-4 py-3">
-                                            <div className="text-sm font-semibold text-white">Related Entities</div>
-                                            <div className="mt-1 text-xs text-slate-400">
-                                                Geometry #{String(previewFeaturePopupAnchor.featureId)}
-                                            </div>
-                                        </div>
-                                        <div className="max-h-[252px] overflow-y-auto">
-                                            <div className="grid gap-2 p-3">
-                                                {previewFeaturePopupEntities.map((entity) => {
-                                                    const entityWikis = previewRelations.entityWikisById[entity.id] || [];
-                                                    return (
-                                                        <button
-                                                            key={entity.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (entityWikis.length > 1) {
-                                                                    setPreviewExpandedEntityId(entity.id);
-                                                                } else {
-                                                                    selectReplayPreviewEntity(entity.id, {
-                                                                        sourceFeatureId: previewFeaturePopupAnchor.featureId,
-                                                                        focusMap: true,
-                                                                        selectGeometry: true,
-                                                                    });
-                                                                    setPreviewFeaturePopupAnchor(null);
-                                                                }
-                                                            }}
-                                                            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                                                        >
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <div className="truncate text-sm font-semibold text-white">
-                                                                    {entity.name}
-                                                                </div>
-                                                                {entityWikis.length > 1 ? (
-                                                                    <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded-full font-medium">
-                                                                        {entityWikis.length} Wikis
-                                                                    </span>
-                                                                ) : null}
-                                                            </div>
-                                                            <div
-                                                                className="mt-1 text-xs leading-5 text-slate-400"
-                                                                style={{
-                                                                    display: "-webkit-box",
-                                                                    WebkitLineClamp: 2,
-                                                                    WebkitBoxOrient: "vertical",
-                                                                    overflow: "hidden",
-                                                                }}
-                                                            >
-                                                                {entity.description?.trim() || "Không có mô tả."}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                                            ) : null}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : null}
@@ -3422,7 +3354,10 @@ function EditorPageContent() {
                                         key={entity.id}
                                         type="button"
                                         onClick={() => {
-                                            selectReplayPreviewEntity(entity.id, { preferredWikiSlug: previewLinkEntityPopup.slug });
+                                            selectReplayPreviewEntity(entity.id, {
+                                                preferredWikiSlug: previewLinkEntityPopup.slug,
+                                                focusMap: false,
+                                            });
                                             setPreviewLinkEntityPopup(null);
                                         }}
                                         className="rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-white/[0.04] dark:hover:text-white"
@@ -3700,6 +3635,26 @@ function snapshotWikiToWiki(snapshot: WikiSnapshot, wikiCache: Record<string, Wi
         slug: snapshot.slug ?? null,
         content: "",
     };
+}
+
+function extractWikiBlockquoteText(content: string | null | undefined): string {
+    if (!content) return "";
+
+    const blockquoteMatch = content.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i);
+    const rawText = blockquoteMatch?.[1]?.trim() || "";
+    if (!rawText) return "";
+
+    return rawText
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/\u00a0/g, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 function pushUniqueString(target: Record<string, string[]>, key: string, value: string) {

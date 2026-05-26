@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import "react-quill-new/dist/quill.snow.css";
 
 import type { Entity } from "@/uhm/api/entities";
@@ -22,6 +22,7 @@ type Props = {
     sidebarWidth?: number;
     onSidebarWidthChange?: (width: number) => void;
     maxDragWidth?: number;
+    compactHeader?: boolean;
 };
 
 function escapeHtml(input: string): string {
@@ -50,6 +51,7 @@ function slugifyHeading(raw: string): string {
     if (!input.length) return "";
     return input
         .toLowerCase()
+        .replace(/đ/g, "d")
         .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]+/g, "-")
@@ -122,7 +124,7 @@ function prepareWikiHtml(inputHtml: string): { html: string; toc: TocItem[] } {
     return { html: doc.body.innerHTML, toc };
 }
 
-export default function PublicWikiSidebar({
+function PublicWikiSidebar({
     entity,
     wiki,
     isLoading,
@@ -132,6 +134,7 @@ export default function PublicWikiSidebar({
     sidebarWidth,
     onSidebarWidthChange,
     maxDragWidth,
+    compactHeader = false,
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
     const tocContainerRef = useRef<HTMLDivElement | null>(null);
@@ -311,20 +314,22 @@ export default function PublicWikiSidebar({
             >
                 <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
+                        {compactHeader ? null : (
+                            <div
+                                style={{
+                                    fontSize: 10,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1.2px",
+                                    fontWeight: 900,
+                                    color: "#94a3b8",
+                                }}
+                            >
+                                Wiki
+                            </div>
+                        )}
                         <div
                             style={{
-                                fontSize: 10,
-                                textTransform: "uppercase",
-                                letterSpacing: "1.2px",
-                                fontWeight: 900,
-                                color: "#94a3b8",
-                            }}
-                        >
-                            Wiki
-                        </div>
-                        <div
-                            style={{
-                                marginTop: 4,
+                                marginTop: compactHeader ? 0 : 4,
                                 fontSize: 18,
                                 fontWeight: 700,
                                 lineHeight: 1.3,
@@ -345,7 +350,7 @@ export default function PublicWikiSidebar({
                                 {entity.description.trim()}
                             </div>
                         ) : null}
-                        {wiki?.title?.trim() && wiki.title.trim() !== entity?.name?.trim() ? (
+                        {!compactHeader && wiki?.title?.trim() && wiki.title.trim() !== entity?.name?.trim() ? (
                             <div
                                 style={{
                                     marginTop: 6,
@@ -638,3 +643,5 @@ export default function PublicWikiSidebar({
         </div>
     );
 }
+
+export default memo(PublicWikiSidebar);

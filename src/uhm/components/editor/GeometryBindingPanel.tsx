@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useMemo, useState, memo, type CSSProperties, type KeyboardEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import NewBadge from "@/uhm/components/editor/NewBadge";
 import { normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
@@ -34,7 +34,7 @@ type Props = {
   onFocusGeometry?: (geometryId: string) => void;
 };
 
-export default function GeometryBindingPanel({
+function GeometryBindingPanel({
   geometries,
   selectedGeometryId,
   selectedGeometryChildIds,
@@ -686,3 +686,5 @@ function MinusIcon() {
     </svg>
   );
 }
+
+export default memo(GeometryBindingPanel);

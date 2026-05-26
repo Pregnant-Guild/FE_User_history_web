@@ -26,6 +26,15 @@ export function isFeatureVisibleAtYear(feature: Feature, year: number): boolean 
     return true;
 }
 
+function getFastHash(str: string | null | undefined): number {
+    if (!str) return 0;
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * 33) ^ str.charCodeAt(i);
+    }
+    return hash >>> 0;
+}
+
 // Chuẩn hóa wiki snapshot để so sánh dirty-state ổn định, không phụ thuộc thứ tự mảng.
 export function normalizeWikisForCompare(input: WikiSnapshot[] | null | undefined) {
     const list = Array.isArray(input) ? input : [];
@@ -43,7 +52,7 @@ export function normalizeWikisForCompare(input: WikiSnapshot[] | null | undefine
             source: w.source,
             title: typeof w.title === "string" ? w.title.trim() : "",
             slug: typeof w.slug === "string" ? w.slug : null,
-            doc: w.doc === null ? null : typeof w.doc === "string" ? w.doc.trim() : null,
+            docHash: typeof w.doc === "string" ? getFastHash(w.doc.trim()) : 0,
         }))
         .sort((a, b) => a.id.localeCompare(b.id));
 }

@@ -21,7 +21,8 @@ export function initSelect(
     onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void,
     onFeatureClick?: (payload: SelectFeatureClickPayload | null) => void,
     onAddToProject?: (feature: maplibregl.MapGeoJSONFeature) => void,
-    isLocalFeature?: (id: string | number) => boolean
+    isLocalFeature?: (id: string | number) => boolean,
+    allowFeatureSelection?: () => boolean
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -85,21 +86,34 @@ export function initSelect(
         }) as maplibregl.MapGeoJSONFeature[];
 
         if (!features.length) {
+            if (allowFeatureSelection && !allowFeatureSelection()) {
+                onFeatureClick?.(null);
+                return;
+            }
             clearSelection();
             onFeatureClick?.(null);
             return;
         }
 
-        const additive = !!e.originalEvent?.altKey;
         const feature = pickPreferredFeature(features);
+        const id = feature.id ?? feature.properties?.id;
+        if (id === undefined || id === null) return;
+        if (allowFeatureSelection && !allowFeatureSelection()) {
+            onFeatureClick?.({
+                featureId: id,
+                point: { x: e.point.x, y: e.point.y },
+                lngLat: { lng: e.lngLat.lng, lat: e.lngLat.lat },
+            });
+            return;
+        }
+
+        const additive = !!e.originalEvent?.altKey;
         const didSelect = selectFeature(feature, additive);
         if (!didSelect) {
             onFeatureClick?.(null);
             return;
         }
 
-        const id = feature.id ?? feature.properties?.id;
-        if (id === undefined || id === null) return;
         onFeatureClick?.({
             featureId: id,
             point: { x: e.point.x, y: e.point.y },

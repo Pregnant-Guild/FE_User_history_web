@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo, type ComponentProps } from "react";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
 import { useShallow } from "zustand/react/shallow";
@@ -39,7 +39,7 @@ type QuillLinkFormat = {
   __uhmOriginalSanitize?: unknown;
 };
 type QuillImageFormatCtor = {
-  new (): {
+  new(): {
     domNode: Element;
     format(name: string, value: string): void;
   };
@@ -64,7 +64,7 @@ function clampTitle(title: string) {
   return t.length ? t.slice(0, 120) : "Untitled wiki";
 }
 
-export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: Props) {
+function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: Props) {
   const { wikis, requestedActiveId } = useEditorStore(
     useShallow((state) => ({
       wikis: state.snapshotWikis,
@@ -95,7 +95,7 @@ export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: 
     activeWikiId: string | null;
     existingHref: string | null;
   } | null>(null);
-  const wikiLinkHandlerRef = useRef<(quill: QuillLike | null | undefined) => void>(() => {});
+  const wikiLinkHandlerRef = useRef<(quill: QuillLike | null | undefined) => void>(() => { });
   const [isWikiLinkOpen, setIsWikiLinkOpen] = useState(false);
   const [wikiLinkQuery, setWikiLinkQuery] = useState("");
   const [wikiLinkError, setWikiLinkError] = useState<string | null>(null);
@@ -285,17 +285,17 @@ export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: 
 
     setWikiSaveError(null);
     setWikis((prev) =>
-          prev.map((w) =>
-            w.id !== activeId
-              ? w
-              : {
-                  ...w,
-                  source: w.source,
-                  operation: w.operation === "create" ? "create" : "update",
-                  title: nextTitle,
-                  slug: nextSlug,
-                  doc: payload,
-            }
+      prev.map((w) =>
+        w.id !== activeId
+          ? w
+          : {
+            ...w,
+            source: w.source,
+            operation: w.operation === "create" ? "create" : "update",
+            title: nextTitle,
+            slug: nextSlug,
+            doc: payload,
+          }
       )
     );
     setOpen(false);
@@ -703,122 +703,122 @@ export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: 
       )}
 
       {collapsed ? null : (
-      <div
-        style={{
-          marginTop: "10px",
-          display: "grid",
-          gap: "8px",
-          border: "1px solid #1e3a8a",
-          borderRadius: "8px",
-          padding: "8px",
-          background: "#0f172a",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ color: "#bfdbfe", fontWeight: 700, fontSize: "12px" }}>
-            Tạo wiki mới
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              setIsCreateOpen((v) => {
-                const next = !v;
-                if (next) {
-                  setCreateError(null);
-                  setIsCheckingCreateSlug(false);
-                  setCreateSlugTouched(false);
-                }
-                return next;
-              })
-            }
-            title={isCreateOpen ? "Dong" : "Mo"}
-            aria-label={isCreateOpen ? "Dong tao wiki" : "Mo tao wiki"}
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 6,
-              border: "1px solid #334155",
-              background: "#0b1220",
-              color: "#e2e8f0",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flex: "0 0 auto",
-            }}
-          >
-            {isCreateOpen ? <CloseIcon /> : <PlusIcon />}
-          </button>
-        </div>
-
-        {isCreateOpen ? (
-          <>
-            <input
-              value={createTitle}
-              onChange={(e) => {
-                const nextTitle = e.target.value;
-                setCreateTitle(nextTitle);
-                setCreateError(null);
-                if (!createSlugTouched) {
-                  setCreateSlug(slugifyWikiTitle(nextTitle));
-                }
-              }}
-              placeholder="Tieu de wiki"
-              disabled={isCheckingCreateSlug}
-              style={{
-                width: "100%",
-                borderRadius: "6px",
-                border: "1px solid #334155",
-                background: "#111827",
-                color: "#f8fafc",
-                padding: "6px 8px",
-                fontSize: "13px",
-              }}
-            />
-            <input
-              value={createSlug}
-              onChange={(e) => {
-                setCreateSlugTouched(true);
-                setCreateSlug(e.target.value);
-                setCreateError(null);
-              }}
-              placeholder="Slug"
-              disabled={isCheckingCreateSlug}
-              style={{
-                width: "100%",
-                borderRadius: "6px",
-                border: "1px solid #334155",
-                background: "#111827",
-                color: "#f8fafc",
-                padding: "6px 8px",
-                fontSize: "13px",
-              }}
-            />
+        <div
+          style={{
+            marginTop: "10px",
+            display: "grid",
+            gap: "8px",
+            border: "1px solid #1e3a8a",
+            borderRadius: "8px",
+            padding: "8px",
+            background: "#0f172a",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ color: "#bfdbfe", fontWeight: 700, fontSize: "12px" }}>
+              Tạo wiki mới
+            </div>
             <button
               type="button"
-              onClick={handleCreateWikiFromPanel}
-              disabled={isCheckingCreateSlug}
+              onClick={() =>
+                setIsCreateOpen((v) => {
+                  const next = !v;
+                  if (next) {
+                    setCreateError(null);
+                    setIsCheckingCreateSlug(false);
+                    setCreateSlugTouched(false);
+                  }
+                  return next;
+                })
+              }
+              title={isCreateOpen ? "Dong" : "Mo"}
+              aria-label={isCreateOpen ? "Dong tao wiki" : "Mo tao wiki"}
               style={{
-                border: "none",
-                borderRadius: "6px",
-                padding: "7px 8px",
-                cursor: isCheckingCreateSlug ? "not-allowed" : "pointer",
-                background: "#2563eb",
-                color: "#ffffff",
-                fontWeight: 600,
-                opacity: isCheckingCreateSlug ? 0.7 : 1,
+                width: 26,
+                height: 26,
+                borderRadius: 6,
+                border: "1px solid #334155",
+                background: "#0b1220",
+                color: "#e2e8f0",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "0 0 auto",
               }}
             >
-              Tạo wiki mới
+              {isCreateOpen ? <CloseIcon /> : <PlusIcon />}
             </button>
-            {createError ? (
-              <div style={{ color: "#fca5a5", fontSize: 12 }}>
-                {createError}
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </div>
+          </div>
+
+          {isCreateOpen ? (
+            <>
+              <input
+                value={createTitle}
+                onChange={(e) => {
+                  const nextTitle = e.target.value;
+                  setCreateTitle(nextTitle);
+                  setCreateError(null);
+                  if (!createSlugTouched) {
+                    setCreateSlug(slugifyWikiTitle(nextTitle));
+                  }
+                }}
+                placeholder="Tieu de wiki"
+                disabled={isCheckingCreateSlug}
+                style={{
+                  width: "100%",
+                  borderRadius: "6px",
+                  border: "1px solid #334155",
+                  background: "#111827",
+                  color: "#f8fafc",
+                  padding: "6px 8px",
+                  fontSize: "13px",
+                }}
+              />
+              <input
+                value={createSlug}
+                onChange={(e) => {
+                  setCreateSlugTouched(true);
+                  setCreateSlug(e.target.value);
+                  setCreateError(null);
+                }}
+                placeholder="Slug"
+                disabled={isCheckingCreateSlug}
+                style={{
+                  width: "100%",
+                  borderRadius: "6px",
+                  border: "1px solid #334155",
+                  background: "#111827",
+                  color: "#f8fafc",
+                  padding: "6px 8px",
+                  fontSize: "13px",
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleCreateWikiFromPanel}
+                disabled={isCheckingCreateSlug}
+                style={{
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "7px 8px",
+                  cursor: isCheckingCreateSlug ? "not-allowed" : "pointer",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontWeight: 600,
+                  opacity: isCheckingCreateSlug ? 0.7 : 1,
+                }}
+              >
+                Tạo wiki mới
+              </button>
+              {createError ? (
+                <div style={{ color: "#fca5a5", fontSize: 12 }}>
+                  {createError}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       )}
 
       <Modal
@@ -1001,11 +1001,10 @@ export default function WikiSidebarPanel({ projectId, setWikis, onRemoveWiki }: 
                       </div>
                     </div>
                     <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                        w.source === "local"
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${w.source === "local"
                           ? "border-emerald-300/60 text-emerald-600 dark:text-emerald-300"
                           : "border-blue-300/60 text-blue-600 dark:text-blue-300"
-                      }`}
+                        }`}
                     >
                       {w.source}
                     </span>
@@ -1110,6 +1109,7 @@ function slugifyWikiTitle(raw: string): string {
   if (!input.length) return "";
   return input
     .toLowerCase()
+    .replace(/đ/g, "d")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
@@ -1149,3 +1149,5 @@ function downloadTextFile(filename: string, contents: string, mime: string): voi
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+export default memo(WikiSidebarPanel);

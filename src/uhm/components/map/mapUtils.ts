@@ -25,6 +25,16 @@ type FeatureLabelInfo = {
 };
 const rasterBaseVisibilityGenerationByMap = new WeakMap<maplibregl.Map, number>();
 
+const resolverCache = new WeakMap<
+    FeatureCollection,
+    Map<number | null | undefined, (feature: Feature) => string | null>
+>();
+
+const featureLabelInfoCache = new WeakMap<
+    Feature,
+    Map<number | null | undefined, FeatureLabelInfo | null>
+>();
+
 export function applyBackgroundLayerVisibility(
     map: maplibregl.Map,
     visibility: BackgroundLayerVisibility
@@ -265,7 +275,7 @@ export function decoratePointFeaturesWithLabels(
     labelContext: FeatureCollection = fc,
     timelineYear?: number | null
 ): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
+    const getLabel = getFeatureLabelResolver(labelContext, timelineYear);
     let changed = false;
     const nextFeatures = fc.features.map((feature) => {
         const point_label = getLabel(feature);
@@ -289,7 +299,7 @@ export function decorateLineFeaturesWithLabels(
     labelContext: FeatureCollection = fc,
     timelineYear?: number | null
 ): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
+    const getLabel = getFeatureLabelResolver(labelContext, timelineYear);
     let changed = false;
     const nextFeatures = fc.features.map((feature) => {
         const line_label = isLineGeometry(feature.geometry) ? getLabel(feature) : null;
@@ -315,7 +325,7 @@ export function buildPolygonLabelFeatureCollection(
     labelContext: FeatureCollection = fc,
     timelineYear?: number | null
 ): FeatureCollection {
-    const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
+    const getLabel = getFeatureLabelResolver(labelContext, timelineYear);
     const features: Feature[] = [];
 
     for (const feature of fc.features) {
@@ -762,6 +772,40 @@ export function roundZoom(value: number): number {
     return Math.round(value * 10) / 10;
 }
 
+export function getFeatureLabelResolver(
+    fc: FeatureCollection,
+    timelineYear?: number | null
+): (feature: Feature) => string | null {
+    let yearMap = resolverCache.get(fc);
+    if (!yearMap) {
+        yearMap = new Map();
+        resolverCache.set(fc, yearMap);
+    }
+    let resolver = yearMap.get(timelineYear);
+    if (!resolver) {
+        resolver = createFeatureLabelResolver(fc, timelineYear);
+        yearMap.set(timelineYear, resolver);
+    }
+    return resolver;
+}
+
+function getSingleEntityFeatureLabelInfoCached(
+    feature: Feature,
+    timelineYear?: number | null
+): FeatureLabelInfo | null {
+    let yearMap = featureLabelInfoCache.get(feature);
+    if (!yearMap) {
+        yearMap = new Map();
+        featureLabelInfoCache.set(feature, yearMap);
+    }
+    let info = yearMap.get(timelineYear);
+    if (info === undefined) {
+        info = getSingleEntityFeatureLabelInfo(feature, timelineYear);
+        yearMap.set(timelineYear, info);
+    }
+    return info;
+}
+
 function createFeatureLabelResolver(
     fc: FeatureCollection,
     timelineYear?: number | null
@@ -770,7 +814,7 @@ function createFeatureLabelResolver(
     const inheritedLabelsByChildId = new Map<string, FeatureLabelInfo | null>();
 
     for (const feature of fc.features) {
-        const labelInfo = getSingleEntityFeatureLabelInfo(feature, timelineYear);
+        const labelInfo = getSingleEntityFeatureLabelInfoCached(feature, timelineYear);
         if (!labelInfo) continue;
         directLabelsByFeatureId.set(String(feature.properties.id), labelInfo);
     }

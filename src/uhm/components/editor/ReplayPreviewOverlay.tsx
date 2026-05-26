@@ -10,6 +10,7 @@ type Props = {
     dialog: DialogState | null;
     toasts: ReplayPreviewToast[];
     sidebarOpen: boolean;
+    sidebarWidth?: number;
     playbackSpeed: number;
     activeStepLabel: string | null;
     activeStepNumber: number | null;
@@ -26,6 +27,7 @@ export default function ReplayPreviewOverlay({
     dialog,
     toasts,
     sidebarOpen,
+    sidebarWidth = 420,
     playbackSpeed,
     activeStepLabel,
     activeStepNumber,
@@ -36,6 +38,7 @@ export default function ReplayPreviewOverlay({
     onExitPreview,
 }: Props) {
     const hasWikiPreview = sidebarOpen;
+    const rightOffset = hasWikiPreview ? sidebarWidth + 32 : 18;
     const shouldRender =
         isPreviewMode ||
         isPlaying ||
@@ -60,7 +63,7 @@ export default function ReplayPreviewOverlay({
                     style={{
                         position: "absolute",
                         top: 72,
-                        right: hasWikiPreview ? 454 : 18,
+                        right: rightOffset,
                         display: "grid",
                         gap: 8,
                         width: 280,
@@ -90,9 +93,9 @@ export default function ReplayPreviewOverlay({
                 <div
                     style={{
                         position: "absolute",
-                        right: hasWikiPreview ? 472 : 18,
+                        left: 18,
+                        right: rightOffset,
                         bottom: 96,
-                        width: 380,
                         borderRadius: 20,
                         overflow: "hidden",
                         border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -102,6 +105,7 @@ export default function ReplayPreviewOverlay({
                         pointerEvents: "auto",
                         display: "flex",
                         flexDirection: "column",
+                        maxHeight: "calc(100vh - 180px)",
                     }}
                 >
                     {dialog.image_url?.trim() ? (
@@ -111,7 +115,7 @@ export default function ReplayPreviewOverlay({
                             style={{
                                 width: "100%",
                                 display: "block",
-                                maxHeight: 220,
+                                maxHeight: 140,
                                 objectFit: "cover",
                                 background: "#020617",
                             }}
@@ -119,14 +123,15 @@ export default function ReplayPreviewOverlay({
                     ) : null}
                     {dialog.text?.trim() ? (
                         <div
-                            className="ql-editor"
+                            className="uhm-replay-dialog-content"
                             style={{
                                 padding: "16px",
                                 color: "#f8fafc",
                                 fontSize: "14px",
                                 lineHeight: "1.6",
                                 overflowY: "auto",
-                                maxHeight: "250px",
+                                maxHeight: dialog.image_url?.trim() ? "180px" : "140px",
+                                minHeight: 0,
                                 background: "transparent",
                             }}
                             dangerouslySetInnerHTML={{ __html: dialog.text }}
@@ -134,6 +139,19 @@ export default function ReplayPreviewOverlay({
                     ) : null}
                 </div>
             ) : null}
+            <style jsx>{`
+                .uhm-replay-dialog-content :global(p) {
+                    margin: 0;
+                }
+                .uhm-replay-dialog-content :global(p + p) {
+                    margin-top: 6px;
+                }
+                .uhm-replay-dialog-content :global(ul),
+                .uhm-replay-dialog-content :global(ol) {
+                    margin: 0;
+                    padding-left: 20px;
+                }
+            `}</style>
 
             {isPreviewMode ? (
                 <div

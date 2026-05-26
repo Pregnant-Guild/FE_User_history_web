@@ -485,7 +485,7 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
         const { html } = rewriteHtmlAndBuildToc(normalizeWikiContentToHtml(r.content), `${window.location.origin}/wiki/`);
         return { ...r, content: html };
       });
-      setComparisonData(processedResults.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setComparisonData(processedResults.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setViewMode("compare");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Lỗi khi tải phiên bản để so sánh.";
@@ -689,9 +689,9 @@ export default function WikiBySlugClient({ slug }: { slug: string }) {
               <div className="min-h-0 overflow-auto">
                 {linkPreviewData?.slug === linkPreview.slug && linkPreviewData.status === "ready" ? (
                   linkPreviewData.quote ? (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words">
-                        {linkPreviewData.quote}
-                      </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words">
+                      {linkPreviewData.quote}
+                    </div>
                   ) : (
                     <div className="text-xs text-gray-500 dark:text-gray-400">No resume.</div>
                   )

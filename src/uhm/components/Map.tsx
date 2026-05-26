@@ -12,6 +12,7 @@ import { setupMapLayers } from "./map/useMapLayers";
 import { useMapInteraction } from "./map/useMapInteraction";
 import { useMapSync } from "./map/useMapSync";
 import { bindImageOverlayInteractions, type MapImageOverlay } from "./map/imageOverlay";
+import { useMapHoverPopup, type MapHoverPopupContent } from "./map/useMapHoverPopup";
 
 export type MapFeaturePayload = {
     featureId: string | number;
@@ -56,6 +57,9 @@ type MapProps = {
     fitToDraftBounds?: boolean;
     fitBoundsKey?: string | number | null;
     onFeatureClick?: ((payload: MapFeaturePayload | null) => void) | undefined;
+    hoverPopupEnabled?: boolean;
+    getHoverPopupContent?: (feature: Feature) => MapHoverPopupContent | null;
+    allowFeatureSelection?: boolean;
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
     focusPadding?: number | import("maplibre-gl").PaddingOptions;
@@ -93,6 +97,9 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     fitToDraftBounds = false,
     fitBoundsKey = null,
     onFeatureClick,
+    hoverPopupEnabled = false,
+    getHoverPopupContent,
+    allowFeatureSelection = true,
     focusFeatureCollection = null,
     focusRequestKey = null,
     focusPadding,
@@ -118,6 +125,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     const onSetModeRef = useRef(onSetMode);
     // Ref callback click feature mới nhất cho tooltip/panel ngoài map.
     const onFeatureClickRef = useRef<MapProps["onFeatureClick"]>(onFeatureClick);
+    const getHoverPopupContentRef = useRef<MapProps["getHoverPopupContent"]>(getHoverPopupContent);
     // Ref callback create mới nhất khi drawing engine tạo feature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
     // Ref callback add geometry global vào project mới nhất cho context menu select.
@@ -142,6 +150,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
     useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
     useEffect(() => { onFeatureClickRef.current = onFeatureClick; }, [onFeatureClick]);
+    useEffect(() => { getHoverPopupContentRef.current = getHoverPopupContent; }, [getHoverPopupContent]);
     useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
     useEffect(() => { onAddFeatureToProjectRef.current = onAddFeatureToProject; }, [onAddFeatureToProject]);
     useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
@@ -201,6 +210,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
         onBindGeometriesRef,
         localFeatureIdsRef,
         onAddFeatureToProjectRef,
+        allowFeatureSelection,
     });
 
     // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.
@@ -227,6 +237,13 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
         editingEngineRef,
         geolocationCenteredRef,
         isPreviewMode: isPreviewMode || mode === "preview" || mode === "replay" || mode === "replay_preview",
+    });
+
+    useMapHoverPopup({
+        mapRef,
+        enabled: hoverPopupEnabled,
+        renderDraftRef,
+        getContentRef: getHoverPopupContentRef,
     });
 
     useEffect(() => {

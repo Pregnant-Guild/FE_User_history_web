@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { UndoAction } from "@/uhm/lib/editor/state/useEditorState";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
 
@@ -49,7 +49,7 @@ type Props = {
     onRemoveImageOverlay: () => void;
 };
 
-export default function Editor({
+function Editor({
     mode,
     setMode,
     entityStatus,
@@ -190,3 +190,5 @@ export default function Editor({
         </div>
     );
 }
+
+export default memo(Editor);
