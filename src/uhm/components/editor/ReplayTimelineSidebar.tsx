@@ -383,6 +383,7 @@ export default function ReplayTimelineSidebar({
 
     return (
         <aside
+            className="no-scrollbar"
             style={{
                 width,
                 height: "100vh",

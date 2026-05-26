@@ -87,6 +87,7 @@ export default function Editor({
 
     return (
         <div
+            className="no-scrollbar"
             style={{
                 width,
                 height: "100vh",
