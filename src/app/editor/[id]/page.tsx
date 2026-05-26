@@ -1456,6 +1456,16 @@ function EditorPageContent() {
         : EMPTY_FEATURE_COLLECTION;
     const isReplayPreviewWikiSidebarOpen = isAnyPreviewMode && (replayPreviewSidebarOpen || isPreviewEntitySidebarOpen);
 
+    const mapFocusPadding = useMemo(() => {
+        if (!isAnyPreviewMode) return 96;
+        return {
+            top: 84,
+            right: isReplayPreviewWikiSidebarOpen ? previewSidebarWidth + 80 : 84,
+            bottom: 116,
+            left: 84,
+        };
+    }, [isAnyPreviewMode, isReplayPreviewWikiSidebarOpen, previewSidebarWidth]);
+
     const handleFocusHistoricalGeometry = useCallback((payload: HistoricalGeometryFocusPayload) => {
         const map = getCurrentMapInstance();
         const geometryId = String(payload.geometry.id || "").trim();
@@ -2743,11 +2753,19 @@ function EditorPageContent() {
         ? sectionCommits.find((commit) => commit.id === projectState.head_commit_id) || null
         : null;
 
+    const handleDeleteFeature = useCallback((id: string | number | (string | number)[]) => {
+        if (Array.isArray(id)) {
+            editor.deleteFeatures(id);
+        } else {
+            editor.deleteFeature(id);
+        }
+    }, [editor]);
+
     // Tạo geometry từ map engine rồi select ngay geometry mới.
-    const handleCreateFeature = (feature: Feature) => {
+    const handleCreateFeature = useCallback((feature: Feature) => {
         editor.createFeature(feature);
         setSelectedFeatureIds([feature.properties.id]);
-    };
+    }, [editor]);
 
     // Base draft for label lookup only. It must not decide which geometry is rendered.
     const labelContextBaseDraft = useMemo(() => {
@@ -2993,13 +3011,7 @@ function EditorPageContent() {
                         onSelectFeatureIds={setSelectedFeatureIds}
                         onCreateFeature={handleCreateFeature}
                         onAddFeatureToProject={handleAddGlobalGeometryToProject}
-                        onDeleteFeature={(id) => {
-                            if (Array.isArray(id)) {
-                                editor.deleteFeatures(id);
-                            } else {
-                                editor.deleteFeature(id);
-                            }
-                        }}
+                        onDeleteFeature={handleDeleteFeature}
                         onHideFeature={handleHideGeometryLocal}
                         onUpdateFeature={editor.updateFeature}
                         allowGeometryEditing={!isAnyPreviewMode}
@@ -3024,16 +3036,7 @@ function EditorPageContent() {
                                 ? (replayPreviewActiveEntity ? previewEntityFocusToken : null)
                                 : geometryFocusRequest?.key ?? null
                         }
-                        focusPadding={
-                            isAnyPreviewMode
-                                ? {
-                                    top: 84,
-                                    right: isReplayPreviewWikiSidebarOpen ? previewSidebarWidth + 80 : 84,
-                                    bottom: 116,
-                                    left: 84,
-                                }
-                                : 96
-                        }
+                        focusPadding={mapFocusPadding}
                         imageOverlay={imageOverlay}
                         onImageOverlayChange={setImageOverlay}
                         onBindGeometries={handleBindGeometries}

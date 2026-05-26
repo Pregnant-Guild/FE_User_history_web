@@ -266,16 +266,22 @@ export function decoratePointFeaturesWithLabels(
     timelineYear?: number | null
 ): FeatureCollection {
     const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
-    return {
-        ...fc,
-        features: fc.features.map((feature) => ({
+    let changed = false;
+    const nextFeatures = fc.features.map((feature) => {
+        const point_label = getLabel(feature);
+        if (feature.properties.point_label === point_label) {
+            return feature;
+        }
+        changed = true;
+        return {
             ...feature,
             properties: {
                 ...feature.properties,
-                point_label: getLabel(feature),
+                point_label,
             },
-        })),
-    };
+        };
+    });
+    return changed ? { ...fc, features: nextFeatures } : fc;
 }
 
 export function decorateLineFeaturesWithLabels(
@@ -284,17 +290,25 @@ export function decorateLineFeaturesWithLabels(
     timelineYear?: number | null
 ): FeatureCollection {
     const getLabel = createFeatureLabelResolver(labelContext, timelineYear);
-    return {
-        ...fc,
-        features: fc.features.map((feature) => ({
+    let changed = false;
+    const nextFeatures = fc.features.map((feature) => {
+        const line_label = isLineGeometry(feature.geometry) ? getLabel(feature) : null;
+        if (feature.properties.line_label === line_label) {
+            return feature;
+        }
+        changed = true;
+        return {
             ...feature,
             properties: {
                 ...feature.properties,
-                line_label: isLineGeometry(feature.geometry) ? getLabel(feature) : null,
+                line_label,
             },
-        })),
-    };
+        };
+    });
+    return changed ? { ...fc, features: nextFeatures } : fc;
 }
+
+const polygonLabelFeaturesCache = new WeakMap<any, { label: string; feature: Feature }>();
 
 export function buildPolygonLabelFeatureCollection(
     fc: FeatureCollection,
@@ -308,10 +322,16 @@ export function buildPolygonLabelFeatureCollection(
         const label = getLabel(feature);
         if (!label) continue;
 
+        const cached = polygonLabelFeaturesCache.get(feature);
+        if (cached && cached.label === label) {
+            features.push(cached.feature);
+            continue;
+        }
+
         const labelPoint = getPolygonLabelPoint(feature.geometry);
         if (!labelPoint) continue;
 
-        features.push({
+        const labelFeature: Feature = {
             type: "Feature",
             properties: {
                 ...feature.properties,
@@ -322,7 +342,9 @@ export function buildPolygonLabelFeatureCollection(
                 type: "Point",
                 coordinates: labelPoint,
             },
-        });
+        };
+        polygonLabelFeaturesCache.set(feature, { label, feature: labelFeature });
+        features.push(labelFeature);
     }
 
     return { type: "FeatureCollection", features };
@@ -452,16 +474,26 @@ export function getGeometryRepresentativePoint(geometry: Geometry): Coordinate |
     return null;
 }
 
+const pathArrowGeometriesCache = new WeakMap<any, Geometry[]>();
+
 export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureCollection {
     const features: Feature[] = [];
 
     for (const feature of fc.features) {
         if (!isPathFeature(feature)) continue;
 
-        const coordinateGroups = getLineCoordinateGroups(feature.geometry);
-        for (const coordinates of coordinateGroups) {
-            const geometry = buildPathArrowGeometry(coordinates);
-            if (!geometry) continue;
+        let arrowGeometries = pathArrowGeometriesCache.get(feature.geometry);
+        if (!arrowGeometries) {
+            arrowGeometries = [];
+            const coordinateGroups = getLineCoordinateGroups(feature.geometry);
+            for (const coordinates of coordinateGroups) {
+                const geometry = buildPathArrowGeometry(coordinates);
+                if (geometry) arrowGeometries.push(geometry);
+            }
+            pathArrowGeometriesCache.set(feature.geometry, arrowGeometries);
+        }
+
+        for (const geometry of arrowGeometries) {
             features.push({
                 type: "Feature",
                 properties: { ...feature.properties },
@@ -986,12 +1018,16 @@ function getLineCoordinateGroups(geometry: Geometry): Coordinate[][] {
     return [];
 }
 
-function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
-    if (geometry.type === "Polygon") {
-        return getPolygonLabelCandidate(geometry.coordinates)?.point || null;
-    }
+const polygonLabelPointCache = new WeakMap<any, Coordinate | null>();
 
-    if (geometry.type === "MultiPolygon") {
+function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
+    if (polygonLabelPointCache.has(geometry)) {
+        return polygonLabelPointCache.get(geometry)!;
+    }
+    let result: Coordinate | null = null;
+    if (geometry.type === "Polygon") {
+        result = getPolygonLabelCandidate(geometry.coordinates)?.point || null;
+    } else if (geometry.type === "MultiPolygon") {
         let best: { point: Coordinate; distance: number } | null = null;
         for (const polygon of geometry.coordinates) {
             const candidate = getPolygonLabelCandidate(polygon);
@@ -1000,10 +1036,10 @@ function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
                 best = candidate;
             }
         }
-        return best?.point || null;
+        result = best?.point || null;
     }
-
-    return null;
+    polygonLabelPointCache.set(geometry, result);
+    return result;
 }
 
 function getPolygonLabelCandidate(polygon: PolygonCoordinates): { point: Coordinate; distance: number } | null {
@@ -1074,45 +1110,39 @@ export function hashStringToColor(str: string): string {
 }
 
 export function decorateFeaturesWithEntityColors(fc: FeatureCollection): FeatureCollection {
-    return {
-        ...fc,
-        features: fc.features.map((feature) => {
-            const geomType = feature.geometry?.type;
-            if (geomType === "Point" || geomType === "MultiPoint") {
-                // Point - giữ nguyên màu của preset/icon
-                return feature;
-            }
-
-            if (geomType === "LineString" || geomType === "MultiLineString") {
-                const entityIds = getFeatureEntityIds(feature);
-                if (entityIds.length > 0) {
-                    const sortedCombined = [...entityIds].sort().join("+");
-                    return {
-                        ...feature,
-                        properties: {
-                            ...feature.properties,
-                            entity_color: hashStringToColor(sortedCombined),
-                        },
-                    };
-                }
-                return feature;
-            }
-
-            if (geomType === "Polygon" || geomType === "MultiPolygon") {
-                const geoId = String(feature.properties?.id || "");
-                if (geoId) {
-                    return {
-                        ...feature,
-                        properties: {
-                            ...feature.properties,
-                            entity_color: hashStringToColor(geoId),
-                        },
-                    };
-                }
-                return feature;
-            }
-
+    let changed = false;
+    const nextFeatures = fc.features.map((feature) => {
+        const geomType = feature.geometry?.type;
+        if (geomType === "Point" || geomType === "MultiPoint") {
+            // Point - giữ nguyên màu của preset/icon
             return feature;
-        }),
-    };
+        }
+
+        let entity_color: string | undefined;
+        if (geomType === "LineString" || geomType === "MultiLineString") {
+            const entityIds = getFeatureEntityIds(feature);
+            if (entityIds.length > 0) {
+                const sortedCombined = [...entityIds].sort().join("+");
+                entity_color = hashStringToColor(sortedCombined);
+            }
+        } else if (geomType === "Polygon" || geomType === "MultiPolygon") {
+            const geoId = String(feature.properties?.id || "");
+            if (geoId) {
+                entity_color = hashStringToColor(geoId);
+            }
+        }
+
+        if ((feature.properties as any).entity_color === entity_color) {
+            return feature;
+        }
+        changed = true;
+        return {
+            ...feature,
+            properties: {
+                ...feature.properties,
+                entity_color,
+            },
+        };
+    });
+    return changed ? { ...fc, features: nextFeatures } : fc;
 }

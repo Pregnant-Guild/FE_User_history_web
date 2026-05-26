@@ -137,7 +137,11 @@ export function useMapSync({
         countriesSource.setData(labeledGeometries);
         placesSource.setData(labeledPoints);
         polygonLabelSource.setData(polygonLabels);
-        (map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined)?.setData(pathArrowShapes);
+
+        const pathArrowSource = map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+        if (pathArrowSource) {
+            pathArrowSource.setData(pathArrowShapes);
+        }
 
         currentSelectedIds.forEach((id) => {
             setSelectedFeatureState(map, id, true);
@@ -152,8 +156,6 @@ export function useMapSync({
             fitBoundsAppliedRef.current = fitMapToFeatureCollection(map, mapSourceDraft);
         }
     }, [mapRef]);
-
-
 
     const tryCenterToUserLocation = useCallback(() => {
         if (geolocationCenteredRef.current) return;
@@ -256,5 +258,3 @@ export function useMapSync({
         },
     };
 }
-
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle, memo } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
@@ -72,7 +72,7 @@ type MapProps = {
     onViewModeChange?: (mode: "local" | "global") => void;
 };
 
-const Map = forwardRef<MapHandle, MapProps>(function Map({
+const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     mode,
     onSetMode,
     renderDraft,
@@ -551,7 +551,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
             ) : null}
         </div>
     );
-});
+}));
 
 export default Map;
 
