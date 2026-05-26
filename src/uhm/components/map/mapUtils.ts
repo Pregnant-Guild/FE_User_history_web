@@ -23,6 +23,7 @@ type FeatureLabelInfo = {
     label: string;
     timeEnd: number | null;
 };
+const rasterBaseVisibilityGenerationByMap = new WeakMap<maplibregl.Map, number>();
 
 export function applyBackgroundLayerVisibility(
     map: maplibregl.Map,
@@ -47,25 +48,42 @@ export function applyBackgroundLayerVisibility(
 }
 
 export function syncRasterBaseVisibility(map: maplibregl.Map, shouldShow: boolean) {
+    const generation = nextRasterBaseVisibilityGeneration(map);
+    const isCurrentRequest = () => rasterBaseVisibilityGenerationByMap.get(map) === generation;
+
     if (shouldShow) {
-        void ensureRasterBaseLayer(map).catch((error) => {
+        void ensureRasterBaseLayer(map, isCurrentRequest).catch((error) => {
             console.error("Failed to load proxied raster background.", error);
-            removeRasterBaseLayer(map);
+            if (isCurrentRequest()) {
+                removeRasterBaseLayer(map);
+            }
         });
         return;
     }
     removeRasterBaseLayer(map);
 }
 
-export async function ensureRasterBaseLayer(map: maplibregl.Map) {
+function nextRasterBaseVisibilityGeneration(map: maplibregl.Map) {
+    const next = (rasterBaseVisibilityGenerationByMap.get(map) || 0) + 1;
+    rasterBaseVisibilityGenerationByMap.set(map, next);
+    return next;
+}
+
+export async function ensureRasterBaseLayer(
+    map: maplibregl.Map,
+    isCurrentRequest: () => boolean = () => true
+) {
     if (!map.getSource(RASTER_BASE_SOURCE_ID)) {
         const source = await createRasterBaseSource();
+        if (!isCurrentRequest()) return;
         if (map.getSource(RASTER_BASE_SOURCE_ID)) {
             // Another caller already added the source while we were waiting.
         } else {
             map.addSource(RASTER_BASE_SOURCE_ID, source);
         }
     }
+
+    if (!isCurrentRequest()) return;
 
     const beforeId = getRasterBaseInsertBeforeLayerId(map);
     if (!map.getLayer(RASTER_BASE_LAYER_ID)) {
@@ -74,6 +92,7 @@ export async function ensureRasterBaseLayer(map: maplibregl.Map) {
         map.moveLayer(RASTER_BASE_LAYER_ID, beforeId);
     }
 
+    if (!isCurrentRequest()) return;
     map.setLayoutProperty(RASTER_BASE_LAYER_ID, "visibility", "visible");
 }
 

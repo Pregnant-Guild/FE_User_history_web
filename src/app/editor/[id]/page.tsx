@@ -808,7 +808,8 @@ function EditorPageContent() {
     }, [
         activeTimelineFilterEnabled,
         activeTimelineYear,
-        editor,
+        editor.mainDraft,
+        editor.replayDraft,
         isReplayEditMode,
         isReplayPreviewMode,
         isViewerPreviewMode,
@@ -1193,7 +1194,6 @@ function EditorPageContent() {
         internalSetMode,
         mode,
         resetReplayPreview,
-        restoreEditorOriginalMapState,
         selectedFeatureIds,
         setHideOutside,
         setReplayFeatureId,
@@ -1540,12 +1540,23 @@ function EditorPageContent() {
     ]);
 
     // Visibility cuối cùng theo type/layer, có override riêng cho replay edit/preview.
+    const replayMarkerGeometryId = useMemo(() => {
+        if (isReplayPreviewMode) {
+            const id = String(previewSession?.replay?.geometry_id || replayFeatureId || "").trim();
+            return id.length ? id : null;
+        }
+        if (isReplayEditMode && replayFeatureId) {
+            return String(replayFeatureId);
+        }
+        return null;
+    }, [isReplayEditMode, isReplayPreviewMode, previewSession?.replay?.geometry_id, replayFeatureId]);
+
     const effectiveGeometryVisibility = useMemo(() => {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
 
-        if ((isReplayEditMode || isReplayPreviewMode) && replayFeatureId) {
+        if ((isReplayEditMode || isReplayPreviewMode) && replayMarkerGeometryId) {
             // Ẩn chính geo được chọn làm replay (marker kịch bản)
-            visibility[String(replayFeatureId)] = false;
+            visibility[replayMarkerGeometryId] = false;
 
             if (isReplayEditMode && hideOutside) {
                 // Trong mode replay, ta chỉ hiển thị những gì có trong draft của replay đó
@@ -1553,7 +1564,7 @@ function EditorPageContent() {
 
                 // Ẩn tất cả các geo KHÔNG nằm trong draft replay hiện tại
                 Object.keys(visibility).forEach(fid => {
-                    if (fid === String(replayFeatureId)) {
+                    if (fid === replayMarkerGeometryId) {
                         visibility[fid] = false;
                     } else {
                         visibility[fid] = currentReplayFeatureIds.has(fid);
@@ -1569,7 +1580,7 @@ function EditorPageContent() {
         hideOutside,
         isReplayEditMode,
         isReplayPreviewMode,
-        replayFeatureId,
+        replayMarkerGeometryId,
     ]);
 
     // Load project editor payload, xử lý auth và pending-submission lock.
@@ -2422,10 +2433,16 @@ function EditorPageContent() {
     });
 
     const handleRerollGeometryId = useCallback((oldId: string | number) => {
+        const feature = editor.draft.features.find((item) => String(item.properties.id) === String(oldId));
+        if (!feature || feature.properties.source === "ref") {
+            flashEntityFormStatus("Không thể đổi ID geometry ref vì đây là identity từ backend.");
+            return;
+        }
+
         const nextId = newId();
         editor.changeFeatureId(oldId, nextId);
         setSelectedFeatureIds((prev) => prev.map((id) => String(id) === String(oldId) ? nextId : id));
-    }, [editor, setSelectedFeatureIds]);
+    }, [editor, flashEntityFormStatus, setSelectedFeatureIds]);
 
     const handleRerollEntityId = useCallback((oldId: string, nextId: string) => {
         const activeEntity = entities.find(e => e.id === oldId);

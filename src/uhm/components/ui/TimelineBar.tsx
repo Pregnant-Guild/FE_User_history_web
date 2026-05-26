@@ -34,18 +34,18 @@ export default function TimelineBar({
     const effectiveDisabled = disabled;
     const safeYear = clampYearValue(year, lower, upper);
 
-    const [localYear, setLocalYear] = useState(safeYear);
-
-    // Đồng bộ prop year với localYear khi prop year thay đổi từ bên ngoài
-    useEffect(() => {
-        setLocalYear(safeYear);
-    }, [safeYear]);
-
-    const localYearRef = useRef(localYear);
-    localYearRef.current = localYear;
-
+    const [localYear, setLocalYear] = useState<number | null>(null);
+    const displayYear = localYear ?? safeYear;
+    const localYearRef = useRef(displayYear);
     const onYearChangeRef = useRef(onYearChange);
-    onYearChangeRef.current = onYearChange;
+
+    useEffect(() => {
+        localYearRef.current = displayYear;
+    }, [displayYear]);
+
+    useEffect(() => {
+        onYearChangeRef.current = onYearChange;
+    }, [onYearChange]);
 
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -66,6 +66,7 @@ export default function TimelineBar({
 
     const handleLocalYearChange = useCallback((nextVal: number) => {
         const clamped = clampYearValue(Math.trunc(nextVal), lower, upper);
+        localYearRef.current = clamped;
         setLocalYear(clamped);
 
         const now = Date.now();
@@ -80,6 +81,11 @@ export default function TimelineBar({
             }, 1000);
         }
     }, [lower, upper, commitYearChange]);
+
+    const finishLocalYearChange = useCallback(() => {
+        commitYearChange(localYearRef.current);
+        setLocalYear(null);
+    }, [commitYearChange]);
 
     const startChangingYear = (direction: number) => {
         if (effectiveDisabled) return;
@@ -108,7 +114,7 @@ export default function TimelineBar({
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
-        commitYearChange(localYearRef.current);
+        finishLocalYearChange();
     };
 
     useEffect(() => {
@@ -163,10 +169,10 @@ export default function TimelineBar({
                     min={lower}
                     max={upper}
                     step={1}
-                    value={localYear}
+                    value={displayYear}
                     onChange={(event) => handleLocalYearChange(Number(event.target.value))}
-                    onMouseUp={() => commitYearChange(localYearRef.current)}
-                    onTouchEnd={() => commitYearChange(localYearRef.current)}
+                    onMouseUp={finishLocalYearChange}
+                    onTouchEnd={finishLocalYearChange}
                     disabled={effectiveDisabled}
                     className={styles.slider}
                     aria-label="Timeline year"
@@ -180,12 +186,12 @@ export default function TimelineBar({
                         min={lower}
                         max={upper}
                         step={1}
-                        value={localYear}
+                        value={displayYear}
                         onChange={(event) => handleLocalYearChange(Number(event.target.value))}
-                        onBlur={() => commitYearChange(localYearRef.current)}
+                        onBlur={finishLocalYearChange}
                         onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                                commitYearChange(localYearRef.current);
+                                finishLocalYearChange();
                             }
                         }}
                         disabled={effectiveDisabled}

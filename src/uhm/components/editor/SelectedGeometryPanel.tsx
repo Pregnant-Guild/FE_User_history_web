@@ -87,6 +87,10 @@ export default function SelectedGeometryPanel({
 
     if (!selectedFeatures || selectedFeatures.length === 0) return null;
     const representativeFeature = selectedFeatures[0];
+    const canRerollGeometryId =
+        !isBulkMode &&
+        representativeFeature.properties.source !== "ref" &&
+        Boolean(onRerollGeometryId);
 
     const groupedGeometryTypeOptions = groupGeometryTypeOptions(GEOMETRY_TYPE_OPTIONS);
     const featureGeometryPreset = resolveFeatureGeometryPreset(representativeFeature);
@@ -225,7 +229,7 @@ export default function SelectedGeometryPanel({
                             <div style={{ color: "#94a3b8", fontSize: "11px", overflowWrap: "anywhere", minWidth: 0, flex: 1 }}>
                                 {isBulkMode ? `Đang chọn ${selectedFeatures.length} geometries` : `ID: ${representativeFeature.properties.id}`}
                             </div>
-                            {!isBulkMode && onRerollGeometryId && (
+                            {canRerollGeometryId && onRerollGeometryId && (
                                 <button
                                     type="button"
                                     onClick={() => onRerollGeometryId(representativeFeature.properties.id)}
