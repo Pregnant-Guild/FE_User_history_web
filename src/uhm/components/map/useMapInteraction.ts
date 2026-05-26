@@ -36,6 +36,8 @@ type UseMapInteractionProps = {
     onUpdateRef: React.MutableRefObject<((id: string | number, geometry: Geometry) => void) | undefined>;
     onFeatureClickRef: React.MutableRefObject<((payload: MapFeaturePayload | null) => void) | undefined>;
     onBindGeometriesRef?: React.MutableRefObject<((targetId: string | number, sourceIds: (string | number)[]) => void) | undefined>;
+    localFeatureIdsRef?: React.MutableRefObject<(string | number)[] | undefined>;
+    onAddFeatureToProjectRef?: React.MutableRefObject<((feature: FeatureCollection["features"][number]) => void) | undefined>;
 };
 
 export function useMapInteraction({
@@ -53,6 +55,8 @@ export function useMapInteraction({
     onUpdateRef,
     onFeatureClickRef,
     onBindGeometriesRef,
+    localFeatureIdsRef,
+    onAddFeatureToProjectRef,
 }: UseMapInteractionProps) {
     const editingEngineRef = useRef<ReturnType<typeof createEditingEngine> | null>(null);
     const engineBindingsRef = useRef<Partial<Record<EditorMode, EngineBinding>>>({});
@@ -199,7 +203,27 @@ export function useMapInteraction({
                     ...payload,
                     feature: currentFeature,
                 });
-            }
+            },
+            onAddFeatureToProjectRef?.current
+                ? (feature) => {
+                    const rawId = feature.id ?? feature.properties?.id;
+                    if (rawId === undefined || rawId === null) return;
+
+                    const originalFeature = renderDraftRef.current.features.find(
+                        (item) => String(item.properties.id) === String(rawId)
+                    );
+                    if (!originalFeature) return;
+                    onAddFeatureToProjectRef.current?.(originalFeature);
+                }
+                : undefined,
+            onAddFeatureToProjectRef?.current
+                ? (id) => {
+                    if (!onAddFeatureToProjectRef?.current) return true;
+                    const localIds = localFeatureIdsRef?.current;
+                    if (!Array.isArray(localIds)) return true;
+                    return localIds.some((localId) => String(localId) === String(id));
+                }
+                : undefined
         );
 
         const cleanupPoint = initPoint(

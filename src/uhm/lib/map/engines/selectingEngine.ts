@@ -19,7 +19,9 @@ export function initSelect(
     onReplayEdit?: (id: string | number) => void,
     isEditSessionActive?: () => boolean,
     onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void,
-    onFeatureClick?: (payload: SelectFeatureClickPayload | null) => void
+    onFeatureClick?: (payload: SelectFeatureClickPayload | null) => void,
+    onAddToProject?: (feature: maplibregl.MapGeoJSONFeature) => void,
+    isLocalFeature?: (id: string | number) => boolean
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -28,7 +30,7 @@ export function initSelect(
         "path-arrow-shapes",
     ] as const;
     const selectedIds = new Set<number | string>();
-    const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit || onBindGeometries);
+    const hasContextActions = Boolean(onDelete || onEdit || onDuplicate || onHide || onReplayEdit || onBindGeometries || onAddToProject);
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
     let cursorTimer: number | null = null;
@@ -306,31 +308,48 @@ export function initSelect(
             return item;
         };
 
-        const selectedCount = selectedIds.size;
-        const effectiveCount = selectedCount || 1;
         const targetId = clickedFeature.id ?? clickedFeature.properties?.id;
+        const hasTargetId = targetId !== undefined && targetId !== null;
+        const isLocalTarget = hasTargetId ? (isLocalFeature?.(targetId) ?? true) : false;
+        const selectedLocalIds = Array.from(selectedIds).filter((id) => isLocalFeature?.(id) ?? true);
+        const localActionIds = selectedLocalIds.length
+            ? selectedLocalIds
+            : isLocalTarget && hasTargetId
+                ? [targetId]
+                : [];
+        const effectiveCount = localActionIds.length;
         const isClickOutsideSelection = !isRightClickedItemAlreadySelected && hasSelection;
 
         type MenuItem = {
             label: string;
             onClick: () => void;
-            group: "edit" | "bind" | "replay" | "delete";
+            group: "add" | "edit" | "bind" | "replay" | "delete";
         };
 
         const items: MenuItem[] = [];
 
-        if (isClickOutsideSelection && onBindGeometries && targetId !== undefined && targetId !== null) {
-            const sourceIds = Array.from(selectedIds);
+        if (onAddToProject && hasTargetId && !isLocalTarget) {
             items.push({
-                group: "bind",
-                label: `Bind ${selectedCount} geo đang chọn vào geo này`,
-                onClick: () => {
-                    onBindGeometries(targetId, sourceIds);
-                },
+                group: "add",
+                label: "Add",
+                onClick: () => onAddToProject(clickedFeature),
             });
         }
 
-        if (!isClickOutsideSelection) {
+        if (isClickOutsideSelection && onBindGeometries && isLocalTarget && hasTargetId) {
+            const sourceIds = selectedLocalIds.filter((id) => String(id) !== String(targetId));
+            if (sourceIds.length) {
+                items.push({
+                    group: "bind",
+                    label: `Bind ${sourceIds.length} geo đang chọn vào geo này`,
+                    onClick: () => {
+                        onBindGeometries(targetId, sourceIds);
+                    },
+                });
+            }
+        }
+
+        if (isLocalTarget && !isClickOutsideSelection) {
             if (
                 effectiveCount === 1 &&
                 clickedFeature.source === "countries" &&
@@ -345,7 +364,7 @@ export function initSelect(
                 });
             }
 
-            if (effectiveCount === 1 && onDuplicate && targetId !== undefined && targetId !== null) {
+            if (effectiveCount === 1 && onDuplicate && hasTargetId) {
                 items.push({
                     group: "edit",
                     label: "Duplicate",
@@ -353,7 +372,7 @@ export function initSelect(
                 });
             }
 
-            if (effectiveCount === 1 && onHide && targetId !== undefined && targetId !== null) {
+            if (effectiveCount === 1 && onHide && hasTargetId) {
                 items.push({
                     group: "edit",
                     label: "Hide",
@@ -362,10 +381,10 @@ export function initSelect(
             }
         }
 
-        if (onReplayEdit) {
+        if (isLocalTarget && onReplayEdit) {
             const replayId = targetId;
             if (replayId !== undefined && replayId !== null) {
-                const totalCount = isClickOutsideSelection ? selectedIds.size + 1 : effectiveCount;
+                const totalCount = isClickOutsideSelection ? selectedLocalIds.length + 1 : effectiveCount;
                 items.push({
                     group: "replay",
                     label: totalCount > 1 ? `Vào replay (${totalCount} geo)` : "Vào replay",
@@ -374,18 +393,15 @@ export function initSelect(
             }
         }
 
-        if (onDelete) {
+        if (isLocalTarget && onDelete && effectiveCount > 0) {
             items.push({
                 group: "delete",
                 label: effectiveCount > 1 ? `Xóa ${effectiveCount} mục` : "Xóa",
                 onClick: () => {
-                    const ids = selectedIds.size
-                        ? Array.from(selectedIds)
-                        : [targetId];
-                    if (ids.length === 1) {
-                        onDelete(ids[0]);
+                    if (localActionIds.length === 1) {
+                        onDelete(localActionIds[0]);
                     } else {
-                        onDelete(ids);
+                        onDelete(localActionIds);
                     }
                     clearSelection();
                 },

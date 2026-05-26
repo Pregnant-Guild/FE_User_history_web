@@ -46,6 +46,7 @@ type MapProps = {
     labelContextDraft?: FeatureCollection;
     labelTimelineYear?: number | null;
     onCreateFeature?: (feature: FeatureCollection["features"][number]) => void;
+    onAddFeatureToProject?: (feature: FeatureCollection["features"][number]) => void;
     onDeleteFeature?: (id: string | number | (string | number)[]) => void;
     onHideFeature?: (id: string | number) => void;
     onUpdateFeature?: (id: string | number, geometry: Geometry) => void;
@@ -61,6 +62,7 @@ type MapProps = {
     imageOverlay?: MapImageOverlay | null;
     onImageOverlayChange?: (overlay: MapImageOverlay) => void;
     onBindGeometries?: (targetId: string | number, sourceIds: (string | number)[]) => void;
+    localFeatureIds?: (string | number)[];
     showViewportControls?: boolean;
     isPreviewMode?: boolean;
     onEnterPreview?: () => void;
@@ -81,6 +83,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     labelContextDraft,
     labelTimelineYear,
     onCreateFeature,
+    onAddFeatureToProject,
     onDeleteFeature,
     onHideFeature,
     onUpdateFeature,
@@ -96,6 +99,7 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     imageOverlay = null,
     onImageOverlayChange,
     onBindGeometries,
+    localFeatureIds,
     showViewportControls = true,
     isPreviewMode = false,
     onEnterPreview,
@@ -116,6 +120,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     const onFeatureClickRef = useRef<MapProps["onFeatureClick"]>(onFeatureClick);
     // Ref callback create mới nhất khi drawing engine tạo feature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
+    // Ref callback add geometry global vào project mới nhất cho context menu select.
+    const onAddFeatureToProjectRef = useRef<MapProps["onAddFeatureToProject"]>(onAddFeatureToProject);
     // Ref callback delete mới nhất khi editing engine xóa feature.
     const onDeleteRef = useRef<MapProps["onDeleteFeature"]>(onDeleteFeature);
     // Ref callback hide local mới nhất khi context menu select ẩn feature khỏi map.
@@ -128,19 +134,23 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
     const onImageOverlayChangeRef = useRef<MapProps["onImageOverlayChange"]>(onImageOverlayChange);
     // Ref callback bind geometry mới nhất để interaction không stale.
     const onBindGeometriesRef = useRef<MapProps["onBindGeometries"]>(onBindGeometries);
- 
+    // Ref danh sách geometry thuộc local project để context menu phân biệt global-only feature.
+    const localFeatureIdsRef = useRef<MapProps["localFeatureIds"]>(localFeatureIds);
+
     useEffect(() => { modeRef.current = mode; }, [mode]);
     useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
     useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
     useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
     useEffect(() => { onFeatureClickRef.current = onFeatureClick; }, [onFeatureClick]);
     useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
+    useEffect(() => { onAddFeatureToProjectRef.current = onAddFeatureToProject; }, [onAddFeatureToProject]);
     useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
     useEffect(() => { onHideRef.current = onHideFeature; }, [onHideFeature]);
     useEffect(() => { onUpdateRef.current = onUpdateFeature; }, [onUpdateFeature]);
     useEffect(() => { imageOverlayRef.current = imageOverlay; }, [imageOverlay]);
     useEffect(() => { onImageOverlayChangeRef.current = onImageOverlayChange; }, [onImageOverlayChange]);
     useEffect(() => { onBindGeometriesRef.current = onBindGeometries; }, [onBindGeometries]);
+    useEffect(() => { localFeatureIdsRef.current = localFeatureIds; }, [localFeatureIds]);
 
     // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {
@@ -189,6 +199,8 @@ const Map = forwardRef<MapHandle, MapProps>(function Map({
         onUpdateRef,
         onFeatureClickRef,
         onBindGeometriesRef,
+        localFeatureIdsRef,
+        onAddFeatureToProjectRef,
     });
 
     // Hook đồng bộ draft/layer/filter/highlight từ React state xuống MapLibre source/layer.

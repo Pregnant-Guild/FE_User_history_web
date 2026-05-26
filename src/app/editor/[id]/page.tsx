@@ -63,6 +63,7 @@ import {
 import { FIXED_TIMELINE_RANGE, clampYearToFixedRange, normalizeTimelineYearValue } from "@/uhm/lib/utils/timeline";
 import { useFeatureCommands } from "@/uhm/lib/editor/geometry/useFeatureCommands";
 import { deleteSubmission } from "@/uhm/api/projects";
+import type { EntitySnapshot } from "@/uhm/types/entities";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import {
@@ -819,6 +820,21 @@ function EditorPageContent() {
         baselineFeatureCollection.features,
         globalGeometries.features,
     ]);
+
+    const localFeatureIds = useMemo(() => {
+        const ids = new Set<string | number>();
+        for (const feature of editor.mainDraft.features) {
+            if (feature.properties?.id !== undefined && feature.properties.id !== null) {
+                ids.add(feature.properties.id);
+            }
+        }
+        for (const feature of baselineFeatureCollection.features) {
+            if (feature.properties?.id !== undefined && feature.properties.id !== null) {
+                ids.add(feature.properties.id);
+            }
+        }
+        return Array.from(ids);
+    }, [baselineFeatureCollection.features, editor.mainDraft.features]);
 
     // Danh sách feature đang chọn, map từ selectedFeatureIds sang draft hiện tại.
     const selectedFeatures = useMemo(() => {
@@ -2419,6 +2435,62 @@ function EditorPageContent() {
         setSelectedFeatureIds,
     ]);
 
+    // Add geometry đang xem từ global mode vào draft local, kèm entity refs đã map được.
+    const handleAddGlobalGeometryToProject = useCallback((feature: Feature) => {
+        const geoId = String(feature?.properties?.id || "").trim();
+        if (!geoId) return;
+
+        const existing = editor.mainDraft.features.find((item) => String(item.properties.id) === geoId) || null;
+        if (existing) {
+            setSelectedFeatureIds([existing.properties.id]);
+            flashEntityFormStatus("Geometry này đã nằm trong project.", 3000);
+            return;
+        }
+
+        if (isGlobalLoading) {
+            flashEntityFormStatus("Đang tải global geometry và entity mapping, thử lại sau.", 3000);
+            return;
+        }
+
+        const entityRefs = buildEntityRefsForFeature(feature, entities);
+        const entityIds = entityRefs.map((entity) => String(entity.id));
+        const featureClone = deepClone(feature);
+        const nextFeature: Feature = {
+            ...featureClone,
+            properties: {
+                ...featureClone.properties,
+                id: geoId,
+                source: "ref",
+                ...buildFeatureEntityPatch(featureClone, entityIds, entityRefs),
+            },
+        };
+        const entitySnapshots = entityRefs.map(toEntityRefSnapshot);
+
+        editor.createFeatureWithSnapshotEntityRows(
+            nextFeature,
+            (prev) => mergeSnapshotEntityRefs(prev, entitySnapshots),
+            `Add global GEO #${geoId}`
+        );
+
+        if (entityRefs.length) {
+            setEntityCatalog((prev) => mergeEntityCatalogById(prev, entityRefs));
+        }
+        setSelectedFeatureIds([nextFeature.properties.id]);
+        flashEntityFormStatus(
+            entityRefs.length
+                ? `Đã add geometry global vào project kèm ${entityRefs.length} entity. Commit khi sẵn sàng.`
+                : "Đã add geometry global vào project. Geometry này chưa có entity mapping.",
+            3000
+        );
+    }, [
+        editor,
+        entities,
+        flashEntityFormStatus,
+        isGlobalLoading,
+        setEntityCatalog,
+        setSelectedFeatureIds,
+    ]);
+
     // Commands thao tác metadata/entity binding cho feature đang chọn.
     const featureCommands = useFeatureCommands({
         editor,
@@ -2826,6 +2898,7 @@ function EditorPageContent() {
                         selectedFeatureIds={selectedFeatureIds}
                         onSelectFeatureIds={setSelectedFeatureIds}
                         onCreateFeature={handleCreateFeature}
+                        onAddFeatureToProject={handleAddGlobalGeometryToProject}
                         onDeleteFeature={(id) => {
                             if (Array.isArray(id)) {
                                 editor.deleteFeatures(id);
@@ -2870,6 +2943,7 @@ function EditorPageContent() {
                         imageOverlay={imageOverlay}
                         onImageOverlayChange={setImageOverlay}
                         onBindGeometries={handleBindGeometries}
+                        localFeatureIds={localFeatureIds}
                         showViewportControls={!isReplayPreviewMode || replayPreview.zoomPanelVisible}
                         isPreviewMode={isAnyPreviewMode}
                         onEnterPreview={!isReplayEditMode && !isAnyPreviewMode ? openViewerPreview : undefined}
@@ -3584,6 +3658,96 @@ function buildEntityLabelContextDraft(draft: FeatureCollection, entities: Entity
             };
         }),
     };
+}
+
+function buildEntityRefsForFeature(feature: Feature, entities: Entity[]): Entity[] {
+    const entityIds = normalizeFeatureEntityIds(feature);
+    if (!entityIds.length) return [];
+
+    const entityById = new globalThis.Map<string, Entity>();
+    for (const entity of entities || []) {
+        const id = String(entity?.id || "").trim();
+        if (!id) continue;
+        entityById.set(id, entity);
+    }
+
+    const entityNames = Array.isArray(feature.properties.entity_names)
+        ? feature.properties.entity_names
+        : [];
+    const primaryName = typeof feature.properties.entity_name === "string"
+        ? feature.properties.entity_name.trim()
+        : "";
+
+    return entityIds.map((id, index) => {
+        const catalogEntity = entityById.get(id);
+        if (catalogEntity) return catalogEntity;
+
+        const name = String(entityNames[index] || (index === 0 ? primaryName : "") || id).trim() || id;
+        return {
+            id,
+            name,
+            description: null,
+            time_start: null,
+            time_end: null,
+            geometry_count: 0,
+        };
+    });
+}
+
+function toEntityRefSnapshot(entity: Entity): EntitySnapshot {
+    return {
+        id: String(entity.id),
+        source: "ref",
+        operation: "reference",
+        name: entity.name,
+        description: entity.description ?? null,
+        time_start: normalizeTimelineYearValue(entity.time_start),
+        time_end: normalizeTimelineYearValue(entity.time_end),
+    };
+}
+
+function mergeSnapshotEntityRefs(prev: EntitySnapshot[], refs: EntitySnapshot[]): EntitySnapshot[] {
+    if (!refs.length) return prev;
+
+    const refsById = new globalThis.Map<string, EntitySnapshot>();
+    for (const ref of refs) {
+        const id = String(ref?.id || "").trim();
+        if (!id) continue;
+        refsById.set(id, ref);
+    }
+    if (!refsById.size) return prev;
+
+    let changed = false;
+    const seen = new Set<string>();
+    const next = (prev || []).map((row) => {
+        const id = String(row?.id || "").trim();
+        if (!id || !refsById.has(id)) return row;
+        seen.add(id);
+        if (row.operation !== "delete") return row;
+        changed = true;
+        return refsById.get(id) || row;
+    });
+
+    const missing = Array.from(refsById.values()).filter((ref) => !seen.has(String(ref.id)));
+    if (missing.length) changed = true;
+    return changed ? [...missing, ...next] : prev;
+}
+
+function mergeEntityCatalogById(prev: Entity[], refs: Entity[]): Entity[] {
+    if (!refs.length) return prev;
+
+    const byId = new globalThis.Map<string, Entity>();
+    for (const entity of prev || []) {
+        const id = String(entity?.id || "").trim();
+        if (!id) continue;
+        byId.set(id, entity);
+    }
+    for (const entity of refs) {
+        const id = String(entity?.id || "").trim();
+        if (!id) continue;
+        byId.set(id, entity);
+    }
+    return Array.from(byId.values());
 }
 
 function parseOptionalEntityYearInput(value: string, fieldName: string): number | undefined {
