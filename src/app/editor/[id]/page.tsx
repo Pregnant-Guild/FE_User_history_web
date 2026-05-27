@@ -3,27 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useShallow } from "zustand/react/shallow";
-import Map, { type MapFeaturePayload, type MapHandle } from "@/uhm/components/Map";
+import Map, { type MapHandle } from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/editor/BackgroundLayersPanel";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import SelectedGeometryPanel from "@/uhm/components/editor/SelectedGeometryPanel";
 import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar";
 import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
-import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
-import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
 import PreviewLayout from "@/uhm/components/preview/PreviewLayout";
-import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
 import GeometryBindingPanel from "@/uhm/components/editor/GeometryBindingPanel";
 import ImageOverlayPanel from "@/uhm/components/editor/ImageOverlayPanel";
-import PresentPlaceSearch, { type HistoricalGeometryFocusPayload, type PresentPlaceSelection } from "@/uhm/components/editor/PresentPlaceSearch";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
-import { fetchWikiById, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
+import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { searchGeometriesByEntityName, fetchGeometriesByBBox, type EntityGeometriesSearchItem, type EntityGeometrySearchGeo } from "@/uhm/api/geometries";
 import { WORLD_BBOX } from "@/uhm/lib/map/geo/constants";
 import {
@@ -50,7 +46,6 @@ import { buildFeatureEntityPatch } from "@/uhm/lib/editor/entity/entityBinding";
 import { newId } from "@/uhm/lib/utils/id";
 import {
     loadBackgroundLayerVisibilityFromStorage,
-    persistBackgroundLayerVisibility,
 } from "@/uhm/lib/editor/background/backgroundVisibilityStorage";
 import { deepClone } from "@/uhm/lib/editor/draft/draftDiff";
 import { useProjectCommands } from "@/uhm/lib/editor/project/useProjectCommands";
@@ -86,7 +81,6 @@ import {
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
 } from "@/uhm/lib/editor/editorPageUtils";
-import { fitMapToFeatureCollection } from "@/uhm/components/map/mapUtils";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
@@ -116,12 +110,6 @@ type PreviewRelationIndex = {
     wikiBySlug: Record<string, Wiki>;
 };
 
-type PreviewLinkEntityPopupState = {
-    slug: string;
-    entities: Entity[];
-    top: number;
-    left: number;
-};
 
 export default function Page() {
     return (
@@ -542,27 +530,6 @@ function EditorPageContent() {
         setTimelineDraftYear(clampYearToFixedRange(Math.trunc(nextYear)));
     }, [setTimelineDraftYear]);
 
-    const handleViewerPreviewTimelineYearChange = useCallback((nextYear: number) => {
-        setPreviewSession((prev) =>
-            prev
-                ? {
-                    ...prev,
-                    timelineYear: clampYearToFixedRange(Math.trunc(nextYear)),
-                }
-                : prev
-        );
-    }, []);
-
-    const handleViewerPreviewTimelineFilterChange = useCallback((enabled: boolean) => {
-        setPreviewSession((prev) =>
-            prev
-                ? {
-                    ...prev,
-                    timelineFilterEnabled: enabled,
-                }
-                : prev
-        );
-    }, []);
 
     // Preview specific UI states
     const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
@@ -613,9 +580,7 @@ function EditorPageContent() {
         hiddenGeometryIds: replayPreviewHiddenGeometryIds,
         timelineYear: replayPreviewTimelineYear,
         timelineFilterEnabled: replayPreviewTimelineFilterEnabled,
-        activeCursor: replayPreviewActiveCursor,
         activeWikiId: replayPreviewActiveWikiId,
-        sidebarOpen: replayPreviewSidebarOpen,
     } = replayPreview;
 
     // Draft hiển thị trong preview có thể ẩn bớt geometry theo action replay.
@@ -660,12 +625,6 @@ function EditorPageContent() {
 
         return activeWikiEntityIds[0] || previewActiveEntityId;
     }, [previewActiveEntityId, previewRelations.wikiEntityIdsById, replayPreviewActiveWikiId]);
-
-    const replayPreviewActiveEntity = useMemo(() => {
-        return replayPreviewActiveEntityId
-            ? previewRelations.entitiesById[replayPreviewActiveEntityId] || null
-            : null;
-    }, [replayPreviewActiveEntityId, previewRelations.entitiesById]);
 
     const replayPreviewActiveEntityGeometries = useMemo(() => {
         return replayPreviewActiveEntityId
@@ -3044,25 +3003,6 @@ function snapshotWikiToWiki(snapshot: WikiSnapshot, wikiCache: Record<string, Wi
     };
 }
 
-function extractWikiBlockquoteText(content: string | null | undefined): string {
-    if (!content) return "";
-
-    const blockquoteMatch = content.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i);
-    const rawText = blockquoteMatch?.[1]?.trim() || "";
-    if (!rawText) return "";
-
-    return rawText
-        .replace(/<[^>]*>/g, "")
-        .replace(/&nbsp;/gi, " ")
-        .replace(/\u00a0/g, " ")
-        .replace(/&amp;/gi, "&")
-        .replace(/&lt;/gi, "<")
-        .replace(/&gt;/gi, ">")
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\s+/g, " ")
-        .trim();
-}
 
 function pushUniqueString(target: Record<string, string[]>, key: string, value: string) {
     if (!target[key]) {
@@ -3080,20 +3020,6 @@ function normalizeRelationArrays(target: Record<string, string[]>) {
     }
 }
 
-function computeFixedPopupPosition(rect: DOMRect, width: number, height: number) {
-    const margin = 12;
-    const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1440;
-    const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 900;
-    const preferredLeft = rect.right + margin;
-    const maxLeft = Math.max(margin, viewportWidth - width - margin);
-    const left = Math.min(preferredLeft, maxLeft);
-
-    const preferredTop = rect.top;
-    const maxTop = Math.max(margin, viewportHeight - height - margin);
-    const top = Math.max(margin, Math.min(preferredTop, maxTop));
-
-    return { top, left };
-}
 
 function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;

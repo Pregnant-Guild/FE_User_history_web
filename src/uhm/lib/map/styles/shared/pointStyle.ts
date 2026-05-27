@@ -23,7 +23,6 @@ export const POINT_GEOTYPE_ICON_PATHS: Partial<Record<PointGeotypeId, string>> =
     port: "/images/mapIcon/point/port.png",
 };
 
-type PointIconVariant = "default" | "draft";
 
 type PointLayerOptions = {
     iconScale?: number;
@@ -42,8 +41,6 @@ const TYPE_MATCH_EXPR: maplibregl.ExpressionSpecification = ["coalesce", ["get",
 const SELECTED_EXPR: maplibregl.ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
 const ICON_CANVAS_SIZE = 48;
-const DRAFT_FILL = "#ef4444";
-const DRAFT_RIM = "#7f1d1d";
 const POINT_GEOMETRY_FILTER: maplibregl.ExpressionSpecification = [
     "any",
     ["==", ["geometry-type"], "Point"],

@@ -1,0 +1,884 @@
+
+> fe_admin_history_web@2.2.3 lint
+> eslint .
+
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/jsvectormap.d.ts
+  2:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/(full-width-pages)/(auth)/layout.tsx
+  1:8  warning  'GridShape' is defined but never used  @typescript-eslint/no-unused-vars
+  5:8  warning  'Image' is defined but never used      @typescript-eslint/no-unused-vars
+  6:8  warning  'Link' is defined but never used       @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/(full-width-pages)/(auth)/reset-password/page.tsx
+  48:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/editor/[id]/page.tsx
+     6:20  warning  'MapFeaturePayload' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+    13:8   warning  'ReplayPreviewOverlay' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+    14:8   warning  'ReplayPreviewLayerPanel' is defined but never used                                                                         @typescript-eslint/no-unused-vars
+    16:8   warning  'PublicWikiSidebar' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+    22:8   warning  'PresentPlaceSearch' is defined but never used                                                                              @typescript-eslint/no-unused-vars
+    22:35  warning  'HistoricalGeometryFocusPayload' is defined but never used                                                                  @typescript-eslint/no-unused-vars
+    22:72  warning  'PresentPlaceSelection' is defined but never used                                                                           @typescript-eslint/no-unused-vars
+    26:10  warning  'fetchWikiById' is defined but never used                                                                                   @typescript-eslint/no-unused-vars
+    53:5   warning  'persistBackgroundLayerVisibility' is defined but never used                                                                @typescript-eslint/no-unused-vars
+    89:10  warning  'fitMapToFeatureCollection' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+   119:6   warning  'PreviewLinkEntityPopupState' is defined but never used                                                                     @typescript-eslint/no-unused-vars
+   545:11  warning  'handleViewerPreviewTimelineYearChange' is assigned a value but never used                                                  @typescript-eslint/no-unused-vars
+   556:11  warning  'handleViewerPreviewTimelineFilterChange' is assigned a value but never used                                                @typescript-eslint/no-unused-vars
+   583:37  error    Unexpected any. Specify a different type                                                                                    @typescript-eslint/no-explicit-any
+   616:23  warning  'replayPreviewActiveCursor' is assigned a value but never used                                                              @typescript-eslint/no-unused-vars
+   618:22  warning  'replayPreviewSidebarOpen' is assigned a value but never used                                                               @typescript-eslint/no-unused-vars
+   664:11  warning  'replayPreviewActiveEntity' is assigned a value but never used                                                              @typescript-eslint/no-unused-vars
+  1199:57  error    Unexpected any. Specify a different type                                                                                    @typescript-eslint/no-explicit-any
+  1203:62  error    Unexpected any. Specify a different type                                                                                    @typescript-eslint/no-explicit-any
+  2420:8   warning  React Hook useCallback has a missing dependency: 'setSelectedFeatureIds'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  3047:10  warning  'extractWikiBlockquoteText' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+  3083:10  warning  'computeFixedPopupPosition' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/user/account/applications/page.tsx
+   42:9   warning  'config' is assigned a value but never used                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   62:15  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  101:23  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  170:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/user/account/page.tsx
+  15:10  warning  'loading' is assigned a value but never used                                                                 @typescript-eslint/no-unused-vars
+  31:6   warning  React Hook useEffect has a missing dependency: 'dispatch'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/user/layout.tsx
+   4:8  warning  'AppHeader' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+  30:6  warning  React Hook useEffect has a missing dependency: 'dispatch'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/user/projects/[id]/page.tsx
+   10:8   warning  'PageBreadcrumb' is defined but never used                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+   31:26  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   36:23  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   51:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   60:6   warning  React Hook useEffect has a missing dependency: 'fetchProject'. Either include it or remove the dependency array                                                                                                                                                                          react-hooks/exhaustive-deps
+   68:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  107:16  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  121:14  warning  'error' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  129:26  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  138:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  168:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  204:24  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  402:74  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  427:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  529:51  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/app/user/role-upgrade/page.tsx
+    3:8  warning  'PageBreadcrumb' is defined but never used            @typescript-eslint/no-unused-vars
+  180:9  warning  'handleItemClick' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/auth/tokenStore.ts
+  48:59  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  65:11  warning  'refresh' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/auth/SignInForm.tsx
+  82:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/auth/SignUpForm.tsx
+   75:14  warning  'error' is defined but never used               @typescript-eslint/no-unused-vars
+  109:13  warning  'signupRes' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/calendar/Calendar.tsx
+  44:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/calendar/Calendar.tsx:44:5
+  42 |   useEffect(() => {
+  43 |     // Initialize with some events
+> 44 |     setEvents([
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  45 |       {
+  46 |         id: "1",
+  47 |         title: "Event Conf.",  react-hooks/set-state-in-effect
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/ecommerce/StatisticsChart.tsx
+  157:23  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/form/role-upgrade/Editor.tsx
+  10:12  error    Component definition is missing display name                                                                                                                                                                                               react/display-name
+  10:67  error    Unexpected any. Specify a different type                                                                                                                                                                                                   @typescript-eslint/no-explicit-any
+  10:88  error    Unexpected any. Specify a different type                                                                                                                                                                                                   @typescript-eslint/no-explicit-any
+  36:27  error    Unexpected any. Specify a different type                                                                                                                                                                                                   @typescript-eslint/no-explicit-any
+  82:6   warning  React Hook useEffect has a missing dependency: 'onEditorReady'. Either include it or remove the dependency array. If 'onEditorReady' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/header/UserDropdown.tsx
+   7:10  warning  'fullDataUser' is defined but never used      @typescript-eslint/no-unused-vars
+  14:9   warning  'router' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  18:10  warning  'loading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationDetailModal.tsx
+  91:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx
+  182:33  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:182:33
+  180 |                     onClick={() => onSort("status")}
+  181 |                   >
+> 182 |                     Trạng thái <SortIcon column="status" />
+      |                                 ^^^^^^^^ This component is created during render
+  183 |                   </div>
+  184 |                 </TableCell>
+  185 |                 <TableCell
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:48:20
+  46 |   };
+  47 |
+> 48 |   const SortIcon = ({ column }: { column: AppSortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 49 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 50 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 79 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 80 |   };
+     | ^^^^ The component is created during render here
+  81 |
+  82 |   const getStatusBadge = (status: string | number) => {
+  83 |     const s = status?.toString();        react-hooks/static-components
+  193:31  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:193:31
+  191 |                     onClick={() => onSort("created_at")}
+  192 |                   >
+> 193 |                     Ngày nộp <SortIcon column="created_at" />
+      |                               ^^^^^^^^ This component is created during render
+  194 |                   </div>
+  195 |                 </TableCell>
+  196 |                 <TableCell
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:48:20
+  46 |   };
+  47 |
+> 48 |   const SortIcon = ({ column }: { column: AppSortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 49 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 50 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 79 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 80 |   };
+     | ^^^^ The component is created during render here
+  81 |
+  82 |   const getStatusBadge = (status: string | number) => {
+  83 |     const s = status?.toString();    react-hooks/static-components
+  204:31  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:204:31
+  202 |                     onClick={() => onSort("reviewed_at")}
+  203 |                   >
+> 204 |                     Cập nhật <SortIcon column="reviewed_at" />
+      |                               ^^^^^^^^ This component is created during render
+  205 |                   </div>
+  206 |                 </TableCell>
+  207 |                 <TableCell
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/ApplicationTable.tsx:48:20
+  46 |   };
+  47 |
+> 48 |   const SortIcon = ({ column }: { column: AppSortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 49 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 50 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 79 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 80 |   };
+     | ^^^^ The component is created during render here
+  81 |
+  82 |   const getStatusBadge = (status: string | number) => {
+  83 |     const s = status?.toString();  react-hooks/static-components
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx
+  101:33  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:101:33
+   99 |                     onClick={() => onSort("display_name")}
+  100 |                   >
+> 101 |                     Người dùng <SortIcon column="display_name" />
+      |                                 ^^^^^^^^ This component is created during render
+  102 |                   </div>
+  103 |                 </TableCell>
+  104 |
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:52:20
+  50 |   };
+  51 |
+> 52 |   const SortIcon = ({ column }: { column: SortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 83 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 84 |   };
+     | ^^^^ The component is created during render here
+  85 |
+  86 |   return (
+  87 |     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">    react-hooks/static-components
+  113:28  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:113:28
+  111 |                     onClick={() => onSort("email")}
+  112 |                   >
+> 113 |                     Email <SortIcon column="email" />
+      |                            ^^^^^^^^ This component is created during render
+  114 |                   </div>
+  115 |                 </TableCell>
+  116 |
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:52:20
+  50 |   };
+  51 |
+> 52 |   const SortIcon = ({ column }: { column: SortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 83 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 84 |   };
+     | ^^^^ The component is created during render here
+  85 |
+  86 |   return (
+  87 |     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">                            react-hooks/static-components
+  165:36  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:165:36
+  163 |                     onClick={() => onSort("created_at")}
+  164 |                   >
+> 165 |                     Ngày tham gia <SortIcon column="created_at" />
+      |                                    ^^^^^^^^ This component is created during render
+  166 |                   </div>
+  167 |                 </TableCell>
+  168 |
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:52:20
+  50 |   };
+  51 |
+> 52 |   const SortIcon = ({ column }: { column: SortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 83 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 84 |   };
+     | ^^^^ The component is created during render here
+  85 |
+  86 |   return (
+  87 |     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">  react-hooks/static-components
+  177:31  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:177:31
+  175 |                     onClick={() => onSort("updated_at")}
+  176 |                   >
+> 177 |                     Cập nhật <SortIcon column="updated_at" />
+      |                               ^^^^^^^^ This component is created during render
+  178 |                   </div>
+  179 |                 </TableCell>
+  180 |
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/BasicTableOne.tsx:52:20
+  50 |   };
+  51 |
+> 52 |   const SortIcon = ({ column }: { column: SortColumn }) => {
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |     const isActive = sortBy === column;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 54 |     return (
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 83 |     );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 84 |   };
+     | ^^^^ The component is created during render here
+  85 |
+  86 |   return (
+  87 |     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">            react-hooks/static-components
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx
+  141:30  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:141:30
+  139 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+  140 |                   <div className="flex items-center cursor-pointer select-none" onClick={() => onSort("original_name")}>
+> 141 |                     Tên tệp <SortIcon column="original_name" />
+      |                              ^^^^^^^^ This component is created during render
+  142 |                   </div>
+  143 |                 </TableCell>
+  144 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:76:20
+   74 |   };
+   75 |
+>  76 |   const SortIcon = ({ column }: { column: MediaSortColumn }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  77 |     const isActive = sortBy === column;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     return (
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  98 |   };
+      | ^^^^ The component is created during render here
+   99 |
+  100 |   const getMimeTypeBadge = (mimeType: string) => {
+  101 |     if (mimeType.includes("image")) {             react-hooks/static-components
+  146:32  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:146:32
+  144 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+  145 |                   <div className="flex items-center cursor-pointer select-none" onClick={() => onSort("mime_type")}>
+> 146 |                     Định dạng <SortIcon column="mime_type" />
+      |                                ^^^^^^^^ This component is created during render
+  147 |                   </div>
+  148 |                 </TableCell>
+  149 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:76:20
+   74 |   };
+   75 |
+>  76 |   const SortIcon = ({ column }: { column: MediaSortColumn }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  77 |     const isActive = sortBy === column;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     return (
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  98 |   };
+      | ^^^^ The component is created during render here
+   99 |
+  100 |   const getMimeTypeBadge = (mimeType: string) => {
+  101 |     if (mimeType.includes("image")) {                 react-hooks/static-components
+  151:33  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:151:33
+  149 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+  150 |                   <div className="flex items-center cursor-pointer select-none" onClick={() => onSort("size")}>
+> 151 |                     Kích thước <SortIcon column="size" />
+      |                                 ^^^^^^^^ This component is created during render
+  152 |                   </div>
+  153 |                 </TableCell>
+  154 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:76:20
+   74 |   };
+   75 |
+>  76 |   const SortIcon = ({ column }: { column: MediaSortColumn }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  77 |     const isActive = sortBy === column;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     return (
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  98 |   };
+      | ^^^^ The component is created during render here
+   99 |
+  100 |   const getMimeTypeBadge = (mimeType: string) => {
+  101 |     if (mimeType.includes("image")) {                         react-hooks/static-components
+  156:35  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:156:35
+  154 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+  155 |                   <div className="flex items-center cursor-pointer select-none" onClick={() => onSort("created_at")}>
+> 156 |                     Ngày tải lên <SortIcon column="created_at" />
+      |                                   ^^^^^^^^ This component is created during render
+  157 |                   </div>
+  158 |                 </TableCell>
+  159 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:76:20
+   74 |   };
+   75 |
+>  76 |   const SortIcon = ({ column }: { column: MediaSortColumn }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  77 |     const isActive = sortBy === column;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     return (
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  98 |   };
+      | ^^^^ The component is created during render here
+   99 |
+  100 |   const getMimeTypeBadge = (mimeType: string) => {
+  101 |     if (mimeType.includes("image")) {         react-hooks/static-components
+  161:31  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:161:31
+  159 |                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+  160 |                   <div className="flex items-center cursor-pointer select-none" onClick={() => onSort("updated_at")}>
+> 161 |                     Cập nhật <SortIcon column="updated_at" />
+      |                               ^^^^^^^^ This component is created during render
+  162 |                   </div>
+  163 |                 </TableCell>
+  164 |                 <TableCell isHeader className="px-5 py-3 font-medium text-center text-gray-500 text-theme-xs dark:text-gray-400 min-w-[120px]">
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/MediaTable.tsx:76:20
+   74 |   };
+   75 |
+>  76 |   const SortIcon = ({ column }: { column: MediaSortColumn }) => {
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  77 |     const isActive = sortBy === column;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  78 |     return (
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  97 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  98 |   };
+      | ^^^^ The component is created during render here
+   99 |
+  100 |   const getMimeTypeBadge = (mimeType: string) => {
+  101 |     if (mimeType.includes("image")) {  react-hooks/static-components
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/tables/UserDetailModal.tsx
+  39:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/ui/table/index.tsx
+  58:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/AccountDetails.tsx
+  31:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/AccountDetails.tsx:31:7
+  29 |   useEffect(() => {
+  30 |     if (!isOpen) {
+> 31 |       setFormValues({
+     |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  32 |         old_password: "",
+  33 |         new_password: "",
+  34 |         confirm_password: "",  react-hooks/set-state-in-effect
+  71:44  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  76:19  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/ApplicationList.tsx
+  142:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/Media.tsx
+   33:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/Media.tsx:33:5
+  31 |
+  32 |   useEffect(() => {
+> 33 |     setLocalMedia(data?.data || []);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |   }, [data]);
+  35 |
+  36 |   const isImageFile = (file: MediaItem) => {  react-hooks/set-state-in-effect
+  117:16  warning  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  159:16  warning  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  210:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @next/next/no-img-element
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/UserInfoCard.tsx
+  28:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/UserInfoCard.tsx:28:7
+  26 |   useEffect(() => {
+  27 |     if (data?.data?.profile) {
+> 28 |       setFormData({
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  29 |         display_name: data.data.profile.display_name || "",
+  30 |         phone: data.data.profile.phone || "",
+  31 |         bio: data.data.profile.bio || "",  react-hooks/set-state-in-effect
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/components/user-profile/UserMetaCard.tsx
+  19:9  warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/config/config.ts
+   25:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   31:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   39:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   44:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   82:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   99:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  128:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  142:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/context/ThemeContext.tsx
+  26:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/context/ThemeContext.tsx:26:5
+  24 |     const initialTheme = savedTheme || "light"; // Default to light theme
+  25 |
+> 26 |     setTheme(initialTheme);
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  27 |     setIsInitialized(true);
+  28 |   }, []);
+  29 |  react-hooks/set-state-in-effect
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/interface/common.ts
+   1:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   5:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  18:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/layout/AppHeader.tsx
+  2:10  warning  'ThemeToggleButton' is defined but never used     @typescript-eslint/no-unused-vars
+  3:8   warning  'NotificationDropdown' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/service/mediaService.ts
+  54:9  warning  'res' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/store/StoreProvider.tsx
+  13:29  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/store/StoreProvider.tsx:13:29
+  11 | }) {
+  12 |     const storeRef = useRef(store);
+> 13 |     return <Provider store={storeRef.current}>{children}</Provider>;
+     |                             ^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  14 | }  react-hooks/refs
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/store/features/userSlice.ts
+  15:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  32:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/config.ts
+  6:7  warning  'GOONG_PROXY_BASE_PATH' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/api/http.ts
+   47:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   52:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   67:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:78  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  106:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/Panel.tsx
+  12:5  warning  'badge' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/ReplayEffectsSidebar.tsx
+    22:34  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   111:7   warning  'uiInputOptionValues' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   165:25  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   183:25  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   212:16  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   213:16  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   221:64  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   226:49  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   316:20  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+   761:11  warning  'safeYear' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   822:11  warning  'firstId' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  1167:27  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  1180:41  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  1190:13  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/ReplayEffectsSidebar.tsx:1190:13
+  1188 |         if (actions.length > 0) {
+  1189 |             const first = actions[0];
+> 1190 |             setComposerFunctionName(first.function_name);
+       |             ^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  1191 |             const def = definitions[first.function_name];
+  1192 |             if (def) {
+  1193 |                 setComposerDraftValues(def.deserialize(first.params));  react-hooks/set-state-in-effect
+  1354:27  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  1380:53  warning  Compilation Skipped: `this` is not supported syntax
+
+React Compiler does not support compiling functions that use `this`.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/ReplayEffectsSidebar.tsx:1380:53
+  1378 |                                 ],
+  1379 |                                 handlers: {
+> 1380 |                                     link: function (this: { quill?: any }) {
+       |                                                     ^^^^^^^^^^^^^^^^^^^^^ `this` was used here
+  1381 |                                         onLinkClick?.(this?.quill);
+  1382 |                                     },
+  1383 |                                 },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/unsupported-syntax
+  1380:69  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  1541:10  warning  'toInputNumber' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  1554:10  warning  'toNumberOr' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  1566:10  warning  'emptyToNull' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  1570:10  warning  'emptyToUndefined' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  1574:10  warning  'compactTrailingUndefined' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  1582:10  warning  'normalizeSelectValue' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/ReplayPreviewLayerPanel.tsx
+    5:10  warning  'GEO_TYPE_KEYS' is defined but never used             @typescript-eslint/no-unused-vars
+  168:7   warning  'buttonClassName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/editor/ReplayPreviewOverlay.tsx
+  112:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/map/mapUtils.ts
+   321:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   487:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1065:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1179:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/map/useMapInstance.ts
+  65:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/map/useMapLayers.ts
+  12:10  warning  'FeatureCollection' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/map/useMapSync.ts
+  5:10  warning  'EMPTY_FEATURE_COLLECTION' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PinnedWikiPopup.tsx
+  24:5  warning  'featureId' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx
+    4:8   warning  'EditorMap' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+   10:10  warning  'useReplayPreview' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   20:10  warning  'persistBackgroundLayerVisibility' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   28:10  warning  'deepClone' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+   55:20  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   81:23  error    Component definition is missing display name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/display-name
+   81:34  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   90:5   warning  'entityWikiLinks' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   96:5   warning  'onViewModeChange' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   98:5   warning  'isGlobalLoading' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  101:5   warning  'selectedStageId' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  102:5   warning  'selectedStepIndex' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  106:5   warning  'mapHandleRef' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  110:5   warning  'previewEntityFocusToken' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  114:5   warning  'isLargeScreen' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  115:5   warning  'setIsLargeScreen' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  143:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:143:9
+  141 |     useEffect(() => {
+  142 |         setPreviewWikiCache({});
+> 143 |         setPreviewWikiError(null);
+      |         ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  144 |         setIsPreviewWikiLoading(false);
+  145 |         setPreviewPinnedWikiPopupAnchor(null);
+  146 |         setPreviewActiveEntityId(null);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/set-state-in-effect
+  209:13  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:209:13
+  207 |     useEffect(() => {
+  208 |         if (!mode || !replayPreviewSidebarOpen) {
+> 209 |             setPreviewWikiError(null);
+      |             ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  210 |             setIsPreviewWikiLoading(false);
+  211 |             return;
+  212 |         }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/set-state-in-effect
+  261:8   warning  React Hook useEffect has a missing dependency: 'setPreviewWikiCache'. Either include it or remove the dependency array. If 'setPreviewWikiCache' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+  305:11  warning  'replayPreviewActiveEntityGeometries' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  315:51  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setPreviewActiveEntityId`, but the source dependencies were [openReplayPreviewWikiPanelById, previewRelations.entitiesById, previewRelations.entityWikisById, setSelectedFeatureIds]. Inferred different dependency than source.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:315:51
+  313 |
+  314 |     // Handle replay preview entity selection
+> 315 |     const selectReplayPreviewEntity = useCallback((
+      |                                                   ^
+> 316 |         entityId: string,
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 317 |         options?: {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 352 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 353 |     }, [
+      | ^^^^^^ Could not preserve existing manual memoization
+  354 |         openReplayPreviewWikiPanelById,
+  355 |         previewRelations.entitiesById,
+  356 |         previewRelations.entityWikisById,                                                                                                                                                                                                                                                                                                                                                            react-hooks/preserve-manual-memoization
+  315:51  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setPreviewEntityFocusToken`, but the source dependencies were [openReplayPreviewWikiPanelById, previewRelations.entitiesById, previewRelations.entityWikisById, setSelectedFeatureIds]. Inferred different dependency than source.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:315:51
+  313 |
+  314 |     // Handle replay preview entity selection
+> 315 |     const selectReplayPreviewEntity = useCallback((
+      |                                                   ^
+> 316 |         entityId: string,
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 317 |         options?: {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 352 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^
+> 353 |     }, [
+      | ^^^^^^ Could not preserve existing manual memoization
+  354 |         openReplayPreviewWikiPanelById,
+  355 |         previewRelations.entitiesById,
+  356 |         previewRelations.entityWikisById,                                                                                                                                                                                                                                                                                                                                                          react-hooks/preserve-manual-memoization
+  353:8   warning  React Hook useCallback has missing dependencies: 'setPreviewActiveEntityId' and 'setPreviewEntityFocusToken'. Either include them or remove the dependency array. If 'setPreviewActiveEntityId' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/exhaustive-deps
+  361:51  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setPreviewActiveEntityId`, but the source dependencies were [closeReplayPreviewWikiPanel, setSelectedFeatureIds]. Inferred different dependency than source.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:361:51
+  359 |
+  360 |     // Handle close sidebar
+> 361 |     const closeReplayPreviewSidebar = useCallback(() => {
+      |                                                   ^^^^^^^
+> 362 |         closeReplayPreviewWikiPanel();
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 363 |         setPreviewActiveEntityId(null);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 364 |         setIsPreviewEntitySidebarOpen(false);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 365 |         setPreviewWikiError(null);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 366 |         setPreviewLinkEntityPopup(null);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 367 |         setSelectedFeatureIds([]);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 368 |     }, [closeReplayPreviewWikiPanel, setSelectedFeatureIds]);
+      | ^^^^^^ Could not preserve existing manual memoization
+  369 |
+  370 |     // Play selected battle replay
+  371 |     const handlePlaySelectedReplay = useCallback((replay: BattleReplay) => {  react-hooks/preserve-manual-memoization
+  368:8   warning  React Hook useCallback has a missing dependency: 'setPreviewActiveEntityId'. Either include it or remove the dependency array. If 'setPreviewActiveEntityId' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+  517:11  warning  'mapRenderDraft' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  575:11  warning  'mapLabelContextDraft' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  580:11  warning  'viewerPreviewSelectedReplay' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  600:55  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setPreviewEntityFocusToken`, but the source dependencies were [previewRelations.geometryEntityIds, selectReplayPreviewEntity]. Inferred different dependency than source.
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/components/preview/PreviewLayout.tsx:600:55
+  598 |     }, []);
+  599 |
+> 600 |     const handleFocusHistoricalGeometry = useCallback((payload: HistoricalGeometryFocusPayload) => {
+      |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 601 |         setFocusedPresentPlace(null);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 602 |         setSelectedFeatureIds([payload.geometry.id]);
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 612 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 613 |     }, [previewRelations.geometryEntityIds, selectReplayPreviewEntity]);
+      | ^^^^^^ Could not preserve existing manual memoization
+  614 |
+  615 |     const effectiveGeometryVisibility = useMemo(() => {
+  616 |         return geometryVisibility;                                                                                                                                                                                                                               react-hooks/preserve-manual-memoization
+  613:8   warning  React Hook useCallback has a missing dependency: 'setPreviewEntityFocusToken'. Either include it or remove the dependency array. If 'setPreviewEntityFocusToken' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+  619:11  warning  'handleSetMode' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  884:10  warning  'buildPreviewRelationIndex' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  909:11  warning  'wikiMap' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/lib/editor/snapshot/editorSnapshot.ts
+  1229:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1230:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1231:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1232:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1281:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/lib/map/styles/shared/pointStyle.ts
+  26:6  warning  'PointIconVariant' is defined but never used     @typescript-eslint/no-unused-vars
+  45:7  warning  'DRAFT_FILL' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  46:7  warning  'DRAFT_RIM' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/lib/replay/replayDispatcher.ts
+    4:5   warning  'GeoFunctionName' is defined but never used        @typescript-eslint/no-unused-vars
+    5:5   warning  'MapFunctionName' is defined but never used        @typescript-eslint/no-unused-vars
+    6:5   warning  'NarrativeFunctionName' is defined but never used  @typescript-eslint/no-unused-vars
+    8:5   warning  'UIOptionName' is defined but never used           @typescript-eslint/no-unused-vars
+   22:14  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+   50:29  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  196:40  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  196:59  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+
+/home/amoratran/wsp/ultimate-history-map/FrontEndUser/src/uhm/lib/replay/useReplayPreview.ts
+  258:8  warning  React Hook useEffect has a missing dependency: 'setDialogWithRef'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 204 problems (99 errors, 105 warnings)
+

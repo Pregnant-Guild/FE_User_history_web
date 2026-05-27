@@ -1,11 +1,7 @@
 import type maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "@/uhm/types/geo";
 import type {
-    GeoFunctionName,
-    MapFunctionName,
-    NarrativeFunctionName,
     ReplayAction,
-    UIOptionName,
     DialogState,
 } from "@/uhm/types/projects";
 import { mapActions } from "./mapActions";
@@ -63,6 +59,9 @@ export const dispatchReplayAction = (
                 return;
             case "set_labels_visible":
                 mapActions.set_labels_visible(map, asBooleanValue(params[0], true));
+                return;
+            case "set_timeline_filter":
+                controllers.setTimelineFilterEnabled(asBooleanValue(params[0], true));
                 return;
             case "fly_to_geometries":
                 mapActions.fly_to_geometries(

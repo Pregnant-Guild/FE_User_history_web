@@ -108,11 +108,6 @@ const uiSimpleOptionValues: UIOptionName[] = [
     "zoom_panel",
 ];
 
-const uiInputOptionValues: UIOptionName[] = [
-    "wiki",
-    "toast",
-];
-
 const mapCameraOptionChoices: Array<{ label: string; value: MapCameraOptionName }> = [
     { label: "LngLat", value: "center" },
     { label: "Zoom", value: "zoom" },
@@ -758,8 +753,6 @@ function MapFunctionShortcutPanel({
     currentTimelineYear: number;
     onAppendActions: (actions: ReplayAction<MapFunctionName>[], label: string) => void;
 }) {
-    const safeYear = Math.trunc(currentTimelineYear);
-
     return (
         <Panel title="Map Functions" defaultOpen>
             <div style={{ display: "grid", gap: 10 }}>
@@ -819,7 +812,6 @@ function GeoFunctionShortcutPanel({
 }) {
     const selectedIds = selectedGeometries.map((item) => item.id);
     const selectedCount = selectedIds.length;
-    const firstId = selectedIds[0] || "";
     const hasSelection = selectedCount > 0;
 
     return (
@@ -1538,49 +1530,11 @@ function asString(value: unknown) {
     return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-function toInputNumber(value: unknown, fallback: string) {
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-    if (typeof value === "string" && value.trim().length) return value;
-    return fallback;
-}
-
-function toOptionalNumber(value: unknown) {
-    const raw = asString(value).trim();
-    if (!raw.length) return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function toNumberOr(value: unknown, fallback: number) {
-    const parsed = toOptionalNumber(value);
-    return parsed == null ? fallback : parsed;
-}
-
 function toStringArray(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
     return value
         .map((item) => asString(item).trim())
         .filter((item) => item.length > 0);
-}
-
-function emptyToNull(value: string) {
-    return value.trim().length ? value : null;
-}
-
-function emptyToUndefined(value: string) {
-    return value.trim().length ? value : undefined;
-}
-
-function compactTrailingUndefined(values: unknown[]) {
-    const next = [...values];
-    while (next.length > 0 && next[next.length - 1] === undefined) {
-        next.pop();
-    }
-    return next;
-}
-
-function normalizeSelectValue(value: string, fallback: string) {
-    return value.trim().length ? value : fallback;
 }
 
 function buildUiEffectsDraftState(actions: ReplayAction<UIOptionName>[]): UiEffectsDraftState {

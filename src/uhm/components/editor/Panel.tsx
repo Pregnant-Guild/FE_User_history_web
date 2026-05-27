@@ -41,7 +41,23 @@ export function Panel({
                     gap: 8,
                 }}
             >
-                <span>{title}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>{title}</span>
+                    {badge && (
+                        <span
+                            style={{
+                                fontSize: 11,
+                                fontWeight: 500,
+                                background: "#374151",
+                                color: "#cbd5e1",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                            }}
+                        >
+                            {badge}
+                        </span>
+                    )}
+                </div>
                 <span
                     style={{
                         width: 22,
