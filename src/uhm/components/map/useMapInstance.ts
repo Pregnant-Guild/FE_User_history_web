@@ -62,20 +62,40 @@ export function useMapInstance() {
 
             mapRef.current = map;
 
-            const syncZoomLevel = () => {
+            let throttleTimeout: any = null;
+
+            const syncZoomLevelImmediate = () => {
                 if (isZoomSliderDraggingRef.current) return;
-                setZoomLevel(roundZoom(map.getZoom()));
+                const currentMap = mapRef.current;
+                if (!currentMap) return;
+                const next = roundZoom(currentMap.getZoom());
+                setZoomLevel((prev) => (prev === next ? prev : next));
+            };
+
+            const syncZoomLevelThrottled = () => {
+                if (isZoomSliderDraggingRef.current) return;
+                if (throttleTimeout) return;
+
+                throttleTimeout = setTimeout(() => {
+                    throttleTimeout = null;
+                    syncZoomLevelImmediate();
+                }, 150);
             };
 
             map.on("load", () => {
                 setZoomBounds({ min: MAP_MIN_ZOOM, max: MAP_MAX_ZOOM });
-                syncZoomLevel();
-                map.on("zoom", syncZoomLevel);
+                syncZoomLevelImmediate();
+                map.on("zoom", syncZoomLevelThrottled);
+                map.on("zoomend", syncZoomLevelImmediate);
                 setIsMapLoaded(true);
             });
 
             return () => {
-                map.off("zoom", syncZoomLevel);
+                if (throttleTimeout) {
+                    clearTimeout(throttleTimeout);
+                }
+                map.off("zoom", syncZoomLevelThrottled);
+                map.off("zoomend", syncZoomLevelImmediate);
                 setIsMapLoaded(false);
                 if (mapRef.current === map) {
                     mapRef.current = null;

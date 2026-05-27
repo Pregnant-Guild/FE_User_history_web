@@ -12,6 +12,7 @@ import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar
 import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
+import PreviewLayout from "@/uhm/components/preview/PreviewLayout";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
@@ -403,45 +404,19 @@ function EditorPageContent() {
     const [previewSession, setPreviewSession] = useState<ReplayPreviewSession | null>(null);
     // State yêu cầu autoplay sau khi chuyển vào preview mode.
     const [previewAutoplayMode, setPreviewAutoplayMode] = useState<"start" | "selection" | null>(null);
-    // Cache wiki đã fetch trong preview để không gọi API lặp lại.
-    const [previewWikiCache, setPreviewWikiCache] = useState<Record<string, Wiki>>({});
-    // State lỗi riêng cho wiki preview sidebar.
-    const [previewWikiError, setPreviewWikiError] = useState<string | null>(null);
-    // State loading riêng cho wiki preview sidebar.
-    const [isPreviewWikiLoading, setIsPreviewWikiLoading] = useState(false);
-    const [previewPinnedWikiPopupAnchor, setPreviewPinnedWikiPopupAnchor] = useState<MapFeaturePayload | null>(null);
-    const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
-    const [isPreviewEntitySidebarOpen, setIsPreviewEntitySidebarOpen] = useState(false);
-    const [focusedPresentPlace, setFocusedPresentPlace] = useState<PresentPlaceSelection | null>(null);
-
     const [viewMode, setViewMode] = useState<"local" | "global">("local");
     const [globalGeometries, setGlobalGeometries] = useState<FeatureCollection>({
         type: "FeatureCollection",
         features: [],
     });
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
-    const [previewLinkEntityPopup, setPreviewLinkEntityPopup] = useState<PreviewLinkEntityPopupState | null>(null);
-    const [previewEntityFocusToken, setPreviewEntityFocusToken] = useState<number | null>(null);
-    const [previewSidebarWidth, setPreviewSidebarWidth] = useState<number>(() => {
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("public-wiki-sidebar-width");
-            if (saved) {
-                const parsed = parseInt(saved, 10);
-                if (!Number.isNaN(parsed) && parsed >= 320 && parsed <= 800) {
-                    return parsed;
-                }
-            }
-        }
-        return 420;
-    });
     // State ảnh overlay local-only để vẽ trace theo ảnh mẫu.
     const [imageOverlay, setImageOverlay] = useState<MapImageOverlay | null>(null);
     // Bật/tắt điều khiển ảnh overlay bằng phím mũi tên và W/S.
     const [imageOverlayKeyboardEnabled, setImageOverlayKeyboardEnabled] = useState(false);
     // Ref giữ object URL hiện tại để revoke khi đổi/xóa ảnh, tránh leak bộ nhớ.
     const imageOverlayObjectUrlRef = useRef<string | null>(null);
-    const previewLinkEntityPopupRef = useRef<HTMLDivElement | null>(null);
-    const previewPinnedWikiPopupRef = useRef<HTMLDivElement | null>(null);
+
     // Cập nhật stage/step được chọn trong sidebar replay.
     const handleReplaySelectionChange = useCallback((stageId: number | null, stepIndex: number | null) => {
         setReplaySelection({ stageId, stepIndex });
@@ -469,23 +444,6 @@ function EditorPageContent() {
     const isViewerPreviewMode = mode === "preview";
     const isReplayPreviewMode = mode === "replay_preview";
     const isAnyPreviewMode = isViewerPreviewMode || isReplayPreviewMode;
-    const clearPresentPlaceFocus = useCallback(() => {
-        setFocusedPresentPlace(null);
-    }, []);
-    const handleFocusPresentPlace = useCallback((place: PresentPlaceSelection) => {
-        const map = getCurrentMapInstance();
-        if (!map) return;
-
-        map.flyTo({
-            center: [place.lng, place.lat],
-            zoom: Math.max(map.getZoom(), 13.5),
-            duration: 900,
-            essential: true,
-        });
-        setFocusedPresentPlace(place);
-        setPreviewPinnedWikiPopupAnchor(null);
-        setPreviewLinkEntityPopup(null);
-    }, [getCurrentMapInstance]);
     const previewReturnModeRef = useRef<EditorMode>("select");
     const replayPreviewReturnRef = useRef<{
         mode: "replay" | "preview";
@@ -505,12 +463,6 @@ function EditorPageContent() {
             }
         };
     }, []);
-
-    useEffect(() => {
-        if (!isAnyPreviewMode) {
-            clearPresentPlaceFocus();
-        }
-    }, [clearPresentPlaceFocus, isAnyPreviewMode]);
 
     useEffect(() => {
         if (!imageOverlayKeyboardEnabled) return;
@@ -612,6 +564,35 @@ function EditorPageContent() {
         );
     }, []);
 
+    // Preview specific UI states
+    const [previewActiveEntityId, setPreviewActiveEntityId] = useState<string | null>(null);
+    const [previewEntityFocusToken, setPreviewEntityFocusToken] = useState<number>(0);
+    const [previewSidebarWidth, setPreviewSidebarWidth] = useState<number>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("public-wiki-sidebar-width");
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!Number.isNaN(parsed) && parsed >= 320 && parsed <= 800) {
+                    return parsed;
+                }
+            }
+        }
+        return 420;
+    });
+    const [isLargeScreen, setIsLargeScreen] = useState(false);
+    const previewLayoutRef = useRef<any>(null);
+
+    // Responsive listener for preview sidebar/viewport offsets
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handleResize = () => {
+            setIsLargeScreen(window.innerWidth >= 1024);
+        };
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
     // Hook điều phối phát replay preview và các side effect lên map/UI.
     const replayPreview = useReplayPreview({
         replay: previewSession?.replay || null,
@@ -627,18 +608,14 @@ function EditorPageContent() {
             mapHandleRef.current?.setGlobeProjection(type === "globe");
         }, []),
     });
+
     const {
         hiddenGeometryIds: replayPreviewHiddenGeometryIds,
         timelineYear: replayPreviewTimelineYear,
         timelineFilterEnabled: replayPreviewTimelineFilterEnabled,
-        resetPreview: resetReplayPreview,
-        playFromSelection: playReplayPreviewFromSelection,
-        playFromStart: playReplayPreviewFromStart,
         activeCursor: replayPreviewActiveCursor,
         activeWikiId: replayPreviewActiveWikiId,
         sidebarOpen: replayPreviewSidebarOpen,
-        openWikiPanelById: openReplayPreviewWikiPanelById,
-        closeWikiPanel: closeReplayPreviewWikiPanel,
     } = replayPreview;
 
     // Draft hiển thị trong preview có thể ẩn bớt geometry theo action replay.
@@ -655,6 +632,46 @@ function EditorPageContent() {
             ),
         };
     }, [isReplayPreviewMode, previewSession?.draft, replayPreviewHiddenGeometryIds]);
+
+    const [previewWikiCache, setPreviewWikiCache] = useState<Record<string, Wiki>>({});
+
+    const previewRelations = useMemo(() => {
+        return buildPreviewRelationIndex({
+            draft: previewSession?.draft || EMPTY_FEATURE_COLLECTION,
+            entities: previewSession?.entities || [],
+            wikis: previewSession?.wikis || [],
+            entityWikiLinks: previewSession?.entityWikiLinks || [],
+            wikiCache: previewWikiCache,
+            projectId,
+        });
+    }, [previewSession?.draft, previewSession?.entities, previewSession?.wikis, previewSession?.entityWikiLinks, previewWikiCache, projectId]);
+
+    const replayPreviewActiveEntityId = useMemo(() => {
+        const activeWikiEntityIds = replayPreviewActiveWikiId
+            ? previewRelations.wikiEntityIdsById[String(replayPreviewActiveWikiId)] || []
+            : [];
+
+        if (
+            previewActiveEntityId &&
+            (!activeWikiEntityIds.length || activeWikiEntityIds.includes(previewActiveEntityId))
+        ) {
+            return previewActiveEntityId;
+        }
+
+        return activeWikiEntityIds[0] || previewActiveEntityId;
+    }, [previewActiveEntityId, previewRelations.wikiEntityIdsById, replayPreviewActiveWikiId]);
+
+    const replayPreviewActiveEntity = useMemo(() => {
+        return replayPreviewActiveEntityId
+            ? previewRelations.entitiesById[replayPreviewActiveEntityId] || null
+            : null;
+    }, [replayPreviewActiveEntityId, previewRelations.entitiesById]);
+
+    const replayPreviewActiveEntityGeometries = useMemo(() => {
+        return replayPreviewActiveEntityId
+            ? previewRelations.entityGeometriesById[replayPreviewActiveEntityId] || EMPTY_FEATURE_COLLECTION
+            : EMPTY_FEATURE_COLLECTION;
+    }, [replayPreviewActiveEntityId, previewRelations.entityGeometriesById]);
 
     const activeTimelineYear = isReplayPreviewMode
         ? replayPreviewTimelineYear
@@ -783,13 +800,9 @@ function EditorPageContent() {
     // Render draft is the only FeatureCollection that decides what appears on the map.
     // It may be timeline-filtered, replay-filtered, or preview-filtered, but it is not the edit source.
     const mapRenderDraft = useMemo(() => {
-        const activeDraft = isReplayPreviewMode
-            ? replayPreviewDraft
-            : isViewerPreviewMode
-                ? previewSession?.draft || editor.mainDraft
-                : isReplayEditMode
-                    ? editor.replayDraft
-                    : editor.mainDraft;
+        const activeDraft = isReplayEditMode
+            ? editor.replayDraft
+            : editor.mainDraft;
 
         const filteredDraft = activeTimelineFilterEnabled
             ? {
@@ -838,14 +851,19 @@ function EditorPageContent() {
         editor.mainDraft,
         editor.replayDraft,
         isReplayEditMode,
-        isReplayPreviewMode,
-        isViewerPreviewMode,
-        previewSession?.draft,
-        replayPreviewDraft,
         viewMode,
         baselineFeatureCollection.features,
         globalGeometries.features,
     ]);
+
+    const activeMapDraft = useMemo(() => {
+        if (isAnyPreviewMode) {
+            return isReplayPreviewMode
+                ? replayPreviewDraft
+                : (previewSession?.draft || EMPTY_FEATURE_COLLECTION);
+        }
+        return mapRenderDraft;
+    }, [isAnyPreviewMode, isReplayPreviewMode, replayPreviewDraft, previewSession?.draft, mapRenderDraft]);
 
     const localFeatureIds = useMemo(() => {
         const ids = new Set<string | number>();
@@ -1023,17 +1041,6 @@ function EditorPageContent() {
         restoreCommit,
     } = sectionCommands;
 
-    const clearPreviewViewerState = useCallback(() => {
-        setPreviewActiveEntityId(null);
-        setIsPreviewEntitySidebarOpen(false);
-        setPreviewEntityFocusToken(null);
-        setPreviewPinnedWikiPopupAnchor(null);
-        setPreviewLinkEntityPopup(null);
-        setPreviewWikiError(null);
-        closeReplayPreviewWikiPanel();
-        setSelectedFeatureIds([]);
-    }, [closeReplayPreviewWikiPanel, setSelectedFeatureIds]);
-
     const openViewerPreview = useCallback(() => {
         if (mode === "preview" || mode === "replay_preview" || mode === "replay") return;
         previewReturnModeRef.current = mode === "idle" ? "select" : mode;
@@ -1052,10 +1059,9 @@ function EditorPageContent() {
             mapViewState: getCurrentMapViewState(),
         });
         setPreviewAutoplayMode(null);
-        clearPreviewViewerState();
+        setSelectedFeatureIds([]);
         internalSetMode("preview");
     }, [
-        clearPreviewViewerState,
         editor.effectiveReplays,
         editor.mainDraft,
         entities,
@@ -1066,35 +1072,35 @@ function EditorPageContent() {
         snapshotWikis,
         timelineDraftYear,
         timelineFilterEnabled,
+        setSelectedFeatureIds,
     ]);
 
     const exitViewerPreview = useCallback(() => {
         restoreEditorOriginalMapState();
         setPreviewAutoplayMode(null);
         setPreviewSession(null);
-        clearPreviewViewerState();
+        setSelectedFeatureIds([]);
         internalSetMode(previewReturnModeRef.current || "select");
-    }, [clearPreviewViewerState, internalSetMode, restoreEditorOriginalMapState]);
+    }, [internalSetMode, restoreEditorOriginalMapState, setSelectedFeatureIds]);
 
     // Thoát replay preview. Nếu replay được mở từ preview thường thì quay lại preview thường.
     const exitReplayPreview = useCallback(() => {
-        resetReplayPreview();
         setPreviewAutoplayMode(null);
         const returnState = replayPreviewReturnRef.current;
         replayPreviewReturnRef.current = { mode: "replay", session: null };
 
         if (returnState.mode === "preview" && returnState.session) {
             setPreviewSession(deepClone(returnState.session));
-            clearPreviewViewerState();
+            setSelectedFeatureIds([]);
             internalSetMode("preview");
             return;
         }
 
         restoreEditorOriginalMapState();
         setPreviewSession(null);
-        clearPreviewViewerState();
+        setSelectedFeatureIds([]);
         internalSetMode("replay");
-    }, [clearPreviewViewerState, internalSetMode, resetReplayPreview, restoreEditorOriginalMapState]);
+    }, [internalSetMode, restoreEditorOriginalMapState, setSelectedFeatureIds]);
 
     // Đóng băng draft/replay hiện tại thành session preview để phát thử.
     const openReplayPreview = useCallback((autoplayMode: "start" | "selection") => {
@@ -1165,18 +1171,44 @@ function EditorPageContent() {
             mapViewState: getCurrentMapViewState(),
         });
         setPreviewAutoplayMode("start");
-        clearPreviewViewerState();
+        setSelectedFeatureIds([]);
         internalSetMode("replay_preview");
     }, [
         activeTimelineFilterEnabled,
         activeTimelineYear,
-        clearPreviewViewerState,
         getCurrentMapViewState,
         internalSetMode,
         isViewerPreviewMode,
         previewSession,
         viewerPreviewSelectedReplay,
+        setSelectedFeatureIds,
     ]);
+
+    const handlePreviewModeChange = useCallback((nextMode: EditorMode) => {
+        if (nextMode === "preview") {
+            if (isReplayPreviewMode) {
+                exitReplayPreview();
+            }
+        } else if (nextMode === "replay_preview") {
+            if (isViewerPreviewMode && viewerPreviewSelectedReplay) {
+                openSelectedViewerReplayPreview();
+            }
+        }
+    }, [isReplayPreviewMode, isViewerPreviewMode, exitReplayPreview, openSelectedViewerReplayPreview, viewerPreviewSelectedReplay]);
+
+    const handleMapFeatureClick = useCallback((payload: any) => {
+        previewLayoutRef.current?.handleFeatureClick(payload);
+    }, []);
+
+    const handleMapHoverPopupContent = useCallback((payload: any) => {
+        return previewLayoutRef.current?.getHoverPopupContent(payload) ?? null;
+    }, []);
+
+    const handleMapPlayPreviewReplay = useCallback(() => {
+        if (viewerPreviewSelectedReplay) {
+            previewLayoutRef.current?.handlePlaySelectedReplay(viewerPreviewSelectedReplay);
+        }
+    }, [viewerPreviewSelectedReplay]);
 
     // State machine chuyển mode editor, xử lý riêng preview/replay để không mất draft.
     const setMode = useCallback((m: EditorMode, featureId?: string | number) => {
@@ -1187,16 +1219,15 @@ function EditorPageContent() {
         if (mode === "preview") {
             setPreviewAutoplayMode(null);
             setPreviewSession(null);
-            clearPreviewViewerState();
+            setSelectedFeatureIds([]);
             internalSetMode(m);
             return;
         }
 
         if (mode === "replay_preview") {
-            resetReplayPreview();
             setPreviewAutoplayMode(null);
             setPreviewSession(null);
-            clearPreviewViewerState();
+            setSelectedFeatureIds([]);
 
             if (m === "replay") {
                 internalSetMode("replay");
@@ -1232,11 +1263,9 @@ function EditorPageContent() {
         }
         internalSetMode(m);
     }, [
-        clearPreviewViewerState,
         editor,
         internalSetMode,
         mode,
-        resetReplayPreview,
         selectedFeatureIds,
         setHideOutside,
         setReplayFeatureId,
@@ -1281,483 +1310,8 @@ function EditorPageContent() {
         }
     }, [activeReplayStages, replaySelection.stageId, replaySelection.stepIndex]);
 
-    useEffect(() => {
-        if (!isReplayPreviewMode || !previewSession || !previewAutoplayMode) return;
-        if (previewAutoplayMode === "selection") {
-            playReplayPreviewFromSelection();
-        } else {
-            playReplayPreviewFromStart();
-        }
-        setPreviewAutoplayMode(null);
-    }, [
-        isReplayPreviewMode,
-        playReplayPreviewFromSelection,
-        playReplayPreviewFromStart,
-        previewAutoplayMode,
-        previewSession,
-    ]);
 
-    useEffect(() => {
-        setPreviewWikiCache({});
-        setPreviewWikiError(null);
-        setIsPreviewWikiLoading(false);
-    }, [previewSession]);
 
-    // Label ngắn cho overlay preview tại step đang phát.
-    const replayPreviewActiveStepLabel = useMemo(() => {
-        if (
-            replayPreviewActiveCursor.stageId == null ||
-            replayPreviewActiveCursor.stepIndex == null
-        ) {
-            return null;
-        }
-        return `Stage #${replayPreviewActiveCursor.stageId} · Step ${replayPreviewActiveCursor.stepIndex + 1}`;
-    }, [replayPreviewActiveCursor.stageId, replayPreviewActiveCursor.stepIndex]);
-
-    const replayPreviewWikiRows = useMemo(
-        () => previewSession?.wikis || [],
-        [previewSession?.wikis]
-    );
-    const previewRelations = useMemo(
-        () => buildPreviewRelationIndex({
-            draft: previewSession?.draft || EMPTY_FEATURE_COLLECTION,
-            entities: previewSession?.entities || [],
-            wikis: replayPreviewWikiRows,
-            entityWikiLinks: previewSession?.entityWikiLinks || [],
-            wikiCache: previewWikiCache,
-            projectId,
-        }),
-        [
-            previewSession?.draft,
-            previewSession?.entities,
-            previewSession?.entityWikiLinks,
-            previewWikiCache,
-            projectId,
-            replayPreviewWikiRows,
-        ]
-    );
-    // Wiki snapshot đang được step preview yêu cầu mở.
-    const replayPreviewActiveWikiSnapshot = useMemo(() => {
-        if (!replayPreviewActiveWikiId) return null;
-        return replayPreviewWikiRows.find((item) => item.id === replayPreviewActiveWikiId) || null;
-    }, [replayPreviewActiveWikiId, replayPreviewWikiRows]);
-
-    useEffect(() => {
-        if (!isAnyPreviewMode || !replayPreviewSidebarOpen) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
-        }
-
-        const activeWikiId = String(replayPreviewActiveWikiId || "").trim();
-        if (!activeWikiId.length) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
-        }
-
-        const localWiki = replayPreviewWikiRows.find((item) => item.id === activeWikiId) || null;
-        if (!localWiki) {
-            setPreviewWikiError("Không tìm thấy wiki trong snapshot preview.");
-            setIsPreviewWikiLoading(false);
-            return;
-        }
-
-        if (typeof localWiki.doc === "string") {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
-        }
-
-        if (previewWikiCache[activeWikiId]) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
-        }
-
-        let disposed = false;
-        setPreviewWikiError(null);
-        setIsPreviewWikiLoading(true);
-        void fetchWikiById(activeWikiId)
-            .then((row) => {
-                if (disposed) return;
-                setPreviewWikiCache((prev) => ({ ...prev, [activeWikiId]: row }));
-            })
-            .catch((err) => {
-                if (disposed) return;
-                setPreviewWikiError(err instanceof Error ? err.message : "Không tải được wiki preview.");
-            })
-            .finally(() => {
-                if (!disposed) {
-                    setIsPreviewWikiLoading(false);
-                }
-            });
-
-        return () => {
-            disposed = true;
-        };
-    }, [
-        isAnyPreviewMode,
-        previewWikiCache,
-        replayPreviewActiveWikiId,
-        replayPreviewSidebarOpen,
-        replayPreviewWikiRows,
-    ]);
-
-    // Wiki đầy đủ cho sidebar preview, ưu tiên doc có sẵn trong snapshot rồi mới dùng cache API.
-    const replayPreviewActiveWiki = useMemo<Wiki | null>(() => {
-        const snapshotWiki = replayPreviewActiveWikiSnapshot;
-        if (!snapshotWiki) return null;
-        if (typeof snapshotWiki.doc === "string") {
-            return {
-                id: snapshotWiki.id,
-                project_id: projectId,
-                title: snapshotWiki.title,
-                slug: snapshotWiki.slug ?? null,
-                content: snapshotWiki.doc || "",
-            };
-        }
-        return previewWikiCache[snapshotWiki.id] || null;
-    }, [previewWikiCache, projectId, replayPreviewActiveWikiSnapshot]);
-
-    const replayPreviewActiveEntityId = useMemo(() => {
-        const activeWikiEntityIds = replayPreviewActiveWikiId
-            ? previewRelations.wikiEntityIdsById[String(replayPreviewActiveWikiId)] || []
-            : [];
-
-        if (
-            previewActiveEntityId &&
-            (!activeWikiEntityIds.length || activeWikiEntityIds.includes(previewActiveEntityId))
-        ) {
-            return previewActiveEntityId;
-        }
-
-        return activeWikiEntityIds[0] || previewActiveEntityId;
-    }, [previewActiveEntityId, previewRelations.wikiEntityIdsById, replayPreviewActiveWikiId]);
-
-    const replayPreviewActiveEntity = replayPreviewActiveEntityId
-        ? previewRelations.entitiesById[replayPreviewActiveEntityId] || null
-        : null;
-    const replayPreviewActiveEntityGeometries = replayPreviewActiveEntityId
-        ? previewRelations.entityGeometriesById[replayPreviewActiveEntityId] || EMPTY_FEATURE_COLLECTION
-        : EMPTY_FEATURE_COLLECTION;
-    const isReplayPreviewWikiSidebarOpen = isAnyPreviewMode && (replayPreviewSidebarOpen || isPreviewEntitySidebarOpen);
-
-    const mapFocusPadding = useMemo(() => {
-        if (!isAnyPreviewMode) return 96;
-        return {
-            top: 84,
-            right: isReplayPreviewWikiSidebarOpen ? previewSidebarWidth + 80 : 84,
-            bottom: 116,
-            left: 84,
-        };
-    }, [isAnyPreviewMode, isReplayPreviewWikiSidebarOpen, previewSidebarWidth]);
-
-    const handleFocusHistoricalGeometry = useCallback((payload: HistoricalGeometryFocusPayload) => {
-        const map = getCurrentMapInstance();
-        const geometryId = String(payload.geometry.id || "").trim();
-        if (!geometryId) return;
-
-        const feature: Feature = {
-            type: "Feature",
-            properties: {
-                id: geometryId,
-                source: "ref",
-                type: payload.geometry.type,
-                time_start: normalizeTimelineYearValue(payload.geometry.time_start),
-                time_end: normalizeTimelineYearValue(payload.geometry.time_end),
-                bound_with: normalizeGeoSearchBoundWith(payload.geometry.bound_with),
-                entity_id: payload.entity.entity_id,
-                entity_ids: [payload.entity.entity_id],
-                entity_name: payload.entity.name,
-                entity_names: [payload.entity.name],
-            },
-            geometry: payload.geometry.draw_geometry,
-        };
-
-        if (activeTimelineFilterEnabled && payload.geometry.time_start != null) {
-            const nextYear = clampYearToFixedRange(Math.trunc(payload.geometry.time_start));
-            if (isReplayPreviewMode) {
-                replayPreview.setTimelineYear(nextYear);
-            } else if (isViewerPreviewMode) {
-                handleViewerPreviewTimelineYearChange(nextYear);
-            }
-        }
-
-        if (map) {
-            fitMapToFeatureCollection(
-                map,
-                { type: "FeatureCollection", features: [feature] },
-                isReplayPreviewWikiSidebarOpen
-                    ? {
-                        top: 96,
-                        right: previewSidebarWidth + 96,
-                        bottom: 120,
-                        left: 96,
-                    }
-                    : 96,
-                { duration: 900, maxZoom: 10, pointZoom: 13 }
-            );
-        }
-
-        const renderedFeature = mapRenderDraft.features.find((item) => String(item.properties.id) === geometryId) || null;
-        setSelectedFeatureIds(renderedFeature ? [renderedFeature.properties.id] : []);
-        setFocusedPresentPlace(null);
-        setPreviewPinnedWikiPopupAnchor(null);
-        setPreviewLinkEntityPopup(null);
-    }, [
-        activeTimelineFilterEnabled,
-        getCurrentMapInstance,
-        handleViewerPreviewTimelineYearChange,
-        isReplayPreviewMode,
-        isReplayPreviewWikiSidebarOpen,
-        isViewerPreviewMode,
-        mapRenderDraft.features,
-        previewSidebarWidth,
-        replayPreview,
-        setSelectedFeatureIds,
-    ]);
-
-    const closeReplayPreviewSidebar = useCallback(() => {
-        closeReplayPreviewWikiPanel();
-        setPreviewActiveEntityId(null);
-        setIsPreviewEntitySidebarOpen(false);
-        setPreviewWikiError(null);
-        setPreviewLinkEntityPopup(null);
-        setSelectedFeatureIds([]);
-    }, [closeReplayPreviewWikiPanel, setSelectedFeatureIds]);
-
-    const selectReplayPreviewEntity = useCallback((
-        entityId: string,
-        options?: {
-            sourceFeatureId?: string | number | null;
-            preferredWikiId?: string | null;
-            preferredWikiSlug?: string | null;
-            focusMap?: boolean;
-            selectGeometry?: boolean;
-        }
-    ) => {
-        const id = String(entityId || "").trim();
-        const entity = previewRelations.entitiesById[id] || null;
-        if (!entity) return;
-
-        const linkedWikis = previewRelations.entityWikisById[id] || [];
-        const preferredWikiId = String(options?.preferredWikiId || "").trim();
-        const preferredWikiSlug = String(options?.preferredWikiSlug || "").trim();
-        const nextWiki =
-            linkedWikis.find((wiki) => preferredWikiId && wiki.id === preferredWikiId) ||
-            linkedWikis.find((wiki) => preferredWikiSlug && String(wiki.slug || "").trim() === preferredWikiSlug) ||
-            linkedWikis[0] ||
-            null;
-
-        setPreviewActiveEntityId(id);
-        setIsPreviewEntitySidebarOpen(true);
-        setPreviewWikiError(null);
-        setPreviewPinnedWikiPopupAnchor(null);
-        setPreviewLinkEntityPopup(null);
-
-        if (options?.focusMap === true) {
-            setPreviewEntityFocusToken((prev) => (prev ?? 0) + 1);
-        }
-        if (options?.selectGeometry && options.sourceFeatureId != null) {
-            setSelectedFeatureIds([options.sourceFeatureId]);
-        }
-        if (nextWiki) {
-            openReplayPreviewWikiPanelById(nextWiki.id);
-        }
-    }, [
-        openReplayPreviewWikiPanelById,
-        previewRelations.entitiesById,
-        previewRelations.entityWikisById,
-        setSelectedFeatureIds,
-    ]);
-
-    const previewPinnedWikiPopupRows = useMemo(() => {
-        if (!previewPinnedWikiPopupAnchor) return [];
-
-        const entityIds = previewRelations.geometryEntityIds[String(previewPinnedWikiPopupAnchor.featureId)] || [];
-        return entityIds.flatMap((entityId) => {
-            const entity = previewRelations.entitiesById[entityId] || null;
-            if (!entity) return [];
-
-            const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
-            if (!linkedWikis.length) {
-                return [{ entity, wiki: null as Wiki | null, quote: "" }];
-            }
-
-            return linkedWikis.map((wiki) => ({
-                entity,
-                wiki,
-                quote: extractWikiBlockquoteText(wiki.content),
-            }));
-        });
-    }, [
-        previewPinnedWikiPopupAnchor,
-        previewRelations.entitiesById,
-        previewRelations.entityWikisById,
-        previewRelations.geometryEntityIds,
-    ]);
-
-    const handlePreviewMapFeatureClick = useCallback((payload: MapFeaturePayload | null) => {
-        if (!isAnyPreviewMode) return;
-        setPreviewLinkEntityPopup(null);
-
-        if (!payload) {
-            setPreviewPinnedWikiPopupAnchor(null);
-            return;
-        }
-
-        const entityIds = previewRelations.geometryEntityIds[String(payload.featureId)] || [];
-        const rows = entityIds.flatMap((entityId) => {
-            const entity = previewRelations.entitiesById[entityId] || null;
-            if (!entity) return [];
-
-            const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
-            if (!linkedWikis.length) {
-                return [{ entity, wiki: null as Wiki | null }];
-            }
-
-            return linkedWikis.map((wiki) => ({ entity, wiki }));
-        });
-
-        if (!rows.length) {
-            setPreviewPinnedWikiPopupAnchor(null);
-            return;
-        }
-
-        if (rows.length === 1) {
-            const row = rows[0];
-            selectReplayPreviewEntity(row.entity.id, {
-                sourceFeatureId: payload.featureId,
-                preferredWikiId: row.wiki?.id,
-                focusMap: false,
-                selectGeometry: false,
-            });
-            setPreviewPinnedWikiPopupAnchor(null);
-            return;
-        }
-
-        setPreviewPinnedWikiPopupAnchor(payload);
-    }, [
-        isAnyPreviewMode,
-        previewRelations.entitiesById,
-        previewRelations.entityWikisById,
-        previewRelations.geometryEntityIds,
-        selectReplayPreviewEntity,
-    ]);
-
-    const getPreviewHoverPopupContent = useCallback((feature: Feature) => {
-        if (!isAnyPreviewMode) return null;
-
-        const entityIds = normalizeFeatureEntityIds(feature);
-        const entitiesForFeature = entityIds
-            .map((entityId) => previewRelations.entitiesById[entityId] || null)
-            .filter((entity): entity is Entity => Boolean(entity));
-        if (!entitiesForFeature.length) return null;
-
-        return {
-            rows: entitiesForFeature.flatMap((entity) => {
-                const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
-                if (!linkedWikis.length) {
-                    return [{ title: entity.name || String(entity.id), quote: "" }];
-                }
-
-                return linkedWikis.map((wiki) => ({
-                    title: entity.name || String(entity.id),
-                    quote: extractWikiBlockquoteText(wiki.content),
-                }));
-            }),
-        };
-    }, [isAnyPreviewMode, previewRelations.entitiesById, previewRelations.entityWikisById]);
-
-    useEffect(() => {
-        if (!previewLinkEntityPopup) return;
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setPreviewLinkEntityPopup(null);
-        };
-        const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target as Node | null;
-            if (target && previewLinkEntityPopupRef.current?.contains(target)) return;
-            setPreviewLinkEntityPopup(null);
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
-        window.addEventListener("pointerdown", handlePointerDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-            window.removeEventListener("pointerdown", handlePointerDown);
-        };
-    }, [previewLinkEntityPopup]);
-
-    useEffect(() => {
-        if (!previewPinnedWikiPopupAnchor) return;
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setPreviewPinnedWikiPopupAnchor(null);
-        };
-        const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target as Node | null;
-            if (target && previewPinnedWikiPopupRef.current?.contains(target)) return;
-            setPreviewPinnedWikiPopupAnchor(null);
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
-        window.addEventListener("pointerdown", handlePointerDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-            window.removeEventListener("pointerdown", handlePointerDown);
-        };
-    }, [previewPinnedWikiPopupAnchor]);
-
-    // Điều hướng link wiki nội bộ trong preview nhưng chỉ trong phạm vi snapshot preview.
-    const handleReplayPreviewWikiLinkRequest = useCallback(({ slug, rect }: { slug: string; rect: DOMRect }) => {
-        const nextSlug = String(slug || "").trim();
-        if (!nextSlug.length) return;
-        const match = replayPreviewWikiRows.find((item) => String(item.slug || "").trim() === nextSlug) || null;
-        if (!match) {
-            setPreviewWikiError(`Wiki /wiki/${nextSlug} không có trong snapshot preview.`);
-            return;
-        }
-
-        const linkedEntityIds = previewRelations.wikiEntityIdsBySlug[nextSlug] || [];
-        const linkedEntities = linkedEntityIds
-            .map((entityId) => previewRelations.entitiesById[entityId] || null)
-            .filter((entity): entity is Entity => Boolean(entity));
-
-        if (linkedEntities.length === 1) {
-            selectReplayPreviewEntity(linkedEntities[0].id, {
-                preferredWikiId: match.id,
-                preferredWikiSlug: nextSlug,
-                focusMap: false,
-            });
-            return;
-        }
-
-        if (linkedEntities.length > 1) {
-            const popupWidth = 240;
-            const popupHeight = Math.min(240, linkedEntities.length * 44 + 20);
-            const { top, left } = computeFixedPopupPosition(rect, popupWidth, popupHeight);
-            setPreviewLinkEntityPopup({
-                slug: nextSlug,
-                entities: linkedEntities,
-                top,
-                left,
-            });
-            return;
-        }
-
-        setPreviewWikiError(null);
-        openReplayPreviewWikiPanelById(match.id);
-    }, [
-        openReplayPreviewWikiPanelById,
-        previewRelations.entitiesById,
-        previewRelations.wikiEntityIdsBySlug,
-        replayPreviewWikiRows,
-        selectReplayPreviewEntity,
-    ]);
-
-    // Visibility cuối cùng theo type/layer, có override riêng cho replay edit/preview.
     const replayMarkerGeometryId = useMemo(() => {
         if (isReplayPreviewMode) {
             const id = String(previewSession?.replay?.geometry_id || replayFeatureId || "").trim();
@@ -1773,14 +1327,11 @@ function EditorPageContent() {
         const visibility: Record<string, boolean> = { ...geometryVisibility };
 
         if ((isReplayEditMode || isReplayPreviewMode) && replayMarkerGeometryId) {
-            // Ẩn chính geo được chọn làm replay (marker kịch bản)
             visibility[replayMarkerGeometryId] = false;
 
             if (isReplayEditMode && hideOutside) {
-                // Trong mode replay, ta chỉ hiển thị những gì có trong draft của replay đó
                 const currentReplayFeatureIds = new Set(editor.draft.features.map(f => String(f.properties.id)));
 
-                // Ẩn tất cả các geo KHÔNG nằm trong draft replay hiện tại
                 Object.keys(visibility).forEach(fid => {
                     if (fid === replayMarkerGeometryId) {
                         visibility[fid] = false;
@@ -2088,7 +1639,7 @@ function EditorPageContent() {
     useEffect(() => {
         if (!selectedFeatureIds || selectedFeatureIds.length === 0) return;
         const renderedFeatureIds = new Set(
-            mapRenderDraft.features.map((feature) => String(feature.properties.id))
+            activeMapDraft.features.map((feature) => String(feature.properties.id))
         );
         const stillExistIds = selectedFeatureIds.filter(id =>
             renderedFeatureIds.has(String(id))
@@ -2096,7 +1647,7 @@ function EditorPageContent() {
         if (stillExistIds.length !== selectedFeatureIds.length) {
             setSelectedFeatureIds(stillExistIds);
         }
-    }, [mapRenderDraft.features, selectedFeatureIds, setSelectedFeatureIds]);
+    }, [activeMapDraft.features, selectedFeatureIds, setSelectedFeatureIds]);
 
     useEffect(() => {
         if (!selectedFeature) {
@@ -3034,6 +2585,8 @@ function EditorPageContent() {
         );
     }
 
+
+
     return (
         <div style={{ display: "flex", minHeight: "100vh" }}>
             <style>{`
@@ -3119,10 +2672,10 @@ function EditorPageContent() {
                 {isBackgroundVisibilityReady ? (
                     <Map
                         ref={mapHandleRef}
-                        mode={mode}
-                        onSetMode={setMode}
-                        renderDraft={mapRenderDraft}
-                        labelContextDraft={mapLabelContextDraft}
+                        mode={isAnyPreviewMode ? (isReplayPreviewMode ? "replay_preview" : "preview") : mode}
+                        onSetMode={isAnyPreviewMode ? handlePreviewModeChange : setMode}
+                        renderDraft={activeMapDraft}
+                        labelContextDraft={isAnyPreviewMode ? (previewSession?.draft || EMPTY_FEATURE_COLLECTION) : mapLabelContextDraft}
                         labelTimelineYear={activeTimelineFilterEnabled ? activeTimelineYear : null}
                         selectedFeatureIds={selectedFeatureIds}
                         onSelectFeatureIds={setSelectedFeatureIds}
@@ -3131,20 +2684,14 @@ function EditorPageContent() {
                         onDeleteFeature={handleDeleteFeature}
                         onHideFeature={handleHideGeometryLocal}
                         onUpdateFeature={editor.updateFeature}
-                        allowGeometryEditing={!isAnyPreviewMode}
-                        allowFeatureSelection={!isAnyPreviewMode}
+                        allowGeometryEditing={!isAnyPreviewMode && mode !== "idle"}
+                        allowFeatureSelection={!isAnyPreviewMode || isViewerPreviewMode}
                         backgroundVisibility={backgroundVisibility}
                         geometryVisibility={effectiveGeometryVisibility}
-                        applyGeometryBindingFilter={
-                            isReplayEditMode || isReplayPreviewMode
-                                ? false
-                                : isViewerPreviewMode
-                                    ? true
-                                    : geometryBindingFilterEnabled
-                        }
-                        onFeatureClick={isAnyPreviewMode ? handlePreviewMapFeatureClick : undefined}
+                        applyGeometryBindingFilter={isAnyPreviewMode ? true : geometryBindingFilterEnabled}
+                        onFeatureClick={isAnyPreviewMode ? handleMapFeatureClick : undefined}
                         hoverPopupEnabled={isAnyPreviewMode}
-                        getHoverPopupContent={getPreviewHoverPopupContent}
+                        getHoverPopupContent={isAnyPreviewMode ? handleMapHoverPopupContent : undefined}
 
                         focusFeatureCollection={
                             isAnyPreviewMode
@@ -3153,222 +2700,82 @@ function EditorPageContent() {
                         }
                         focusRequestKey={
                             isAnyPreviewMode
-                                ? (replayPreviewActiveEntity ? previewEntityFocusToken : null)
+                                ? previewEntityFocusToken
                                 : geometryFocusRequest?.key ?? null
                         }
-                        focusPadding={mapFocusPadding}
+                        focusPadding={
+                            isAnyPreviewMode && previewActiveEntityId && isLargeScreen
+                                ? { top: 84, right: previewSidebarWidth + 80, bottom: 116, left: 84 }
+                                : { top: 84, right: 84, bottom: 116, left: 84 }
+                        }
                         imageOverlay={imageOverlay}
                         onImageOverlayChange={setImageOverlay}
                         onBindGeometries={handleBindGeometries}
                         localFeatureIds={localFeatureIds}
                         showViewportControls={!isReplayPreviewMode || replayPreview.zoomPanelVisible}
                         isPreviewMode={isAnyPreviewMode}
-                        onEnterPreview={!isReplayEditMode && !isAnyPreviewMode ? openViewerPreview : undefined}
-                        onExitPreview={isReplayPreviewMode ? exitReplayPreview : isViewerPreviewMode ? exitViewerPreview : undefined}
-                        onPlayPreviewReplay={isViewerPreviewMode && viewerPreviewSelectedReplay ? openSelectedViewerReplayPreview : undefined}
+                        onEnterPreview={openViewerPreview}
+                        onExitPreview={isReplayPreviewMode ? exitReplayPreview : exitViewerPreview}
+                        onPlayPreviewReplay={viewerPreviewSelectedReplay ? handleMapPlayPreviewReplay : undefined}
                         viewMode={viewMode}
                         onViewModeChange={setViewMode}
                     />
                 ) : (
                     <div style={{ width: "100%", height: "100%", background: "#0b1220" }} />
                 )}
-                {isAnyPreviewMode ? (
-                    <PresentPlaceSearch
-                        focusedPlace={focusedPresentPlace}
-                        onFocusPlace={handleFocusPresentPlace}
-                        onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
-                        onClearFocus={clearPresentPlaceFocus}
-                        leftOffset={18}
+
+                {isAnyPreviewMode && previewSession ? (
+                    <PreviewLayout
+                        ref={previewLayoutRef}
+                        projectId={projectId}
+                        mode={mode === "preview" ? "preview" : "replay_preview"}
+                        onModeChange={handlePreviewModeChange}
+                        onExitPreview={isReplayPreviewMode ? exitReplayPreview : exitViewerPreview}
+                        draft={previewSession.draft}
+                        replays={previewSession.replays}
+                        entities={previewSession.entities}
+                        wikis={previewSession.wikis}
+                        entityWikiLinks={previewSession.entityWikiLinks}
+                        backgroundVisibility={backgroundVisibility}
+                        onBackgroundVisibilityChange={setBackgroundVisibility}
+                        geometryVisibility={geometryVisibility}
+                        onGeometryVisibilityChange={setGeometryVisibility}
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        globalGeometries={globalGeometries}
+                        isGlobalLoading={isGlobalLoading}
+                        baseline={baselineFeatureCollection}
+                        activeReplay={previewSession.replay}
+                        selectedStageId={previewSession.selectedStageId}
+                        selectedStepIndex={previewSession.selectedStepIndex}
+                        autoplayMode={previewAutoplayMode}
+                        
+                        replayPreview={replayPreview}
+                        mapHandleRef={mapHandleRef}
+                        previewRelations={previewRelations}
+                        previewWikiCache={previewWikiCache}
+                        setPreviewWikiCache={setPreviewWikiCache}
+                        
+                        previewActiveEntityId={previewActiveEntityId}
+                        setPreviewActiveEntityId={setPreviewActiveEntityId}
+                        previewEntityFocusToken={previewEntityFocusToken}
+                        setPreviewEntityFocusToken={setPreviewEntityFocusToken}
+                        previewSidebarWidth={previewSidebarWidth}
+                        setPreviewSidebarWidth={setPreviewSidebarWidth}
+                        isLargeScreen={isLargeScreen}
+                        setIsLargeScreen={setIsLargeScreen}
                     />
-                ) : null}
-                {isReplayPreviewMode ? (
-                    <ReplayPreviewOverlay
-                        isPreviewMode={true}
-                        isPlaying={replayPreview.isPlaying}
-                        dialog={replayPreview.dialog}
-                        toasts={replayPreview.toasts}
-                        sidebarOpen={isReplayPreviewWikiSidebarOpen}
-                        sidebarWidth={previewSidebarWidth}
-                        playbackSpeed={replayPreview.playbackSpeed}
-                        activeStepLabel={replayPreviewActiveStepLabel}
-                        activeStepNumber={replayPreview.activeStepNumber}
-                        totalSteps={replayPreview.totalSteps}
-                        onPlayPreview={replayPreview.playFromStart}
-                        onStopPreview={replayPreview.stopPreview}
-                        onResetPreview={replayPreview.resetPreview}
-                        onExitPreview={exitReplayPreview}
-                    />
-                ) : null}
-                {isAnyPreviewMode && isReplayPreviewWikiSidebarOpen ? (
-                    <aside
-                        style={{
-                            position: "absolute",
-                            top: 16,
-                            right: 16,
-                            bottom: 16,
-                            maxWidth: "calc(100vw - 2rem)",
-                            zIndex: 20,
-                        }}
-                    >
-                        <PublicWikiSidebar
-                            entity={replayPreviewActiveEntity}
-                            wiki={replayPreviewActiveWiki}
-                            isLoading={isPreviewWikiLoading}
-                            error={replayPreview.activeWikiId || replayPreviewActiveEntity ? previewWikiError : "Chưa có wiki được chọn trong step này."}
-                            onClose={closeReplayPreviewSidebar}
-                            onWikiLinkRequest={handleReplayPreviewWikiLinkRequest}
-                            sidebarWidth={previewSidebarWidth}
-                            onSidebarWidthChange={setPreviewSidebarWidth}
-                            maxDragWidth={typeof window !== "undefined" ? Math.min(800, window.innerWidth - 340) : 800}
-                            compactHeader
-                        />
-                    </aside>
-                ) : null}
-                {isAnyPreviewMode ? (
-                    <aside
-                        style={{
-                            position: "absolute",
-                            top: "50%",
-                            left: 18,
-                            transform: "translateY(-50%)",
-                            zIndex: 16,
-                            pointerEvents: "auto",
-                        }}
-                    >
-                        <ReplayPreviewLayerPanel
-                            backgroundVisibility={backgroundVisibility}
-                            geometryVisibility={effectiveGeometryVisibility}
-                            onToggleBackground={(id) =>
-                                setBackgroundVisibility((prev) => {
-                                    const next = { ...prev, [id]: !prev[id] };
-                                    persistBackgroundLayerVisibility(next);
-                                    return next;
-                                })
-                            }
-                            onToggleGeometry={(typeKey) =>
-                                setGeometryVisibility((prev) => ({
-                                    ...prev,
-                                    [typeKey]: prev[typeKey] === false,
-                                }))
-                            }
-                        />
-                    </aside>
-                ) : null}
-                {isAnyPreviewMode && previewPinnedWikiPopupAnchor && previewPinnedWikiPopupRows.length > 0 ? (
-                    <div
-                        ref={previewPinnedWikiPopupRef}
-                        className="absolute z-30 w-[320px] max-w-[calc(100vw-2rem)]"
-                        style={{
-                            left: clampNumber(previewPinnedWikiPopupAnchor.point.x + 18, 16, typeof window !== "undefined" ? window.innerWidth - 340 : previewPinnedWikiPopupAnchor.point.x + 18),
-                            top: clampNumber(previewPinnedWikiPopupAnchor.point.y - 8, 16, typeof window !== "undefined" ? window.innerHeight - 280 : previewPinnedWikiPopupAnchor.point.y - 8),
-                        }}
-                    >
-                        <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 shadow-xl backdrop-blur">
-                            <div className="max-h-[300px] overflow-y-auto p-3">
-                                <div className="grid gap-2">
-                                    {previewPinnedWikiPopupRows.map(({ entity, wiki, quote }) => (
-                                        <button
-                                            key={`${entity.id}:${wiki?.id || "entity-only"}`}
-                                            type="button"
-                                            onClick={() => {
-                                                selectReplayPreviewEntity(entity.id, {
-                                                    sourceFeatureId: previewPinnedWikiPopupAnchor.featureId,
-                                                    preferredWikiId: wiki?.id,
-                                                    focusMap: false,
-                                                    selectGeometry: false,
-                                                });
-                                            }}
-                                            className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
-                                        >
-                                            <div className="truncate text-sm font-semibold text-white">
-                                                {entity.name || String(entity.id)}
-                                            </div>
-                                            {quote ? (
-                                                <div
-                                                    className="mt-2 pl-3 pr-1 text-sm italic leading-relaxed text-slate-300"
-                                                    style={{
-                                                        borderLeft: "3px solid rgba(56, 189, 248, 0.4)",
-                                                        display: "-webkit-box",
-                                                        WebkitLineClamp: 4,
-                                                        WebkitBoxOrient: "vertical",
-                                                        overflow: "hidden",
-                                                        whiteSpace: "normal",
-                                                    }}
-                                                >
-                                                    {quote}
-                                                </div>
-                                            ) : null}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
-                {!isReplayPreviewMode || replayPreview.timelineVisible ? (
+                ) : (
                     <TimelineBar
                         year={activeTimelineYear}
-                        onYearChange={
-                            isReplayPreviewMode
-                                ? replayPreview.setTimelineYear
-                                : isViewerPreviewMode
-                                    ? handleViewerPreviewTimelineYearChange
-                                    : handleTimelineYearChange
-                        }
+                        onYearChange={handleTimelineYearChange}
                         isLoading={false}
                         disabled={false}
                         statusText={null}
                         filterEnabled={activeTimelineFilterEnabled}
-                        onFilterEnabledChange={
-                            isReplayPreviewMode
-                                ? replayPreview.setTimelineFilterEnabled
-                                : isViewerPreviewMode
-                                    ? handleViewerPreviewTimelineFilterChange
-                                    : setTimelineFilterEnabled
-                        }
-                        style={
-                            isAnyPreviewMode && isReplayPreviewWikiSidebarOpen
-                                ? { right: `${previewSidebarWidth + 32}px` }
-                                : undefined
-                        }
+                        onFilterEnabledChange={setTimelineFilterEnabled}
                     />
-                ) : null}
-                {isAnyPreviewMode && previewLinkEntityPopup ? (
-                    <div
-                        ref={previewLinkEntityPopupRef}
-                        className="fixed z-[60] w-[240px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
-                        style={{ top: previewLinkEntityPopup.top, left: previewLinkEntityPopup.left }}
-                    >
-                        <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-800">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                Related Entities
-                            </div>
-                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                /wiki/{previewLinkEntityPopup.slug}
-                            </div>
-                        </div>
-                        <div className="max-h-[220px] overflow-y-auto p-2">
-                            <div className="grid gap-1">
-                                {previewLinkEntityPopup.entities.map((entity) => (
-                                    <button
-                                        key={entity.id}
-                                        type="button"
-                                        onClick={() => {
-                                            selectReplayPreviewEntity(entity.id, {
-                                                preferredWikiSlug: previewLinkEntityPopup.slug,
-                                                focusMap: false,
-                                            });
-                                            setPreviewLinkEntityPopup(null);
-                                        }}
-                                        className="rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-white/[0.04] dark:hover:text-white"
-                                    >
-                                        {entity.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
+                )}
             </div>
 
             {!isReplayEditMode && !isAnyPreviewMode ? (

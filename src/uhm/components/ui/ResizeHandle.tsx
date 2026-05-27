@@ -12,18 +12,35 @@ export function ResizeHandle({ onDrag, title }: ResizeHandleProps) {
     const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
         event.preventDefault();
         const startX = event.clientX;
-        let lastX = startX;
+
+        // Tạo đường ghost ảo chỉ vị trí kéo thay vì kích hoạt re-render liên tục
+        const ghost = document.createElement("div");
+        ghost.style.position = "fixed";
+        ghost.style.top = "0";
+        ghost.style.bottom = "0";
+        ghost.style.width = "4px";
+        ghost.style.backgroundColor = "#38bdf8";
+        ghost.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.8)";
+        ghost.style.zIndex = "99999";
+        ghost.style.cursor = "col-resize";
+        ghost.style.pointerEvents = "none";
+        ghost.style.left = `${startX}px`;
+        document.body.appendChild(ghost);
 
         const onMove = (e: PointerEvent) => {
-            const deltaX = e.clientX - lastX;
-            if (deltaX !== 0) {
-                onDrag(deltaX);
-                lastX = e.clientX;
-            }
+            ghost.style.left = `${e.clientX}px`;
         };
-        const onUp = () => {
+
+        const onUp = (e: PointerEvent) => {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
+            if (ghost.parentNode) {
+                ghost.parentNode.removeChild(ghost);
+            }
+            const deltaX = e.clientX - startX;
+            if (deltaX !== 0) {
+                onDrag(deltaX);
+            }
         };
 
         window.addEventListener("pointermove", onMove);

@@ -161,18 +161,36 @@ function PublicWikiSidebar({
         const startX = event.clientX;
         const startWidth = width;
 
+        // Tạo đường ghost ảo chỉ vị trí kéo thay vì kích hoạt re-render liên tục
+        const ghost = document.createElement("div");
+        ghost.style.position = "fixed";
+        ghost.style.top = "0";
+        ghost.style.bottom = "0";
+        ghost.style.width = "4px";
+        ghost.style.backgroundColor = "#38bdf8";
+        ghost.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.8)";
+        ghost.style.zIndex = "99999";
+        ghost.style.cursor = "col-resize";
+        ghost.style.pointerEvents = "none";
+        ghost.style.left = `${startX}px`;
+        document.body.appendChild(ghost);
+
         const onMove = (e: PointerEvent) => {
+            ghost.style.left = `${e.clientX}px`;
+        };
+
+        const onUp = (e: PointerEvent) => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            if (ghost.parentNode) {
+                ghost.parentNode.removeChild(ghost);
+            }
             const deltaX = e.clientX - startX;
             const nextWidth = Math.max(320, Math.min(maxDragWidthLimit, startWidth - deltaX));
             setWidth(nextWidth);
             if (typeof window !== "undefined") {
                 localStorage.setItem("public-wiki-sidebar-width", String(nextWidth));
             }
-        };
-
-        const onUp = () => {
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
         };
 
         window.addEventListener("pointermove", onMove);
