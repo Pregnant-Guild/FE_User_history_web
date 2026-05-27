@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import type { RefObject, Dispatch, SetStateAction } from "react";
 import { type MapFeaturePayload, type MapHandle } from "@/uhm/components/Map";
+import type { MapHoverPopupContent } from "@/uhm/components/map/useMapHoverPopup";
 import PresentPlaceSearch, { type HistoricalGeometryFocusPayload, type PresentPlaceSelection } from "@/uhm/components/editor/PresentPlaceSearch";
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
@@ -10,14 +12,15 @@ import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import RelatedEntityPopup from "./RelatedEntityPopup";
 import PinnedWikiPopup from "./PinnedWikiPopup";
 
-import { type Wiki } from "@/uhm/api/wikis";
+import { fetchWikiById, type Wiki } from "@/uhm/api/wikis";
 import type { Entity } from "@/uhm/api/entities";
 import type { FeatureCollection } from "@/uhm/types/geo";
-import type { BattleReplay } from "@/uhm/types/projects";
+import type { BattleReplay, EntityWikiLinkSnapshot } from "@/uhm/types/projects";
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { type BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
-import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { normalizeFeatureEntityIds } from "@/uhm/lib/editor/snapshot/editorSnapshot";
+import type { PreviewRelationIndex } from "@/uhm/lib/preview/types";
+import type { Feature } from "@/uhm/lib/editor/state/useEditorState";
 
 type Props = {
     projectId: string;
@@ -28,36 +31,43 @@ type Props = {
     replays: BattleReplay[];
     entities: Entity[];
     wikis: WikiSnapshot[];
+    entityWikiLinks?: EntityWikiLinkSnapshot[];
     backgroundVisibility: BackgroundLayerVisibility;
     onBackgroundVisibilityChange: (vis: BackgroundLayerVisibility) => void;
     geometryVisibility: Record<string, boolean>;
     onGeometryVisibilityChange: (vis: Record<string, boolean>) => void;
+    viewMode?: "local" | "global";
+    onViewModeChange?: (mode: "local" | "global") => void;
+    globalGeometries?: FeatureCollection;
+    isGlobalLoading?: boolean;
+    baseline?: FeatureCollection;
     activeReplay?: BattleReplay | null;
+    selectedStageId?: number | null;
+    selectedStepIndex?: number | null;
     autoplayMode?: "start" | "selection" | null;
 
     replayPreview: any;
+    mapHandleRef?: RefObject<MapHandle | null>;
     previewRelations: PreviewRelationIndex;
     previewActiveEntityId: string | null;
     setPreviewActiveEntityId: (id: string | null) => void;
-    setPreviewEntityFocusToken: React.Dispatch<React.SetStateAction<number>>;
+    previewEntityFocusToken?: number;
+    setPreviewEntityFocusToken: Dispatch<SetStateAction<number>>;
     previewSidebarWidth: number;
-    setPreviewSidebarWidth: React.Dispatch<React.SetStateAction<number>>;
+    setPreviewSidebarWidth: Dispatch<SetStateAction<number>>;
     previewWikiCache: Record<string, Wiki>;
-    setPreviewWikiCache: React.Dispatch<React.SetStateAction<Record<string, Wiki>>>;
+    setPreviewWikiCache: Dispatch<SetStateAction<Record<string, Wiki>>>;
+    isLargeScreen?: boolean;
+    setIsLargeScreen?: Dispatch<SetStateAction<boolean>>;
 };
 
-type PreviewRelationIndex = {
-    entitiesById: Record<string, Entity>;
-    entityGeometriesById: Record<string, FeatureCollection>;
-    entityWikisById: Record<string, Wiki[]>;
-    geometryEntityIds: Record<string, string[]>;
-    wikiEntityIdsById: Record<string, string[]>;
-    wikiEntityIdsBySlug: Record<string, string[]>;
-    wikiById: Record<string, Wiki>;
-    wikiBySlug: Record<string, Wiki>;
+export type PreviewLayoutHandle = {
+    handleFeatureClick: (payload: MapFeaturePayload | null) => void;
+    getHoverPopupContent: (feature: Feature) => MapHoverPopupContent | null;
+    handlePlaySelectedReplay: (replay: BattleReplay) => void;
 };
 
-const PreviewLayout = forwardRef<any, Props>(({
+const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     projectId,
     mode,
     onModeChange,
@@ -636,6 +646,8 @@ const PreviewLayout = forwardRef<any, Props>(({
                     isLoading={false}
                     disabled={isReplayPreviewMode}
                     statusText={null}
+                    filterEnabled={replayPreview.timelineFilterEnabled}
+                    onFilterEnabledChange={replayPreview.setTimelineFilterEnabled}
                     style={
                         isReplayPreviewWikiSidebarOpen
                             ? { right: `${previewSidebarWidth + 32}px` }
@@ -703,4 +715,11 @@ function computeFixedPopupPosition(rect: DOMRect, width: number, height: number)
     const top = Math.max(margin, Math.min(preferredTop, maxTop));
 
     return { top, left };
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
 }

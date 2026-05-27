@@ -25,20 +25,19 @@ import { EMPTY_FEATURE_COLLECTION, WORLD_BBOX } from "@/uhm/lib/map/geo/constant
 import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
 import { clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/utils/timeline";
 import type { FeatureCollection } from "@/uhm/types/geo";
+import {
+    buildEntityLabelContextDraft,
+    buildPublicPreviewRelationIndex,
+} from "@/uhm/lib/preview/relationIndex";
+import {
+    EMPTY_PREVIEW_RELATIONS,
+    type PreviewRelationIndex,
+} from "@/uhm/lib/preview/types";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const ENTITY_PAGE_LIMIT = 100;
 const WIKI_PAGE_LIMIT = 100;
 const RELATION_CONCURRENCY = 6;
-
-type RelationIndex = {
-    entitiesById: Record<string, Entity>;
-    entityGeometriesById: Record<string, FeatureCollection>;
-    entityWikisById: Record<string, Wiki[]>;
-    geometryEntityIds: Record<string, string[]>;
-    wikiEntityIdsBySlug: Record<string, string[]>;
-    wikiBySlug: Record<string, Wiki>;
-};
 
 type LinkEntityPopupState = {
     slug: string;
@@ -48,15 +47,6 @@ type LinkEntityPopupState = {
 };
 
 type CachedWiki = Wiki & { __fetched?: boolean };
-
-const EMPTY_RELATIONS: RelationIndex = {
-    entitiesById: {},
-    entityGeometriesById: {},
-    entityWikisById: {},
-    geometryEntityIds: {},
-    wikiEntityIdsBySlug: {},
-    wikiBySlug: {},
-};
 
 export default function Page() {
     const [data, setData] = useState<FeatureCollection>(EMPTY_FEATURE_COLLECTION);
@@ -75,7 +65,7 @@ export default function Page() {
         for (const key of GEO_TYPE_KEYS) init[key] = true;
         return init;
     });
-    const [relations, setRelations] = useState<RelationIndex>(EMPTY_RELATIONS);
+    const [relations, setRelations] = useState<PreviewRelationIndex>(EMPTY_PREVIEW_RELATIONS);
     const [isRelationsLoading, setIsRelationsLoading] = useState(false);
     const [relationsStatus, setRelationsStatus] = useState<string | null>(null);
     const [relationsProgress, setRelationsProgress] = useState<{ completed: number; total: number }>({
@@ -192,18 +182,9 @@ export default function Page() {
                 const entities = await fetchAllEntities();
                 if (disposed) return;
 
-                const next: RelationIndex = {
-                    entitiesById: {},
-                    entityGeometriesById: {},
-                    entityWikisById: {},
-                    geometryEntityIds: {},
-                    wikiEntityIdsBySlug: {},
-                    wikiBySlug: {},
-                };
+                const entityGeometriesById: Record<string, FeatureCollection> = {};
+                const entityWikisById: Record<string, Wiki[]> = {};
 
-                for (const entity of entities) {
-                    next.entitiesById[entity.id] = entity;
-                }
 
                 setRelationsProgress({ completed: 0, total: entities.length });
 
@@ -214,19 +195,8 @@ export default function Page() {
                     ]);
                     if (disposed) return;
 
-                    next.entityGeometriesById[entity.id] = geometries;
-                    next.entityWikisById[entity.id] = wikis;
-
-                    for (const feature of geometries.features) {
-                        pushUniqueString(next.geometryEntityIds, String(feature.properties.id), entity.id);
-                    }
-
-                    for (const wiki of wikis) {
-                        const slug = String(wiki.slug || "").trim();
-                        if (!slug.length) continue;
-                        next.wikiBySlug[slug] = wiki;
-                        pushUniqueString(next.wikiEntityIdsBySlug, slug, entity.id);
-                    }
+                    entityGeometriesById[entity.id] = geometries;
+                    entityWikisById[entity.id] = wikis;
 
                     const completed = index + 1;
                     if (completed === entities.length || completed % 5 === 0) {
@@ -236,8 +206,11 @@ export default function Page() {
 
                 if (disposed) return;
 
-                normalizeRelationArrays(next.geometryEntityIds);
-                normalizeRelationArrays(next.wikiEntityIdsBySlug);
+                const next = buildPublicPreviewRelationIndex({
+                    entities,
+                    entityGeometriesById,
+                    entityWikisById,
+                });
 
                 setRelations(next);
                 setWikiCache((prev) => ({ ...next.wikiBySlug, ...prev }));
@@ -275,8 +248,8 @@ export default function Page() {
         ? relations.entityGeometriesById[activeEntityId] || EMPTY_FEATURE_COLLECTION
         : EMPTY_FEATURE_COLLECTION;
     const mapLabelContextDraft = useMemo(
-        () => buildEntityLabelContextDraft(data, relations.geometryEntityIds, relations.entitiesById),
-        [data, relations.entitiesById, relations.geometryEntityIds]
+        () => buildEntityLabelContextDraft(data, relations),
+        [data, relations]
     );
 
     const activeWiki = useMemo(() => {
@@ -935,62 +908,6 @@ async function mapWithConcurrency<T>(
             }
         })
     );
-}
-
-function pushUniqueString(target: Record<string, string[]>, key: string, value: string) {
-    if (!target[key]) {
-        target[key] = [value];
-        return;
-    }
-    if (!target[key].includes(value)) {
-        target[key].push(value);
-    }
-}
-
-function normalizeRelationArrays(target: Record<string, string[]>) {
-    for (const key of Object.keys(target)) {
-        target[key] = Array.from(new Set(target[key]));
-    }
-}
-
-function buildEntityLabelContextDraft(
-    draft: FeatureCollection,
-    geometryEntityIds: Record<string, string[]>,
-    entitiesById: Record<string, Entity>
-): FeatureCollection {
-    if (!draft.features.length) return draft;
-
-    return {
-        ...draft,
-        features: draft.features.map((feature) => {
-            const entityIds = geometryEntityIds[String(feature.properties.id)] || [];
-            if (!entityIds.length) return feature;
-
-            const candidates = entityIds.map((id) => {
-                const entity = entitiesById[id] || null;
-                const name = String(entity?.name || id).trim();
-                if (!name) return null;
-                return {
-                    id,
-                    name,
-                    time_start: entity?.time_start ?? null,
-                    time_end: entity?.time_end ?? null,
-                };
-            }).filter((candidate) => candidate !== null);
-
-            return {
-                ...feature,
-                properties: {
-                    ...feature.properties,
-                    entity_id: entityIds[0] || null,
-                    entity_ids: entityIds,
-                    entity_name: candidates[0]?.name || null,
-                    entity_names: candidates.map((candidate) => candidate.name),
-                    entity_label_candidates: candidates,
-                },
-            };
-        }),
-    };
 }
 
 function clampNumber(value: number, min: number, max: number): number {

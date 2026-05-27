@@ -10,7 +10,7 @@ import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import SelectedGeometryPanel from "@/uhm/components/editor/SelectedGeometryPanel";
 import ReplayTimelineSidebar from "@/uhm/components/editor/ReplayTimelineSidebar";
 import ReplayEffectsSidebar from "@/uhm/components/editor/ReplayEffectsSidebar";
-import PreviewLayout from "@/uhm/components/preview/PreviewLayout";
+import PreviewLayout, { type PreviewLayoutHandle } from "@/uhm/components/preview/PreviewLayout";
 import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
@@ -81,6 +81,10 @@ import {
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
 } from "@/uhm/lib/editor/editorPageUtils";
+import {
+    buildEntityLabelContextDraft as buildPreviewEntityLabelContextDraft,
+    buildSnapshotPreviewRelationIndex,
+} from "@/uhm/lib/preview/relationIndex";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const DEFAULT_EDITOR_USER_ID = "local-editor";
@@ -98,18 +102,6 @@ type ReplayPreviewSession = {
     timelineFilterEnabled: boolean;
     mapViewState: ReturnType<MapHandle["getViewState"]>;
 };
-
-type PreviewRelationIndex = {
-    entitiesById: Record<string, Entity>;
-    entityGeometriesById: Record<string, FeatureCollection>;
-    entityWikisById: Record<string, Wiki[]>;
-    geometryEntityIds: Record<string, string[]>;
-    wikiEntityIdsById: Record<string, string[]>;
-    wikiEntityIdsBySlug: Record<string, string[]>;
-    wikiById: Record<string, Wiki>;
-    wikiBySlug: Record<string, Wiki>;
-};
-
 
 export default function Page() {
     return (
@@ -547,7 +539,7 @@ function EditorPageContent() {
         return 420;
     });
     const [isLargeScreen, setIsLargeScreen] = useState(false);
-    const previewLayoutRef = useRef<any>(null);
+    const previewLayoutRef = useRef<PreviewLayoutHandle | null>(null);
 
     // Responsive listener for preview sidebar/viewport offsets
     useEffect(() => {
@@ -601,7 +593,7 @@ function EditorPageContent() {
     const [previewWikiCache, setPreviewWikiCache] = useState<Record<string, Wiki>>({});
 
     const previewRelations = useMemo(() => {
-        return buildPreviewRelationIndex({
+        return buildSnapshotPreviewRelationIndex({
             draft: previewSession?.draft || EMPTY_FEATURE_COLLECTION,
             entities: previewSession?.entities || [],
             wikis: previewSession?.wikis || [],
@@ -635,12 +627,12 @@ function EditorPageContent() {
     const activeTimelineYear = isReplayPreviewMode
         ? replayPreviewTimelineYear
         : isViewerPreviewMode
-            ? previewSession?.timelineYear ?? timelineDraftYear
+            ? replayPreviewTimelineYear
             : timelineDraftYear;
     const activeTimelineFilterEnabled = isReplayPreviewMode
         ? replayPreviewTimelineFilterEnabled
         : isViewerPreviewMode
-            ? previewSession?.timelineFilterEnabled ?? timelineFilterEnabled
+            ? replayPreviewTimelineFilterEnabled
             : timelineFilterEnabled;
 
     // Render draft is the only FeatureCollection that decides what appears on the map.
@@ -817,12 +809,30 @@ function EditorPageContent() {
 
     const activeMapDraft = useMemo(() => {
         if (isAnyPreviewMode) {
-            return isReplayPreviewMode
+            const previewDraft = isReplayPreviewMode
                 ? replayPreviewDraft
                 : (previewSession?.draft || EMPTY_FEATURE_COLLECTION);
+            if (!activeTimelineFilterEnabled) {
+                return previewDraft;
+            }
+            const safeYear = clampYearToFixedRange(Math.trunc(activeTimelineYear));
+            return {
+                ...previewDraft,
+                features: previewDraft.features.filter((feature) =>
+                    isFeatureVisibleAtYear(feature, safeYear)
+                ),
+            };
         }
         return mapRenderDraft;
-    }, [isAnyPreviewMode, isReplayPreviewMode, replayPreviewDraft, previewSession?.draft, mapRenderDraft]);
+    }, [
+        activeTimelineFilterEnabled,
+        activeTimelineYear,
+        isAnyPreviewMode,
+        isReplayPreviewMode,
+        mapRenderDraft,
+        previewSession?.draft,
+        replayPreviewDraft,
+    ]);
 
     const localFeatureIds = useMemo(() => {
         const ids = new Set<string | number>();
@@ -2420,7 +2430,7 @@ function EditorPageContent() {
         const entitiesForLabel = isAnyPreviewMode
             ? previewSession?.entities || []
             : entities;
-        return buildEntityLabelContextDraft(labelContextBaseDraft, entitiesForLabel);
+        return buildPreviewEntityLabelContextDraft(labelContextBaseDraft, entitiesForLabel);
     }, [entities, isAnyPreviewMode, labelContextBaseDraft, previewSession?.entities]);
 
     if (blockedPendingSubmissionId) {
@@ -2908,118 +2918,6 @@ function readImageAspectRatio(url: string): Promise<number> {
         image.src = url;
     });
 }
-
-function buildPreviewRelationIndex(options: {
-    draft: FeatureCollection;
-    entities: Entity[];
-    wikis: WikiSnapshot[];
-    entityWikiLinks: EntityWikiLinkSnapshot[];
-    wikiCache: Record<string, Wiki>;
-    projectId: string;
-}): PreviewRelationIndex {
-    const next: PreviewRelationIndex = {
-        entitiesById: {},
-        entityGeometriesById: {},
-        entityWikisById: {},
-        geometryEntityIds: {},
-        wikiEntityIdsById: {},
-        wikiEntityIdsBySlug: {},
-        wikiById: {},
-        wikiBySlug: {},
-    };
-
-    for (const entity of options.entities || []) {
-        const id = String(entity?.id || "").trim();
-        if (!id) continue;
-        next.entitiesById[id] = entity;
-    }
-
-    for (const wikiSnapshot of options.wikis || []) {
-        if (!wikiSnapshot || wikiSnapshot.operation === "delete") continue;
-        const wiki = snapshotWikiToWiki(wikiSnapshot, options.wikiCache, options.projectId);
-        if (!wiki?.id) continue;
-        next.wikiById[wiki.id] = wiki;
-        const slug = String(wiki.slug || "").trim();
-        if (slug) next.wikiBySlug[slug] = wiki;
-    }
-
-    for (const feature of options.draft.features || []) {
-        const geometryId = String(feature.properties.id);
-        for (const entityId of normalizeFeatureEntityIds(feature)) {
-            if (!next.entitiesById[entityId]) {
-                next.entitiesById[entityId] = { id: entityId, name: entityId };
-            }
-            pushUniqueString(next.geometryEntityIds, geometryId, entityId);
-            if (!next.entityGeometriesById[entityId]) {
-                next.entityGeometriesById[entityId] = { type: "FeatureCollection", features: [] };
-            }
-            if (!next.entityGeometriesById[entityId].features.some((item) => String(item.properties.id) === geometryId)) {
-                next.entityGeometriesById[entityId].features.push(feature);
-            }
-        }
-    }
-
-    for (const link of options.entityWikiLinks || []) {
-        if (!link || link.operation === "delete") continue;
-        const entityId = String(link.entity_id || "").trim();
-        const wikiId = String(link.wiki_id || "").trim();
-        const entity = next.entitiesById[entityId] || null;
-        const wiki = next.wikiById[wikiId] || null;
-        if (!entity || !wiki) continue;
-
-        if (!next.entityWikisById[entityId]) next.entityWikisById[entityId] = [];
-        if (!next.entityWikisById[entityId].some((item) => item.id === wiki.id)) {
-            next.entityWikisById[entityId].push(wiki);
-        }
-
-        pushUniqueString(next.wikiEntityIdsById, wiki.id, entityId);
-        const slug = String(wiki.slug || "").trim();
-        if (slug) pushUniqueString(next.wikiEntityIdsBySlug, slug, entityId);
-    }
-
-    normalizeRelationArrays(next.geometryEntityIds);
-    normalizeRelationArrays(next.wikiEntityIdsById);
-    normalizeRelationArrays(next.wikiEntityIdsBySlug);
-    return next;
-}
-
-function snapshotWikiToWiki(snapshot: WikiSnapshot, wikiCache: Record<string, Wiki>, projectId: string): Wiki {
-    if (typeof snapshot.doc === "string") {
-        return {
-            id: snapshot.id,
-            project_id: projectId,
-            title: snapshot.title,
-            slug: snapshot.slug ?? null,
-            content: snapshot.doc || "",
-        };
-    }
-
-    return wikiCache[snapshot.id] || {
-        id: snapshot.id,
-        project_id: projectId,
-        title: snapshot.title,
-        slug: snapshot.slug ?? null,
-        content: "",
-    };
-}
-
-
-function pushUniqueString(target: Record<string, string[]>, key: string, value: string) {
-    if (!target[key]) {
-        target[key] = [value];
-        return;
-    }
-    if (!target[key].includes(value)) {
-        target[key].push(value);
-    }
-}
-
-function normalizeRelationArrays(target: Record<string, string[]>) {
-    for (const key of Object.keys(target)) {
-        target[key] = Array.from(new Set(target[key]));
-    }
-}
-
 
 function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
