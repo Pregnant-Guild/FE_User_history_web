@@ -4,9 +4,11 @@ import type { Feature, FeatureCollection } from "@/uhm/lib/editor/state/useEdito
 import { FEATURE_STATE_SOURCE_IDS } from "@/uhm/lib/map/constants";
 
 export type MapHoverPopupContent = {
+    key?: string;
     rows: Array<{
         title: string;
         quote?: string | null;
+        onClick?: () => void;
     }>;
 };
 
@@ -40,12 +42,12 @@ export function useMapHoverPopup({
             className: "uhm-map-hover-popup",
         });
 
-        let hoveredId: string | null = null;
+        let hoveredKey: string | null = null;
         let frameId: number | null = null;
         let pendingEvent: maplibregl.MapMouseEvent | null = null;
 
         const removePopup = () => {
-            hoveredId = null;
+            hoveredKey = null;
             popup.remove();
         };
 
@@ -91,8 +93,9 @@ export function useMapHoverPopup({
                 return;
             }
 
-            if (id !== hoveredId) {
-                hoveredId = id;
+            const contentKey = `${id}:${content.key || content.rows.map((row) => `${row.title}:${row.quote || ""}`).join("|")}`;
+            if (contentKey !== hoveredKey) {
+                hoveredKey = contentKey;
                 popup.setDOMContent(buildPopupNode(content));
             }
 
@@ -185,13 +188,37 @@ function buildPopupNode(content: MapHoverPopupContent): HTMLElement {
         const titleText = row.title.trim();
         if (!titleText) continue;
 
-        const card = document.createElement("div");
+        const card: HTMLButtonElement | HTMLDivElement = row.onClick
+            ? document.createElement("button")
+            : document.createElement("div");
+        if (row.onClick) {
+            (card as HTMLButtonElement).type = "button";
+            card.onclick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                row.onClick?.();
+            };
+        }
         card.style.width = "100%";
         card.style.border = "1px solid rgba(255, 255, 255, 0.10)";
         card.style.borderRadius = "8px";
         card.style.background = "rgba(255, 255, 255, 0.03)";
         card.style.padding = "12px";
         card.style.textAlign = "left";
+        card.style.font = "inherit";
+        card.style.cursor = row.onClick ? "pointer" : "default";
+        card.style.display = "block";
+        card.style.transition = "border-color 140ms ease, background 140ms ease";
+        if (row.onClick) {
+            card.onmouseenter = () => {
+                card.style.borderColor = "rgba(56, 189, 248, 0.40)";
+                card.style.background = "rgba(14, 165, 233, 0.10)";
+            };
+            card.onmouseleave = () => {
+                card.style.borderColor = "rgba(255, 255, 255, 0.10)";
+                card.style.background = "rgba(255, 255, 255, 0.03)";
+            };
+        }
 
         const title = document.createElement("div");
         title.textContent = titleText;

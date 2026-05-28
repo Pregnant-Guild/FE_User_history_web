@@ -28,6 +28,7 @@ export type FeatureProperties = {
     entity_name?: string | null;
     entity_names?: string[];
     entity_label_candidates?: EntityLabelCandidate[];
+    public_entity_previews?: FeatureEntityPreview[];
     entity_type_id?: string | null;
     point_label?: string | null;
     line_label?: string | null;
@@ -39,6 +40,23 @@ export type EntityLabelCandidate = {
     name: string;
     time_start?: number | null;
     time_end?: number | null;
+};
+
+export type FeatureWikiPreview = {
+    id: string;
+    title?: string;
+    slug?: string | null;
+    preview_quote?: string | null;
+    content?: string | null;
+};
+
+export type FeatureEntityPreview = {
+    id: string;
+    name: string;
+    description?: string | null;
+    time_start?: number | null;
+    time_end?: number | null;
+    wikis?: FeatureWikiPreview[];
 };
 
 export type Feature = {

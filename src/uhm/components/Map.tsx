@@ -336,15 +336,115 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             display: "flex",
                             alignItems: "center",
                             gap: "10px",
-                            background: "rgba(15, 23, 42, 0.88)",
-                            border: "1px solid rgba(148, 163, 184, 0.38)",
-                            borderRadius: "999px",
-                            padding: "8px 12px",
-                            color: "#e2e8f0",
-                            backdropFilter: "blur(3px)",
+                            background: "linear-gradient(135deg, rgba(30, 30, 30, 0.72) 0%, rgba(20, 20, 20, 0.85) 100%)",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderRadius: "50px",
+                            padding: "8px 16px",
+                            color: "#f8fafc",
+                            boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 1px 0 rgba(255, 255, 255, 0.05)",
+                            backdropFilter: "blur(8px)",
+                            WebkitBackdropFilter: "blur(8px)",
                             pointerEvents: "auto",
                         }}
                     >
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            .premium-zoom-btn {
+                                width: 28px;
+                                height: 28px;
+                                border-radius: 8px;
+                                border: 1px solid rgba(255, 255, 255, 0.15);
+                                background: rgba(255, 255, 255, 0.08);
+                                color: #ffffff;
+                                font-size: 16px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                display: grid;
+                                place-items: center;
+                                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                                user-select: none;
+                            }
+                            .premium-zoom-btn:hover {
+                                border-color: rgba(255, 255, 255, 0.3);
+                                background: rgba(255, 255, 255, 0.15);
+                            }
+                            .premium-zoom-btn:active {
+                                background: rgba(16, 185, 129, 0.25);
+                                border-color: #10b981;
+                            }
+                            .premium-zoom-slider {
+                                -webkit-appearance: none;
+                                appearance: none;
+                                flex: 1;
+                                min-width: 80px;
+                                height: 24px;
+                                background: transparent;
+                                cursor: pointer;
+                                outline: none;
+                            }
+                            .premium-zoom-slider::-webkit-slider-runnable-track {
+                                width: 100%;
+                                height: 6px;
+                                background: rgba(255, 255, 255, 0.15);
+                                border-radius: 999px;
+                                border: 1px solid rgba(255, 255, 255, 0.05);
+                                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+                                transition: all 0.2s;
+                            }
+                            .premium-zoom-slider:hover::-webkit-slider-runnable-track {
+                                background: rgba(255, 255, 255, 0.25);
+                                border-color: rgba(255, 255, 255, 0.1);
+                            }
+                            .premium-zoom-slider::-webkit-slider-thumb {
+                                -webkit-appearance: none;
+                                appearance: none;
+                                margin-top: -6px;
+                                height: 18px;
+                                width: 18px;
+                                border-radius: 50%;
+                                background: radial-gradient(circle at 30% 30%, #34d399 0%, #059669 100%);
+                                border: 1.5px solid #ffffff;
+                                box-shadow: 0 0 10px rgba(16, 185, 129, 0.4), 0 3px 6px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+                                cursor: pointer;
+                                transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+                            }
+                            .premium-zoom-slider:hover::-webkit-slider-thumb {
+                                transform: scale(1.2);
+                                box-shadow: 0 0 15px rgba(16, 185, 129, 0.6), 0 5px 10px rgba(0, 0, 0, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+                            }
+                            .premium-toggle-track {
+                                width: 38px;
+                                height: 20px;
+                                border-radius: 999px;
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                background: rgba(255, 255, 255, 0.1);
+                                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+                                position: relative;
+                                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                                flex: 0 0 auto;
+                            }
+                            .premium-toggle-track.active {
+                                background: rgba(52, 211, 153, 0.35);
+                                border-color: rgba(16, 185, 129, 0.6);
+                                box-shadow: 0 0 8px rgba(16, 185, 129, 0.35), inset 0 1px 2px rgba(0, 0, 0, 0.2);
+                            }
+                            .premium-toggle-thumb {
+                                position: absolute;
+                                top: 1.5px;
+                                left: 2px;
+                                width: 15px;
+                                height: 15px;
+                                border-radius: 50%;
+                                background: #94a3b8;
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+                                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                            }
+                            .premium-toggle-track.active .premium-toggle-thumb {
+                                left: 19px;
+                                background: #34d399;
+                                box-shadow: 0 0 10px rgba(52, 211, 153, 0.6), 0 2px 4px rgba(0, 0, 0, 0.25);
+                            }
+                        `}} />
                         <label
                             title={
                                 isGlobeProjection
@@ -355,7 +455,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 display: "inline-flex",
                                 alignItems: "center",
                                 gap: "8px",
-                                padding: "0 6px",
+                                padding: "0 2px",
                                 userSelect: "none",
                                 cursor: "pointer",
                                 flexShrink: 0,
@@ -368,41 +468,16 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 aria-label="Toggle globe projection"
                                 style={{ display: "none" }}
                             />
-                            <span
-                                aria-hidden="true"
-                                style={{
-                                    position: "relative",
-                                    width: "42px",
-                                    height: "22px",
-                                    borderRadius: "999px",
-                                    border: "1px solid rgba(148, 163, 184, 0.45)",
-                                    background: isGlobeProjection
-                                        ? "rgba(56, 189, 248, 0.30)"
-                                        : "rgba(148, 163, 184, 0.18)",
-                                    boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
-                                    transition: "background 160ms ease",
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        position: "absolute",
-                                        top: "2px",
-                                        left: isGlobeProjection ? "22px" : "2px",
-                                        width: "18px",
-                                        height: "18px",
-                                        borderRadius: "999px",
-                                        background: isGlobeProjection ? "#38bdf8" : "#e2e8f0",
-                                        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.35)",
-                                        transition: "left 160ms ease, background 160ms ease",
-                                    }}
-                                />
-                            </span>
+                            <div className={`premium-toggle-track ${isGlobeProjection ? "active" : ""}`}>
+                                <span className="premium-toggle-thumb" />
+                            </div>
                             <span
                                 style={{
                                     fontSize: "12px",
-                                    color: isGlobeProjection ? "#7dd3fc" : "#cbd5e1",
+                                    color: isGlobeProjection ? "#ffffff" : "#94a3b8",
                                     fontWeight: 700,
                                     minWidth: "40px",
+                                    transition: "color 0.25s ease",
                                 }}
                             >
                                 {isGlobeProjection ? "Globe" : "Flat"}
@@ -410,7 +485,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         </label>
 
                         {onViewModeChange ? (
-                            <div style={{ display: "flex", background: "rgba(15, 23, 42, 0.6)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(148, 163, 184, 0.2)", gap: "2px", flexShrink: 0 }}>
+                            <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.08)", borderRadius: "999px", padding: "2px", border: "1px solid rgba(255, 255, 255, 0.15)", gap: "2px", flexShrink: 0 }}>
                                 <button
                                     type="button"
                                     onClick={() => onViewModeChange("local")}
@@ -452,13 +527,14 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             <button
                                 type="button"
                                 onClick={isPreviewMode ? onExitPreview : onEnterPreview}
+                                className="premium-zoom-btn"
                                 style={{
-                                    ...zoomButtonStyle,
                                     width: "auto",
                                     minWidth: "76px",
                                     padding: "0 12px",
-                                    background: isPreviewMode ? "#334155" : "#166534",
-                                    fontWeight: 800,
+                                    background: isPreviewMode ? "rgba(51, 65, 85, 0.6)" : "rgba(16, 185, 129, 0.25)",
+                                    borderColor: isPreviewMode ? "rgba(255,255,255,0.15)" : "#10b981",
+                                    color: isPreviewMode ? "#ffffff" : "#34d399",
                                     flexShrink: 0,
                                 }}
                                 aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
@@ -472,18 +548,17 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             <button
                                 type="button"
                                 onClick={onPlayPreviewReplay}
+                                className="premium-zoom-btn"
                                 style={{
-                                    ...zoomButtonStyle,
                                     width: "auto",
                                     minWidth: "64px",
                                     padding: "0 12px",
                                     display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
                                     gap: "7px",
-                                    background: "#2563eb",
+                                    background: "rgba(56, 189, 248, 0.15)",
+                                    borderColor: "rgba(56, 189, 248, 0.4)",
+                                    color: "#38bdf8",
                                     fontSize: "13px",
-                                    fontWeight: 800,
                                     flexShrink: 0,
                                 }}
                                 aria-label="Play selected replay"
@@ -506,7 +581,8 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         <button
                             type="button"
                             onClick={() => handleZoomByStep(-0.8)}
-                            style={{ ...zoomButtonStyle, flexShrink: 0 }}
+                            className="premium-zoom-btn"
+                            style={{ flexShrink: 0 }}
                             aria-label="Zoom out"
                         >
                             -
@@ -518,6 +594,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             max={zoomBounds.max}
                             step={0.1}
                             value={zoomLevel}
+                            className="premium-zoom-slider"
                             onPointerDown={(event) => {
                                 event.stopPropagation();
                                 try {
@@ -539,19 +616,14 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             onPointerCancel={endZoomSliderDrag}
                             onBlur={endZoomSliderDrag}
                             onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
-                            style={{
-                                flex: 1,
-                                minWidth: "60px",
-                                accentColor: "#38bdf8",
-                                cursor: "pointer",
-                            }}
                             aria-label="Map zoom"
                         />
 
                         <button
                             type="button"
                             onClick={() => handleZoomByStep(0.8)}
-                            style={{ ...zoomButtonStyle, flexShrink: 0 }}
+                            className="premium-zoom-btn"
+                            style={{ flexShrink: 0 }}
                             aria-label="Zoom in"
                         >
                             +
@@ -559,10 +631,11 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
 
                         <div
                             style={{
-                                minWidth: "56px",
+                                minWidth: "48px",
                                 textAlign: "right",
                                 fontSize: "12px",
-                                color: "#cbd5e1",
+                                fontWeight: 700,
+                                color: "#94a3b8",
                                 fontVariantNumeric: "tabular-nums",
                                 flexShrink: 0,
                             }}

@@ -3,7 +3,6 @@ import { API_URL_ROOT } from "../../../api";
 const GOONG_TILES_BASE_URL = "https://tiles.goong.io";
 
 export const API_BASE_URL = normalizeApiBaseUrl(API_URL_ROOT);
-const GOONG_PROXY_BASE_PATH = `${API_BASE_URL}/proxy`;
 
 export const GOONG_SATELLITE_STYLE_UPSTREAM_URL = `${GOONG_TILES_BASE_URL}/assets/goong_satellite.json`;
 export const GOONG_VECTOR_OVERLAY_STYLE_UPSTREAM_URL = `${GOONG_TILES_BASE_URL}/assets/goong_map_web.json`;
@@ -45,6 +44,7 @@ export const API_ENDPOINTS = {
     geometries: `${API_BASE_URL}/geometries`,
     entities: `${API_BASE_URL}/entities`,
     wikis: `${API_BASE_URL}/wikis`,
+    relations: `${API_BASE_URL}/relations`,
     wikiContent: (id: string) => `${API_BASE_URL}/wikis/content/${id}`,
     // New API uses projects + commits + submissions (JWT-protected).
     authSignin: `${API_BASE_URL}/auth/signin`,
@@ -54,4 +54,5 @@ export const API_ENDPOINTS = {
     currentUserProjects: `${API_BASE_URL}/users/current/project`,
     projects: `${API_BASE_URL}/projects`,
     submissions: `${API_BASE_URL}/submissions`,
+    battleReplays: `${API_BASE_URL}/battle-replays`,
 } as const;

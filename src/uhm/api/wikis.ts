@@ -8,6 +8,7 @@ export type Wiki = {
   title?: string;
   slug?: string | null;
   content?: string;
+  preview_quote?: string | null;
   is_deleted?: boolean;
   created_at?: string;
   updated_at?: string;
