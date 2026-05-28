@@ -93,6 +93,13 @@ export function useReplayPreview({
     const baselineRef = useRef<PreviewBaseline | null>(null);
     const effects = useMemo(() => createReplayMapEffects(), []);
 
+    const selectedStageIdRef = useRef(selectedStageId);
+    const selectedStepIndexRef = useRef(selectedStepIndex);
+    useEffect(() => {
+        selectedStageIdRef.current = selectedStageId;
+        selectedStepIndexRef.current = selectedStepIndex;
+    }, [selectedStageId, selectedStepIndex]);
+
     const flatSteps = useMemo(() => flattenReplaySteps(replay), [replay]);
 
     useEffect(() => {
@@ -203,61 +210,60 @@ export function useReplayPreview({
     }, [restorePreviewState]);
 
     const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
-    useEffect(() => {
-        controllersRef.current = {
-            map: getMapInstance(),
-            draft,
-            effects,
-            setTimelineVisible,
-            setTimelineFilterEnabled,
-            setLayerPanelVisible,
-            setZoomPanelVisible,
-            setSidebarOpen,
-            onSelectWiki: (id) => {
-                const nextId = String(id || "").trim();
-                setActiveWikiId(nextId || null);
-            },
-            addToast,
-            setPlaybackSpeed: (nextSpeed) => {
-                const safe = Number.isFinite(nextSpeed) && nextSpeed > 0 ? nextSpeed : 1;
-                playbackSpeedRef.current = safe;
-                setPlaybackSpeed(safe);
-            },
-            onYearChange: setTimelineYear,
-            showGeometries: (ids) => {
-                const nextIds = normalizeIdList(ids);
-                if (!nextIds.length) return;
-                setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
-            },
-            hideGeometries: (ids) => {
-                const nextIds = normalizeIdList(ids);
-                if (!nextIds.length) return;
-                setHiddenGeometryIds((prev) => {
-                    const seen = new Set(prev);
-                    for (const id of nextIds) {
-                        seen.add(id);
-                    }
-                    return Array.from(seen);
-                });
-            },
-            showOnlyGeometries: (ids) => {
-                const keepIds = new Set(normalizeIdList(ids));
-                if (!keepIds.size) return;
-                setHiddenGeometryIds(
-                    draft.features
-                        .map((feature) => String(feature.properties.id))
-                        .filter((id) => !keepIds.has(id))
-                );
-            },
-            showAllGeometries: () => {
-                setHiddenGeometryIds([]);
-            },
-            setDialog: setDialogWithRef,
-            getDialog: () => dialogRef.current,
-        };
-    }, [addToast, draft, effects, getMapInstance]);
+    controllersRef.current = {
+        map: getMapInstance(),
+        draft,
+        effects,
+        setTimelineVisible,
+        setTimelineFilterEnabled,
+        setLayerPanelVisible,
+        setZoomPanelVisible,
+        setSidebarOpen,
+        onSelectWiki: (id) => {
+            const nextId = String(id || "").trim();
+            setActiveWikiId(nextId || null);
+        },
+        addToast,
+        setPlaybackSpeed: (nextSpeed) => {
+            const safe = Number.isFinite(nextSpeed) && nextSpeed > 0 ? nextSpeed : 1;
+            playbackSpeedRef.current = safe;
+            setPlaybackSpeed(safe);
+        },
+        onYearChange: setTimelineYear,
+        showGeometries: (ids) => {
+            const nextIds = normalizeIdList(ids);
+            if (!nextIds.length) return;
+            setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
+        },
+        hideGeometries: (ids) => {
+            const nextIds = normalizeIdList(ids);
+            if (!nextIds.length) return;
+            setHiddenGeometryIds((prev) => {
+                const seen = new Set(prev);
+                for (const id of nextIds) {
+                    seen.add(id);
+                }
+                return Array.from(seen);
+            });
+        },
+        showOnlyGeometries: (ids) => {
+            const keepIds = new Set(normalizeIdList(ids));
+            if (!keepIds.size) return;
+            setHiddenGeometryIds(
+                draft.features
+                    .map((feature) => String(feature.properties.id))
+                    .filter((id) => !keepIds.has(id))
+            );
+        },
+        showAllGeometries: () => {
+            setHiddenGeometryIds([]);
+        },
+        setDialog: setDialogWithRef,
+        getDialog: () => dialogRef.current,
+    };
 
     const playFromIndex = useCallback(async (startIndex: number) => {
+        console.log("playFromIndex starting at:", startIndex, "flatSteps count:", flatSteps.length);
         if (!flatSteps.length) return;
         const safeStartIndex = Math.max(0, Math.min(flatSteps.length - 1, startIndex));
         resetPresentation();
@@ -271,7 +277,10 @@ export function useReplayPreview({
         setIsPlaying(true);
 
         for (let index = safeStartIndex; index < flatSteps.length; index += 1) {
-            if (runIdRef.current !== runId) return;
+            if (runIdRef.current !== runId) {
+                console.log("playFromIndex loop aborted because runId changed");
+                return;
+            }
 
             const current = flatSteps[index];
             setActiveCursor({
@@ -282,7 +291,10 @@ export function useReplayPreview({
             onSelectStep(current.stageId, current.stepIndex);
 
             const controllers = controllersRef.current;
-            if (!controllers) return;
+            if (!controllers) {
+                console.warn("playFromIndex aborted: controllersRef.current is null!");
+                return;
+            }
             controllers.map = getMapInstance();
             controllers.draft = draft;
 
@@ -322,9 +334,10 @@ export function useReplayPreview({
     }, [playFromIndex]);
 
     const playFromSelection = useCallback(() => {
-        const selectedIndex = findReplayStepIndex(flatSteps, selectedStageId, selectedStepIndex);
+        const selectedIndex = findReplayStepIndex(flatSteps, selectedStageIdRef.current, selectedStepIndexRef.current);
+        console.log("playFromSelection called: selectedIndex =", selectedIndex, "selectedStageId =", selectedStageIdRef.current, "selectedStepIndex =", selectedStepIndexRef.current);
         void playFromIndex(selectedIndex >= 0 ? selectedIndex : 0);
-    }, [flatSteps, playFromIndex, selectedStageId, selectedStepIndex]);
+    }, [flatSteps, playFromIndex]);
 
     return {
         isPlaying,

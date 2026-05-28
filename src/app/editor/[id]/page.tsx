@@ -15,7 +15,6 @@ import WikiSidebarPanel from "@/uhm/components/wiki/WikiSidebarPanel";
 import ProjectEntityRefsPanel from "@/uhm/components/editor/ProjectEntityRefsPanel";
 import EntityWikiBindingsPanel from "@/uhm/components/editor/EntityWikiBindingsPanel";
 import GeometryBindingPanel from "@/uhm/components/editor/GeometryBindingPanel";
-import ImageOverlayPanel from "@/uhm/components/editor/ImageOverlayPanel";
 import { Entity, fetchEntities, searchEntitiesByName } from "@/uhm/api/entities";
 import { ApiError } from "@/uhm/api/http";
 import { fetchCurrentUser } from "@/uhm/api/auth";
@@ -2780,15 +2779,6 @@ function EditorPageContent() {
                                     geoSearchResults={geoSearchResults}
                                     isGeoSearching={isGeoSearching}
                                     onImportGeoFromSearch={handleImportGeoFromSearch}
-                                />
-                                <ImageOverlayPanel
-                                    overlay={imageOverlay}
-                                    onPickImage={handlePickImageOverlay}
-                                    onPasteImage={handlePasteImageOverlay}
-                                    keyboardEnabled={imageOverlayKeyboardEnabled}
-                                    onKeyboardEnabledChange={setImageOverlayKeyboardEnabled}
-                                    onOpacityChange={handleImageOverlayOpacityChange}
-                                    onRemove={handleRemoveImageOverlay}
                                 />
                                 <GeometryBindingPanel
                                     geometries={geometryChoices}

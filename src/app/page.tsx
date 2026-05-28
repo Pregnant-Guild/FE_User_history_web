@@ -9,6 +9,12 @@ import { useReplayPreview } from "@/uhm/lib/replay/useReplayPreview";
 import type { MapHandle } from "@/uhm/components/Map";
 import { useRef, useMemo, useCallback } from "react";
 import { usePublicPreviewInteraction } from "@/uhm/components/preview/hooks/usePublicPreviewInteraction";
+import PresentPlaceSearch, {
+    type HistoricalGeometryFocusPayload,
+    type PresentPlaceSelection,
+} from "@/uhm/components/editor/PresentPlaceSearch";
+import { fitMapToFeatureCollection } from "@/uhm/components/map/mapUtils";
+import type { FeatureCollection } from "@/uhm/types/geo";
 import {
     type BackgroundLayerId,
     type BackgroundLayerVisibility,
@@ -53,6 +59,7 @@ export default function Page() {
     const [replayMode, setReplayMode] = useState<"idle" | "playing">("idle");
     const [selectedReplayStageId, setSelectedReplayStageId] = useState<number | null>(null);
     const [selectedReplayStepIndex, setSelectedReplayStepIndex] = useState<number | null>(null);
+    const [focusedPresentPlace, setFocusedPresentPlace] = useState<PresentPlaceSelection | null>(null);
 
     const [searchTimelineYear, setSearchTimelineYear] = useState(timelineYear);
     useEffect(() => {
@@ -102,19 +109,22 @@ export default function Page() {
         return null;
     }, [replays, selectedFeatureIds]);
 
+    const getMapInstance = useCallback(() => mapHandleRef.current?.getMap() || null, []);
+    const handleSelectReplayStep = useCallback((stageId: number | null, stepIndex: number | null) => {
+        setSelectedReplayStageId(stageId);
+        setSelectedReplayStepIndex(stepIndex);
+    }, []);
+
     const replayPreview = useReplayPreview({
         replay: activeReplay?.replay || null,
         draft: renderDraft,
-        getMapInstance: () => mapHandleRef.current?.getMap() || null,
+        getMapInstance,
         initialTimelineYear: timelineDraftYear,
         initialTimelineFilterEnabled: false,
         initialMapViewState: null,
         selectedStageId: selectedReplayStageId,
         selectedStepIndex: selectedReplayStepIndex,
-        onSelectStep: (stageId, stepIndex) => {
-            setSelectedReplayStageId(stageId);
-            setSelectedReplayStepIndex(stepIndex);
-        },
+        onSelectStep: handleSelectReplayStep,
     });
 
     const {
@@ -205,7 +215,59 @@ export default function Page() {
     const handleExitReplay = useCallback(() => {
         setReplayMode("idle");
         replayPreview.resetPreview();
+        setFocusedPresentPlace(null);
     }, [replayPreview]);
+
+    const handleFocusPresentPlace = useCallback((place: PresentPlaceSelection) => {
+        setFocusedPresentPlace(place);
+        const map = mapHandleRef.current?.getMap();
+        if (map) {
+            const currentZoom = map.getZoom();
+            map.flyTo({
+                center: [place.lng, place.lat],
+                zoom: Math.max(currentZoom, 13.5),
+            });
+        }
+    }, []);
+
+    const clearPresentPlaceFocus = useCallback(() => {
+        setFocusedPresentPlace(null);
+    }, []);
+
+    const handleFocusHistoricalGeometry = useCallback((payload: HistoricalGeometryFocusPayload) => {
+        setFocusedPresentPlace(null);
+
+        const map = mapHandleRef.current?.getMap();
+        if (map && payload.geometry?.draw_geometry) {
+            const fc: FeatureCollection = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        properties: {
+                            id: payload.geometry.id,
+                        },
+                        geometry: payload.geometry.draw_geometry,
+                    },
+                ],
+            };
+            fitMapToFeatureCollection(map, fc, 84, { duration: 1000 });
+        }
+
+        if (payload.geometry.time_start != null) {
+            handleTimelineYearChange(payload.geometry.time_start);
+        }
+
+        setSelectedFeatureIds([payload.geometry.id]);
+
+        const linkedEntityIds = relations.geometryEntityIds[String(payload.geometry.id)] || [];
+        if (linkedEntityIds.length === 1) {
+            selectEntity(linkedEntityIds[0], {
+                sourceFeatureId: payload.geometry.id,
+                selectGeometry: false,
+            });
+        }
+    }, [relations.geometryEntityIds, selectEntity, setSelectedFeatureIds]);
 
     const filteredRenderDraft = useMemo(() => {
         if (replayMode !== "playing" || !replayPreview.hiddenGeometryIds?.length) {
@@ -294,7 +356,80 @@ export default function Page() {
                             />
                         ) : null
                     }
-                />
+                >
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: 10,
+                            left: 18,
+                            zIndex: 18,
+                            display: "flex",
+                            gap: "10px",
+                            alignItems: "flex-start",
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                window.location.href = "/user";
+                            }}
+                            title="Tham gia hệ thống"
+                            aria-label="Tham gia hệ thống"
+                            style={{
+                                width: "46px",
+                                height: "46px",
+                                backgroundColor: "#1e293b",
+                                color: "#f8fafc",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "12px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                                backdropFilter: "blur(8px)",
+                                flexShrink: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "#334155";
+                                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "#1e293b";
+                                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                            }}
+                        >
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
+                        </button>
+
+                        <PresentPlaceSearch
+                            focusedPlace={focusedPresentPlace}
+                            onFocusPlace={handleFocusPresentPlace}
+                            onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                            onClearFocus={clearPresentPlaceFocus}
+                            style={{
+                                position: "relative",
+                                top: 0,
+                                left: 0,
+                                width: "min(392px, calc(100vw - 90px))",
+                            }}
+                        />
+                    </div>
+                </PreviewMapShell>
             ) : (
                 <div className="h-screen w-full bg-[#0b1220]" />
             )}
