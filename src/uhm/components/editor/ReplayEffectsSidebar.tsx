@@ -155,7 +155,7 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
             { name: "image_url", label: "Ảnh tư liệu", kind: "text", placeholder: "https://... (URL ảnh)" },
             { name: "text", label: "Nội dung", kind: "rich-text", placeholder: "Nội dung dẫn chuyện..." },
         ],
-        create: () => ({ function_name: "set_dialog", params: [{ avatar: "", text: "", image_url: "", image_caption: "" }] }),
+        create: () => ({ function_name: "set_dialog", params: [{ text: "", image_url: "" }] }),
         deserialize: (params) => {
             const data: any = params[0];
             if (data === null) {
@@ -176,9 +176,7 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
                 return [null];
             }
             const data: any = {
-                avatar: "",
                 text: asString(values.text),
-                image_caption: "",
             };
             if (values.image_url) {
                 data.image_url = asString(values.image_url);

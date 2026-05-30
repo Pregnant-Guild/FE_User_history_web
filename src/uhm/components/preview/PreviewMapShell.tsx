@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import Map, { type MapFeaturePayload } from "@/uhm/components/Map";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
@@ -87,6 +87,24 @@ export default function PreviewMapShell({
     overlay,
     children,
 }: Props) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const menuOptionStyle: CSSProperties = {
+        width: 46,
+        height: 46,
+        backgroundColor: "#1e293b",
+        color: "#cbd5e1",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRadius: 12,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
+        backdropFilter: "blur(6px)",
+    };
+
     return (
         <div className="relative min-h-screen overflow-hidden bg-gray-950 text-gray-100">
             <div className="relative min-h-screen">
@@ -123,22 +141,144 @@ export default function PreviewMapShell({
                     style={timelineStyle}
                 />
 
+                <style dangerouslySetInnerHTML={{ __html: `
+                    @keyframes slideDown {
+                        from {
+                            opacity: 0;
+                            transform: translateY(-8px);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: translateY(0);
+                        }
+                    }
+                `}} />
+
                 <aside
                     style={{
                         position: "absolute",
-                        top: "50%",
+                        top: 10,
+                        bottom: 20,
                         left: 18,
-                        transform: "translateY(-50%)",
-                        zIndex: 16,
-                        pointerEvents: "auto",
+                        zIndex: 18,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                        width: 58,
+                        pointerEvents: "none",
                     }}
                 >
-                    <ReplayPreviewLayerPanel
-                        backgroundVisibility={backgroundVisibility}
-                        geometryVisibility={geometryVisibility}
-                        onToggleBackground={onToggleBackground}
-                        onToggleGeometry={onToggleGeometry}
-                    />
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                            alignItems: "center",
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                            title={isMenuOpen ? "Đóng cài đặt" : "Tham gia hệ thống / Trợ giúp"}
+                            aria-label="Cài đặt"
+                            style={{
+                                width: 46,
+                                height: 46,
+                                backgroundColor: "#1e293b",
+                                color: "#f8fafc",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: 12,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                                backdropFilter: "blur(8px)",
+                                flexShrink: 0,
+                            }}
+                        >
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
+                        </button>
+
+                        {isMenuOpen && (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 8,
+                                    alignItems: "center",
+                                    animation: "slideDown 0.2s ease-out",
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => { window.location.href = "/user"; }}
+                                    title="Quản trị & Chỉnh sửa (Edit)"
+                                    style={menuOptionStyle}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                    </svg>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => { window.location.href = "/faq"; }}
+                                    title="Hỏi đáp & Hướng dẫn (FAQ)"
+                                    style={menuOptionStyle}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                                    </svg>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => { window.location.href = "/about-us"; }}
+                                    title="Về chúng tôi (About Us)"
+                                    style={menuOptionStyle}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div
+                        style={{
+                            flexGrow: 1,
+                            flexShrink: 1,
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        <ReplayPreviewLayerPanel
+                            backgroundVisibility={backgroundVisibility}
+                            geometryVisibility={geometryVisibility}
+                            onToggleBackground={onToggleBackground}
+                            onToggleGeometry={onToggleGeometry}
+                        />
+                    </div>
                 </aside>
                 
                 {overlay}

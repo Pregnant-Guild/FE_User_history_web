@@ -42,6 +42,11 @@ export function usePublicPreviewInteraction(options: {
     const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, replayActiveWikiId, replayMode } = options;
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
+    const [isManualSidebarOpen, setIsManualSidebarOpen] = useState(false);
+
+    useEffect(() => {
+        setIsManualSidebarOpen(false);
+    }, [replayMode]);
     const [wikiCache, setWikiCache] = useState<Record<string, CachedWiki>>({});
     const [hoverWikiPreviewByEntityId, setHoverWikiPreviewByEntityId] = useState<Record<string, HoverWikiPreview>>({});
     const [isActiveWikiLoading, setIsActiveWikiLoading] = useState(false);
@@ -104,6 +109,7 @@ export function usePublicPreviewInteraction(options: {
         setActiveWikiSlug(nextWikiSlug);
         setActiveWikiError(null);
         setLinkEntityPopup(null);
+        setIsManualSidebarOpen(true);
         if (selectOptions?.selectGeometry && selectOptions?.sourceFeatureId != null) {
             setSelectedFeatureIds([selectOptions.sourceFeatureId]);
         }
@@ -402,6 +408,7 @@ export function usePublicPreviewInteraction(options: {
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setSelectedFeatureIds([]);
+        setIsManualSidebarOpen(false);
     }, [setSelectedFeatureIds]);
 
     return {
@@ -416,6 +423,8 @@ export function usePublicPreviewInteraction(options: {
         handleWikiLinkRequest,
         closeWikiSidebar,
         setLinkEntityPopup,
+        isManualSidebarOpen,
+        setIsManualSidebarOpen,
     };
 }
 

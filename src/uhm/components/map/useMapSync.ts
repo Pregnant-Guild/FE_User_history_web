@@ -80,20 +80,20 @@ export function useMapSync({
     const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
     const isPreviewModeRef = useRef(isPreviewMode);
 
-    const fitBoundsAppliedRef = useRef(false);
+    renderDraftRef.current = renderDraft;
+    labelContextDraftRef.current = labelContextDraft;
+    labelTimelineYearRef.current = labelTimelineYear;
+    backgroundVisibilityRef.current = backgroundVisibility;
+    geometryVisibilityRef.current = geometryVisibility;
+    selectedFeatureIdsRef.current = selectedFeatureIds;
+    applyGeometryBindingFilterRef.current = applyGeometryBindingFilter;
+    fitToDraftBoundsRef.current = fitToDraftBounds;
+    imageOverlayRef.current = imageOverlay || null;
+    focusFeatureCollectionRef.current = focusFeatureCollection;
+    focusPaddingRef.current = focusPadding;
+    isPreviewModeRef.current = isPreviewMode;
 
-    useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
-    useEffect(() => { labelContextDraftRef.current = labelContextDraft; }, [labelContextDraft]);
-    useEffect(() => { labelTimelineYearRef.current = labelTimelineYear; }, [labelTimelineYear]);
-    useEffect(() => { backgroundVisibilityRef.current = backgroundVisibility; }, [backgroundVisibility]);
-    useEffect(() => { geometryVisibilityRef.current = geometryVisibility; }, [geometryVisibility]);
-    useEffect(() => { selectedFeatureIdsRef.current = selectedFeatureIds; }, [selectedFeatureIds]);
-    useEffect(() => { applyGeometryBindingFilterRef.current = applyGeometryBindingFilter; }, [applyGeometryBindingFilter]);
-    useEffect(() => { fitToDraftBoundsRef.current = fitToDraftBounds; }, [fitToDraftBounds]);
-    useEffect(() => { imageOverlayRef.current = imageOverlay || null; }, [imageOverlay]);
-    useEffect(() => { focusFeatureCollectionRef.current = focusFeatureCollection; }, [focusFeatureCollection]);
-    useEffect(() => { focusPaddingRef.current = focusPadding; }, [focusPadding]);
-    useEffect(() => { isPreviewModeRef.current = isPreviewMode; }, [isPreviewMode]);
+    const fitBoundsAppliedRef = useRef(false);
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;

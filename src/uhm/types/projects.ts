@@ -88,10 +88,8 @@ export type EditorSnapshot = {
 };
 
 export type DialogState = {
-    avatar: string;        // Avatar image URL
     text: string;          // Subtitle / spoken narrative text
     image_url?: string;    // Optional image URL
-    image_caption?: string;// Optional caption
 };
 
 export type UIOptionName =

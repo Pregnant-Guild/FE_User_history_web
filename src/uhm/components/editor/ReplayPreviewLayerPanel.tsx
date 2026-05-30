@@ -221,7 +221,7 @@ export default function ReplayPreviewLayerPanel({
                 alignItems: "center",
                 boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
                 backdropFilter: "blur(12px)",
-                maxHeight: "calc(100vh - 180px)",
+                maxHeight: "100%",
                 overflowY: "auto",
                 overflowX: "hidden",
             }}

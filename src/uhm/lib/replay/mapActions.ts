@@ -140,10 +140,15 @@ export const mapActions = {
     },
 
     restore_label_visibility: (map: maplibregl.Map, state: Record<string, "visible" | "none">) => {
-        for (const [layerId, visibility] of Object.entries(state)) {
-            if (!map.getLayer(layerId)) continue;
-            map.setLayoutProperty(layerId, "visibility", visibility);
-        }
+        const style = map.getStyle();
+        if (!style) return;
+        style.layers.forEach((layer) => {
+            const layout = "layout" in layer ? layer.layout : undefined;
+            if (layer.type === "symbol" && layout && typeof layout === "object" && "text-field" in layout) {
+                const visibility = state[layer.id] ?? "visible";
+                map.setLayoutProperty(layer.id, "visibility", visibility);
+            }
+        });
     },
 };
 

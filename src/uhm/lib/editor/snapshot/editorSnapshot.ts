@@ -1208,10 +1208,8 @@ function normalizeReplayMapAndGeoActions(
 function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<NarrativeFunctionName>[] {
     if (!Array.isArray(actions)) return [];
 
-    let avatar = "";
     let text = "";
     let image_url = "";
-    let image_caption = "";
     let hasDialog = false;
     let isCleared = false;
 
@@ -1226,10 +1224,8 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
                 const data = params[0];
                 if (data && typeof data === "object") {
                     hasDialog = true;
-                    avatar = String((data as any).avatar || avatar);
                     text = String((data as any).text || text);
                     image_url = String((data as any).image_url || image_url);
-                    image_caption = String((data as any).image_caption || image_caption);
                 } else if (data === null) {
                     isCleared = true;
                 }
@@ -1237,7 +1233,6 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
             }
             case "show_dialog_box":
                 hasDialog = true;
-                avatar = String(params[0] || avatar);
                 text = String(params[1] || text);
                 break;
             case "set_title":
@@ -1263,7 +1258,6 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
             case "display_historical_image":
                 hasDialog = true;
                 image_url = String(params[0] || image_url);
-                image_caption = String(params[1] || image_caption);
                 break;
             case "clear_dialog_box":
             case "clear_title":
@@ -1279,14 +1273,10 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
 
     if (hasDialog) {
         const dialogData: any = {
-            avatar,
             text,
         };
         if (image_url) {
             dialogData.image_url = image_url;
-        }
-        if (image_caption) {
-            dialogData.image_caption = image_caption;
         }
         return [{
             function_name: "set_dialog",

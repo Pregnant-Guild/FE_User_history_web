@@ -65,6 +65,12 @@ export function useMapInteraction({
     const previousModeRef = useRef<EditorMode>(mode);
     const mapCleanupFnsRef = useRef<Array<() => void>>([]);
 
+    const allowGeometryEditingRef = useRef(allowGeometryEditing);
+    allowGeometryEditingRef.current = allowGeometryEditing;
+
+    const allowFeatureSelectionRef = useRef(allowFeatureSelection);
+    allowFeatureSelectionRef.current = allowFeatureSelection;
+
     useEffect(() => {
         if (!editingEngineRef.current) {
             editingEngineRef.current = createEditingEngine({
@@ -151,41 +157,33 @@ export function useMapInteraction({
         const selectEngine = initSelect(
             map,
             () => modeRef.current,
-            allowGeometryEditing
-                ? (id: string | number | (string | number)[]) => {
-                    editingEngineRef.current?.clearEditing();
-                    onSelectFeatureIdsRef.current?.([]);
-                    onDeleteRef.current?.(id);
-                }
-                : undefined,
-            allowGeometryEditing
-                ? (feature) => {
-                    const rawId = feature.id ?? feature.properties?.id;
-                    const originalFeature = renderDraftRef.current.features.find(
-                        (item) => String(item.properties.id) === String(rawId)
-                    );
-                    editingEngineRef.current?.beginEditing(
-                        (originalFeature || feature) as unknown as maplibregl.MapGeoJSONFeature
-                    );
-                }
-                : undefined,
-            allowGeometryEditing
-                ? (id: string | number) => {
-                    const originalFeature = renderDraftRef.current.features.find(
-                        (item) => String(item.properties.id) === String(id)
-                    );
-                    if (!originalFeature) return;
+            (id: string | number | (string | number)[]) => {
+                editingEngineRef.current?.clearEditing();
+                onSelectFeatureIdsRef.current?.([]);
+                onDeleteRef.current?.(id);
+            },
+            (feature) => {
+                const rawId = feature.id ?? feature.properties?.id;
+                const originalFeature = renderDraftRef.current.features.find(
+                    (item) => String(item.properties.id) === String(rawId)
+                );
+                editingEngineRef.current?.beginEditing(
+                    (originalFeature || feature) as unknown as maplibregl.MapGeoJSONFeature
+                );
+            },
+            (id: string | number) => {
+                const originalFeature = renderDraftRef.current.features.find(
+                    (item) => String(item.properties.id) === String(id)
+                );
+                if (!originalFeature) return;
 
-                    const nextFeature = buildDuplicatedFeatureShapeOnly(originalFeature);
-                    onCreateRef.current?.(nextFeature);
-                }
-                : undefined,
-            allowGeometryEditing
-                ? (id: string | number) => {
-                    onHideRef.current?.(id);
-                    onSelectFeatureIdsRef.current?.([]);
-                }
-                : undefined,
+                const nextFeature = buildDuplicatedFeatureShapeOnly(originalFeature);
+                onCreateRef.current?.(nextFeature);
+            },
+            (id: string | number) => {
+                onHideRef.current?.(id);
+                onSelectFeatureIdsRef.current?.([]);
+            },
             (ids) => onSelectFeatureIdsRef.current?.(ids),
             (id: string | number) => onSetModeRef.current?.("replay", id),
             () => Boolean(editingEngineRef.current?.editingRef.current),
@@ -206,27 +204,25 @@ export function useMapInteraction({
                     feature: currentFeature,
                 });
             },
-            onAddFeatureToProjectRef?.current
-                ? (feature) => {
-                    const rawId = feature.id ?? feature.properties?.id;
-                    if (rawId === undefined || rawId === null) return;
+            (feature) => {
+                if (!onAddFeatureToProjectRef?.current) return;
+                const rawId = feature.id ?? feature.properties?.id;
+                if (rawId === undefined || rawId === null) return;
 
-                    const originalFeature = renderDraftRef.current.features.find(
-                        (item) => String(item.properties.id) === String(rawId)
-                    );
-                    if (!originalFeature) return;
-                    onAddFeatureToProjectRef.current?.(originalFeature);
-                }
-                : undefined,
-            onAddFeatureToProjectRef?.current
-                ? (id) => {
-                    if (!onAddFeatureToProjectRef?.current) return true;
-                    const localIds = localFeatureIdsRef?.current;
-                    if (!Array.isArray(localIds)) return true;
-                    return localIds.some((localId) => String(localId) === String(id));
-                }
-                : undefined,
-            () => allowFeatureSelection
+                const originalFeature = renderDraftRef.current.features.find(
+                    (item) => String(item.properties.id) === String(rawId)
+                );
+                if (!originalFeature) return;
+                onAddFeatureToProjectRef.current?.(originalFeature);
+            },
+            (id) => {
+                if (!onAddFeatureToProjectRef?.current) return true;
+                const localIds = localFeatureIdsRef?.current;
+                if (!Array.isArray(localIds)) return true;
+                return localIds.some((localId) => String(localId) === String(id));
+            },
+            () => allowFeatureSelectionRef.current,
+            () => allowGeometryEditingRef.current
         );
 
         const cleanupPoint = initPoint(

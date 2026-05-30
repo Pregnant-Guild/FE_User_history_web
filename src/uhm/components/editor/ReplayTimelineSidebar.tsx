@@ -1364,9 +1364,6 @@ function buildNarrativeActionEntry(
                 const plainText = dialog.text.replace(/<[^>]*>/g, "");
                 parts.push(`text=${summarizeValue(plainText, "")}`);
             }
-            if (dialog.avatar) {
-                parts.push(`avatar=${summarizeValue(dialog.avatar, "")}`);
-            }
             if (dialog.image_url) {
                 parts.push(`image=${summarizeValue(dialog.image_url, "")}`);
             }

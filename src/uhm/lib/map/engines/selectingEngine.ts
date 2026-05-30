@@ -22,7 +22,8 @@ export function initSelect(
     onFeatureClick?: (payload: SelectFeatureClickPayload | null) => void,
     onAddToProject?: (feature: maplibregl.MapGeoJSONFeature) => void,
     isLocalFeature?: (id: string | number) => boolean,
-    allowFeatureSelection?: () => boolean
+    allowFeatureSelection?: () => boolean,
+    allowGeometryEditing?: () => boolean
 ) {
 
     const FEATURE_STATE_SOURCES = [
@@ -363,7 +364,9 @@ export function initSelect(
             }
         }
 
-        if (isLocalTarget && !isClickOutsideSelection) {
+        const canEditGeometry = allowGeometryEditing ? allowGeometryEditing() : true;
+
+        if (isLocalTarget && !isClickOutsideSelection && canEditGeometry) {
             if (
                 effectiveCount === 1 &&
                 clickedFeature.source === "countries" &&
@@ -407,7 +410,7 @@ export function initSelect(
             }
         }
 
-        if (isLocalTarget && onDelete && effectiveCount > 0) {
+        if (isLocalTarget && onDelete && effectiveCount > 0 && canEditGeometry) {
             items.push({
                 group: "delete",
                 label: effectiveCount > 1 ? `Xóa ${effectiveCount} mục` : "Xóa",

@@ -61,6 +61,8 @@ export function useReplayPreview({
     setMapProjection,
 }: UseReplayPreviewOptions) {
     const [isPlaying, setIsPlaying] = useState(false);
+    const isPlayingRef = useRef(false);
+    isPlayingRef.current = isPlaying;
     const [dialog, setDialog] = useState<DialogState | null>(null);
     const dialogRef = useRef<DialogState | null>(null);
     const setDialogWithRef = useCallback((d: DialogState | null) => {
@@ -127,7 +129,6 @@ export function useReplayPreview({
             toastTimeoutsRef.current = [];
         };
     }, [effects, getMapInstance]);
-
     const clearToasts = useCallback(() => {
         toastTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
         toastTimeoutsRef.current = [];
@@ -179,6 +180,7 @@ export function useReplayPreview({
         setTimelineFilterEnabled(baseline.timelineFilterEnabled);
         const map = getMapInstance();
         if (map) {
+            map.stop(); // Stop ongoing camera animations/transitions immediately
             mapActions.restore_label_visibility(map, baseline.labelVisibility);
             if (baseline.mapViewState) {
                 if (setMapProjection) {
@@ -208,6 +210,11 @@ export function useReplayPreview({
         runIdRef.current += 1;
         restorePreviewState();
     }, [restorePreviewState]);
+
+    useEffect(() => {
+        runIdRef.current += 1;
+        restorePreviewState();
+    }, [replay?.id, restorePreviewState]);
 
     const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
     controllersRef.current = {
@@ -265,6 +272,29 @@ export function useReplayPreview({
     const playFromIndex = useCallback(async (startIndex: number) => {
         console.log("playFromIndex starting at:", startIndex, "flatSteps count:", flatSteps.length);
         if (!flatSteps.length) return;
+
+        const map = getMapInstance();
+        if (map) {
+            map.stop(); // Stop ongoing camera animations/transitions immediately
+            if (baselineRef.current && !isPlayingRef.current) {
+                const center = map.getCenter();
+                const projection = map.getProjection();
+                baselineRef.current.mapViewState = initialMapViewState || {
+                    center: { lng: center.lng, lat: center.lat },
+                    zoom: map.getZoom(),
+                    pitch: map.getPitch(),
+                    bearing: map.getBearing(),
+                    projection: String(projection?.type || "mercator"),
+                };
+                baselineRef.current.labelVisibility = mapActions.get_label_visibility(map);
+                baselineRef.current.timelineYear = timelineYear;
+                baselineRef.current.timelineFilterEnabled = timelineFilterEnabled;
+                baselineRef.current.timelineVisible = timelineVisible;
+                baselineRef.current.layerPanelVisible = layerPanelVisible;
+                baselineRef.current.zoomPanelVisible = zoomPanelVisible;
+            }
+        }
+
         const safeStartIndex = Math.max(0, Math.min(flatSteps.length - 1, startIndex));
         resetPresentation();
         effects.clear(getMapInstance());
@@ -324,6 +354,12 @@ export function useReplayPreview({
         getMapInstance,
         initialTimelineFilterEnabled,
         initialTimelineYear,
+        initialMapViewState,
+        timelineYear,
+        timelineFilterEnabled,
+        timelineVisible,
+        layerPanelVisible,
+        zoomPanelVisible,
         onSelectStep,
         resetPresentation,
         restorePreviewState,

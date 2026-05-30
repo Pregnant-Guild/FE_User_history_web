@@ -126,13 +126,14 @@ Các visual effect dùng overlay source/layer riêng và không mutate geometry 
 
 | Action | Params | Runtime hiện tại |
 | --- | --- | --- |
+| `set_dialog` | `[data: { text: string; image_url?: string } \| null]` | Set dialog box text and optional image, or clear it if null |
 | `set_title` | `[title: string]` | Set title overlay |
 | `clear_title` | `[]` | Clear title |
 | `set_descriptions` | `[text: string]` | Set description overlay |
 | `clear_descriptions` | `[]` | Clear descriptions |
-| `show_dialog_box` | `[avatar, text, side, speaker?]` | Hiện dialog, side là `left` hoặc `right` |
+| `show_dialog_box` | `[avatar, text, side, speaker?]` | Legacy: hiện dialog, nay được normalize sang `set_dialog` |
 | `clear_dialog_box` | `[]` | Clear dialog |
-| `display_historical_image` | `[url, caption?]` | Hiện image overlay lịch sử |
+| `display_historical_image` | `[url, caption?]` | Legacy: hiện image overlay, nay được normalize sang `set_dialog` |
 | `clear_historical_image` | `[]` | Clear image |
 | `set_step_subtitle` | `[subtitle: string | null]` | Set subtitle |
 | `clear_step_subtitle` | `[]` | Clear subtitle |

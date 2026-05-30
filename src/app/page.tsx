@@ -31,8 +31,8 @@ const CURRENT_YEAR = new Date().getUTCFullYear();
 
 export default function Page() {
     const [selectedFeatureIds, setSelectedFeatureIds] = useState<(string | number)[]>([]);
-    const [timelineYear, setTimelineYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
-    const [timelineDraftYear, setTimelineDraftYear] = useState<number>(() => clampYearToFixedRange(CURRENT_YEAR));
+    const [timelineYear, setTimelineYear] = useState<number>(1000);
+    const [timelineDraftYear, setTimelineDraftYear] = useState<number>(1000);
     const [timeRange, setTimeRange] = useState<number>(0);
     const [backgroundVisibility, setBackgroundVisibility] = useState<BackgroundLayerVisibility>(
         () => ({ ...HIDDEN_BACKGROUND_LAYER_VISIBILITY })
@@ -56,6 +56,7 @@ export default function Page() {
     const [isLargeScreen, setIsLargeScreen] = useState(false);
     
     const mapHandleRef = useRef<MapHandle>(null);
+    const isFirstMount = useRef(true);
     const [replayMode, setReplayMode] = useState<"idle" | "playing">("idle");
     const [selectedReplayStageId, setSelectedReplayStageId] = useState<number | null>(null);
     const [selectedReplayStepIndex, setSelectedReplayStepIndex] = useState<number | null>(null);
@@ -139,6 +140,7 @@ export default function Page() {
         handleWikiLinkRequest,
         closeWikiSidebar,
         setLinkEntityPopup,
+        isManualSidebarOpen,
     } = usePublicPreviewInteraction({
         data,
         relations,
@@ -165,6 +167,30 @@ export default function Page() {
         }, TIMELINE_DEBOUNCE_MS);
         return () => window.clearTimeout(timeoutId);
     }, [timelineDraftYear, timelineYear]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("timeline-year");
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed)) {
+                    const clamped = clampYearToFixedRange(parsed);
+                    setTimelineYear(clamped);
+                    setTimelineDraftYear(clamped);
+                }
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
+        }
+        if (typeof window !== "undefined") {
+            localStorage.setItem("timeline-year", String(timelineYear));
+        }
+    }, [timelineYear]);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -297,6 +323,32 @@ export default function Page() {
 
     const currentTimelineYear = replayMode === "playing" ? replayPreview.timelineYear : timelineDraftYear;
 
+    const activeStepLabel = useMemo(() => {
+        if (
+            replayPreview.activeCursor.stageId == null ||
+            replayPreview.activeCursor.stepIndex == null
+        ) {
+            return null;
+        }
+        return `Stage #${replayPreview.activeCursor.stageId} · Step ${replayPreview.activeCursor.stepIndex + 1}`;
+    }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
+
+    const isSidebarOpen = replayMode === "playing"
+        ? (replayPreview.sidebarOpen || isManualSidebarOpen)
+        : Boolean(activeEntity);
+
+    const displayedActiveEntity = isSidebarOpen ? activeEntity : null;
+    const displayedActiveWiki = isSidebarOpen ? activeWiki : null;
+
+    const computedTimelineStyle = useMemo(() => {
+        const rightMargin = (displayedActiveEntity && isLargeScreen) ? sidebarWidth + 32 : 18;
+        return {
+            left: "88px",
+            right: `${rightMargin}px`,
+            transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        };
+    }, [displayedActiveEntity, isLargeScreen, sidebarWidth]);
+
     return (
         <>
             {isBackgroundVisibilityReady ? (
@@ -322,11 +374,11 @@ export default function Page() {
                     onTimelineTimeRangeChange={handleTimeRangeChange}
                     isTimelineLoading={isTimelineLoading || isRelationsLoading}
                     timelineStatusText={relationsStatus || timelineStatus}
-                    timelineStyle={activeEntity && isLargeScreen ? { right: `${sidebarWidth + 32}px` } : undefined}
+                    timelineStyle={computedTimelineStyle}
                     hoverPopupEnabled
                     getHoverPopupContent={getHoverPopupContent}
-                    activeEntity={replayMode === "playing" ? (replayPreview.sidebarOpen ? activeEntity : null) : activeEntity}
-                    activeWiki={replayMode === "playing" ? (replayPreview.sidebarOpen ? activeWiki : null) : activeWiki}
+                    activeEntity={displayedActiveEntity}
+                    activeWiki={displayedActiveWiki}
                     isWikiLoading={isActiveWikiLoading}
                     wikiError={activeWikiError}
                     onCloseWikiSidebar={closeWikiSidebar}
@@ -343,10 +395,10 @@ export default function Page() {
                                 isPlaying={replayPreview.isPlaying}
                                 dialog={replayPreview.dialog}
                                 toasts={replayPreview.toasts}
-                                sidebarOpen={replayPreview.sidebarOpen}
+                                sidebarOpen={isSidebarOpen}
                                 sidebarWidth={sidebarWidth}
                                 playbackSpeed={replayPreview.playbackSpeed}
-                                activeStepLabel=""
+                                activeStepLabel={activeStepLabel}
                                 activeStepNumber={replayPreview.activeStepNumber}
                                 totalSteps={replayPreview.totalSteps}
                                 onPlayPreview={replayPreview.playFromStart}
@@ -361,7 +413,7 @@ export default function Page() {
                         style={{
                             position: "absolute",
                             top: 10,
-                            left: 18,
+                            left: 80,
                             zIndex: 18,
                             display: "flex",
                             gap: "10px",
@@ -369,53 +421,6 @@ export default function Page() {
                             pointerEvents: "auto",
                         }}
                     >
-                        <button
-                            type="button"
-                            onClick={() => {
-                                window.location.href = "/user";
-                            }}
-                            title="Tham gia hệ thống"
-                            aria-label="Tham gia hệ thống"
-                            style={{
-                                width: "46px",
-                                height: "46px",
-                                backgroundColor: "#1e293b",
-                                color: "#f8fafc",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: "12px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                                backdropFilter: "blur(8px)",
-                                flexShrink: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = "#334155";
-                                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "#1e293b";
-                                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
-                            }}
-                        >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                            </svg>
-                        </button>
-
                         <PresentPlaceSearch
                             focusedPlace={focusedPresentPlace}
                             onFocusPlace={handleFocusPresentPlace}
@@ -425,7 +430,7 @@ export default function Page() {
                                 position: "relative",
                                 top: 0,
                                 left: 0,
-                                width: "min(392px, calc(100vw - 90px))",
+                                width: "min(392px, calc(100vw - 120px))",
                             }}
                         />
                     </div>

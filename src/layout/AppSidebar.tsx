@@ -37,7 +37,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 ];
 
 const OTHERS_ITEMS: NavItem[] = [
-  { icon: <ShootingStarIcon />, name: "Hỗ trợ", path: "/user/quick-qa" },
+  { icon: <ShootingStarIcon />, name: "Hỗ trợ", path: "/faq" },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -356,12 +356,12 @@ const AppSidebar: React.FC = () => {
           </li>
           <li>
             <Link
-              href="/user/about-us"
+              href="/about-us"
               className={`menu-item group ${
-                isActive("/user/about-us") ? "menu-item-active" : "menu-item-icon-inactive"
+                isActive("/about-us") ? "menu-item-active" : "menu-item-icon-inactive"
               } ${!isExpanded ? "lg:justify-center px-2" : "lg:justify-start"}`}
             >
-              <span className={`menu-item-icon ${isActive("/user/about-us") ? "text-gray-950" : "text-gray-400"}`}>
+              <span className={`menu-item-icon ${isActive("/about-us") ? "text-gray-950" : "text-gray-400"}`}>
                 <ShootingStarIcon />
               </span>
               {isSidebarVisible && <span className="block truncate text-[14px]">Về chúng tôi</span>}

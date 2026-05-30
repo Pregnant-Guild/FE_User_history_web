@@ -145,21 +145,21 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     // Ref danh sách geometry thuộc local project để context menu phân biệt global-only feature.
     const localFeatureIdsRef = useRef<MapProps["localFeatureIds"]>(localFeatureIds);
 
-    useEffect(() => { modeRef.current = mode; }, [mode]);
-    useEffect(() => { renderDraftRef.current = renderDraft; }, [renderDraft]);
-    useEffect(() => { onSelectFeatureIdsRef.current = onSelectFeatureIds; }, [onSelectFeatureIds]);
-    useEffect(() => { onSetModeRef.current = onSetMode; }, [onSetMode]);
-    useEffect(() => { onFeatureClickRef.current = onFeatureClick; }, [onFeatureClick]);
-    useEffect(() => { getHoverPopupContentRef.current = getHoverPopupContent; }, [getHoverPopupContent]);
-    useEffect(() => { onCreateRef.current = onCreateFeature; }, [onCreateFeature]);
-    useEffect(() => { onAddFeatureToProjectRef.current = onAddFeatureToProject; }, [onAddFeatureToProject]);
-    useEffect(() => { onDeleteRef.current = onDeleteFeature; }, [onDeleteFeature]);
-    useEffect(() => { onHideRef.current = onHideFeature; }, [onHideFeature]);
-    useEffect(() => { onUpdateRef.current = onUpdateFeature; }, [onUpdateFeature]);
-    useEffect(() => { imageOverlayRef.current = imageOverlay; }, [imageOverlay]);
-    useEffect(() => { onImageOverlayChangeRef.current = onImageOverlayChange; }, [onImageOverlayChange]);
-    useEffect(() => { onBindGeometriesRef.current = onBindGeometries; }, [onBindGeometries]);
-    useEffect(() => { localFeatureIdsRef.current = localFeatureIds; }, [localFeatureIds]);
+    modeRef.current = mode;
+    renderDraftRef.current = renderDraft;
+    onSelectFeatureIdsRef.current = onSelectFeatureIds;
+    onSetModeRef.current = onSetMode;
+    onFeatureClickRef.current = onFeatureClick;
+    getHoverPopupContentRef.current = getHoverPopupContent;
+    onCreateRef.current = onCreateFeature;
+    onAddFeatureToProjectRef.current = onAddFeatureToProject;
+    onDeleteRef.current = onDeleteFeature;
+    onHideRef.current = onHideFeature;
+    onUpdateRef.current = onUpdateFeature;
+    imageOverlayRef.current = imageOverlay;
+    onImageOverlayChangeRef.current = onImageOverlayChange;
+    onBindGeometriesRef.current = onBindGeometries;
+    localFeatureIdsRef.current = localFeatureIds;
 
     // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {

@@ -145,10 +145,8 @@ export type EntityWikiLinkSnapshot = {
  * Không còn wrapper `function_name: "UI"` trong shape mới.
  */
 export type DialogState = {
-    avatar: string;        // Avatar image URL
     text: string;          // Subtitle / spoken narrative text
     image_url?: string;    // Optional image URL
-    image_caption?: string;// Optional caption
 };
 
 export type UIOptionName =
@@ -254,27 +252,27 @@ export type ReplayGeoFunctionParamTupleDocs = {
     hide_others_geometries: [
         geometry_ids: string[],
     ];
-    pulse_geometry: [
+    pulse_geometry: [ //beta feature
         geometry_id: string,
         color?: string,
         repeat?: number,
         duration?: number,
     ];
-    animate_dashed_border: [
+    animate_dashed_border: [//beta feature
         geometry_id: string,
         color?: string,
         width?: number,
         speed?: number,
         duration?: number,
     ];
-    set_geometry_style: [
+    set_geometry_style: [//beta feature
         geometry_ids: string[],
         fill_color?: string,
         fill_opacity?: number,
         line_color?: string,
         line_width?: number,
     ];
-    orbit_camera_around_geometry: [
+    orbit_camera_around_geometry: [//beta feature
         geometry_id: string,
         zoom?: number,
         pitch?: number,

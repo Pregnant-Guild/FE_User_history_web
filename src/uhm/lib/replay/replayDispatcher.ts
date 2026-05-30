@@ -175,10 +175,8 @@ export const dispatchReplayAction = (
             // merge with existing dialog state if available
             const existing = controllers.getDialog ? controllers.getDialog() : null;
             narrativeActions.set_dialog(controllers.setDialog, {
-                avatar: nextDialog.avatar ?? existing?.avatar ?? "",
                 text: nextDialog.text ?? existing?.text ?? "",
                 image_url: nextDialog.image_url ?? existing?.image_url,
-                image_caption: nextDialog.image_caption ?? existing?.image_caption,
             });
         }
         return;
@@ -270,13 +268,13 @@ function normalizeSingleAction(action: any): ReplayAction<any> | null {
         case "set_dialog":
             return { function_name, params };
         case "show_dialog_box":
-            return { function_name: "set_dialog", params: [{ avatar: params[0], text: params[1] }] };
+            return { function_name: "set_dialog", params: [{ text: params[1] }] };
         case "set_title":
         case "set_descriptions":
         case "set_step_subtitle":
             return { function_name: "set_dialog", params: [{ text: params[0] }] };
         case "display_historical_image":
-            return { function_name: "set_dialog", params: [{ image_url: params[0], image_caption: params[1] }] };
+            return { function_name: "set_dialog", params: [{ image_url: params[0] }] };
         case "clear_dialog_box":
         case "clear_title":
         case "clear_descriptions":
