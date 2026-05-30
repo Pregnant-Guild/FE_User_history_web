@@ -7,38 +7,38 @@ import { UserMetaCardProps } from "@/interface/user";
 import { apiGetCurrentUser } from "@/service/auth";
 import { setUserData } from "@/store/features/userSlice";
 import { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 import StickyHeader from "@/components/ui/StickyHeader";
 import { SafeHTMLRenderer } from "@/components/ui/parse/SafeHTMLRenderer";
 import { apiGetCurrentUserApplications } from "@/service/userService";
 import Loading from "@/app/loading";
 
 export default function Profile() {
-  const [user, setUser] = useState<UserMetaCardProps | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [application, setApplication] = useState<any>(null);
-  const [appLoading, setAppLoading] = useState(false);
+  const currentUser = useSelector((state: RootState) => state.user.data);
   const dispatch = useDispatch();
 
-  const isHistorian = !!user?.data?.roles?.some(
+  const [application, setApplication] = useState<any>(null);
+  const [appLoading, setAppLoading] = useState(false);
+
+  const isHistorian = !!currentUser?.roles?.some(
     (role: any) => role.name === "HISTORIAN"
   );
 
+  // Background refresh of user data to ensure eventual consistency
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const userData = await apiGetCurrentUser();
         dispatch(setUserData(userData.data));
-        setUser(userData);
       } catch (err) {
         console.error("Lỗi:", err);
-      } finally {
-        setLoading(false);
       }
     };
     fetchUser();
   }, [dispatch]);
 
+  // Fetch applications in parallel immediately if user is a historian
   useEffect(() => {
     if (isHistorian) {
       const fetchApp = async () => {
@@ -61,11 +61,15 @@ export default function Profile() {
     }
   }, [isHistorian]);
 
-  if (loading) {
-    return (
-      <Loading/>
-    );
+  // Only show full page spinner on initial load when Redux state has no cached data
+  if (!currentUser) {
+    return <Loading />;
   }
+
+  const userMetaProps: UserMetaCardProps = {
+    data: currentUser,
+    status: true,
+  };
 
   // Nếu người dùng có role là HISTORIAN
   if (isHistorian) {
@@ -74,15 +78,15 @@ export default function Profile() {
         <StickyHeader header={`Thông tin tài khoản`} />
         <div className="md:px-12 flex flex-col md:flex-row mx-auto gap-6 w-full max-w-7xl items-start">
           <div className="w-full md:max-w-72 xl:max-w-82 pr-0 md:pr-4 border-b md:border-b-0 md:border-r border-gray-300 pb-6 md:pb-0 shrink-0 space-y-6">
-            <UserMetaCard data={user ?? {}} />
-            <UserInfoCard data={{ ...user, openEdit: true }} />
-            <AccountDetails data={user ?? {}} />
+            <UserMetaCard data={userMetaProps} />
+            <UserInfoCard data={{ ...userMetaProps, openEdit: true }} />
+            <AccountDetails data={userMetaProps} />
           </div>
 
           <div className="flex-1 min-w-0 w-full">
             {appLoading ? (
-              <div>
-                <Loading/>
+              <div className="flex items-center justify-center p-20 w-full bg-zinc-50/50 dark:bg-zinc-950/30 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                <div className="w-8 h-8 border-4 border-zinc-200 border-t-blue-600 rounded-full animate-spin"></div>
               </div>
             ) : application ? (
               <div className="">
@@ -106,9 +110,9 @@ export default function Profile() {
           Thông tin tài khoản
         </h3>
         <div className="space-y-6">
-          <UserMetaCard data={user ?? {}} />
-          <UserInfoCard data={{ ...user, openEdit: true }} />
-          <AccountDetails data={user ?? {}} />
+          <UserMetaCard data={userMetaProps} />
+          <UserInfoCard data={{ ...userMetaProps, openEdit: true }} />
+          <AccountDetails data={userMetaProps} />
         </div>
       </div>
     </div>
