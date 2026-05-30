@@ -61,13 +61,22 @@ export default function Profile() {
     }
   }, [isHistorian]);
 
-  // Only show full page spinner on initial load when Redux state has no cached data
   if (!currentUser) {
     return <Loading />;
   }
 
   const userMetaProps: UserMetaCardProps = {
-    data: currentUser,
+    data: currentUser
+      ? {
+          id: currentUser.id,
+          email: currentUser.email,
+          profile: currentUser.profile,
+          roles: currentUser.roles?.map((role) => ({
+            id: Number(role.id) || undefined,
+            name: role.name,
+          })),
+        }
+      : undefined,
     status: true,
   };
 
