@@ -143,7 +143,6 @@ export default function ProjectDetailsPage() {
   };
 
   const handleRemoveMember = async (userId: string) => {
-    // 1. Hiển thị hộp thoại xác nhận bằng SweetAlert2
     const result = await Swal.fire({
       title: "Xác nhận xóa?",
       text: "Bạn có chắc chắn muốn xóa thành viên này khỏi dự án?",
@@ -263,18 +262,18 @@ export default function ProjectDetailsPage() {
             {[
               {
                 id: "overview",
-                label: "Overview",
+                label: "Tổng quan",
                 icon: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
               },
               {
                 id: "members",
-                label: `Members`,
+                label: `Thành viên`,
                 count: project.members?.length || 0,
                 icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
               },
               {
                 id: "settings",
-                label: "Settings",
+                label: "Cài đặt",
                 icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
               },
             ].map((tab) => (
@@ -324,7 +323,7 @@ export default function ProjectDetailsPage() {
             <div className="md:col-span-3">
               <div className="border border-gray-200 dark:border-[#30363d] rounded-xl overflow-hidden ">
                 <div className="bg-gray-50 dark:bg-[#161b22] px-5 py-3 border-b border-gray-200 dark:border-[#30363d] font-semibold text-sm text-gray-800 dark:text-[#c9d1d9]">
-                  About
+                  Thông tin
                 </div>
                 <div className="p-6 bg-white dark:bg-[#0d1117] text-[15px] leading-relaxed text-gray-700 dark:text-[#8b949e]">
                   {project.description || (
@@ -339,7 +338,7 @@ export default function ProjectDetailsPage() {
             <div className="md:col-span-1 space-y-6">
               <div>
                 <h3 className="font-semibold text-sm mb-4 border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-[#c9d1d9]">
-                  Owner
+                  Chủ dự án
                 </h3>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 shrink-0 flex items-center justify-center">
@@ -379,7 +378,7 @@ export default function ProjectDetailsPage() {
         {activeTab === "members" && (
           <div className="max-w-4xl">
             <h2 className="text-2xl font-normal mb-6 pb-2 border-b border-gray-200 dark:border-[#30363d]">
-              Manage access
+              Quản lý quyền truy cập
             </h2>
 
             <form
@@ -403,14 +402,14 @@ export default function ProjectDetailsPage() {
                   }
                   className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#30363d] bg-white dark:bg-[#0d1117] outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 cursor-pointer"
                 >
-                  <option value="EDITOR">Editor</option>
-                  <option value="VIEWER">Viewer</option>
+                  <option value="EDITOR">Chỉnh sửa</option>
+                  <option value="VIEWER">Xem</option>
                 </select>
                 <button
                   type="submit"
                   className="px-5 py-2 text-sm font-medium text-white bg-[#238636] border border-transparent rounded-md hover:bg-[#2ea043] transition-colors "
                 >
-                  Add member
+                  Thêm thành viên
                 </button>
               </div>
             </form>
@@ -449,8 +448,8 @@ export default function ProjectDetailsPage() {
                           }
                           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-[#30363d] bg-white dark:bg-[#21262d] outline-none hover:bg-gray-50 dark:hover:bg-[#30363d] cursor-pointer transition-colors"
                         >
-                          <option value="EDITOR">Editor</option>
-                          <option value="VIEWER">Viewer</option>
+                          <option value="EDITOR">Chỉnh sửa</option>
+                          <option value="VIEWER">Xem</option>
                         </select>
                         <button
                           onClick={() => handleRemoveMember(member.user_id)}
@@ -488,12 +487,12 @@ export default function ProjectDetailsPage() {
           <div className="max-w-3xl space-y-10">
             <section>
               <h2 className="text-2xl font-normal mb-4 pb-2 border-b border-gray-200 dark:border-[#30363d]">
-                General
+                Chung
               </h2>
               <form onSubmit={handleUpdateInfo} className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-gray-800 dark:text-[#c9d1d9]">
-                    Project name
+                    Tên dự án
                   </label>
                   <input
                     type="text"
@@ -506,7 +505,7 @@ export default function ProjectDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-gray-800 dark:text-[#c9d1d9]">
-                    Description
+                    Mô tả
                   </label>
                   <textarea
                     rows={4}
@@ -519,7 +518,7 @@ export default function ProjectDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-gray-800 dark:text-[#c9d1d9]">
-                    Status
+                    Nhãn
                   </label>
                   <select
                     value={editForm.status}
@@ -531,32 +530,32 @@ export default function ProjectDetailsPage() {
                     }
                     className="w-48 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#30363d] bg-white dark:bg-[#0d1117] outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="PUBLIC">Public</option>
-                    <option value="PRIVATE">Private</option>
-                    <option value="ARCHIVE">Archive</option>
+                    <option value="PUBLIC">Công khai</option>
+                    <option value="PRIVATE">Riêng tư</option>
+                    <option value="ARCHIVE">Lưu trữ</option>
                   </select>
                 </div>
                 <button
                   type="submit"
                   className="px-5 py-2 text-sm font-medium rounded-md bg-[#21262d] text-[#c9d1d9] border border-[#30363d] hover:bg-[#30363d] transition-colors "
                 >
-                  Update settings
+                  Cập nhật
                 </button>
               </form>
             </section>
 
             <section>
               <h2 className="text-2xl font-normal text-red-500 mb-4 pb-2 border-b border-red-500/30">
-                Danger Zone
+                Vùng nguy hiểm
               </h2>
               <div className="border border-red-500/30 rounded-xl overflow-hidden">
                 <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="font-semibold text-sm text-gray-800 dark:text-[#c9d1d9]">
-                      Transfer ownership
+                      Chuyển quyền sở hữu
                     </div>
                     <div className="text-xs text-gray-500 dark:text-[#8b949e] mt-1">
-                      Transfer this project to another member in the project.
+                      Chuyển quyền sở hữu dự án này sang một thành viên khác trong dự án.
                     </div>
                   </div>
                   <form
@@ -593,18 +592,17 @@ export default function ProjectDetailsPage() {
                       }
                       className="shrink-0 px-4 py-2 text-sm font-medium text-red-500 bg-transparent border border-red-500/50 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-red-500 dark:disabled:hover:bg-transparent"
                     >
-                      Transfer
+                      Chuyển quyền
                     </button>
                   </form>
                 </div>
                 <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-colors">
                   <div>
                     <div className="font-semibold text-sm text-gray-800 dark:text-[#c9d1d9]">
-                      Delete this project
+                      Xóa dự án
                     </div>
                     <div className="text-xs text-gray-500 dark:text-[#8b949e] mt-1">
-                      Once you delete a project, there is no going back. Please
-                      be certain.
+                     Thận trọng với hành động này! Xóa dự án sẽ xóa vĩnh viễn tất cả dữ liệu liên quan và không thể khôi phục.
                     </div>
                   </div>
                   <button
@@ -612,7 +610,7 @@ export default function ProjectDetailsPage() {
                     onClick={handleDeleteProject}
                     className="shrink-0 px-4 py-2 text-sm font-medium text-red-500 bg-transparent border border-red-500/50 rounded-md hover:bg-red-500 hover:text-white dark:hover:bg-red-900/30 transition-colors"
                   >
-                    Delete project
+                    Xóa dự án
                   </button>
                 </div>
               </div>
