@@ -5,37 +5,35 @@ import { useState } from 'react';
 const faqData = [
   {
     id: 1,
-    question: "1. Phần mềm này tương thích với những hệ điều hành nào?",
-    answer: "Hệ thống tương thích hoàn toàn với Windows 10/11, macOS 12 trở lên. Đối với môi trường máy chủ, chúng tôi hỗ trợ các bản phân phối Linux phổ biến như Ubuntu và Debian."
+    question: "1. Tôi có thể đổi mật khẩu ở đâu?",
+    answer: "Bạn có thể đổi mật khẩu ở mục Thông tin tài khoản ở góc dưới bên trái màn hình. Kéo xuống mục thay đổi mật khẩu và cập nhật thông tin."
   },
   {
     id: 2,
-    question: "2. Sự khác biệt giữa phiên bản Miễn phí và Trả phí là gì?",
-    answer: "Phiên bản trả phí cung cấp băng thông không giới hạn, hỗ trợ kỹ thuật ưu tiên 24/7, và quyền truy cập sớm vào các tính năng nâng cao. Bản miễn phí sẽ giới hạn một số tính năng xuất dữ liệu."
+    question: "2. Làm sao để liên hệ với ban quản trị khi cần hỗ trợ gấp?",
+    answer: "Bạn có thể liên hệ với ban quản trị qua email hoặc số điện thoại được cung cấp trong mục Liên hệ hỗ trợ"
   },
   {
     id: 3,
-    question: "3. Hệ thống hỗ trợ những phương thức kết nối nào?",
-    answer: "Chúng tôi hỗ trợ kết nối qua REST API, WebSocket cho dữ liệu thời gian thực và cung cấp sẵn SDK cho các ngôn ngữ phổ biến như TypeScript, Go."
+    question: "3. Để có thể làm kiểm duyệt viên tôi cần làm gì?",
+    answer: "Bạn có thể gửi yêu cầu làm Nhà sử học bằng cách truy cập vào mục Nhà Sử Học ở góc dưới bên trái màn hình. Điền đầy đủ thông tin yêu cầu và gửi cho chúng tôi. Chúng tôi sẽ xem xét và liên hệ qua email."
   },
   {
     id: 4,
-    question: "4. Làm thế nào để tôi có thể tích hợp vào dự án Next.js hiện tại?",
-    answer: "Bạn chỉ cần cài đặt package qua npm/yarn, thêm API Key vào file .env và gọi component Provider ở file layout.tsx gốc. Tài liệu chi tiết có sẵn trong mục Developer Docs."
+    question: "4. Thời gian phản hồi khi gửi yêu cầu là bao lâu?",
+    answer: "Thông thường chúng tôi sẽ phản hồi yêu cầu của bạn trong vòng 24-48 giờ làm việc."
   },
   {
     id: 5,
-    question: "5. Dữ liệu của tôi được bảo mật như thế nào?",
-    answer: "Toàn bộ dữ liệu được mã hóa đầu cuối (End-to-End Encryption). Chúng tôi tuân thủ nghiêm ngặt các tiêu chuẩn bảo mật quốc tế và thường xuyên rà soát hệ thống để phòng chống các lỗ hổng bảo mật."
-  }
+    question: "5. Làm gì nếu tài khoản của tôi bị khóa?",
+    answer: "Bạn có thể liên hệ với ban quản trị qua email hoặc số điện thoại được cung cấp trong mục Liên hệ hỗ trợ"
+  },
 ];
 
 export default function Page() {
-  // Lưu index của câu hỏi đang được mở. Mặc định mở câu đầu tiên (index 0).
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const toggleFAQ = (index: number) => {
-    // Nếu click lại vào câu đang mở thì đóng nó, ngược lại thì mở câu mới
     setOpenIndex(openIndex === index ? null : index);
   };
 
@@ -62,7 +60,6 @@ export default function Page() {
                   </span>
                 </button>
                 
-                {/* Phần nội dung có hiệu ứng trượt */}
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
                     isOpen ? 'max-h-96 opacity-100 pb-6' : 'max-h-0 opacity-0'
