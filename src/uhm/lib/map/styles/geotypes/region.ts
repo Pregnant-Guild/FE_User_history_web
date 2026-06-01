@@ -24,6 +24,7 @@ export function getRegionLayers(sourceId: string, pathArrowSourceId?: string, po
             type: "symbol",
             source: pointSourceId!,
             filter: filter,
+            minzoom: 5,
             layout: {
                 "text-font": [...MAP_EMPHASIS_TEXT_FONT_STACK],
                 "text-field": ["coalesce", ["get", "point_label"], ""],

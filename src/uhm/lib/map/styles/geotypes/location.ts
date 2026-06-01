@@ -23,6 +23,7 @@ export function getLocationLayers(sourceId: string, pathArrowSourceId?: string, 
             type: "circle",
             source: pointSourceId!,
             filter: filter,
+            minzoom: 5,
             paint: {
                 "circle-color": "#e2e8f0",
                 "circle-radius": ["case", SELECTED_EXPR, 18, 0],
@@ -38,6 +39,7 @@ export function getLocationLayers(sourceId: string, pathArrowSourceId?: string, 
             type: "circle",
             source: pointSourceId!,
             filter: filter,
+            minzoom: 5,
             paint: {
                 "circle-color": [
                     "case",
@@ -67,6 +69,7 @@ export function getLocationLayers(sourceId: string, pathArrowSourceId?: string, 
             type: "symbol",
             source: pointSourceId!,
             filter: filter,
+            minzoom: 5,
             layout: {
                 "text-font": [...MAP_EMPHASIS_TEXT_FONT_STACK],
                 "text-field": ["coalesce", ["get", "point_label"], ""],

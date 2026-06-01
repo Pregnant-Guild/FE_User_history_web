@@ -1244,12 +1244,19 @@ export function clampNumber(value: number, min: number, max: number): number {
 }
 
 export function hashStringToColor(str: string): string {
-    let hash = 0;
+    let hash = 5381;
     for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        hash = (hash * 33) ^ str.charCodeAt(i);
     }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue}, 70%, 50%)`;
+    // Use Knuth's multiplicative hashing multiplier to scatter consecutive/close hash values
+    const scattered = Math.abs(hash * 2654435761);
+    const hue = scattered % 360;
+    
+    // Vary saturation and lightness slightly to increase color diversity and uniqueness
+    const saturation = 70 + (scattered % 20); // 70% to 90%
+    const lightness = 45 + ((scattered >> 5) % 15); // 45% to 60%
+    
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 export function decorateFeaturesWithEntityColors(fc: FeatureCollection): FeatureCollection {

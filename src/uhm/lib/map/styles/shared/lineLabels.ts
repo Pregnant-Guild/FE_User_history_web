@@ -14,6 +14,7 @@ export function getLineLabelLayers(sourceId: string): LayerSpecification[] {
             type: "symbol",
             source: sourceId,
             filter: ["all", LINE_GEOMETRY_FILTER, ["!=", ["coalesce", ["get", "line_label"], ""], ""]],
+            minzoom: 5,
             layout: {
                 "text-font": [...MAP_TEXT_FONT_STACK],
                 "symbol-placement": "line",

@@ -7,6 +7,7 @@ export function getPolygonLabelLayers(sourceId: string): LayerSpecification[] {
             id: "polygon-labels-text",
             type: "symbol",
             source: sourceId,
+            minzoom: 5,
             layout: {
                 "text-font": [...MAP_TEXT_FONT_STACK],
                 "text-field": ["coalesce", ["get", "polygon_label"], ""],

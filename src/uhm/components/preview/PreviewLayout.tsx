@@ -11,6 +11,7 @@ import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import RelatedEntityPopup from "./RelatedEntityPopup";
 import PinnedWikiPopup from "./PinnedWikiPopup";
+import { fitMapToFeatureCollection } from "@/uhm/components/map/mapUtils";
 
 import { fetchWikiById, type Wiki } from "@/uhm/api/wikis";
 import type { Entity } from "@/uhm/api/entities";
@@ -81,6 +82,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     autoplayMode = null,
 
     replayPreview,
+    mapHandleRef,
     previewRelations,
     previewActiveEntityId,
     setPreviewActiveEntityId,
@@ -89,6 +91,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     setPreviewSidebarWidth,
     previewWikiCache,
     setPreviewWikiCache,
+    isLargeScreen,
 }: Props, ref) => {
     const isReplayPreviewMode = mode === "replay_preview";
 
@@ -466,7 +469,15 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     // Search and focus place
     const handleFocusPresentPlace = useCallback((place: PresentPlaceSelection) => {
         setFocusedPresentPlace(place);
-    }, []);
+        const map = mapHandleRef?.current?.getMap();
+        if (map) {
+            const currentZoom = map.getZoom();
+            map.flyTo({
+                center: [place.lng, place.lat],
+                zoom: Math.max(currentZoom, 13.5),
+            });
+        }
+    }, [mapHandleRef]);
 
     const clearPresentPlaceFocus = useCallback(() => {
         setFocusedPresentPlace(null);
@@ -476,6 +487,23 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         setFocusedPresentPlace(null);
         setPreviewEntityFocusToken((prev) => (prev ?? 0) + 1);
 
+        const map = mapHandleRef?.current?.getMap();
+        if (map && payload.geometry?.draw_geometry) {
+            const fc: FeatureCollection = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        properties: {
+                            id: payload.geometry.id,
+                        },
+                        geometry: payload.geometry.draw_geometry,
+                    },
+                ],
+            };
+            fitMapToFeatureCollection(map, fc, 84, { duration: 1000 });
+        }
+
         const linkedEntityIds = previewRelations.geometryEntityIds[String(payload.geometry.id)] || [];
         if (linkedEntityIds.length === 1) {
             selectReplayPreviewEntity(linkedEntityIds[0], {
@@ -484,11 +512,22 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                 selectGeometry: false,
             });
         }
-    }, [previewRelations.geometryEntityIds, selectReplayPreviewEntity, setPreviewEntityFocusToken]);
+    }, [mapHandleRef, previewRelations.geometryEntityIds, selectReplayPreviewEntity, setPreviewEntityFocusToken]);
 
     const effectiveGeometryVisibility = useMemo(() => {
         return geometryVisibility;
     }, [geometryVisibility]);
+
+    const computedTimelineStyle = useMemo(() => {
+        const rightMargin = (isReplayPreviewWikiSidebarOpen && isLargeScreen)
+            ? previewSidebarWidth + 32
+            : 18;
+        return {
+            left: "88px",
+            right: `${rightMargin}px`,
+            transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        };
+    }, [isReplayPreviewWikiSidebarOpen, isLargeScreen, previewSidebarWidth]);
 
 
 
@@ -583,29 +622,43 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
             <aside
                 style={{
                     position: "absolute",
-                    top: "50%",
+                    top: 80,
+                    bottom: 20,
                     left: 18,
-                    transform: "translateY(-50%)",
                     zIndex: 16,
-                    pointerEvents: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    width: 58,
+                    pointerEvents: "none",
                 }}
             >
-                <ReplayPreviewLayerPanel
-                    backgroundVisibility={backgroundVisibility}
-                    geometryVisibility={effectiveGeometryVisibility}
-                    onToggleBackground={(id) =>
-                        onBackgroundVisibilityChange({
-                            ...backgroundVisibility,
-                            [id]: !backgroundVisibility[id],
-                        })
-                    }
-                    onToggleGeometry={(typeKey) =>
-                        onGeometryVisibilityChange({
-                            ...geometryVisibility,
-                            [typeKey]: geometryVisibility[typeKey] === false,
-                        })
-                    }
-                />
+                <div
+                    style={{
+                        flexGrow: 1,
+                        flexShrink: 1,
+                        minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        pointerEvents: "auto",
+                    }}
+                >
+                    <ReplayPreviewLayerPanel
+                        backgroundVisibility={backgroundVisibility}
+                        geometryVisibility={effectiveGeometryVisibility}
+                        onToggleBackground={(id) =>
+                            onBackgroundVisibilityChange({
+                                ...backgroundVisibility,
+                                [id]: !backgroundVisibility[id],
+                            })
+                        }
+                        onToggleGeometry={(typeKey) =>
+                            onGeometryVisibilityChange({
+                                ...geometryVisibility,
+                                [typeKey]: geometryVisibility[typeKey] === false,
+                            })
+                        }
+                    />
+                </div>
             </aside>
 
             {previewPinnedWikiPopupAnchor && previewPinnedWikiPopupRows.length > 0 ? (
@@ -648,11 +701,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                     statusText={null}
                     filterEnabled={replayPreview.timelineFilterEnabled}
                     onFilterEnabledChange={replayPreview.setTimelineFilterEnabled}
-                    style={
-                        isReplayPreviewWikiSidebarOpen
-                            ? { right: `${previewSidebarWidth + 32}px` }
-                            : undefined
-                    }
+                    style={computedTimelineStyle}
                 />
             ) : null}
 
