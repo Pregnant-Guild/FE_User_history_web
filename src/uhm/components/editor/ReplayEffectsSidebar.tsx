@@ -520,6 +520,7 @@ export default function ReplayEffectsSidebar({
             {selectedStage && selectedStep && selectedStepIndex != null ? (
                 <>
                     <ActionGroupEditor
+                        resetKey={`narrative-${selectedStage.id}-${selectedStepIndex}`}
                         title="Narrative"
                         groupLabel={`Replay: cập nhật narrative step ${selectedStepIndex + 1} của stage #${selectedStage.id}`}
                         actions={selectedStep.use_narrow_function}
@@ -1144,6 +1145,7 @@ function ActionGroupEditor<T extends string>({
     emptyOptionLabel,
     onUpdateActions,
     onLinkClick,
+    resetKey,
 }: {
     title: string;
     groupLabel: string;
@@ -1155,6 +1157,7 @@ function ActionGroupEditor<T extends string>({
     emptyOptionLabel?: string;
     onUpdateActions: (nextActions: ReplayAction<T>[], label: string) => void;
     onLinkClick?: (quill: any) => void;
+    resetKey?: string;
 }) {
     const functionNames = useMemo(() => Object.keys(definitions) as T[], [definitions]);
     const [composerFunctionName, setComposerFunctionName] = useState<T | "">(
@@ -1167,12 +1170,15 @@ function ActionGroupEditor<T extends string>({
         )
     );
 
+    const lastResetKeyRef = useRef<string | undefined>(undefined);
     const lastLoadedActionsRef = useRef<any>(null);
 
     useEffect(() => {
-        if (JSON.stringify(actions) === JSON.stringify(lastLoadedActionsRef.current)) {
+        const resetKeyChanged = resetKey !== lastResetKeyRef.current;
+        if (!resetKeyChanged && JSON.stringify(actions) === JSON.stringify(lastLoadedActionsRef.current)) {
             return;
         }
+        lastResetKeyRef.current = resetKey;
         lastLoadedActionsRef.current = actions;
 
         if (actions.length > 0) {
@@ -1187,7 +1193,7 @@ function ActionGroupEditor<T extends string>({
             setComposerFunctionName(defaultFun);
             setComposerDraftValues(buildActionComposerDraft(definitions, defaultFun));
         }
-    }, [actions, definitions, createOnSelect, functionNames]);
+    }, [actions, definitions, createOnSelect, functionNames, resetKey]);
 
     const composerDefinition = composerFunctionName
         ? definitions[composerFunctionName]
@@ -1343,6 +1349,29 @@ function FieldInput({
     onChange: (nextValue: ActionValue) => void;
     onLinkClick?: (quill: any) => void;
 }) {
+    const onLinkClickRef = useRef(onLinkClick);
+    useEffect(() => {
+        onLinkClickRef.current = onLinkClick;
+    }, [onLinkClick]);
+
+    const quillModules = useMemo(() => {
+        return {
+            toolbar: {
+                container: [
+                    ["bold", "italic", "underline", "strike"],
+                    [{ list: "ordered" }, { list: "bullet" }],
+                    ["link"],
+                    ["clean"],
+                ],
+                handlers: {
+                    link: function (this: { quill?: any }) {
+                        onLinkClickRef.current?.(this?.quill);
+                    },
+                },
+            },
+        };
+    }, []);
+
     const baseLabel = (
         <div style={{ fontSize: 12, color: "#cbd5e1", fontWeight: 700 }}>
             {field.label}
@@ -1358,21 +1387,7 @@ function FieldInput({
                         theme="snow"
                         value={asString(value)}
                         onChange={(content: string) => onChange(content)}
-                        modules={{
-                            toolbar: {
-                                container: [
-                                    ["bold", "italic", "underline", "strike"],
-                                    [{ list: "ordered" }, { list: "bullet" }],
-                                    ["link"],
-                                    ["clean"],
-                                ],
-                                handlers: {
-                                    link: function (this: { quill?: any }) {
-                                        onLinkClick?.(this?.quill);
-                                    },
-                                },
-                            },
-                        }}
+                        modules={quillModules}
                     />
                 </div>
             </label>

@@ -1108,6 +1108,14 @@ function EditorPageContent() {
         timelineFilterEnabled,
     ]);
 
+    const handleEnterPreviewClick = useCallback(() => {
+        if (mode === "replay") {
+            openReplayPreview("start");
+        } else {
+            openViewerPreview();
+        }
+    }, [mode, openReplayPreview, openViewerPreview]);
+
     const viewerPreviewSelectedReplay = useMemo(() => {
         if (!isViewerPreviewMode || !selectedFeatureIds.length) return null;
         const selectedGeometryId = String(selectedFeatureIds[0] ?? "").trim();
@@ -1212,9 +1220,9 @@ function EditorPageContent() {
         }
 
         if (m === "replay" && featureId) {
-            // QUY TẮC: Geo chọn đầu tiên là geo main.
-            const finalSelectedIds = Array.from(new Set([...selectedFeatureIds, featureId]));
-            const triggerId = selectedFeatureIds.length > 0 ? selectedFeatureIds[0] : featureId;
+            // Sử dụng chính geo được click chuột phải làm main replay geometry
+            const triggerId = featureId;
+            const finalSelectedIds = Array.from(new Set([featureId, ...selectedFeatureIds]));
 
             setReplayFeatureId(triggerId);
             setReplaySelection({ stageId: null, stepIndex: null });
@@ -2682,7 +2690,7 @@ function EditorPageContent() {
                         localFeatureIds={localFeatureIds}
                         showViewportControls={!isReplayPreviewMode || replayPreview.zoomPanelVisible}
                         isPreviewMode={isAnyPreviewMode}
-                        onEnterPreview={openViewerPreview}
+                        onEnterPreview={handleEnterPreviewClick}
                         onExitPreview={isReplayPreviewMode ? exitReplayPreview : exitViewerPreview}
                         onPlayPreviewReplay={viewerPreviewSelectedReplay ? handleMapPlayPreviewReplay : undefined}
                         viewMode={viewMode}

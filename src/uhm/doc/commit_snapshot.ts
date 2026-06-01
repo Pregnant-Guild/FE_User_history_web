@@ -154,7 +154,6 @@ export type UIOptionName =
     | "layer_panel"
     | "zoom_panel"
     | "wiki"
-    | "toast";
 
 export type MapFunctionName =
     | "set_camera_view"
@@ -226,7 +225,6 @@ export type ReplayUiParamTupleDocs = {
     layer_panel: [visible: boolean];
     zoom_panel: [visible: boolean];
     wiki: [wiki_id: string | null];
-    toast: [message: string];
 };
 
 /**

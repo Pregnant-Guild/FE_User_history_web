@@ -93,53 +93,69 @@ export default function ReplayPreviewOverlay({
                 <div
                     style={{
                         position: "absolute",
-                        left: 18,
+                        left: 88,
                         right: rightOffset,
                         bottom: 96,
-                        borderRadius: 20,
-                        overflow: "hidden",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        background: "rgba(11, 18, 32, 0.85)",
-                        backdropFilter: "blur(12px)",
-                        boxShadow: "0 16px 44px rgba(2, 6, 23, 0.42)",
-                        pointerEvents: "auto",
+                        pointerEvents: "none",
                         display: "flex",
-                        flexDirection: "column",
-                        maxHeight: "calc(100vh - 180px)",
+                        justifyContent: "flex-start",
                     }}
                 >
-                    {dialog.image_url?.trim() ? (
-                        <img
-                            src={dialog.image_url}
-                            alt="Historical"
-                            style={{
-                                width: "100%",
-                                display: "block",
-                                maxHeight: 140,
-                                objectFit: "cover",
-                                background: "#020617",
-                            }}
-                        />
-                    ) : null}
-                    {dialog.text?.trim() ? (
-                        <div
-                            className="uhm-replay-dialog-content"
-                            style={{
-                                padding: "16px",
-                                color: "#f8fafc",
-                                fontSize: "14px",
-                                lineHeight: "1.6",
-                                overflowY: "auto",
-                                maxHeight: dialog.image_url?.trim() ? "180px" : "140px",
-                                minHeight: 0,
-                                background: "transparent",
-                            }}
-                            dangerouslySetInnerHTML={{ __html: dialog.text }}
-                        />
-                    ) : null}
+                    <div
+                        style={{
+                            width: "min(640px, 100%)",
+                            borderRadius: 20,
+                            overflow: "hidden",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            background: "rgba(11, 18, 32, 0.85)",
+                            backdropFilter: "blur(12px)",
+                            boxShadow: "0 16px 44px rgba(2, 6, 23, 0.42)",
+                            pointerEvents: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            maxHeight: "calc(100vh - 180px)",
+                        }}
+                    >
+                        {dialog.image_url?.trim() ? (
+                            <img
+                                src={dialog.image_url}
+                                alt="Historical"
+                                style={{
+                                    width: "100%",
+                                    display: "block",
+                                    maxHeight: 140,
+                                    objectFit: "cover",
+                                    background: "#020617",
+                                }}
+                            />
+                        ) : null}
+                        {dialog.text?.trim() ? (
+                            <div
+                                className="uhm-replay-dialog-content"
+                                style={{
+                                    padding: "16px",
+                                    color: "#f8fafc",
+                                    fontSize: "14px",
+                                    lineHeight: "1.6",
+                                    overflowY: "auto",
+                                    maxHeight: dialog.image_url?.trim() ? "180px" : "140px",
+                                    minHeight: 0,
+                                    background: "transparent",
+                                }}
+                                dangerouslySetInnerHTML={{ __html: dialog.text }}
+                            />
+                        ) : null}
+                    </div>
                 </div>
             ) : null}
             <style jsx>{`
+                .uhm-replay-dialog-content::-webkit-scrollbar {
+                    display: none;
+                }
+                .uhm-replay-dialog-content {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
                 .uhm-replay-dialog-content :global(p) {
                     margin: 0;
                 }
