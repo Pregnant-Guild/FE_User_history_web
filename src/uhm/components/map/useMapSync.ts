@@ -200,7 +200,7 @@ export function useMapSync({
         applyRenderDraftToMap(renderDraft, labelContextDraft, selectedFeatureIds);
         const editingId = editingEngineRef.current?.editingRef?.current?.id;
         if (allowGeometryEditing && editingId !== undefined && editingId !== null) {
-            const stillExists = renderDraft.features.some((f) => f.properties.id === editingId);
+            const stillExists = renderDraft.features.some((f) => String(f.properties.id) === String(editingId));
             if (!stillExists) {
                 editingEngineRef.current?.clearEditing();
             }

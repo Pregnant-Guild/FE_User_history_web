@@ -187,6 +187,19 @@ export function setupMapLayers(
         data: { type: "FeatureCollection", features: [] },
     });
 
+    // Glowing halo under the edit shape line
+    map.addLayer({
+        id: "edit-shape-glow",
+        type: "line",
+        source: "edit-shape",
+        paint: {
+            "line-color": "#38bdf8",
+            "line-width": 8,
+            "line-opacity": 0.35,
+            "line-blur": 1.5,
+        },
+    });
+
     map.addLayer({
         id: "edit-shape-line",
         type: "line",
@@ -194,6 +207,19 @@ export function setupMapLayers(
         paint: {
             "line-color": "#38bdf8",
             "line-width": 3,
+        },
+    });
+
+    // Glowing halo under the edit handles
+    map.addLayer({
+        id: "edit-handles-glow",
+        type: "circle",
+        source: "edit-handles",
+        paint: {
+            "circle-color": "#f97316",
+            "circle-radius": 22,
+            "circle-opacity": 0.35,
+            "circle-blur": 0.85,
         },
     });
 

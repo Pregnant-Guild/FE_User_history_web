@@ -75,6 +75,8 @@ const RAW_GEOMETRY_TYPE_OPTIONS: Array<{
     { value: "rebellion_zone", label: "Rebellion Zone", groupId: "circle", geometryPreset: "circle-area" },
 
     { value: "person_event", label: "Person Event", groupId: "point", geometryPreset: "point" },
+    { value: "region", label: "Region (Vùng nhãn tên)", groupId: "point", geometryPreset: "point" },
+    { value: "location", label: "Location (Địa điểm chấm)", groupId: "point", geometryPreset: "point" },
     { value: "temple", label: "Temple", groupId: "point", geometryPreset: "point" },
     { value: "capital", label: "Capital", groupId: "point", geometryPreset: "point" },
     { value: "city", label: "City", groupId: "point", geometryPreset: "point" },

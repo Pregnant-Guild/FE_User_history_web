@@ -333,8 +333,9 @@ export function useMapInteraction({
             drawingEngine.cleanup
         );
 
-        if (allowGeometryEditing) {
-            editingEngineRef.current?.bindEditEvents(map);
+        const editCleanup = editingEngineRef.current?.bindEditEvents(map);
+        if (editCleanup) {
+            mapCleanupFnsRef.current.push(editCleanup);
         }
     };
 

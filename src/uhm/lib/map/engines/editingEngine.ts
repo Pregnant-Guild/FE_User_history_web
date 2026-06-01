@@ -10,15 +10,16 @@ export type EditingHandle = {
     isCircle?: boolean;
     circleCenter?: [number, number];
     circleRadius?: number;
+    geometryType?: "Point" | "LineString" | "Polygon";
 };
 
 export type EditingAPI = {
     beginEditing: (feature: maplibregl.MapGeoJSONFeature) => void;
     clearEditing: () => void;
-    bindEditEvents: (map: maplibregl.Map) => void;
+    bindEditEvents: (map: maplibregl.Map) => (() => void);
 };
 
-// Tạo engine chỉnh sửa polygon đã có (kéo đỉnh, thêm đỉnh, commit/cancel).
+// Tạo engine chỉnh sửa polygon, line, point đã có (kéo đỉnh, thêm đỉnh, commit/cancel).
 export function createEditingEngine(options: {
     mapRef: React.MutableRefObject<maplibregl.Map | null>;
     onUpdate: (id: string | number, geometry: Geometry) => void;
@@ -43,54 +44,79 @@ export function createEditingEngine(options: {
         (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(empty);
     };
 
-    // Đồng bộ polygon tạm và các handle point lên map source.
+    // Đồng bộ polygon/line/point tạm và các handle point lên map source.
     const updateEditSources = () => {
         const editing = editingRef.current;
         const map = mapRef.current;
+        console.log("updateEditSources: editing:", editing, "map loaded:", map?.isStyleLoaded());
         if (!editing || !map || !map.isStyleLoaded()) return;
 
-        let shape: GeoJSON.FeatureCollection<GeoJSON.Polygon>;
+        let shape: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.LineString | GeoJSON.Point>;
         let handles: GeoJSON.FeatureCollection<GeoJSON.Point>;
 
-        if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
-            const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
-            const closedRing = [...ring, ring[0]];
-            shape = {
-                type: "FeatureCollection",
-                features: [
-                    {
-                        type: "Feature",
-                        geometry: { type: "Polygon", coordinates: [closedRing] },
-                        properties: {},
-                    },
-                ],
-            };
+        const geomType = editing.geometryType || "Polygon";
 
-            // Circle handles: 0 = center, 1 = radius control
-            const radiusHandlePoint = destinationPoint(editing.circleCenter, editing.circleRadius, 90);
-            handles = {
-                type: "FeatureCollection",
-                features: [
-                    {
+        if (geomType === "Polygon") {
+            if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
+                const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
+                const closedRing = [...ring, ring[0]];
+                shape = {
+                    type: "FeatureCollection",
+                    features: [
+                        {
+                            type: "Feature",
+                            geometry: { type: "Polygon", coordinates: [closedRing] },
+                            properties: {},
+                        },
+                    ],
+                };
+
+                // Circle handles: 0 = center, 1 = radius control
+                const radiusHandlePoint = destinationPoint(editing.circleCenter, editing.circleRadius, 90);
+                handles = {
+                    type: "FeatureCollection",
+                    features: [
+                        {
+                            type: "Feature",
+                            geometry: { type: "Point", coordinates: editing.circleCenter },
+                            properties: { idx: 0, type: "center" },
+                        },
+                        {
+                            type: "Feature",
+                            geometry: { type: "Point", coordinates: radiusHandlePoint },
+                            properties: { idx: 1, type: "radius" },
+                        },
+                    ],
+                };
+            } else {
+                const closedRing = [...editing.ring, editing.ring[0]];
+                shape = {
+                    type: "FeatureCollection",
+                    features: [
+                        {
+                            type: "Feature",
+                            geometry: { type: "Polygon", coordinates: [closedRing] },
+                            properties: {},
+                        },
+                    ],
+                };
+
+                handles = {
+                    type: "FeatureCollection",
+                    features: editing.ring.map((c, idx) => ({
                         type: "Feature",
-                        geometry: { type: "Point", coordinates: editing.circleCenter },
-                        properties: { idx: 0, type: "center" },
-                    },
-                    {
-                        type: "Feature",
-                        geometry: { type: "Point", coordinates: radiusHandlePoint },
-                        properties: { idx: 1, type: "radius" },
-                    },
-                ],
-            };
-        } else {
-            const closedRing = [...editing.ring, editing.ring[0]];
+                        geometry: { type: "Point", coordinates: c },
+                        properties: { idx },
+                    })),
+                };
+            }
+        } else if (geomType === "LineString") {
             shape = {
                 type: "FeatureCollection",
                 features: [
                     {
                         type: "Feature",
-                        geometry: { type: "Polygon", coordinates: [closedRing] },
+                        geometry: { type: "LineString", coordinates: editing.ring },
                         properties: {},
                     },
                 ],
@@ -104,6 +130,23 @@ export function createEditingEngine(options: {
                     properties: { idx },
                 })),
             };
+        } else {
+            // Point
+            shape = {
+                type: "FeatureCollection",
+                features: [],
+            };
+
+            handles = {
+                type: "FeatureCollection",
+                features: [
+                    {
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: editing.ring[0] },
+                        properties: { idx: 0 },
+                    },
+                ],
+            };
         }
 
         (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(shape);
@@ -116,18 +159,33 @@ export function createEditingEngine(options: {
         if (!editing) return;
 
         let geometry: Geometry;
-        if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
-            const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
+        const geomType = editing.geometryType || "Polygon";
+
+        if (geomType === "Polygon") {
+            if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
+                const ring = buildCircleRing(editing.circleCenter, editing.circleRadius);
+                geometry = {
+                    type: "Polygon",
+                    coordinates: [[...ring, ring[0]]],
+                    circle_center: editing.circleCenter,
+                    circle_radius: editing.circleRadius,
+                };
+            } else {
+                geometry = {
+                    type: "Polygon",
+                    coordinates: [[...editing.ring, editing.ring[0]]],
+                };
+            }
+        } else if (geomType === "LineString") {
             geometry = {
-                type: "Polygon",
-                coordinates: [[...ring, ring[0]]],
-                circle_center: editing.circleCenter,
-                circle_radius: editing.circleRadius,
+                type: "LineString",
+                coordinates: editing.ring,
             };
         } else {
+            // Point
             geometry = {
-                type: "Polygon",
-                coordinates: [[...editing.ring, editing.ring[0]]],
+                type: "Point",
+                coordinates: editing.ring[0],
             };
         }
 
@@ -146,19 +204,56 @@ export function createEditingEngine(options: {
         if (!map || !map.isStyleLoaded() || !map.getLayer("edit-handles-circle")) return;
         map.setPaintProperty("edit-handles-circle", "circle-color", enabled ? "#ef4444" : "#f97316");
         map.setPaintProperty("edit-handles-circle", "circle-stroke-color", enabled ? "#7f1d1d" : "#0f172a");
+        if (map.getLayer("edit-handles-glow")) {
+            map.setPaintProperty("edit-handles-glow", "circle-color", enabled ? "#ef4444" : "#f97316");
+        }
     };
 
-    // Bắt đầu chỉnh sửa từ feature polygon được chọn.
+    // Bắt đầu chỉnh sửa từ feature polygon/line/point được chọn.
     const beginEditing = (feature: maplibregl.MapGeoJSONFeature) => {
-        if (feature.geometry.type !== "Polygon") return;
+        console.log("beginEditing called with feature:", feature);
+        if (!feature || !feature.geometry) {
+            console.warn("beginEditing: feature or feature.geometry is missing");
+            return;
+        }
         const geom = feature.geometry as Geometry;
-        const coords = (geom.coordinates?.[0] ?? []) as [number, number][];
-        if (coords.length < 4) return;
+        const type = geom.type;
+        console.log("beginEditing: geometry type is", type);
+        if (type !== "Polygon" && type !== "LineString" && type !== "Point") {
+            console.warn("beginEditing: unsupported geometry type:", type);
+            return;
+        }
 
         const isCircle = !!geom.circle_center;
 
-        // remove duplicated closing point
-        const ring = coords.slice(0, -1).map((c) => [c[0], c[1]] as [number, number]);
+        let ring: [number, number][] = [];
+        if (type === "Polygon") {
+            const coords = (geom.coordinates?.[0] ?? []) as [number, number][];
+            console.log("beginEditing Polygon coords:", coords);
+            if (coords.length < 4) {
+                console.warn("beginEditing: Polygon coords length is less than 4");
+                return;
+            }
+            // remove duplicated closing point
+            ring = coords.slice(0, -1).map((c) => [c[0], c[1]] as [number, number]);
+        } else if (type === "LineString") {
+            const coords = (geom.coordinates ?? []) as [number, number][];
+            console.log("beginEditing LineString coords:", coords);
+            if (coords.length < 2) {
+                console.warn("beginEditing: LineString coords length is less than 2");
+                return;
+            }
+            ring = coords.map((c) => [c[0], c[1]] as [number, number]);
+        } else if (type === "Point") {
+            const coords = (geom.coordinates ?? []) as [number, number];
+            console.log("beginEditing Point coords:", coords);
+            if (coords.length < 2) {
+                console.warn("beginEditing: Point coords length is less than 2");
+                return;
+            }
+            ring = [[coords[0], coords[1]]];
+        }
+
         editingRef.current = {
             id: feature.id ?? feature.properties?.id,
             ring,
@@ -166,7 +261,9 @@ export function createEditingEngine(options: {
             isCircle,
             circleCenter: geom.circle_center,
             circleRadius: geom.circle_radius,
+            geometryType: type,
         };
+        console.log("beginEditing: initialized editingRef.current:", editingRef.current);
         setDeleteVertexMode(false);
         updateEditSources();
     };
@@ -192,8 +289,8 @@ export function createEditingEngine(options: {
             const idx = Number(feature?.properties?.idx);
             if (!Number.isInteger(idx)) return;
             e.preventDefault();
+            e.originalEvent.stopPropagation(); // Chặn sự kiện lan ra bản đồ tránh gây kéo/pan bản đồ
             if (deleteVertexModeRef.current) {
-                e.originalEvent.stopPropagation();
                 deleteVertex(idx);
                 return;
             }
@@ -240,7 +337,7 @@ export function createEditingEngine(options: {
             if (!editing) return;
             if (e.key === "Enter") {
                 finishEditing();
-            } else if (e.key === "Delete" && !editing.isCircle) {
+            } else if (e.key === "Delete" && editing.geometryType !== "Point" && !editing.isCircle) {
                 e.preventDefault();
                 setDeleteVertexMode(!deleteVertexModeRef.current);
             } else if (e.key === "Escape") {
@@ -256,7 +353,7 @@ export function createEditingEngine(options: {
         // Chuột phải vào handle để mở menu xóa/thêm đỉnh.
         const onHandleContextMenu = (e: maplibregl.MapLayerMouseEvent) => {
             const editing = editingRef.current;
-            if (!editing || editing.isCircle) return;
+            if (!editing || editing.geometryType === "Point" || editing.isCircle) return;
             e.preventDefault();
             e.originalEvent.stopPropagation();
             const feature = e.features?.[0];
@@ -281,15 +378,24 @@ export function createEditingEngine(options: {
         document.addEventListener("keydown", onKeyDown);
         map.getCanvas().addEventListener("mouseleave", onCanvasLeave);
 
-        map.on("remove", () => {
+        const cleanup = () => {
             map.off("mousedown", "edit-handles-circle", onHandleDown);
             map.off("contextmenu", "edit-handles-circle", onHandleContextMenu);
             map.off("mousemove", onHandleMove);
             map.off("mouseup", stopDragging);
             document.removeEventListener("keydown", onKeyDown);
-            map.getCanvas().removeEventListener("mouseleave", onCanvasLeave);
+            try {
+                map.getCanvas()?.removeEventListener("mouseleave", onCanvasLeave);
+            } catch {
+                // ignore
+            }
             hideContextMenu();
-        });
+            map.off("remove", cleanup);
+        };
+
+        map.on("remove", cleanup);
+
+        return cleanup;
     };
 
     const showHandleContextMenu = (x: number, y: number, idx: number) => {
@@ -328,9 +434,16 @@ export function createEditingEngine(options: {
         };
 
         const editing = editingRef.current;
-        const canDelete = Boolean(editing && !editing.isCircle && editing.ring.length > 3);
+        if (!editing) return;
+
+        const isLine = editing.geometryType === "LineString";
+        const canDelete = isLine ? editing.ring.length > 2 : editing.ring.length > 3;
+        const canInsert = isLine ? idx < editing.ring.length - 1 : true;
+
         menu.appendChild(createItem("Xóa đỉnh", () => deleteVertex(idx), !canDelete));
-        menu.appendChild(createItem("Thêm đỉnh", () => insertVertexAfter(idx)));
+        if (canInsert) {
+            menu.appendChild(createItem("Thêm đỉnh", () => insertVertexAfter(idx)));
+        }
 
         document.body.appendChild(menu);
         contextMenu = menu;
@@ -346,7 +459,10 @@ export function createEditingEngine(options: {
 
     const deleteVertex = (idx: number) => {
         const editing = editingRef.current;
-        if (!editing || editing.isCircle || editing.ring.length <= 3) return;
+        if (!editing || editing.geometryType === "Point" || editing.isCircle) return;
+        const isLine = editing.geometryType === "LineString";
+        const minLength = isLine ? 2 : 3;
+        if (editing.ring.length <= minLength) return;
         if (idx < 0 || idx >= editing.ring.length) return;
         editing.ring.splice(idx, 1);
         updateEditSources();
@@ -354,8 +470,11 @@ export function createEditingEngine(options: {
 
     const insertVertexAfter = (idx: number) => {
         const editing = editingRef.current;
-        if (!editing || editing.isCircle || editing.ring.length < 2) return;
+        if (!editing || editing.geometryType === "Point" || editing.isCircle || editing.ring.length < 2) return;
         if (idx < 0 || idx >= editing.ring.length) return;
+        const isLine = editing.geometryType === "LineString";
+        if (isLine && idx === editing.ring.length - 1) return;
+
         const current = editing.ring[idx];
         const next = editing.ring[(idx + 1) % editing.ring.length];
         const midpoint: [number, number] = [

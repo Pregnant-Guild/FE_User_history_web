@@ -496,8 +496,10 @@ export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureC
         if (!arrowGeometries) {
             arrowGeometries = [];
             const coordinateGroups = getLineCoordinateGroups(feature.geometry);
+            const featureType = getFeatureSemanticType(feature);
+            const isRetreat = featureType === "retreat_route";
             for (const coordinates of coordinateGroups) {
-                const geometry = buildPathArrowGeometry(coordinates);
+                const geometry = buildPathArrowGeometry(coordinates, isRetreat);
                 if (geometry) arrowGeometries.push(geometry);
             }
             pathArrowGeometriesCache.set(feature.geometry, arrowGeometries);
@@ -528,7 +530,7 @@ export function getFeatureSemanticType(feature: Feature): string | null {
     return normalizeGeoTypeKey(value);
 }
 
-export function buildPathArrowGeometry(coords: [number, number][]): Geometry | null {
+export function buildPathArrowGeometry(coords: [number, number][], isRetreatRoute = false): Geometry | null {
     const sourceCoords = removeDuplicatePathCoords(coords);
     if (sourceCoords.length < 2) return null;
 
@@ -553,54 +555,141 @@ export function buildPathArrowGeometry(coords: [number, number][]): Geometry | n
     const shoulderWidth = clampNumber(totalLength * 0.1, 10, 100000);
     const headWidth = shoulderWidth * 2.0;
 
-    const leftBody: ProjectedPoint[] = [];
-    const rightBody: ProjectedPoint[] = [];
-
-    for (let i = 0; i < bodyPoints.length; i += 1) {
-        const point = bodyPoints[i];
-        const normal = normalAt(bodyPoints, i);
-        const progress = bodyEndDistance > 0
-            ? Math.pow(clampNumber(point.distance / bodyEndDistance, 0, 1), 0.9)
-            : 0;
-        const width = tailWidth + (shoulderWidth - tailWidth) * progress;
-        const half = width / 2;
-        leftBody.push({
-            x: point.x + normal.x * half,
-            y: point.y + normal.y * half,
-        });
-        rightBody.push({
-            x: point.x - normal.x * half,
-            y: point.y - normal.y * half,
-        });
-    }
-
     const base = bodyPoints[bodyPoints.length - 1];
     const tip = pointAtDistance(measured, totalLength);
     const headNormal = normalFromSegment(base, tip) || normalAt(bodyPoints, bodyPoints.length - 1);
     const headHalf = headWidth / 2;
-    const headBaseLeft = {
-        x: base.x + headNormal.x * headHalf,
-        y: base.y + headNormal.y * headHalf,
-    };
-    const headBaseRight = {
-        x: base.x - headNormal.x * headHalf,
-        y: base.y - headNormal.y * headHalf,
-    };
 
-    const ring = [
-        ...leftBody,
-        headBaseLeft,
-        { x: tip.x, y: tip.y },
-        headBaseRight,
-        ...rightBody.reverse(),
-        leftBody[0],
-    ].map((point) => unprojectLngLat(point, origin, cosOriginLat));
+    if (isRetreatRoute) {
+        // Segmented Arrow (MultiPolygon)
+        const rings: [number, number][][] = [];
 
-    if (ring.length < 4) return null;
-    return {
-        type: "Polygon",
-        coordinates: [ring],
-    };
+        // 1. Generate body segments
+        const segmentLength = totalLength * 0.10; // Dash length
+        const gapLength = totalLength * 0.04;    // Gap length
+
+        let currentD = 0;
+        while (currentD < bodyEndDistance) {
+            const startD = currentD;
+            const endD = Math.min(startD + segmentLength, bodyEndDistance - gapLength);
+
+            if (endD - startD > totalLength * 0.01) {
+                const segmentPoints: MeasuredPoint[] = [];
+                segmentPoints.push(pointAtDistance(measured, startD));
+                
+                for (const p of bodyPoints) {
+                    if (p.distance > startD && p.distance < endD) {
+                        segmentPoints.push(p);
+                    }
+                }
+                
+                segmentPoints.push(pointAtDistance(measured, endD));
+
+                const leftBody: ProjectedPoint[] = [];
+                const rightBody: ProjectedPoint[] = [];
+
+                for (let i = 0; i < segmentPoints.length; i += 1) {
+                    const point = segmentPoints[i];
+                    const normal = normalAt(segmentPoints, i);
+                    const progress = bodyEndDistance > 0
+                        ? Math.pow(clampNumber(point.distance / bodyEndDistance, 0, 1), 0.9)
+                        : 0;
+                    const width = tailWidth + (shoulderWidth - tailWidth) * progress;
+                    const half = width / 2;
+                    leftBody.push({
+                        x: point.x + normal.x * half,
+                        y: point.y + normal.y * half,
+                    });
+                    rightBody.push({
+                        x: point.x - normal.x * half,
+                        y: point.y - normal.y * half,
+                    });
+                }
+
+                const ring = [
+                    ...leftBody,
+                    ...rightBody.reverse(),
+                    leftBody[0],
+                ].map((point) => unprojectLngLat(point, origin, cosOriginLat));
+
+                if (ring.length >= 4) {
+                    rings.push(ring);
+                }
+            }
+
+            currentD += segmentLength + gapLength;
+        }
+
+        // 2. Generate head segment (standalone arrowhead chevron/triangle)
+        const headBaseLeft = {
+            x: base.x + headNormal.x * headHalf,
+            y: base.y + headNormal.y * headHalf,
+        };
+        const headBaseRight = {
+            x: base.x - headNormal.x * headHalf,
+            y: base.y - headNormal.y * headHalf,
+        };
+        const headRing = [
+            { x: base.x, y: base.y },
+            headBaseLeft,
+            { x: tip.x, y: tip.y },
+            headBaseRight,
+            { x: base.x, y: base.y },
+        ].map((point) => unprojectLngLat(point, origin, cosOriginLat));
+
+        rings.push(headRing);
+
+        return {
+            type: "MultiPolygon",
+            coordinates: rings.map(r => [r]),
+        };
+    } else {
+        // Continuous Arrow (Polygon)
+        const leftBody: ProjectedPoint[] = [];
+        const rightBody: ProjectedPoint[] = [];
+
+        for (let i = 0; i < bodyPoints.length; i += 1) {
+            const point = bodyPoints[i];
+            const normal = normalAt(bodyPoints, i);
+            const progress = bodyEndDistance > 0
+                ? Math.pow(clampNumber(point.distance / bodyEndDistance, 0, 1), 0.9)
+                : 0;
+            const width = tailWidth + (shoulderWidth - tailWidth) * progress;
+            const half = width / 2;
+            leftBody.push({
+                x: point.x + normal.x * half,
+                y: point.y + normal.y * half,
+            });
+            rightBody.push({
+                x: point.x - normal.x * half,
+                y: point.y - normal.y * half,
+            });
+        }
+
+        const headBaseLeft = {
+            x: base.x + headNormal.x * headHalf,
+            y: base.y + headNormal.y * headHalf,
+        };
+        const headBaseRight = {
+            x: base.x - headNormal.x * headHalf,
+            y: base.y - headNormal.y * headHalf,
+        };
+
+        const ring = [
+            ...leftBody,
+            headBaseLeft,
+            { x: tip.x, y: tip.y },
+            headBaseRight,
+            ...rightBody.reverse(),
+            leftBody[0],
+        ].map((point) => unprojectLngLat(point, origin, cosOriginLat));
+
+        if (ring.length < 4) return null;
+        return {
+            type: "Polygon",
+            coordinates: [ring],
+        };
+    }
 }
 
 export type ProjectedPoint = {
@@ -833,11 +922,21 @@ function createFeatureLabelResolver(
     return (feature) => {
         const featureId = String(feature.properties.id);
         const directEntityIds = getFeatureEntityIds(feature);
+        let label: string | null = null;
         if (directEntityIds.length > 0) {
-            return directLabelsByFeatureId.get(featureId)?.label || null;
+            label = directLabelsByFeatureId.get(featureId)?.label || null;
+        } else {
+            label = inheritedLabelsByChildId.get(featureId)?.label || null;
         }
 
-        return inheritedLabelsByChildId.get(featureId)?.label || null;
+        if (!label) {
+            const geotype = feature.properties?.type || feature.properties?.entity_type_id;
+            if (geotype === "region") {
+                return "__Missing__";
+            }
+        }
+
+        return label;
     };
 }
 

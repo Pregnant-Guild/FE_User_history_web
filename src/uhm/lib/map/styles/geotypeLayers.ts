@@ -19,6 +19,8 @@ import { getCityLayers } from "./geotypes/city";
 import { getFortificationLayers } from "./geotypes/fortification";
 import { getRuinLayers } from "./geotypes/ruin";
 import { getPortLayers } from "./geotypes/port";
+import { getRegionLayers } from "./geotypes/region";
+import { getLocationLayers } from "./geotypes/location";
 import { getLineLabelLayers } from "./shared/lineLabels";
 import { getPolygonLabelLayers } from "./shared/polygonLabels";
 
@@ -42,7 +44,9 @@ export function getAllGeotypeLayers(sourceId: string, pathArrowSourceId?: string
         ...getCityLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getFortificationLayers(sourceId, pathArrowSourceId, pointSourceId),
         ...getRuinLayers(sourceId, pathArrowSourceId, pointSourceId),
-        ...getPortLayers(sourceId, pathArrowSourceId, pointSourceId)
+        ...getPortLayers(sourceId, pathArrowSourceId, pointSourceId),
+        ...getRegionLayers(sourceId, pathArrowSourceId, pointSourceId),
+        ...getLocationLayers(sourceId, pathArrowSourceId, pointSourceId)
     ];
 }
 

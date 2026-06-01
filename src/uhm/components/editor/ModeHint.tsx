@@ -41,7 +41,6 @@ export function ModeHint({ mode }: { mode: EditorMode }) {
             <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
                 <div style={{ marginBottom: 4 }}>Click vào hình trên map để Chọn (Select).</div>
                 <ul style={{ paddingLeft: 16, margin: 0, opacity: 0.85 }}>
-                    <li>(Khi đã chọn) Nhấp biểu tượng <b>Cây Bút</b> để sửa đỉnh.</li>
                     <li>Trong chế độ Sửa đỉnh:
                         <ul style={{ paddingLeft: 16, margin: "2px 0 0 0" }}>
                             <li><b>Enter</b>: Lưu hình đã sửa</li>

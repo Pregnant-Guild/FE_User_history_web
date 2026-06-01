@@ -367,10 +367,13 @@ export function initSelect(
         const canEditGeometry = allowGeometryEditing ? allowGeometryEditing() : true;
 
         if (isLocalTarget && !isClickOutsideSelection && canEditGeometry) {
+            const isEditableType =
+                (clickedFeature.source === "countries" && (clickedFeature.geometry?.type === "Polygon" || clickedFeature.geometry?.type === "LineString")) ||
+                (clickedFeature.source === "places" && clickedFeature.geometry?.type === "Point");
+
             if (
                 effectiveCount === 1 &&
-                clickedFeature.source === "countries" &&
-                clickedFeature.geometry?.type === "Polygon" &&
+                isEditableType &&
                 onEdit
             ) {
                 const single = clickedFeature;
