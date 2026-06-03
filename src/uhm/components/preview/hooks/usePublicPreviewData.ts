@@ -26,8 +26,9 @@ import { fetchBattleReplaysByGeometryIds } from "@/uhm/api/battleReplays";
 export function usePublicPreviewData(options: {
     timelineYear: number;
     timeRange: number;
+    enabled?: boolean;
 }) {
-    const { timelineYear, timeRange } = options;
+    const { timelineYear, timeRange, enabled = true } = options;
     const [data, setData] = useState<FeatureCollection>(EMPTY_FEATURE_COLLECTION);
     const [relations, setRelations] = useState<PreviewRelationIndex>(EMPTY_PREVIEW_RELATIONS);
     const [replays, setReplays] = useState<BattleReplay[]>([]);
@@ -38,6 +39,17 @@ export function usePublicPreviewData(options: {
     const timelineFetchRequestRef = useRef(0);
 
     useEffect(() => {
+        if (!enabled) {
+            setData(EMPTY_FEATURE_COLLECTION);
+            setRelations(EMPTY_PREVIEW_RELATIONS);
+            setReplays([]);
+            setIsTimelineLoading(false);
+            setIsRelationsLoading(false);
+            setTimelineStatus(null);
+            setRelationsStatus(null);
+            return;
+        }
+
         let disposed = false;
         const requestId = ++timelineFetchRequestRef.current;
 
@@ -132,12 +144,16 @@ export function usePublicPreviewData(options: {
                 buildRelationInputFromGeometryRelations(next, entitiesByGeometryId, {})
             );
             setRelations(entityOnlyRelations);
+            
+            // Mark loading as complete immediately so map transitions and becomes interactive
+            setIsRelationsLoading(false);
+            setRelationsStatus(null);
+
             if (!entityIds.length) {
-                setRelationsStatus(null);
-                setIsRelationsLoading(false);
                 return;
             }
 
+            // Fetch wiki previews in the background to populate hover cards without blocking map init
             try {
                 const wikisByEntityId = await fetchWikisByEntityIdsWithPreviews(entityIds);
                 if (disposed || requestId !== timelineFetchRequestRef.current) return;
@@ -145,19 +161,11 @@ export function usePublicPreviewData(options: {
                 setRelations(buildPublicPreviewRelationIndex(
                     buildRelationInputFromGeometryRelations(next, entitiesByGeometryId, wikisByEntityId)
                 ));
-                setRelationsStatus(null);
             } catch (err) {
                 if (err instanceof ApiError) {
-                    console.error("Load public map entity-wiki previews failed", err.body);
+                    console.error("Load background entity-wiki previews failed", err.body);
                 } else {
-                    console.error("Load public map entity-wiki previews failed", err);
-                }
-                if (!disposed && requestId === timelineFetchRequestRef.current) {
-                    setRelationsStatus("Không tải được tóm tắt wiki cho bản đồ.");
-                }
-            } finally {
-                if (!disposed && requestId === timelineFetchRequestRef.current) {
-                    setIsRelationsLoading(false);
+                    console.error("Load background entity-wiki previews failed", err);
                 }
             }
         }
@@ -166,7 +174,7 @@ export function usePublicPreviewData(options: {
         return () => {
             disposed = true;
         };
-    }, [timelineYear, timeRange]);
+    }, [timelineYear, timeRange, enabled]);
 
     const labelContextDraft = useMemo(
         () => buildEntityLabelContextDraft(data, relations),

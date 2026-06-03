@@ -2,8 +2,8 @@ import { API_ENDPOINTS } from "@/uhm/api/config";
 import { requestJson } from "@/uhm/api/http";
 import type { BattleReplay } from "@/uhm/types/projects";
 
-const BATCH_SIZE = 20;
-const BATCH_CONCURRENCY = 6;
+const BATCH_SIZE = 100;
+const BATCH_CONCURRENCY = 4;
 
 export async function fetchBattleReplaysByGeometryIds(geometryIds: string[]): Promise<Record<string, BattleReplay[]>> {
     const uniqueIds = Array.from(new Set(

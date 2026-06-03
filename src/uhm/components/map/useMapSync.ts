@@ -161,6 +161,17 @@ export function useMapSync({
         if (geolocationCenteredRef.current) return;
         if (fitToDraftBoundsRef.current) return;
         if (typeof window === "undefined") return;
+
+        // Nếu đã có tọa độ lưu từ phiên làm việc trước, không tự động dịch chuyển nữa
+        try {
+            if (window.localStorage.getItem("uhm:mapViewport")) {
+                geolocationCenteredRef.current = true;
+                return;
+            }
+        } catch {
+            // ignore
+        }
+
         if (!("geolocation" in navigator)) return;
 
         const map = mapRef.current;
@@ -175,7 +186,8 @@ export function useMapSync({
 
                 const currentZoom = map.getZoom();
                 const nextZoom = Number.isFinite(currentZoom) ? Math.max(currentZoom, 5) : 5;
-                map.easeTo({ center: [longitude, latitude], zoom: nextZoom, duration: 900 });
+                // Dùng jumpTo để teleport lập tức, loại bỏ hoạt ảnh trượt camera kéo dài
+                map.jumpTo({ center: [longitude, latitude], zoom: nextZoom });
             },
             () => { },
             { enableHighAccuracy: false, timeout: 4000, maximumAge: 60_000 }

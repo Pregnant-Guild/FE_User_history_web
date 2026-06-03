@@ -261,8 +261,6 @@ export function createReplayMapEffects() {
             if (path.length === 1) {
                 map.easeTo({
                     center: path[0],
-                    zoom: clampNumber(zoom, 1, 18, 8),
-                    pitch: clampNumber(pitch, 0, 85, 50),
                     duration: clampNumber(duration, 250, 60000, 5000),
                 });
                 return;
@@ -274,8 +272,6 @@ export function createReplayMapEffects() {
             if (totalDistance <= 0) return;
 
             const totalDuration = clampNumber(duration, 250, 60000, 5000);
-            const safeZoom = clampNumber(zoom, 1, 18, 8);
-            const safePitch = clampNumber(pitch, 0, 85, 50);
             const startedAt = performance.now();
             let rafId = 0;
             let unregister: Cleanup | null = null;
@@ -293,12 +289,8 @@ export function createReplayMapEffects() {
                 const progress = Math.min(1, (now - startedAt) / totalDuration);
                 const targetDistance = totalDistance * progress;
                 const center = interpolateMeasuredPath(measured, targetDistance);
-                const next = interpolateMeasuredPath(measured, Math.min(totalDistance, targetDistance + totalDistance * 0.02));
                 map.jumpTo({
                     center,
-                    zoom: safeZoom,
-                    pitch: safePitch,
-                    bearing: getBearing(center, next),
                 });
                 if (progress >= 1) {
                     stop();

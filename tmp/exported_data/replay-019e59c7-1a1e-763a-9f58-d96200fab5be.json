@@ -1,0 +1,1162 @@
+{
+  "exported_at": "2026-06-03T07:17:00.451Z",
+  "geometry_id": "019e59c7-1a1e-763a-9f58-d96200fab5be",
+  "current_replay": {
+    "id": "019e59c7-1a1e-763a-9f58-d96200fab5be",
+    "geometry_id": "019e59c7-1a1e-763a-9f58-d96200fab5be",
+    "target_geometry_ids": [
+      "019e59c7-1a1e-763a-9f58-d96200fab5be",
+      "019e46e3-8ec3-77ad-8c3c-b40055be267f",
+      "019e46ec-c8a5-7697-beb8-6cafc230e247",
+      "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab",
+      "019e46ed-07a3-73b9-8660-3c159c28bf1e",
+      "019e46ed-32e8-72bf-bb19-b6e0a2974ef0",
+      "019e46ee-b235-734e-a611-27362260a2f1",
+      "019e46ee-cf98-701a-b308-f9ae7d1714f3",
+      "019e46ee-e7d3-74f5-a2aa-07e6e245253c",
+      "019e46ee-f3e8-7788-b080-80c7f92050b5",
+      "019e46ef-02da-72e9-ba4e-ec5b18bbc508",
+      "019e46ef-1208-70ec-887e-9bb48dc5a5f3",
+      "019e46ef-33e0-7606-b4c0-91643717dc63",
+      "019e46ef-6440-73ea-ad57-0d8fe9910871",
+      "019e46ef-7f33-75b0-a1d4-f81ab7103ed7",
+      "019e46ef-a542-704d-bd51-3bfcfda31d29",
+      "019e46f0-a18a-75a9-b537-090ca511e573",
+      "019e46f0-b145-710a-a89f-0bbfb44fc2ef",
+      "019e46f0-c9fe-7661-8132-05eb9473348e",
+      "019e46f0-e6d5-70b5-b629-034acb04eceb",
+      "019e46f1-03f0-7112-a594-d6c9530810fc",
+      "019e46f1-190a-7385-bfad-f1fc78e37b89",
+      "019e46f1-27c1-77d6-a30b-0b776b464776",
+      "019e46f1-7632-724c-b0b6-b34752fa22a0",
+      "019e46f1-8528-72ff-bdc8-9c30e8494451",
+      "019e46f1-a152-731b-94f2-4f5461cef762",
+      "019e46f1-aba1-7312-afef-1e9c0cb05010",
+      "019e46f1-bac4-7739-8c73-81130593e131",
+      "019e46f1-d337-763e-bb48-c2ee3da9f0c4",
+      "019e46f1-ed27-717b-9518-f7680f24c476",
+      "019e46f2-0065-748d-9576-94f46a1114f5",
+      "019e46f2-137a-748b-ac2f-5b4fac11f196",
+      "019e46f2-2424-76ca-98ba-8e8bccf6f894",
+      "019e46f2-343a-73df-b842-c05a1a9416b8",
+      "019e46f2-5219-72b8-9c61-ee4bc361acf5",
+      "019e46f2-5ff6-757e-a2a2-cba551b49a46",
+      "019e46f2-6b93-7099-bc11-028f7532ebef",
+      "019e46f2-77cb-731f-9145-052ac0cb2e1e",
+      "019e46f2-c599-75ec-a9d5-f5dee9b07d52",
+      "019e46f2-d663-763f-b0d7-c9ae9c34b8fc",
+      "019e46f2-e840-7260-a33b-224cbf7b48d8",
+      "019e46f3-0524-77f8-9a38-cb5aae0b8949",
+      "019e46f3-39f5-776f-bf00-e5d95673c3c9",
+      "019e46f3-7aa5-73c8-afd0-ff5e6a944e08",
+      "019e4093-3207-70ff-9231-05ff00b07c73",
+      "019e414b-2b8a-70f8-b672-8e547dab2286",
+      "019e4008-f1d8-714e-9331-d95c0e700397",
+      "019e8222-dae3-77a6-a079-30203c4d3011",
+      "019e8221-11f7-76dd-9e4f-bd11b984382d",
+      "019e8220-1311-76aa-bb30-a14cd61b9114",
+      "019e8285-b88e-73cb-8989-24f46b0d569f",
+      "019e82d3-122f-73a8-b850-998a1870f46a",
+      "019e8213-a6da-76bf-8ea7-0933b3846825",
+      "019e821d-4a32-7389-8cf8-528767be5a06",
+      "019e821e-0e93-7400-a0a7-b823d5c19e97",
+      "019e82d5-ab45-72e8-8511-668df0bc54d5",
+      "019e82d6-d09b-7137-95e0-d49881b5325b",
+      "019e824e-2266-767f-bc6e-73558954f346",
+      "019e8251-3813-76be-8750-20b015d04c02",
+      "019e8251-e766-7368-81a6-88c5e4088fa7",
+      "019e8252-75a3-7599-8795-3480436cbfb0"
+    ],
+    "detail": [
+      {
+        "id": 0,
+        "title": "Bối cảnh & Ngoại giao ngoại bang (1281 - 1284)",
+        "detail_time_start": "1281",
+        "detail_time_stop": "1284",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e414b-2b8a-70f8-b672-8e547dab2286"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Năm 1281, hoàng đế nhà Nguyên lập An Nam tuyên úy ty, cử Sài Thung hộ tống Trần Di Ái về Đại Việt làm vua bù nhìn. Vua Trần Nhân Tông cho quân đón đánh tại biên giới, buộc Di Ái bỏ trốn, chỉ còn Sài Thung sang Thăng Long khiển trách triều đình."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e4008-f1d8-714e-9331-d95c0e700397"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Cuối năm 1282, tướng Nguyên Toa Đô chỉ huy hạm đội đánh Chiêm Thành ở phía Nam nhằm tạo thế hai gọng kìm. Quân dân Chiêm Thành rút vào rừng núi kháng chiến, nhà Trần cử binh và thuyền chiến sang giúp Chiêm nhằm cản bước tiến giặc."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "name": "set_dialog",
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Nhận thấy nguy cơ xâm lược cận kề, triều đình nhà Trần chuẩn bị kháng chiến. Trần Quốc Tuấn được phong Quốc công Tiết chế thống lĩnh quân đội. Hội nghị Bình Than (1282) và Hội nghị Diên Hồng (1284) củng cố quyết tâm quyết chiến của quân dân Đại Việt."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 1,
+        "title": "Hai gọng kìm Nguyên tràn sang (Tháng 1 - Tháng 2/1285)",
+        "detail_time_start": "01/1285",
+        "detail_time_stop": "02/1285",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [
+              {
+                "function_name": "wiki",
+                "params": [
+                  "019e5c83-8f17-7682-ad0c-d7d38d5a4790"
+                ]
+              }
+            ],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ee-b235-734e-a611-27362260a2f1"
+                  ],
+                  2500
+                ]
+              },
+              {
+                "function_name": "hide_others_geometries",
+                "params": [
+                  [
+                    "019e46ee-b235-734e-a611-27362260a2f1",
+                    "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                  ]
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Ngày 27/1/1285, Thoát Hoan dẫn đại quân Nguyên vượt biên giới Lạng Sơn tiến vào nước ta. Quốc công Tiết chế Trần Quốc Tuấn trực tiếp chỉ huy các lực lượng chặn kích địch tại Nội Bàng, Chi Lăng rồi chủ động lùi binh để bảo toàn chủ lực."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ef-6440-73ea-ad57-0d8fe9910871"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Ở hướng Tây Bắc, cánh quân Nguyên từ Vân Nam do Nasirud Din chỉ huy tiến qua Tuyên Quang xuôi theo dòng sông Chảy. Tướng Trần Nhật Duật chỉ huy lực lượng vùng biên ải chặn đánh kiên cường rồi rút lui chiến lược về giữ vùng đồng bằng."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ec-c8a5-7697-beb8-6cafc230e247"
+                  ],
+                  2500
+                ]
+              },
+              {
+                "function_name": "follow_geometries_path",
+                "params": [
+                  [
+                    "019e46ec-c8a5-7697-beb8-6cafc230e247"
+                  ],
+                  5000,
+                  8,
+                  50
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Từ phía Nam, cánh quân Toa Đô tiến đánh ra Nghệ An, Thanh Hóa nhằm khép chặt gọng kìm. Trần Kiện hàng giặc. Trần Quang Khải được triều đình điều vào trấn thủ để tổ chức phòng thủ dọc các tuyến sông lớn nhằm ngăn chặn quân Nguyên."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Rút lui chiến lược & Vườn không nhà trống (Tháng 2 - Tháng 3/1285)",
+        "detail_time_start": "02/1285",
+        "detail_time_stop": "03/1285",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ee-f3e8-7788-b080-80c7f92050b5",
+                    "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Sau những trận quyết chiến ác liệt tại phòng tuyến Vạn Kiếp chống lại thế giặc như vũ bão, Trần Quốc Tuấn quyết định rút toàn bộ quân chủ lực về Thăng Long. Triều đình Trần nhanh chóng triệt thoái, bỏ lại một kinh thành trống rỗng cho giặc."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                  ],
+                  2500
+                ]
+              },
+              {
+                "function_name": "follow_geometries_path",
+                "params": [
+                  [
+                    "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                  ],
+                  5000,
+                  8,
+                  50
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Quân dân Thăng Long thực hiện xuất sắc chính sách 'Vườn không nhà trống'. Triều đình Trần cùng đại quân xuôi dòng sông Hồng tiến hành cuộc rút lui chiến lược về vùng Thiên Trường (Nam Định) và Trường Yên (Ninh Bình) để củng cố thế trận."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Để bảo vệ cuộc triệt thoái của triều đình, tướng Trần Bình Trọng chỉ huy chặn hậu quyết liệt tại bãi Thiên Mạc. Ông bị bắt, khẳng khái trả lời giặc: 'Ta thà làm quỷ nước Nam, chứ không thèm làm vương đất Bắc' và oanh liệt hy sinh."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Tiêu hao sinh lực & Bẻ gãy liên lạc giặc (Tháng 3 - Tháng 4/1285)",
+        "detail_time_start": "03/1285",
+        "detail_time_stop": "04/1285",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46e3-8ec3-77ad-8c3c-b40055be267f",
+                    "019e46ef-33e0-7606-b4c0-91643717dc63"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Thoát Hoan chiếm đóng Thăng Long nhưng lâm vào thế bị động sâu sắc. Quân dân Đại Việt triệt phá nguồn lương thảo, khiến quân Nguyên thiếu thốn lương thực trầm trọng, suy kiệt do dịch bệnh hoành hành dưới nắng hè oi ả."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab",
+                    "019e46ed-07a3-73b9-8660-3c159c28bf1e",
+                    "019e46ed-32e8-72bf-bb19-b6e0a2974ef0"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Ô Mã Nhi truy lùng gắt gao dọc sông Hồng nhưng bộ chỉ huy nhà Trần đã vượt biển Quảng Ninh vòng vào Thanh Hóa trú ẩn. Toa Đô tiến quân lên Ninh Bình nhưng hai cánh quân Nguyên hoàn toàn bị chia cắt, không thể liên lạc hay hợp binh."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Đại phản công thần tốc (Tháng 5 - Tháng 6/1285)",
+        "detail_time_start": "05/1285",
+        "detail_time_stop": "06/1285",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46f0-c9fe-7661-8132-05eb9473348e"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Tháng 5/1285, nhận thấy địch đã suy yếu, nhà Trần phát động tổng phản công. Trận đánh mở màn diễn ra oanh liệt tại bến Hàm Tử (Hưng Yên). Lực lượng do Trần Nhật Duật và Trần Quốc Toản chỉ huy đại bại thủy quân Toa Đô."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Thừa thắng xốc tới, Chiêu Minh vương Trần Quang Khải thống lĩnh thủy quân tấn công trực diện đồn Chương Dương (Hà Nội), đập tan phòng tuyến quan trọng nhất của quân Nguyên, giải phóng Thăng Long. Thoát Hoan chạy qua sông Hồng cố thủ."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Quân Trần quyết tâm tiêu diệt dứt điểm cánh quân phía Nam, vây chặt Toa Đô tại Tây Kết (Khoái Châu). Toa Đô bị chém đầu tại trận, mũi tiến công phía Nam của quân Nguyên tan vỡ hoàn toàn, Ô Mã Nhi phải chui vào thuyền thúng trốn ra biển."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Quân Nguyên tháo chạy về nước (Tháng 6/1285)",
+        "detail_time_start": "06/1285",
+        "detail_time_stop": "06/1285",
+        "steps": [
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46f0-e6d5-70b5-b629-034acb04eceb",
+                    "019e46ee-cf98-701a-b308-f9ae7d1714f3"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Thoát Hoan nghe tin Toa Đô tử trận liền hoảng loạn bỏ chạy từ Thăng Long về hướng Vạn Kiếp. Quân Trần truy kích quyết liệt. Tại sông Cầu và Vạn Kiếp, Nguyễn Khoái phục kích diệt vạn tên giặc, tướng Nguyên Lý Hằng trúng tên độc tử trận."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "duration": 6000,
+            "use_UI_function": [],
+            "use_geo_function": [
+              {
+                "function_name": "fly_to_geometries",
+                "params": [
+                  [
+                    "019e46ee-b235-734e-a611-27362260a2f1"
+                  ],
+                  2500
+                ]
+              }
+            ],
+            "use_map_function": [],
+            "use_narrow_function": [
+              {
+                "function_name": "set_dialog",
+                "params": [
+                  {
+                    "text": "Trên đường chạy trốn qua Lạng Sơn về nước, quân Nguyên liên tục bị các toán dân binh miền núi phục kích bắn tên độc. Thoát Hoan phải chui vào ống đồng để tránh tên, bắt quân lính khiêng chạy qua biên giới. Đất nước hoàn toàn sạch bóng quân thù."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "snapshot_fragment": {
+    "replays": [
+      {
+        "id": "019e59c7-1a1e-763a-9f58-d96200fab5be",
+        "geometry_id": "019e59c7-1a1e-763a-9f58-d96200fab5be",
+        "target_geometry_ids": [
+          "019e59c7-1a1e-763a-9f58-d96200fab5be",
+          "019e46e3-8ec3-77ad-8c3c-b40055be267f",
+          "019e46ec-c8a5-7697-beb8-6cafc230e247",
+          "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab",
+          "019e46ed-07a3-73b9-8660-3c159c28bf1e",
+          "019e46ed-32e8-72bf-bb19-b6e0a2974ef0",
+          "019e46ee-b235-734e-a611-27362260a2f1",
+          "019e46ee-cf98-701a-b308-f9ae7d1714f3",
+          "019e46ee-e7d3-74f5-a2aa-07e6e245253c",
+          "019e46ee-f3e8-7788-b080-80c7f92050b5",
+          "019e46ef-02da-72e9-ba4e-ec5b18bbc508",
+          "019e46ef-1208-70ec-887e-9bb48dc5a5f3",
+          "019e46ef-33e0-7606-b4c0-91643717dc63",
+          "019e46ef-6440-73ea-ad57-0d8fe9910871",
+          "019e46ef-7f33-75b0-a1d4-f81ab7103ed7",
+          "019e46ef-a542-704d-bd51-3bfcfda31d29",
+          "019e46f0-a18a-75a9-b537-090ca511e573",
+          "019e46f0-b145-710a-a89f-0bbfb44fc2ef",
+          "019e46f0-c9fe-7661-8132-05eb9473348e",
+          "019e46f0-e6d5-70b5-b629-034acb04eceb",
+          "019e46f1-03f0-7112-a594-d6c9530810fc",
+          "019e46f1-190a-7385-bfad-f1fc78e37b89",
+          "019e46f1-27c1-77d6-a30b-0b776b464776",
+          "019e46f1-7632-724c-b0b6-b34752fa22a0",
+          "019e46f1-8528-72ff-bdc8-9c30e8494451",
+          "019e46f1-a152-731b-94f2-4f5461cef762",
+          "019e46f1-aba1-7312-afef-1e9c0cb05010",
+          "019e46f1-bac4-7739-8c73-81130593e131",
+          "019e46f1-d337-763e-bb48-c2ee3da9f0c4",
+          "019e46f1-ed27-717b-9518-f7680f24c476",
+          "019e46f2-0065-748d-9576-94f46a1114f5",
+          "019e46f2-137a-748b-ac2f-5b4fac11f196",
+          "019e46f2-2424-76ca-98ba-8e8bccf6f894",
+          "019e46f2-343a-73df-b842-c05a1a9416b8",
+          "019e46f2-5219-72b8-9c61-ee4bc361acf5",
+          "019e46f2-5ff6-757e-a2a2-cba551b49a46",
+          "019e46f2-6b93-7099-bc11-028f7532ebef",
+          "019e46f2-77cb-731f-9145-052ac0cb2e1e",
+          "019e46f2-c599-75ec-a9d5-f5dee9b07d52",
+          "019e46f2-d663-763f-b0d7-c9ae9c34b8fc",
+          "019e46f2-e840-7260-a33b-224cbf7b48d8",
+          "019e46f3-0524-77f8-9a38-cb5aae0b8949",
+          "019e46f3-39f5-776f-bf00-e5d95673c3c9",
+          "019e46f3-7aa5-73c8-afd0-ff5e6a944e08",
+          "019e4093-3207-70ff-9231-05ff00b07c73",
+          "019e414b-2b8a-70f8-b672-8e547dab2286",
+          "019e4008-f1d8-714e-9331-d95c0e700397",
+          "019e8222-dae3-77a6-a079-30203c4d3011",
+          "019e8221-11f7-76dd-9e4f-bd11b984382d",
+          "019e8220-1311-76aa-bb30-a14cd61b9114",
+          "019e8285-b88e-73cb-8989-24f46b0d569f",
+          "019e82d3-122f-73a8-b850-998a1870f46a",
+          "019e8213-a6da-76bf-8ea7-0933b3846825",
+          "019e821d-4a32-7389-8cf8-528767be5a06",
+          "019e821e-0e93-7400-a0a7-b823d5c19e97",
+          "019e82d5-ab45-72e8-8511-668df0bc54d5",
+          "019e82d6-d09b-7137-95e0-d49881b5325b",
+          "019e824e-2266-767f-bc6e-73558954f346",
+          "019e8251-3813-76be-8750-20b015d04c02",
+          "019e8251-e766-7368-81a6-88c5e4088fa7",
+          "019e8252-75a3-7599-8795-3480436cbfb0"
+        ],
+        "detail": [
+          {
+            "id": 0,
+            "title": "Bối cảnh & Ngoại giao ngoại bang (1281 - 1284)",
+            "detail_time_start": "1281",
+            "detail_time_stop": "1284",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e414b-2b8a-70f8-b672-8e547dab2286"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Năm 1281, hoàng đế nhà Nguyên lập An Nam tuyên úy ty, cử Sài Thung hộ tống Trần Di Ái về Đại Việt làm vua bù nhìn. Vua Trần Nhân Tông cho quân đón đánh tại biên giới, buộc Di Ái bỏ trốn, chỉ còn Sài Thung sang Thăng Long khiển trách triều đình."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e4008-f1d8-714e-9331-d95c0e700397"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Cuối năm 1282, tướng Nguyên Toa Đô chỉ huy hạm đội đánh Chiêm Thành ở phía Nam nhằm tạo thế hai gọng kìm. Quân dân Chiêm Thành rút vào rừng núi kháng chiến, nhà Trần cử binh và thuyền chiến sang giúp Chiêm nhằm cản bước tiến giặc."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "name": "set_dialog",
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Nhận thấy nguy cơ xâm lược cận kề, triều đình nhà Trần chuẩn bị kháng chiến. Trần Quốc Tuấn được phong Quốc công Tiết chế thống lĩnh quân đội. Hội nghị Bình Than (1282) và Hội nghị Diên Hồng (1284) củng cố quyết tâm quyết chiến của quân dân Đại Việt."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "Hai gọng kìm Nguyên tràn sang (Tháng 1 - Tháng 2/1285)",
+            "detail_time_start": "01/1285",
+            "detail_time_stop": "02/1285",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [
+                  {
+                    "function_name": "wiki",
+                    "params": [
+                      "019e5c83-8f17-7682-ad0c-d7d38d5a4790"
+                    ]
+                  }
+                ],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ee-b235-734e-a611-27362260a2f1"
+                      ],
+                      2500
+                    ]
+                  },
+                  {
+                    "function_name": "hide_others_geometries",
+                    "params": [
+                      [
+                        "019e46ee-b235-734e-a611-27362260a2f1",
+                        "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                      ]
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Ngày 27/1/1285, Thoát Hoan dẫn đại quân Nguyên vượt biên giới Lạng Sơn tiến vào nước ta. Quốc công Tiết chế Trần Quốc Tuấn trực tiếp chỉ huy các lực lượng chặn kích địch tại Nội Bàng, Chi Lăng rồi chủ động lùi binh để bảo toàn chủ lực."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ef-6440-73ea-ad57-0d8fe9910871"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Ở hướng Tây Bắc, cánh quân Nguyên từ Vân Nam do Nasirud Din chỉ huy tiến qua Tuyên Quang xuôi theo dòng sông Chảy. Tướng Trần Nhật Duật chỉ huy lực lượng vùng biên ải chặn đánh kiên cường rồi rút lui chiến lược về giữ vùng đồng bằng."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ec-c8a5-7697-beb8-6cafc230e247"
+                      ],
+                      2500
+                    ]
+                  },
+                  {
+                    "function_name": "follow_geometries_path",
+                    "params": [
+                      [
+                        "019e46ec-c8a5-7697-beb8-6cafc230e247"
+                      ],
+                      5000,
+                      8,
+                      50
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Từ phía Nam, cánh quân Toa Đô tiến đánh ra Nghệ An, Thanh Hóa nhằm khép chặt gọng kìm. Trần Kiện hàng giặc. Trần Quang Khải được triều đình điều vào trấn thủ để tổ chức phòng thủ dọc các tuyến sông lớn nhằm ngăn chặn quân Nguyên."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Rút lui chiến lược & Vườn không nhà trống (Tháng 2 - Tháng 3/1285)",
+            "detail_time_start": "02/1285",
+            "detail_time_stop": "03/1285",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ee-f3e8-7788-b080-80c7f92050b5",
+                        "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Sau những trận quyết chiến ác liệt tại phòng tuyến Vạn Kiếp chống lại thế giặc như vũ bão, Trần Quốc Tuấn quyết định rút toàn bộ quân chủ lực về Thăng Long. Triều đình Trần nhanh chóng triệt thoái, bỏ lại một kinh thành trống rỗng cho giặc."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                      ],
+                      2500
+                    ]
+                  },
+                  {
+                    "function_name": "follow_geometries_path",
+                    "params": [
+                      [
+                        "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                      ],
+                      5000,
+                      8,
+                      50
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Quân dân Thăng Long thực hiện xuất sắc chính sách 'Vườn không nhà trống'. Triều đình Trần cùng đại quân xuôi dòng sông Hồng tiến hành cuộc rút lui chiến lược về vùng Thiên Trường (Nam Định) và Trường Yên (Ninh Bình) để củng cố thế trận."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46f2-5219-72b8-9c61-ee4bc361acf5"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Để bảo vệ cuộc triệt thoái của triều đình, tướng Trần Bình Trọng chỉ huy chặn hậu quyết liệt tại bãi Thiên Mạc. Ông bị bắt, khẳng khái trả lời giặc: 'Ta thà làm quỷ nước Nam, chứ không thèm làm vương đất Bắc' và oanh liệt hy sinh."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Tiêu hao sinh lực & Bẻ gãy liên lạc giặc (Tháng 3 - Tháng 4/1285)",
+            "detail_time_start": "03/1285",
+            "detail_time_stop": "04/1285",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46e3-8ec3-77ad-8c3c-b40055be267f",
+                        "019e46ef-33e0-7606-b4c0-91643717dc63"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Thoát Hoan chiếm đóng Thăng Long nhưng lâm vào thế bị động sâu sắc. Quân dân Đại Việt triệt phá nguồn lương thảo, khiến quân Nguyên thiếu thốn lương thực trầm trọng, suy kiệt do dịch bệnh hoành hành dưới nắng hè oi ả."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab",
+                        "019e46ed-07a3-73b9-8660-3c159c28bf1e",
+                        "019e46ed-32e8-72bf-bb19-b6e0a2974ef0"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Ô Mã Nhi truy lùng gắt gao dọc sông Hồng nhưng bộ chỉ huy nhà Trần đã vượt biển Quảng Ninh vòng vào Thanh Hóa trú ẩn. Toa Đô tiến quân lên Ninh Bình nhưng hai cánh quân Nguyên hoàn toàn bị chia cắt, không thể liên lạc hay hợp binh."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Đại phản công thần tốc (Tháng 5 - Tháng 6/1285)",
+            "detail_time_start": "05/1285",
+            "detail_time_stop": "06/1285",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46f0-c9fe-7661-8132-05eb9473348e"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Tháng 5/1285, nhận thấy địch đã suy yếu, nhà Trần phát động tổng phản công. Trận đánh mở màn diễn ra oanh liệt tại bến Hàm Tử (Hưng Yên). Lực lượng do Trần Nhật Duật và Trần Quốc Toản chỉ huy đại bại thủy quân Toa Đô."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46e3-8ec3-77ad-8c3c-b40055be267f"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Thừa thắng xốc tới, Chiêu Minh vương Trần Quang Khải thống lĩnh thủy quân tấn công trực diện đồn Chương Dương (Hà Nội), đập tan phòng tuyến quan trọng nhất của quân Nguyên, giải phóng Thăng Long. Thoát Hoan chạy qua sông Hồng cố thủ."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ec-e9dc-70b9-bd8a-f08eef8e51ab"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Quân Trần quyết tâm tiêu diệt dứt điểm cánh quân phía Nam, vây chặt Toa Đô tại Tây Kết (Khoái Châu). Toa Đô bị chém đầu tại trận, mũi tiến công phía Nam của quân Nguyên tan vỡ hoàn toàn, Ô Mã Nhi phải chui vào thuyền thúng trốn ra biển."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Quân Nguyên tháo chạy về nước (Tháng 6/1285)",
+            "detail_time_start": "06/1285",
+            "detail_time_stop": "06/1285",
+            "steps": [
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46f0-e6d5-70b5-b629-034acb04eceb",
+                        "019e46ee-cf98-701a-b308-f9ae7d1714f3"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Thoát Hoan nghe tin Toa Đô tử trận liền hoảng loạn bỏ chạy từ Thăng Long về hướng Vạn Kiếp. Quân Trần truy kích quyết liệt. Tại sông Cầu và Vạn Kiếp, Nguyễn Khoái phục kích diệt vạn tên giặc, tướng Nguyên Lý Hằng trúng tên độc tử trận."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "duration": 6000,
+                "use_UI_function": [],
+                "use_geo_function": [
+                  {
+                    "function_name": "fly_to_geometries",
+                    "params": [
+                      [
+                        "019e46ee-b235-734e-a611-27362260a2f1"
+                      ],
+                      2500
+                    ]
+                  }
+                ],
+                "use_map_function": [],
+                "use_narrow_function": [
+                  {
+                    "function_name": "set_dialog",
+                    "params": [
+                      {
+                        "text": "Trên đường chạy trốn qua Lạng Sơn về nước, quân Nguyên liên tục bị các toán dân binh miền núi phục kích bắn tên độc. Thoát Hoan phải chui vào ống đồng để tránh tên, bắt quân lính khiêng chạy qua biên giới. Đất nước hoàn toàn sạch bóng quân thù."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

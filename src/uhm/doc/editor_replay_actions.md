@@ -91,8 +91,6 @@ Shape mới nên dùng trực tiếp:
 | --- | --- | --- |
 | `set_camera_view` | `[state]` | `map.easeTo` center/zoom/pitch/bearing/duration |
 | `set_time_filter` | `[year: number]` | Set replay preview timeline year |
-| `enable_timeline_filter` | `[]` | Bật timeline filter |
-| `disable_timeline_filter` | `[]` | Tắt timeline filter |
 | `toggle_labels` | `[visible: boolean]` | Legacy labels toggle |
 | `show_labels` | `[]` | Hiện symbol text labels |
 | `hide_labels` | `[]` | Ẩn symbol text labels |
@@ -119,6 +117,8 @@ Shape mới nên dùng trực tiếp:
 | `follow_geometry_path` | `[geometryId, duration?, zoom?, pitch?]` | Camera chạy theo tọa độ path geometry |
 | `follow_geometries_path` | `[geometryIds, duration?, zoom?, pitch?]` | Camera chạy theo chuỗi path geometry |
 | `dim_other_geometries` | `[geometryIds]` | Chỉ hiện target ids, ẩn các geometry khác |
+| `set_as_background_geometries` | `[geometryIds]` | Đặt các geometry làm background (luôn hiển thị, không bị ẩn) |
+| `remove_from_background_geometries` | `[geometryIds]` | Loại bỏ các geometry khỏi danh sách background |
 
 Các visual effect dùng overlay source/layer riêng và không mutate geometry draft.
 
@@ -144,8 +144,6 @@ Map shortcuts:
 
 - `show_labels`
 - `hide_labels`
-- `enable_timeline_filter`
-- `disable_timeline_filter`
 - `set_time_filter`
 - `reset_camera_north`
 - `show_all_geometries`
@@ -162,6 +160,8 @@ Geo shortcuts:
 - `show_geometry_label`
 - `dim_other_geometries`
 - `set_geometry_style`
+- `set_as_background_geometries`
+- `remove_from_background_geometries`
 
 Narrative composer hiện hỗ trợ đầy đủ các narrative actions ở mục 6.
 

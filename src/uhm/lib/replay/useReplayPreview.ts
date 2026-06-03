@@ -93,6 +93,7 @@ export function useReplayPreview({
     const toastIdRef = useRef(0);
     const toastTimeoutsRef = useRef<number[]>([]);
     const baselineRef = useRef<PreviewBaseline | null>(null);
+    const backgroundIdsRef = useRef<Set<string>>(new Set());
     const effects = useMemo(() => createReplayMapEffects(), []);
 
     const selectedStageIdRef = useRef(selectedStageId);
@@ -144,6 +145,7 @@ export function useReplayPreview({
         playbackSpeedRef.current = 1;
         setPlaybackSpeed(1);
         setHiddenGeometryIds([]);
+        backgroundIdsRef.current.clear();
         effects.clear(getMapInstance());
         clearToasts();
     }, [clearToasts, effects, getMapInstance, setDialogWithRef]);
@@ -243,7 +245,9 @@ export function useReplayPreview({
             setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
         },
         hideGeometries: (ids) => {
-            const nextIds = normalizeIdList(ids);
+            const nextIds = normalizeIdList(ids).filter(
+                (id) => !backgroundIdsRef.current.has(id)
+            );
             if (!nextIds.length) return;
             setHiddenGeometryIds((prev) => {
                 const seen = new Set(prev);
@@ -259,8 +263,21 @@ export function useReplayPreview({
             setHiddenGeometryIds(
                 draft.features
                     .map((feature) => String(feature.properties.id))
-                    .filter((id) => !keepIds.has(id))
+                    .filter((id) => !backgroundIdsRef.current.has(id) && !keepIds.has(id))
             );
+        },
+        setAsBackgroundGeometries: (ids) => {
+            const nextIds = normalizeIdList(ids);
+            for (const id of nextIds) {
+                backgroundIdsRef.current.add(id);
+            }
+            setHiddenGeometryIds((prev) => prev.filter((id) => !nextIds.includes(id)));
+        },
+        removeFromBackgroundGeometries: (ids) => {
+            const nextIds = normalizeIdList(ids);
+            for (const id of nextIds) {
+                backgroundIdsRef.current.delete(id);
+            }
         },
         showAllGeometries: () => {
             setHiddenGeometryIds([]);

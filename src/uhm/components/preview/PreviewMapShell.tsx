@@ -48,6 +48,7 @@ type Props = {
     mapHandleRef?: React.RefObject<import("@/uhm/components/Map").MapHandle | null>;
     overlay?: ReactNode;
     children?: ReactNode;
+    onLoad?: () => void;
 };
 
 export default function PreviewMapShell({
@@ -86,6 +87,7 @@ export default function PreviewMapShell({
     mapHandleRef,
     overlay,
     children,
+    onLoad,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -126,6 +128,7 @@ export default function PreviewMapShell({
                     hoverPopupEnabled={hoverPopupEnabled}
                     getHoverPopupContent={getHoverPopupContent}
                     onPlayPreviewReplay={onPlayPreviewReplay}
+                    onLoad={onLoad}
                 />
 
                 <TimelineBar

@@ -101,7 +101,6 @@ export type UIOptionName =
 
 export type MapFunctionName =
     | "set_camera_view"          // Đặt trạng thái camera (center, zoom, pitch, bearing)
-    | "set_timeline_filter"      // Bật/tắt lọc timeline
     | "set_labels_visible";      // Ẩn/hiện nhãn (labels) trên bản đồ
 
 export type GeoFunctionName =
@@ -112,7 +111,9 @@ export type GeoFunctionName =
     | "pulse_geometry"           // Hiệu ứng pulse/emphasis cho geometry
     | "animate_dashed_border"    // Hiệu ứng border nét đứt chuyển động
     | "set_geometry_style"       // Đổi style trực tiếp của geometry
-    | "orbit_camera_around_geometry"; // Quay camera quanh một geometry
+    | "orbit_camera_around_geometry" // Quay camera quanh một geometry
+    | "set_as_background_geometries" // Đặt các geometry làm background (luôn hiện)
+    | "remove_from_background_geometries"; // Loại các geometry khỏi background
 
 export type NarrativeFunctionName =
     | "set_dialog";              // Đặt kịch bản đối thoại/hình ảnh dẫn chuyện mới (hoặc null để xóa)

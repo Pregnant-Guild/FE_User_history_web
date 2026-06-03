@@ -6,6 +6,7 @@ import { getBaseMapStyle } from "./useMapLayers";
 import { unregisterMapFromIconUpdates } from "@/uhm/lib/map/styles/geotypeLayers";
 
 const MAP_PROJECTION_STORAGE_KEY = "uhm:mapProjection";
+const MAP_VIEWPORT_STORAGE_KEY = "uhm:mapViewport";
 
 export function applyMapProjection(map: maplibregl.Map, isGlobe: boolean) {
     map.setProjection({ type: isGlobe ? "globe" : "mercator" });
@@ -50,17 +51,47 @@ export function useMapInstance() {
         if (!container) return;
 
         try {
+            let initialCenter: [number, number] = [0, 20];
+            let initialZoom = 2;
+            try {
+                const saved = window.localStorage.getItem(MAP_VIEWPORT_STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Number.isFinite(parsed.lng) && Number.isFinite(parsed.lat) && Number.isFinite(parsed.zoom)) {
+                        initialCenter = [parsed.lng, parsed.lat];
+                        initialZoom = parsed.zoom;
+                    }
+                }
+            } catch {
+                // ignore
+            }
+
             const map = new maplibregl.Map({
                 container,
                 attributionControl: false,
                 minZoom: MAP_MIN_ZOOM,
                 maxZoom: MAP_MAX_ZOOM,
                 style: getBaseMapStyle(),
-                center: [0, 20],
-                zoom: 2,
+                center: initialCenter,
+                zoom: initialZoom,
             });
 
             mapRef.current = map;
+
+            const saveViewport = () => {
+                const currentMap = mapRef.current;
+                if (!currentMap) return;
+                try {
+                    const center = currentMap.getCenter();
+                    const zoom = currentMap.getZoom();
+                    window.localStorage.setItem(
+                        MAP_VIEWPORT_STORAGE_KEY,
+                        JSON.stringify({ lng: center.lng, lat: center.lat, zoom })
+                    );
+                } catch {
+                    // ignore
+                }
+            };
 
             let throttleTimeout: any = null;
 
@@ -87,6 +118,7 @@ export function useMapInstance() {
                 syncZoomLevelImmediate();
                 map.on("zoom", syncZoomLevelThrottled);
                 map.on("zoomend", syncZoomLevelImmediate);
+                map.on("moveend", saveViewport);
                 setIsMapLoaded(true);
             });
 
@@ -96,6 +128,7 @@ export function useMapInstance() {
                 }
                 map.off("zoom", syncZoomLevelThrottled);
                 map.off("zoomend", syncZoomLevelImmediate);
+                map.off("moveend", saveViewport);
                 setIsMapLoaded(false);
                 if (mapRef.current === map) {
                     mapRef.current = null;

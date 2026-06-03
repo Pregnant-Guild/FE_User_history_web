@@ -776,26 +776,6 @@ function MapFunctionShortcutPanel({
                             )
                         }
                     />
-                    <ShortcutButton
-                        label="Enable Filter"
-                        tone="green"
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "set_timeline_filter", params: [true] }],
-                                "Map: enable timeline filter"
-                            )
-                        }
-                    />
-                    <ShortcutButton
-                        label="Disable Filter"
-                        tone="slate"
-                        onClick={() =>
-                            onAppendActions(
-                                [{ function_name: "set_timeline_filter", params: [false] }],
-                                "Map: disable timeline filter"
-                            )
-                        }
-                    />
                 </div>
             </div>
         </Panel>
@@ -874,6 +854,28 @@ function GeoFunctionShortcutPanel({
                             onAppendActions(
                                 [{ function_name: "hide_others_geometries", params: [selectedIds] }],
                                 `Geo: hide others ngoài ${selectedCount} geo`
+                            )
+                        }
+                    />
+                    <ShortcutButton
+                        label="Đặt làm BG"
+                        tone="teal"
+                        disabled={!hasSelection}
+                        onClick={() =>
+                            onAppendActions(
+                                [{ function_name: "set_as_background_geometries", params: [selectedIds] }],
+                                `Geo: đặt ${selectedCount} geo làm background`
+                            )
+                        }
+                    />
+                    <ShortcutButton
+                        label="Loại khỏi BG"
+                        tone="teal"
+                        disabled={!hasSelection}
+                        onClick={() =>
+                            onAppendActions(
+                                [{ function_name: "remove_from_background_geometries", params: [selectedIds] }],
+                                `Geo: loại ${selectedCount} geo khỏi background`
                             )
                         }
                     />

@@ -157,7 +157,6 @@ export type UIOptionName =
 
 export type MapFunctionName =
     | "set_camera_view"
-    | "set_timeline_filter"
     | "set_labels_visible";
 
 export type GeoFunctionName =
@@ -168,7 +167,9 @@ export type GeoFunctionName =
     | "pulse_geometry"
     | "animate_dashed_border"
     | "set_geometry_style"
-    | "orbit_camera_around_geometry";
+    | "orbit_camera_around_geometry"
+    | "set_as_background_geometries"
+    | "remove_from_background_geometries";
 
 export type NarrativeFunctionName =
     | "set_dialog";
@@ -234,7 +235,6 @@ export type ReplayUiParamTupleDocs = {
 
 export type ReplayMapFunctionParamTupleDocs = {
     set_camera_view: [state: ReplayCameraViewStateDoc];
-    set_timeline_filter: [enabled: boolean];
     set_labels_visible: [visible: boolean];
 };
 
@@ -276,6 +276,12 @@ export type ReplayGeoFunctionParamTupleDocs = {
         pitch?: number,
         revolutions?: number,
         duration?: number,
+    ];
+    set_as_background_geometries: [
+        geometry_ids: string[],
+    ];
+    remove_from_background_geometries: [
+        geometry_ids: string[],
     ];
 };
 

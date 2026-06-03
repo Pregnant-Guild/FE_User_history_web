@@ -1031,19 +1031,6 @@ function normalizeReplayMapAndGeoActions(
                     params: [params[0]],
                 });
                 break;
-            case "set_timeline_filter":
-                normalizedMapActions.push({
-                    function_name: "set_timeline_filter",
-                    params: [Boolean(params[0])],
-                });
-                break;
-            case "enable_timeline_filter":
-            case "disable_timeline_filter":
-                normalizedMapActions.push({
-                    function_name: "set_timeline_filter",
-                    params: [functionName === "enable_timeline_filter"],
-                });
-                break;
             case "set_labels_visible":
                 normalizedMapActions.push({
                     function_name: "set_labels_visible",
@@ -1191,6 +1178,18 @@ function normalizeReplayMapAndGeoActions(
             case "orbit_camera_around_geometry":
                 normalizedGeoActions.push({
                     function_name: "orbit_camera_around_geometry",
+                    params,
+                });
+                break;
+            case "set_as_background_geometries":
+                normalizedGeoActions.push({
+                    function_name: "set_as_background_geometries",
+                    params,
+                });
+                break;
+            case "remove_from_background_geometries":
+                normalizedGeoActions.push({
+                    function_name: "remove_from_background_geometries",
                     params,
                 });
                 break;

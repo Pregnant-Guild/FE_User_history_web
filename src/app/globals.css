@@ -1,13 +1,11 @@
 @import 'tailwindcss';
 
-@import './fonts.css';
-
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
-  --font-inter: "SF Pro Display", ui-sans-serif, system-ui, sans-serif;
+  --font-inter: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;

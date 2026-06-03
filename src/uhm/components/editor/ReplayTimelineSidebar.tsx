@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import type {
     BattleReplay,
     GeoFunctionName,
@@ -91,6 +91,7 @@ export default function ReplayTimelineSidebar({
     onStopPreview,
     onResetPreview,
 }: Props) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const stages = useMemo(() => replay?.detail || [], [replay?.detail]);
     const selectedStage =
         stages.find((stage) => stage.id === selectedStageId) ||
@@ -157,6 +158,77 @@ export default function ReplayTimelineSidebar({
         window.URL.revokeObjectURL(url);
     };
 
+    const handleImportReplayJsonClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleImportReplayJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const jsonText = e.target?.result as string;
+                const parsed = JSON.parse(jsonText);
+
+                let importedReplay: BattleReplay | null = null;
+                if (parsed && typeof parsed === "object") {
+                    if (parsed.current_replay && typeof parsed.current_replay === "object") {
+                        importedReplay = parsed.current_replay as BattleReplay;
+                    } else if (parsed.id && parsed.target_geometry_ids && Array.isArray(parsed.detail)) {
+                        importedReplay = parsed as BattleReplay;
+                    }
+                }
+
+                if (!importedReplay || !Array.isArray(importedReplay.detail)) {
+                    alert("Định dạng file JSON không hợp lệ cho Replay!");
+                    return;
+                }
+
+                if (replay && importedReplay.geometry_id !== replay.geometry_id) {
+                    const confirmImport = window.confirm(
+                        `Geometry ID của replay nhập vào (${importedReplay.geometry_id}) khác với geometry ID hiện tại (${replay.geometry_id}). Bạn có muốn tiếp tục?`
+                    );
+                    if (!confirmImport) return;
+                }
+
+                onMutateReplay("Replay: import JSON", (draftReplay) => {
+                    draftReplay.detail = importedReplay!.detail;
+                    draftReplay.target_geometry_ids = importedReplay!.target_geometry_ids || draftReplay.target_geometry_ids;
+                    draftReplay.id = replay?.id || draftReplay.id;
+                    draftReplay.geometry_id = replay?.geometry_id || draftReplay.geometry_id;
+                });
+            } catch (err) {
+                alert("Lỗi đọc file JSON: " + (err as Error).message);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = "";
+    };
+
+function getBackgroundGeometryIdsFromReplay(replay: any): Set<string> {
+    const bgIds = new Set<string>();
+    if (!replay || !Array.isArray(replay.detail)) return bgIds;
+    for (const stage of replay.detail) {
+        if (!Array.isArray(stage.steps)) continue;
+        for (const step of stage.steps) {
+            if (Array.isArray(step.use_geo_function)) {
+                for (const action of step.use_geo_function) {
+                    if (action.function_name === "set_as_background_geometries") {
+                        const ids = Array.isArray(action.params[0]) ? action.params[0] : [];
+                        for (const id of ids) bgIds.add(String(id));
+                    } else if (action.function_name === "remove_from_background_geometries") {
+                        const ids = Array.isArray(action.params[0]) ? action.params[0] : [];
+                        for (const id of ids) bgIds.delete(String(id));
+                    }
+                }
+            }
+        }
+    }
+    return bgIds;
+}
+
     const handleCreateStage = () => {
         if (!replay) return;
         if (!validateReplayTimeFormat(createStageForm.detail_time_start) ||
@@ -167,6 +239,19 @@ export default function ReplayTimelineSidebar({
             stages.length > 0
                 ? Math.max(...stages.map((stage) => stage.id)) + 1
                 : 0;
+
+        const bgIds = getBackgroundGeometryIdsFromReplay(replay);
+        const geometriesToHide = (replay.target_geometry_ids || []).filter(
+            (id: string) => !bgIds.has(String(id))
+        );
+        const initialGeoFunctions = [];
+        if (geometriesToHide.length > 0) {
+            initialGeoFunctions.push({
+                function_name: "set_geometry_visibility" as const,
+                params: [geometriesToHide, false],
+            });
+        }
+
         const nextStage: ReplayStage = {
             id: nextId,
             title: createStageForm.title.trim() || undefined,
@@ -177,7 +262,7 @@ export default function ReplayTimelineSidebar({
                     duration: 5000,
                     use_UI_function: [],
                     use_map_function: [],
-                    use_geo_function: [],
+                    use_geo_function: initialGeoFunctions,
                     use_narrow_function: [],
                 },
             ],
@@ -413,7 +498,7 @@ export default function ReplayTimelineSidebar({
                                 ? `Có ${pendingSaveCount} thay đổi chưa commit. Thoát replay để commit từ editor chính.`
                                 : "Replay đang đồng bộ với snapshot hiện tại."}
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                             <button
                                 type="button"
                                 onClick={onUndoReplay}
@@ -429,6 +514,31 @@ export default function ReplayTimelineSidebar({
                             </button>
                             <button
                                 type="button"
+                                onClick={onExitReplay}
+                                style={{
+                                    ...buttonStyle,
+                                    background: "#0f766e",
+                                    border: "none",
+                                }}
+                            >
+                                Thoát replay
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleImportReplayJsonClick}
+                                disabled={!replay}
+                                style={{
+                                    ...buttonStyle,
+                                    background: replay ? "#b45309" : "#1e293b",
+                                    border: "none",
+                                    cursor: replay ? "pointer" : "not-allowed",
+                                    opacity: replay ? 1 : 0.7,
+                                }}
+                            >
+                                Import JSON
+                            </button>
+                            <button
+                                type="button"
                                 onClick={handleExportReplayJson}
                                 disabled={!replay}
                                 style={{
@@ -441,18 +551,14 @@ export default function ReplayTimelineSidebar({
                             >
                                 Export JSON
                             </button>
-                            <button
-                                type="button"
-                                onClick={onExitReplay}
-                                style={{
-                                    ...buttonStyle,
-                                    background: "#0f766e",
-                                    border: "none",
-                                }}
-                            >
-                                Thoát replay
-                            </button>
                         </div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleImportReplayJson}
+                            accept=".json"
+                            style={{ display: "none" }}
+                        />
                         <div
                             style={{
                                 display: "grid",
@@ -1315,7 +1421,6 @@ const narrativeFunctionLabels: Record<NarrativeFunctionName, string> = {
 
 const mapFunctionLabels: Record<MapFunctionName, string> = {
     set_camera_view: "Camera view",
-    set_timeline_filter: "Lọc timeline",
     set_labels_visible: "Hiện nhãn map",
 };
 
@@ -1328,6 +1433,8 @@ const geoFunctionLabels: Record<GeoFunctionName, string> = {
     animate_dashed_border: "Border nét đứt",
     set_geometry_style: "Style geometry",
     orbit_camera_around_geometry: "Orbit quanh geo",
+    set_as_background_geometries: "Đặt làm background",
+    remove_from_background_geometries: "Loại khỏi background",
 };
 
 function buildStepActionEntries(step: ReplayStep): StepActionEntry[] {
@@ -1392,9 +1499,6 @@ function buildMapActionEntry(
     let summary = "Không có tham số.";
 
     switch (action.function_name) {
-        case "set_timeline_filter":
-            summary = `enabled=${Boolean(params[0] ?? true) ? "true" : "false"}`;
-            break;
         case "set_labels_visible":
             summary = `visible=${Boolean(params[0] ?? true) ? "true" : "false"}`;
             break;
@@ -1480,6 +1584,12 @@ function buildGeoActionEntry(
             summary = [
                 `keep=${summarizeGeometryIdsValue(params[0])}`,
             ].join(" | ");
+            break;
+        case "set_as_background_geometries":
+            summary = `geometry=${summarizeGeometryIdsValue(params[0])}`;
+            break;
+        case "remove_from_background_geometries":
+            summary = `geometry=${summarizeGeometryIdsValue(params[0])}`;
             break;
     }
 

@@ -31,6 +31,8 @@ export interface ReplayControllers {
     hideGeometries: (ids: string[]) => void;
     showOnlyGeometries: (ids: string[]) => void;
     showAllGeometries: () => void;
+    setAsBackgroundGeometries: (ids: string[]) => void;
+    removeFromBackgroundGeometries: (ids: string[]) => void;
 
     // Narrative Setters
     setDialog: (dialog: DialogState | null) => void;
@@ -59,9 +61,6 @@ export const dispatchReplayAction = (
                 return;
             case "set_labels_visible":
                 mapActions.set_labels_visible(map, asBooleanValue(params[0], true));
-                return;
-            case "set_timeline_filter":
-                controllers.setTimelineFilterEnabled(asBooleanValue(params[0], true));
                 return;
             case "fly_to_geometries":
                 mapActions.fly_to_geometries(
@@ -136,6 +135,12 @@ export const dispatchReplayAction = (
                     asNumberValue(params[3], 1),
                     asNumberValue(params[4], 5000)
                 );
+                return;
+            case "set_as_background_geometries":
+                controllers.setAsBackgroundGeometries(toStringValues(params[0]));
+                return;
+            case "remove_from_background_geometries":
+                controllers.removeFromBackgroundGeometries(toStringValues(params[0]));
                 return;
         }
     }
@@ -219,11 +224,6 @@ function normalizeSingleAction(action: any): ReplayAction<any> | null {
         // Map Functions
         case "set_camera_view":
             return { function_name, params };
-        case "set_timeline_filter":
-            return { function_name, params: [Boolean(params[0])] };
-        case "enable_timeline_filter":
-        case "disable_timeline_filter":
-            return { function_name: "set_timeline_filter", params: [function_name === "enable_timeline_filter"] };
         case "set_labels_visible":
         case "toggle_labels":
             return { function_name: "set_labels_visible", params: [Boolean(params[0])] };
@@ -260,6 +260,8 @@ function normalizeSingleAction(action: any): ReplayAction<any> | null {
         case "animate_dashed_border":
         case "set_geometry_style":
         case "orbit_camera_around_geometry":
+        case "set_as_background_geometries":
+        case "remove_from_background_geometries":
             return { function_name, params };
         case "show_geometry_label":
             return null;

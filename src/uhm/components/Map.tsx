@@ -1,8 +1,6 @@
 "use client";
 
 import { type CSSProperties, useEffect, useRef, forwardRef, useImperativeHandle, memo } from "react";
-import "maplibre-gl/dist/maplibre-gl.css";
-
 import { Feature, FeatureCollection, Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import type { EditorMode } from "@/uhm/lib/editor/session/sessionTypes";
@@ -74,6 +72,7 @@ type MapProps = {
     onPlayPreviewReplay?: () => void;
     viewMode?: "local" | "global";
     onViewModeChange?: (mode: "local" | "global") => void;
+    onLoad?: () => void;
 };
 
 const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
@@ -114,6 +113,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     onPlayPreviewReplay,
     viewMode = "local",
     onViewModeChange,
+    onLoad,
 }, ref) {
     // Ref giữ mode mới nhất cho MapLibre handlers được register một lần.
     const modeRef = useRef<MapProps["mode"]>(mode);
@@ -160,6 +160,11 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     onImageOverlayChangeRef.current = onImageOverlayChange;
     onBindGeometriesRef.current = onBindGeometries;
     localFeatureIdsRef.current = localFeatureIds;
+
+    useEffect(() => {
+        // Dynamically import MapLibre CSS to prevent it from blocking initial layout bundle CSS load.
+        import("maplibre-gl/dist/maplibre-gl.css");
+    }, []);
 
     // Hook sở hữu lifecycle MapLibre instance và các control camera/projection.
     const {
@@ -270,6 +275,12 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
         }
     }, [mode, isMapLoaded, mapRef]);
 
+    useEffect(() => {
+        if (isMapLoaded && onLoad) {
+            onLoad();
+        }
+    }, [isMapLoaded, onLoad]);
+
     const hasImageOverlay = Boolean(imageOverlay);
     useEffect(() => {
         const map = mapRef.current;
@@ -282,8 +293,32 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     }, [hasImageOverlay, isMapLoaded, mapRef]);
 
     return (
-        <div style={{ width: "100%", height, position: "relative" }}>
-            <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+        <div style={{ width: "100%", height, position: "relative", backgroundColor: "#0b1220" }}>
+            {/* Opaque map placeholder image for LCP optimization */}
+            <img
+                src="/images/map_placeholder.webp"
+                alt="Map Loading Placeholder"
+                fetchPriority="high"
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    zIndex: 0,
+                }}
+            />
+
+            <div 
+                ref={containerRef} 
+                style={{ 
+                    width: "100%", 
+                    height: "100%", 
+                    position: "relative", 
+                    zIndex: 1, 
+                    backgroundColor: "transparent" 
+                }} 
+            />
 
             {fatalInitError ? (
                 <div
