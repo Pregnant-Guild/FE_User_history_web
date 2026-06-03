@@ -30,6 +30,10 @@ export default function Page() {
                 src="/images/map_placeholder.webp"
                 alt="Map Background"
                 fetchPriority="high"
+                loading="eager"
+                decoding="sync"
+                width={1920}
+                height={1080}
                 style={{
                     position: "absolute",
                     inset: 0,
@@ -37,6 +41,8 @@ export default function Page() {
                     height: "100%",
                     objectFit: "cover",
                     zIndex: 0,
+                    backgroundImage: "url('data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQAgCdASoQAAkAAgA0JbACdAD0j9ruBiEAAP71e6Hb3PzxBzEI1XGXkdQ3Wq1ek8XLa1nPPm65FhrFIjmR0%2BxZwNUJBvg15I7CuzvhuunZ%2FUF83IaP8Evo6gAAAA%3D%3D')",
+                    backgroundSize: "cover",
                 }}
             />
 

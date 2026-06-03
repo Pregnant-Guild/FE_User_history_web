@@ -29,6 +29,10 @@ export default function MapPlaceholder({ isLoaderOnly = true, onEnter }: MapPlac
                     src="/images/map_placeholder.webp"
                     alt="Map Loading Placeholder"
                     fetchPriority="high"
+                    loading="eager"
+                    decoding="sync"
+                    width={1920}
+                    height={1080}
                     style={{
                         position: "absolute",
                         inset: 0,
@@ -37,6 +41,8 @@ export default function MapPlaceholder({ isLoaderOnly = true, onEnter }: MapPlac
                         objectFit: "cover",
                         zIndex: 1,
                         filter: "brightness(0.3) contrast(1.1)",
+                        backgroundImage: "url('data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQAgCdASoQAAkAAgA0JbACdAD0j9ruBiEAAP71e6Hb3PzxBzEI1XGXkdQ3Wq1ek8XLa1nPPm65FhrFIjmR0%2BxZwNUJBvg15I7CuzvhuunZ%2FUF83IaP8Evo6gAAAA%3D%3D')",
+                        backgroundSize: "cover",
                     }}
                 />
 
@@ -112,6 +118,10 @@ export default function MapPlaceholder({ isLoaderOnly = true, onEnter }: MapPlac
                 src="/images/map_placeholder.webp"
                 alt="Map Background"
                 fetchPriority="high"
+                loading="eager"
+                decoding="sync"
+                width={1920}
+                height={1080}
                 style={{
                     position: "absolute",
                     inset: 0,
@@ -122,6 +132,8 @@ export default function MapPlaceholder({ isLoaderOnly = true, onEnter }: MapPlac
                     transform: "scale(1.02)",
                     filter: "brightness(0.25) contrast(1.15) sepia(0.2)",
                     transition: "transform 10s ease-out",
+                    backgroundImage: "url('data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQAgCdASoQAAkAAgA0JbACdAD0j9ruBiEAAP71e6Hb3PzxBzEI1XGXkdQ3Wq1ek8XLa1nPPm65FhrFIjmR0%2BxZwNUJBvg15I7CuzvhuunZ%2FUF83IaP8Evo6gAAAA%3D%3D')",
+                    backgroundSize: "cover",
                 }}
             />
 

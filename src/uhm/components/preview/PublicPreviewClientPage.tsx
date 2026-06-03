@@ -33,7 +33,12 @@ import { clampYearToFixedRange, TIMELINE_DEBOUNCE_MS } from "@/uhm/lib/utils/tim
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
-export default function PublicPreviewClientPage() {
+interface PublicPreviewClientPageProps {
+    userHasEntered: boolean;
+    onEnter: () => void;
+}
+
+export default function PublicPreviewClientPage({ userHasEntered, onEnter }: PublicPreviewClientPageProps) {
     const [selectedFeatureIds, setSelectedFeatureIds] = useState<(string | number)[]>([]);
     const [timelineYear, setTimelineYear] = useState<number>(1000);
     const [timelineDraftYear, setTimelineDraftYear] = useState<number>(1000);
@@ -454,13 +459,13 @@ export default function PublicPreviewClientPage() {
                     position: "fixed",
                     inset: 0,
                     zIndex: 9999,
-                    pointerEvents: isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "none" : "auto",
-                    opacity: isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? 0 : 1,
-                    visibility: isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "hidden" : "visible",
+                    pointerEvents: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "none" : "auto",
+                    opacity: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? 0 : 1,
+                    visibility: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "hidden" : "visible",
                     transition: "opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s",
                 }}
             >
-                <MapPlaceholder />
+                <MapPlaceholder isLoaderOnly={userHasEntered} onEnter={onEnter} />
             </div>
 
             {linkEntityPopup ? (

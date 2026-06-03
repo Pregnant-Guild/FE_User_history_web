@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.css";
 import ChartTab from "../common/ChartTab";
 import { CalenderIcon } from "../../icons";
 
