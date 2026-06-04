@@ -216,7 +216,14 @@ export function setupMapLayers(
         type: "circle",
         source: "edit-handles",
         paint: {
-            "circle-color": "#f97316",
+            "circle-color": [
+                "match",
+                ["get", "status"],
+                "delete", "#ef4444",
+                "vertex", "#22c55e",
+                "edge", "#eab308",
+                "#3b82f6" // default none
+            ],
             "circle-radius": 22,
             "circle-opacity": 0.35,
             "circle-blur": 0.85,
@@ -228,9 +235,23 @@ export function setupMapLayers(
         type: "circle",
         source: "edit-handles",
         paint: {
-            "circle-color": "#f97316",
+            "circle-color": [
+                "match",
+                ["get", "status"],
+                "delete", "#ef4444",
+                "vertex", "#22c55e",
+                "edge", "#eab308",
+                "#3b82f6" // default none
+            ],
             "circle-radius": 12,
-            "circle-stroke-color": "#0f172a",
+            "circle-stroke-color": [
+                "match",
+                ["get", "status"],
+                "delete", "#7f1d1d",
+                "vertex", "#14532d",
+                "edge", "#713f12",
+                "#0f172a" // default none
+            ],
             "circle-stroke-width": 3,
         },
     });

@@ -61,8 +61,8 @@ export function initDrawing(
         if (getMode() !== "draw") return;
 
         let lngLat = e.lngLat;
-        // Dùng Shift (hoặc Alt nếu Shift bị maplibre chiếm dụng) để snap
-        if (e.originalEvent.shiftKey || e.originalEvent.altKey) {
+        // Dùng Shift để snap
+        if (e.originalEvent.shiftKey) {
             lngLat = snapToNearestGeometry(map, e.lngLat, e.point);
         }
 
@@ -75,7 +75,7 @@ export function initDrawing(
         if (getMode() !== "draw" || coords.length === 0) return;
 
         let lngLat = e.lngLat;
-        if (e.originalEvent.shiftKey || e.originalEvent.altKey) {
+        if (e.originalEvent.shiftKey) {
             lngLat = snapToNearestGeometry(map, e.lngLat, e.point);
         }
 

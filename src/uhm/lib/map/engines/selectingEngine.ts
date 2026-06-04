@@ -108,7 +108,7 @@ export function initSelect(
             return;
         }
 
-        const additive = !!e.originalEvent?.altKey;
+        const additive = !!e.originalEvent?.shiftKey;
         const didSelect = selectFeature(feature, additive);
         if (!didSelect) {
             onFeatureClick?.(null);

@@ -1,7 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { buildCircleRing, destinationPoint, distanceMeters } from "@/uhm/lib/map/geo/geoMath";
-import { snapToNearestGeometry } from "@/uhm/lib/map/engines/snapUtils";
+import { snapToNearestGeometry, snapToNearestGeometryDetailed } from "@/uhm/lib/map/engines/snapUtils";
 
 export type EditingHandle = {
     id: string | number;
@@ -28,6 +28,7 @@ export function createEditingEngine(options: {
     const editingRef = { current: null as EditingHandle | null };
     const dragStateRef = { current: null as { idx: number } | null };
     const deleteVertexModeRef = { current: false };
+    let vertexSnapStatuses: ("vertex" | "edge" | "none")[] = [];
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
 
@@ -35,6 +36,7 @@ export function createEditingEngine(options: {
     const clearEditing = () => {
         editingRef.current = null;
         dragStateRef.current = null;
+        vertexSnapStatuses = [];
         setDeleteVertexMode(false);
         hideContextMenu();
         const map = mapRef.current;
@@ -55,6 +57,42 @@ export function createEditingEngine(options: {
         let handles: GeoJSON.FeatureCollection<GeoJSON.Point>;
 
         const geomType = editing.geometryType || "Polygon";
+
+        const getHandleProperties = (idx: number, coordinate: [number, number], extraProps = {}) => {
+            let status: "none" | "vertex" | "edge" | "delete" = "none";
+            if (deleteVertexModeRef.current) {
+                status = "delete";
+            } else {
+                const isDragging = dragStateRef.current !== null;
+                const isDraggedVertex = dragStateRef.current?.idx === idx;
+                
+                if (isDragging && !isDraggedVertex && vertexSnapStatuses[idx]) {
+                    status = vertexSnapStatuses[idx];
+                } else {
+                    const lngLat = new maplibregl.LngLat(coordinate[0], coordinate[1]);
+                    const pointPx = map.project(lngLat);
+                    const snapResult = snapToNearestGeometryDetailed(map, lngLat, pointPx, editing.id);
+                    
+                    if (snapResult.type !== "none") {
+                        const dist = distanceMeters(coordinate, [snapResult.lngLat.lng, snapResult.lngLat.lat]);
+                        if (dist <= 1.0) {
+                            status = snapResult.type;
+                        } else {
+                            status = "none";
+                        }
+                    } else {
+                        status = "none";
+                    }
+                    
+                    vertexSnapStatuses[idx] = status;
+                }
+            }
+            return {
+                idx,
+                status,
+                ...extraProps
+            };
+        };
 
         if (geomType === "Polygon") {
             if (editing.isCircle && editing.circleCenter && editing.circleRadius !== undefined) {
@@ -79,12 +117,12 @@ export function createEditingEngine(options: {
                         {
                             type: "Feature",
                             geometry: { type: "Point", coordinates: editing.circleCenter },
-                            properties: { idx: 0, type: "center" },
+                            properties: getHandleProperties(0, editing.circleCenter, { type: "center" }),
                         },
                         {
                             type: "Feature",
                             geometry: { type: "Point", coordinates: radiusHandlePoint },
-                            properties: { idx: 1, type: "radius" },
+                            properties: getHandleProperties(1, radiusHandlePoint, { type: "radius" }),
                         },
                     ],
                 };
@@ -106,7 +144,7 @@ export function createEditingEngine(options: {
                     features: editing.ring.map((c, idx) => ({
                         type: "Feature",
                         geometry: { type: "Point", coordinates: c },
-                        properties: { idx },
+                        properties: getHandleProperties(idx, c),
                     })),
                 };
             }
@@ -127,7 +165,7 @@ export function createEditingEngine(options: {
                 features: editing.ring.map((c, idx) => ({
                     type: "Feature",
                     geometry: { type: "Point", coordinates: c },
-                    properties: { idx },
+                    properties: getHandleProperties(idx, c),
                 })),
             };
         } else {
@@ -143,7 +181,7 @@ export function createEditingEngine(options: {
                     {
                         type: "Feature",
                         geometry: { type: "Point", coordinates: editing.ring[0] },
-                        properties: { idx: 0 },
+                        properties: getHandleProperties(0, editing.ring[0]),
                     },
                 ],
             };
@@ -200,13 +238,7 @@ export function createEditingEngine(options: {
 
     const setDeleteVertexMode = (enabled: boolean) => {
         deleteVertexModeRef.current = enabled;
-        const map = mapRef.current;
-        if (!map || !map.isStyleLoaded() || !map.getLayer("edit-handles-circle")) return;
-        map.setPaintProperty("edit-handles-circle", "circle-color", enabled ? "#ef4444" : "#f97316");
-        map.setPaintProperty("edit-handles-circle", "circle-stroke-color", enabled ? "#7f1d1d" : "#0f172a");
-        if (map.getLayer("edit-handles-glow")) {
-            map.setPaintProperty("edit-handles-glow", "circle-color", enabled ? "#ef4444" : "#f97316");
-        }
+        updateEditSources();
     };
 
     // Bắt đầu chỉnh sửa từ feature polygon/line/point được chọn.
@@ -306,7 +338,7 @@ export function createEditingEngine(options: {
             if (!drag || !editing) return;
 
             const lngLat = e.originalEvent.shiftKey
-                ? snapToNearestGeometry(map, e.lngLat, e.point)
+                ? snapToNearestGeometry(map, e.lngLat, e.point, editing.id)
                 : e.lngLat;
             const nextCoordinate: [number, number] = [lngLat.lng, lngLat.lat];
 
@@ -329,6 +361,7 @@ export function createEditingEngine(options: {
             dragStateRef.current = null;
             map.getCanvas().style.cursor = "";
             map.dragPan.enable();
+            updateEditSources();
         };
 
         // Bắt phím điều khiển phiên chỉnh sửa.
@@ -465,6 +498,7 @@ export function createEditingEngine(options: {
         if (editing.ring.length <= minLength) return;
         if (idx < 0 || idx >= editing.ring.length) return;
         editing.ring.splice(idx, 1);
+        vertexSnapStatuses.splice(idx, 1);
         updateEditSources();
     };
 
@@ -482,6 +516,7 @@ export function createEditingEngine(options: {
             (current[1] + next[1]) / 2,
         ];
         editing.ring.splice(idx + 1, 0, midpoint);
+        vertexSnapStatuses.splice(idx + 1, 0, "none");
         updateEditSources();
     };
 

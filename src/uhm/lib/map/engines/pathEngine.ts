@@ -78,7 +78,7 @@ export function initPath(
     const onClick = (e: maplibregl.MapLayerMouseEvent) => {
         if (getMode() !== "add-path") return;
 
-        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+        const lngLat = e.originalEvent.shiftKey
             ? snapToNearestGeometry(map, e.lngLat, e.point)
             : e.lngLat;
 
@@ -105,7 +105,7 @@ export function initPath(
         }
         if (coords.length === 0) return;
 
-        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+        const lngLat = e.originalEvent.shiftKey
             ? snapToNearestGeometry(map, e.lngLat, e.point)
             : e.lngLat;
         updatePreview([...coords, [lngLat.lng, lngLat.lat]]);

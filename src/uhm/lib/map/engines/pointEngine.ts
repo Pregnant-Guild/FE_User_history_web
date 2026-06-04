@@ -13,7 +13,7 @@ export function initPoint(
     function onClick(e: maplibregl.MapLayerMouseEvent) {
         if (getMode() !== "add-point") return;
 
-        const lngLat = e.originalEvent.shiftKey || e.originalEvent.altKey
+        const lngLat = e.originalEvent.shiftKey
             ? snapToNearestGeometry(map, e.lngLat, e.point)
             : e.lngLat;
 

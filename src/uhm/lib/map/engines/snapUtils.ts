@@ -12,18 +12,33 @@ type GeometryWithCoordinates = Exclude<GeoJSON.Geometry, GeoJSON.GeometryCollect
     coordinates: unknown;
 };
 
+export type SnapResult = {
+    lngLat: maplibregl.LngLat;
+    type: "vertex" | "edge" | "none";
+};
+
 export function snapToNearestGeometry(
     map: maplibregl.Map,
     lngLat: maplibregl.LngLat,
-    pointPx: maplibregl.Point
+    pointPx: maplibregl.Point,
+    excludeFeatureId?: string | number | null
 ): maplibregl.LngLat {
+    return snapToNearestGeometryDetailed(map, lngLat, pointPx, excludeFeatureId).lngLat;
+}
+
+export function snapToNearestGeometryDetailed(
+    map: maplibregl.Map,
+    lngLat: maplibregl.LngLat,
+    pointPx: maplibregl.Point,
+    excludeFeatureId?: string | number | null
+): SnapResult {
     const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
         [pointPx.x - QUERY_THRESHOLD_PX, pointPx.y - QUERY_THRESHOLD_PX],
         [pointPx.x + QUERY_THRESHOLD_PX, pointPx.y + QUERY_THRESHOLD_PX],
     ];
 
     const snapLayerIds = getSnapLayerIds(map);
-    if (!snapLayerIds.length) return lngLat;
+    if (!snapLayerIds.length) return { lngLat, type: "none" };
 
     const features = map.queryRenderedFeatures(bbox, {
         layers: snapLayerIds,
@@ -38,7 +53,7 @@ export function snapToNearestGeometry(
         return (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
     };
 
-    // Tìm điểm gần nhất trên đoạn thẳng [a, b] so với điểm p
+    // Tìm điểm gần nhất trên đoạn thẳng [a, b] so với điểm p (tính trên pixel màn hình)
     const getClosestPointOnSegment = (p: maplibregl.Point, a: maplibregl.Point, b: maplibregl.Point): maplibregl.Point => {
         const atob = { x: b.x - a.x, y: b.y - a.y };
         const atop = { x: p.x - a.x, y: p.y - a.y };
@@ -49,6 +64,30 @@ export function snapToNearestGeometry(
         t = Math.max(0, Math.min(1, t));
         
         return new maplibregl.Point(a.x + atob.x * t, a.y + atob.y * t);
+    };
+
+    // Tìm điểm gần nhất trên đoạn thẳng kinh vĩ độ [a, b] so với tọa độ con trỏ p (bảo toàn độ chính xác 64-bit)
+    const getClosestPointOnLngLatSegment = (p: maplibregl.LngLat, a: Coordinate, b: Coordinate): maplibregl.LngLat => {
+        const latRad = ((a[1] + b[1] + p.lat) / 3) * Math.PI / 180;
+        const cosLat = Math.cos(latRad);
+        
+        const ax = a[0] * cosLat, ay = a[1];
+        const bx = b[0] * cosLat, by = b[1];
+        const px = p.lng * cosLat, py = p.lat;
+        
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        
+        if (lenSq === 0) return new maplibregl.LngLat(a[0], a[1]);
+        
+        let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        
+        const resultLng = (ax + dx * t) / cosLat;
+        const resultLat = ay + dy * t;
+        
+        return new maplibregl.LngLat(resultLng, resultLat);
     };
 
     const processVertex = (coordinate: Coordinate) => {
@@ -84,7 +123,7 @@ export function snapToNearestGeometry(
             
             if (distSq < nearestEdgeDist && distSq <= EDGE_SNAP_THRESHOLD_PX ** 2) {
                 nearestEdgeDist = distSq;
-                nearestEdgeLngLat = map.unproject(closestPx);
+                nearestEdgeLngLat = getClosestPointOnLngLatSegment(lngLat, start, end);
             }
         }
     };
@@ -100,6 +139,14 @@ export function snapToNearestGeometry(
         // Bỏ qua các layer preview hoặc edit để không tự snap vào nét đang vẽ dở.
         if (feature.layer.id.includes("preview") || feature.layer.id.includes("edit-")) {
             continue;
+        }
+
+        // Bỏ qua chính đối tượng đang được chỉnh sửa để không tự snap vào chính nó
+        const fId = feature.id ?? feature.properties?.id;
+        if (excludeFeatureId !== undefined && excludeFeatureId !== null && fId !== undefined && fId !== null) {
+            if (String(fId) === String(excludeFeatureId)) {
+                continue;
+            }
         }
 
         const type = feature.geometry.type;
@@ -124,7 +171,13 @@ export function snapToNearestGeometry(
         }
     }
 
-    return nearestVertexLngLat || nearestEdgeLngLat || lngLat;
+    if (nearestVertexLngLat) {
+        return { lngLat: nearestVertexLngLat, type: "vertex" };
+    }
+    if (nearestEdgeLngLat) {
+        return { lngLat: nearestEdgeLngLat, type: "edge" };
+    }
+    return { lngLat, type: "none" };
 }
 
 function getSnapLayerIds(map: maplibregl.Map): string[] {
