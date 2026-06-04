@@ -100,6 +100,13 @@ export function useMapSync({
     const lastPathArrowStrRef = useRef("");
 
     useEffect(() => {
+        const map = mapRef.current;
+        if (map) {
+            (map as any)._renderDraftRef = renderDraftRef;
+        }
+    }, [mapRef]);
+
+    useEffect(() => {
         fitBoundsAppliedRef.current = false;
     }, [fitBoundsKey]);
 

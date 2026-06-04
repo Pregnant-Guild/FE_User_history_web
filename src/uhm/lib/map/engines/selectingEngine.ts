@@ -50,7 +50,7 @@ export function initSelect(
 
     // Chọn hoặc toggle đối tượng; giữ Alt để chọn cộng dồn/tắt chọn.
     function selectFeature(feature: maplibregl.MapGeoJSONFeature, additive: boolean) {
-        const id = feature.id ?? feature.properties?.id;
+        const id = feature.properties?.id ?? feature.id;
         if (id === undefined || id === null) return false;
 
         if (!additive) {
@@ -97,7 +97,7 @@ export function initSelect(
         }
 
         const feature = pickPreferredFeature(features);
-        const id = feature.id ?? feature.properties?.id;
+        const id = feature.properties?.id ?? feature.id;
         if (id === undefined || id === null) return;
         if (allowFeatureSelection && !allowFeatureSelection()) {
             onFeatureClick?.({
@@ -141,7 +141,7 @@ export function initSelect(
         if (!features.length) return;
 
         const feature = pickPreferredFeature(features);
-        const id = feature.id ?? feature.properties?.id;
+        const id = feature.properties?.id ?? feature.id;
         if (id === undefined || id === null) return;
 
         const isRightClickedItemAlreadySelected = Array.from(selectedIds).some(sid => String(sid) === String(id));

@@ -48,6 +48,7 @@ export function setupMapLayers(
         id: "draw-preview-fill",
         type: "fill",
         source: "draw-preview",
+        filter: ["==", ["get", "type"], "fill"],
         paint: {
             "fill-color": "#22c55e",
             "fill-opacity": 0.4,
@@ -58,6 +59,7 @@ export function setupMapLayers(
         id: "draw-preview-line",
         type: "line",
         source: "draw-preview",
+        filter: ["!=", ["get", "type"], "fill"],
         paint: {
             "line-color": "#16a34a",
             "line-width": 2,

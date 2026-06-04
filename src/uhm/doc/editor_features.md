@@ -118,22 +118,39 @@ Mặc định `type: "war"` và `geometry_preset: "circle-area"`.
 - `SelectedGeometryPanel`, `ProjectEntityRefsPanel` và `GeometryBindingPanel` đều đọc từ selection này.
 - Multi-select có tồn tại ở level state, nhưng một số thao tác chỉ hợp lệ khi các geometry cùng shape.
 
-### Vertex editing
+### Vertex editing (Chỉnh sửa đỉnh)
 
-Khi đang ở `select`, editor có thể sửa polygon/circle qua `editingEngine`.
+Khi đang ở chế độ `select`, nhấp đúp vào geometry để mở chế độ chỉnh sửa chi tiết qua `editingEngine`:
 
-- Kéo handle để đổi vị trí đỉnh.
-- Với circle:
-  - handle `0`: dời tâm
-  - handle `1`: đổi bán kính
-- `Ctrl` hoặc `Cmd` + click lên đường edit để chèn thêm đỉnh mới cho polygon.
-- `Enter` để áp dụng chỉnh sửa.
-- `Escape` để hủy chỉnh sửa.
+* **Kéo thả đỉnh (Move Vertex):** Kéo các handle (điểm tròn) để dịch chuyển vị trí đỉnh.
+* **Chỉnh sửa hình tròn (Circle Editing):** 
+  * Handle `0`: di chuyển tâm hình tròn.
+  * Handle `1`: thay đổi bán kính.
+* **Thêm đỉnh mới:** `Ctrl` (hoặc `Cmd`) + click vào một cạnh bất kỳ của Polygon/LineString để chèn thêm đỉnh mới.
+* **Vẽ tiếp / Bám dọc biên (Continue Draw / Tracing):**
+  * Nhấp chuột phải vào một đỉnh và chọn `"Vẽ tiếp về bên trái"` hoặc `"Vẽ tiếp về bên phải"`.
+  * Trong quá trình vẽ tiếp, nhấn giữ phím `T` để tự động bám dọc (trace) theo biên của hình học khác gần nhất.
+  * Hệ thống tự khóa snap vào đối tượng đang bám để tránh đứt gãy hình học, tự động khâu nối (`stitchRing`) và làm sạch đỉnh trùng bằng sai số sai biệt $10^{-9}$ để giữ nguyên nút kết nối.
+  * Nhấn `Backspace` để hoàn tác (undo) các đỉnh hoặc toàn bộ đoạn vừa bám (trace).
+  * Nhấn `Enter` để lưu đoạn vẽ tiếp, hoặc `Escape` để hủy.
+* **Xóa hàng loạt đỉnh (Range Delete):**
+  * Nhấn phím `Delete` (hoặc click nút Xóa đỉnh trên panel) để vào chế độ Xóa đỉnh (các handle đổi sang màu **Đỏ**).
+  * *Xóa đơn:* Nhấp chuột trái vào bất kỳ đỉnh nào để xóa đỉnh đó.
+  * *Xóa khoảng (Range Delete):* 
+    * Giữ phím `Shift` và click vào đỉnh đầu tiên (đổi sang màu **Xanh lá** làm điểm neo, các đỉnh khác đổi sang màu **Xanh dương** an toàn).
+    * Di chuyển chuột tới đỉnh thứ hai: Toàn bộ cung đường đi giữa hai điểm neo dự kiến xóa sẽ hiển thị màu **Đỏ**, các đỉnh không bị ảnh hưởng sẽ giữ màu **Xanh dương**.
+    * Đối với Polygon, mặc định cung đường ngắn nhất (trung điểm gần chuột nhất) sẽ được chọn. Người dùng có thể **nhấn giữ phím Alt** để cưỡng bức chọn cung ngược lại.
+    * Click vào đỉnh thứ hai (hoặc nhấn giữ Shift + click) để xác nhận xóa toàn bộ các đỉnh màu đỏ ở giữa.
+    * Nhấn `Escape` hoặc click chuột phải, hoặc click ra vùng trống ngoài bản đồ để hủy chọn khoảng xóa.
+  * Nhấn `Delete` lần nữa hoặc nhấn `Escape` (khi không chọn khoảng) để thoát chế độ Xóa đỉnh.
+* **Áp dụng & Hủy chỉnh sửa:** 
+  * Nhấn `Enter` để lưu toàn bộ thay đổi hình học.
+  * Nhấn `Escape` (khi không trong chế độ xóa/vẽ tiếp) để hủy bỏ mọi thay đổi và quay lại trạng thái cũ.
 
 ### Xóa geometry
 
-- Hành động xóa được đi qua `onDeleteFeature`.
-- Undo có thể khôi phục lại geometry vừa xóa.
+- Hành động xóa toàn bộ một hình học được đi qua `onDeleteFeature`.
+- Undo có thể khôi phục lại geometry vừa xóa cùng các liên kết tương ứng.
 
 ## 6. Metadata geometry
 

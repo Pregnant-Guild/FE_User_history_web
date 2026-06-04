@@ -84,5 +84,26 @@ graph TD
 | :--- | :---: | :---: | :--- |
 | **Hút vào Đỉnh (Vertex)** | Xanh lá | `#22c55e` | Điểm đang kéo trùng khít với một đỉnh mốc cũ của đối tượng địa lý khác. |
 | **Hút vào Cạnh (Edge)** | Vàng | `#eab308` | Điểm đang kéo nằm hoàn hảo trên đường nối giữa hai đỉnh của đối tượng địa lý khác. |
-| **Không hút (None)** | Xanh dương | `#3b82f6` | Điểm đang kéo tự do, không dính vào bất kỳ đối tượng nào (hoặc không nhấn Shift). |
+| **Không hút (None)** | Xanh dương | `#3b82f6` | Điểm đang kéo tự do, không dính vào bất kỳ đối tượng nào. |
 | **Chế độ xóa hàng loạt** | Đỏ | `#ef4444` | Toàn bộ các đỉnh chuyển sang màu đỏ khi bạn bật chế độ xóa đỉnh bằng phím `Delete`. |
+
+---
+
+## 6. Tính Năng Tự Động Bám Biên (Auto-Tracing)
+
+Khi vẽ bản đồ lịch sử, việc copy hoặc chạy dọc theo biên giới có sẵn của quốc gia láng giềng là cực kỳ thường gặp. Thay vì phải click thủ công từng đỉnh, hệ thống hỗ trợ **Auto-Tracing** (Bắt và chạy theo biên giới) với quy trình tối giản và chính xác.
+
+### Cách thức hoạt động:
+1. **Bật Snapping:** Nhấn giữ **`Shift`** khi click để đặt điểm bắt đầu trên biên giới (Point 1).
+2. **Kích hoạt Trace:** Nhấn tổ hợp **`Shift + T`** và click chọn điểm bắt đầu để hệ thống hiểu bạn muốn bắt đầu một chuỗi trace.
+3. **Xem trước (Preview):** Di chuột đến điểm kết thúc mong muốn (Point 2) trên cùng quốc gia đó. Một đường vẽ nháp **màu vàng hổ phách (`#eab308`)** sẽ tự động chạy dọc theo biên giới để bạn xem trước.
+4. **Chốt Trace:** Click chuột để chốt. Toàn bộ các đỉnh trung gian sẽ lập tức được chèn vào hình vẽ của bạn. Đường biên giới đã trace xong cũng sẽ giữ nguyên **màu vàng** để phân biệt với phần vẽ tự do (màu xanh lá).
+
+### Thuật toán Dò hướng tối ưu (Area-based Splitting):
+Khi chọn 2 điểm trên một đa giác khép kín (Polygon), biên giới sẽ chia đa giác làm 2 con đường (xuôi và ngược chiều kim đồng hồ). Để xác định chính xác người dùng muốn đi đường nào:
+1. Hệ thống tạo ra 2 đa giác phụ khép kín tương ứng với 2 con đường bằng cách nối thẳng điểm bắt đầu và điểm kết thúc.
+2. Tính diện tích của cả 2 đa giác phụ này.
+3. Chọn con đường thuộc đa giác phụ **có diện tích nhỏ hơn** (vì đường biên cần copy luôn là một lát cắt nhỏ của quốc gia, đa giác phụ chứa nó sẽ nhỏ hơn rất nhiều so với phần còn lại của quốc gia láng giềng).
+
+### Quay lại bước trước (Undo/Backspace):
+* Khi nhấn **`Backspace`** sau khi thực hiện trace, hệ thống sẽ **xóa hàng loạt** tất cả các đỉnh trung gian được copy của lượt trace đó, đưa hình vẽ quay trở lại ngay điểm bắt đầu trace (Point 1). Điều này giúp người dùng không phải bấm Backspace hàng chục lần để hoàn tác một đường biên phức tạp.

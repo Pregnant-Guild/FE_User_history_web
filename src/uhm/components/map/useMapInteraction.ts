@@ -132,6 +132,7 @@ export function useMapInteraction({
     }, [mode, mapRef]);
 
     const setupMapInteractions = (map: maplibregl.Map) => {
+        (map as any)._renderDraftRef = renderDraftRef;
         const drawingEngine = initDrawing(
             map,
             () => modeRef.current,
@@ -163,7 +164,7 @@ export function useMapInteraction({
                 onDeleteRef.current?.(id);
             },
             (feature) => {
-                const rawId = feature.id ?? feature.properties?.id;
+                const rawId = feature.properties?.id ?? feature.id;
                 const originalFeature = renderDraftRef.current.features.find(
                     (item) => String(item.properties.id) === String(rawId)
                 );
@@ -206,7 +207,7 @@ export function useMapInteraction({
             },
             (feature) => {
                 if (!onAddFeatureToProjectRef?.current) return;
-                const rawId = feature.id ?? feature.properties?.id;
+                const rawId = feature.properties?.id ?? feature.id;
                 if (rawId === undefined || rawId === null) return;
 
                 const originalFeature = renderDraftRef.current.features.find(
