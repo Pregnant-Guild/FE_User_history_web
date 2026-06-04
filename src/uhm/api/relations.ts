@@ -3,7 +3,7 @@ import { requestJson } from "@/uhm/api/http";
 import type { Entity } from "@/uhm/api/entities";
 import type { Wiki } from "@/uhm/api/wikis";
 
-const RELATION_BATCH_SIZE = 20;
+const RELATION_BATCH_SIZE = 10;
 const RELATION_BATCH_CONCURRENCY = 4;
 
 export type WikiContentPreview = {
