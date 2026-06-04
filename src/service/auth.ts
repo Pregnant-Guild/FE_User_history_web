@@ -62,8 +62,8 @@ export const apiResetPassword = async (payload: ResetPasswordPayload) => {
   return response.data;
 };
 
-export const apiGetCurrentUser = async () => {
-  const response = await api.get(API.User.CURRENT);
+export const apiGetCurrentUser = async (config?: any) => {
+  const response = await api.get(API.User.CURRENT, config);
   return response?.data;
 };
 

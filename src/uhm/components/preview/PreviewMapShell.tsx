@@ -121,7 +121,7 @@ export default function PreviewMapShell({
     useEffect(() => {
         const fetchUserAvatar = async () => {
             try {
-                const userData = await apiGetCurrentUser();
+                const userData = await apiGetCurrentUser({ skipRefresh: true } as any);
                 console.log("PreviewMapShell: Fetched userData:", userData);
                 if (userData?.data?.profile?.avatar_url) {
                     console.log("PreviewMapShell: Setting avatarUrl to:", userData.data.profile.avatar_url);
@@ -130,7 +130,7 @@ export default function PreviewMapShell({
                     console.log("PreviewMapShell: No avatar_url in profile:", userData?.data?.profile);
                 }
             } catch (err) {
-                console.error("PreviewMapShell: Failed to fetch user avatar:", err);
+                console.log("PreviewMapShell: No active session (user is guest)");
             }
         };
         fetchUserAvatar();
@@ -250,17 +250,34 @@ export default function PreviewMapShell({
                                 padding: 0,
                             }}
                         >
-                            <Image
-                                src={avatarUrl || "/images/no-images.jpg"}
-                                alt="Cài đặt"
-                                width={46}
-                                height={46}
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                }}
-                            />
+                            {avatarUrl ? (
+                                <Image
+                                    src={avatarUrl}
+                                    alt="Cài đặt"
+                                    width={46}
+                                    height={46}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                            ) : (
+                                <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#cbd5e1"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ transition: "color 0.2s ease" }}
+                                >
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                </svg>
+                            )}
                         </button>
 
                         {isMenuOpen && (
