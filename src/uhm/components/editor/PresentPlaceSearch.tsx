@@ -282,7 +282,8 @@ export default function PresentPlaceSearch({
             style={{
                 position: "absolute",
                 top: 10,
-                left: leftOffset,
+                left: "50%",
+                transform: "translateX(-50%)",
                 zIndex: 18,
                 width: "min(392px, calc(100vw - 36px))",
                 pointerEvents: "auto",

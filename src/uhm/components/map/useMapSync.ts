@@ -94,6 +94,10 @@ export function useMapSync({
     isPreviewModeRef.current = isPreviewMode;
 
     const fitBoundsAppliedRef = useRef(false);
+    const lastCountriesStrRef = useRef("");
+    const lastPlacesStrRef = useRef("");
+    const lastPolygonLabelStrRef = useRef("");
+    const lastPathArrowStrRef = useRef("");
 
     useEffect(() => {
         fitBoundsAppliedRef.current = false;
@@ -134,13 +138,31 @@ export function useMapSync({
         const polygonLabels = buildPolygonLabelFeatureCollection(polygons, labelContext, labelTimelineYear);
         const pathArrowShapes = buildPathArrowFeatureCollection(mapSourceDraft);
 
-        countriesSource.setData(labeledGeometries);
-        placesSource.setData(labeledPoints);
-        polygonLabelSource.setData(polygonLabels);
+        const countriesStr = JSON.stringify(labeledGeometries);
+        if (countriesStr !== lastCountriesStrRef.current) {
+            countriesSource.setData(labeledGeometries);
+            lastCountriesStrRef.current = countriesStr;
+        }
+
+        const placesStr = JSON.stringify(labeledPoints);
+        if (placesStr !== lastPlacesStrRef.current) {
+            placesSource.setData(labeledPoints);
+            lastPlacesStrRef.current = placesStr;
+        }
+
+        const polygonLabelsStr = JSON.stringify(polygonLabels);
+        if (polygonLabelsStr !== lastPolygonLabelStrRef.current) {
+            polygonLabelSource.setData(polygonLabels);
+            lastPolygonLabelStrRef.current = polygonLabelsStr;
+        }
 
         const pathArrowSource = map.getSource(PATH_ARROW_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
         if (pathArrowSource) {
-            pathArrowSource.setData(pathArrowShapes);
+            const pathArrowStr = JSON.stringify(pathArrowShapes);
+            if (pathArrowStr !== lastPathArrowStrRef.current) {
+                pathArrowSource.setData(pathArrowShapes);
+                lastPathArrowStrRef.current = pathArrowStr;
+            }
         }
 
         currentSelectedIds.forEach((id) => {

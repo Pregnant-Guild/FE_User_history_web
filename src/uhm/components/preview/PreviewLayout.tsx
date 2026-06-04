@@ -567,7 +567,6 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                 onFocusPlace={handleFocusPresentPlace}
                 onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
                 onClearFocus={clearPresentPlaceFocus}
-                leftOffset={18}
             />
 
             {isReplayPreviewMode ? (
@@ -596,6 +595,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                         top: 16,
                         right: 16,
                         bottom: 16,
+                        left: isLargeScreen ? "auto" : 16,
                         maxWidth: "calc(100vw - 2rem)",
                         zIndex: 20,
                     }}

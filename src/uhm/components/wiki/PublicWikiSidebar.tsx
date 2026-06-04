@@ -23,6 +23,8 @@ type Props = {
     onSidebarWidthChange?: (width: number) => void;
     maxDragWidth?: number;
     compactHeader?: boolean;
+    sidebarHeight?: number;
+    onSidebarHeightChange?: (height: number) => void;
 };
 
 function escapeHtml(input: string): string {
@@ -135,6 +137,8 @@ function PublicWikiSidebar({
     onSidebarWidthChange,
     maxDragWidth,
     compactHeader = false,
+    sidebarHeight,
+    onSidebarHeightChange,
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
     const tocContainerRef = useRef<HTMLDivElement | null>(null);
@@ -194,6 +198,48 @@ function PublicWikiSidebar({
             setWidth(nextWidth);
             if (typeof window !== "undefined") {
                 localStorage.setItem("public-wiki-sidebar-width", String(nextWidth));
+            }
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+    };
+
+    const handleHeightPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        const startY = event.clientY;
+        const startHeight = sidebarHeight || 400;
+
+        // Tạo đường ghost ảo nằm ngang chỉ vị trí kéo chiều cao
+        const ghost = document.createElement("div");
+        ghost.style.position = "fixed";
+        ghost.style.left = "0";
+        ghost.style.right = "0";
+        ghost.style.height = "4px";
+        ghost.style.backgroundColor = "#38bdf8";
+        ghost.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.8)";
+        ghost.style.zIndex = "99999";
+        ghost.style.cursor = "row-resize";
+        ghost.style.pointerEvents = "none";
+        
+        const startScreenY = window.innerHeight - startHeight;
+        ghost.style.top = `${startScreenY}px`;
+        document.body.appendChild(ghost);
+
+        const onMove = (e: PointerEvent) => {
+            ghost.style.top = `${e.clientY}px`;
+        };
+
+        const onUp = (e: PointerEvent) => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            if (ghost.parentNode) {
+                ghost.parentNode.removeChild(ghost);
+            }
+            const deltaY = startY - e.clientY;
+            const nextHeight = Math.max(200, Math.min(window.innerHeight * 0.9, startHeight + deltaY));
+            if (onSidebarHeightChange) {
+                onSidebarHeightChange(nextHeight);
             }
         };
 
@@ -281,23 +327,62 @@ function PublicWikiSidebar({
         return () => root.removeEventListener("click", handleClick);
     }, [onWikiLinkRequest, renderHtml]);
 
+    const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
+    useEffect(() => {
+        const checkDevice = () => setIsMobileOrTablet(window.innerWidth < 1024);
+        checkDevice();
+        window.addEventListener("resize", checkDevice);
+        return () => window.removeEventListener("resize", checkDevice);
+    }, []);
+
     return (
         <div
             style={{
-                width: `${width}px`,
+                width: "100%",
+                maxWidth: isMobileOrTablet ? "100%" : `${width}px`,
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",
                 minHeight: 0,
                 overflow: "hidden",
-                borderRadius: 20,
-                border: "1px solid rgba(148, 163, 184, 0.22)",
+                borderRadius: isMobileOrTablet ? "24px 24px 0 0" : 20,
+                border: isMobileOrTablet ? "1px solid rgba(148, 163, 184, 0.22)" : "1px solid rgba(148, 163, 184, 0.22)",
+                borderBottom: isMobileOrTablet ? "none" : "1px solid rgba(148, 163, 184, 0.22)",
+                borderLeft: isMobileOrTablet ? "none" : "1px solid rgba(148, 163, 184, 0.22)",
+                borderRight: isMobileOrTablet ? "none" : "1px solid rgba(148, 163, 184, 0.22)",
                 background: "linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85))",
                 boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
                 backdropFilter: "blur(12px)",
                 position: "relative",
             }}
         >
+            {/* Grab Handle for bottom sheet on mobile */}
+            {isMobileOrTablet ? (
+                <div
+                    onPointerDown={handleHeightPointerDown}
+                    style={{
+                        width: "100%",
+                        height: 24,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "row-resize",
+                        zIndex: 60,
+                        userSelect: "none",
+                        flexShrink: 0,
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 36,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: "rgba(255, 255, 255, 0.3)",
+                        }}
+                    />
+                </div>
+            ) : null}
+
             {/* Drag Handle on the left edge */}
             <div
                 onPointerDown={handlePointerDown}
@@ -311,7 +396,7 @@ function PublicWikiSidebar({
                     zIndex: 50,
                     userSelect: "none",
                 }}
-                className="group"
+                className="group hidden lg:block"
                 title="Kéo để chỉnh kích thước"
             >
                 {/* Visual drag line overlay */}

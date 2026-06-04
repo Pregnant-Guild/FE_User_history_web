@@ -173,7 +173,7 @@ function buildPopupNode(content: MapHoverPopupContent): HTMLElement {
     root.style.overflowY = "auto";
     root.style.padding = "12px";
     root.style.border = "1px solid rgba(255, 255, 255, 0.10)";
-    root.style.borderRadius = "12px";
+    root.style.borderRadius = "0px";
     root.style.background = "rgba(2, 6, 23, 0.95)";
     root.style.boxShadow = "0 18px 36px rgba(0, 0, 0, 0.35)";
     root.style.backdropFilter = "blur(8px)";
@@ -201,7 +201,7 @@ function buildPopupNode(content: MapHoverPopupContent): HTMLElement {
         }
         card.style.width = "100%";
         card.style.border = "1px solid rgba(255, 255, 255, 0.10)";
-        card.style.borderRadius = "8px";
+        card.style.borderRadius = "0px";
         card.style.background = "rgba(255, 255, 255, 0.03)";
         card.style.padding = "12px";
         card.style.textAlign = "left";
@@ -262,7 +262,7 @@ function stylePopupChrome(popup: maplibregl.Popup) {
     const content = element.querySelector(".maplibregl-popup-content") as HTMLElement | null;
     if (content) {
         content.style.padding = "0";
-        content.style.borderRadius = "12px";
+        content.style.borderRadius = "0px";
         content.style.background = "transparent";
         content.style.boxShadow = "none";
     }

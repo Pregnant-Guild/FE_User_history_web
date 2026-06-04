@@ -14,8 +14,10 @@ type Message = {
 
 export default function ChatbotWidget({
   projectId = "",
+  hideFloatingButton = false,
 }: {
   projectId?: string;
+  hideFloatingButton?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -32,6 +34,14 @@ export default function ChatbotWidget({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    const handleToggle = () => setIsOpen((prev) => !prev);
+    window.addEventListener("toggle-chatbot", handleToggle);
+    return () => {
+      window.removeEventListener("toggle-chatbot", handleToggle);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -93,7 +103,7 @@ export default function ChatbotWidget({
 
   return (
     <div className="fixed bottom-8 right-8 z-50">
-      {!isOpen && (
+      {!isOpen && !hideFloatingButton && (
         <button
           name="AI chat"
           onClick={() => setIsOpen(true)}

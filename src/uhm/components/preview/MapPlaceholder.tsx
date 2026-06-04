@@ -8,7 +8,7 @@ interface MapPlaceholderProps {
 
 export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
     return (
-        <div 
+        <div
             onClick={onEnter}
             style={{
                 position: "fixed",
@@ -50,7 +50,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
             />
 
             {/* Glowing background gradient lights - Warm Candle & Antique ambiance */}
-            <div 
+            <div
                 style={{
                     position: "absolute",
                     inset: 0,
@@ -60,7 +60,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
             />
 
             {/* Content Container (Antique, Luxurious serif typography) */}
-            <div 
+            <div
                 style={{
                     position: "relative",
                     zIndex: 3,
@@ -74,7 +74,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 }}
             >
                 {/* Title (Largest, gold/yellow color, antique Georgia font) */}
-                <h1 
+                <h1
                     style={{
                         fontFamily: "Georgia, serif",
                         fontSize: "min(52px, 10vw)",
@@ -91,7 +91,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 </h1>
 
                 {/* Subtitle / Description (Right below title, italic, elegant, muted color) */}
-                <p 
+                <p
                     style={{
                         fontFamily: "Georgia, serif",
                         fontStyle: "italic",
@@ -108,7 +108,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
             </div>
 
             {/* Bottom hint "nhấn vào chỗ bất kì để vào" with a slow breathing/fade pulse animation */}
-            <div 
+            <div
                 style={{
                     position: "absolute",
                     bottom: "50px",
@@ -122,7 +122,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                     pointerEvents: "none",
                 }}
             >
-                <div 
+                <div
                     style={{
                         fontFamily: "Georgia, serif",
                         fontSize: "12px",
@@ -137,7 +137,8 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 >
                     nhấn vào chỗ bất kì để vào
                 </div>
-                <style dangerouslySetInnerHTML={{ __html: `
+                <style dangerouslySetInnerHTML={{
+                    __html: `
                     @keyframes placeholder-pulse {
                         0%, 100% { opacity: 0.35; transform: scale(0.98); }
                         50% { opacity: 0.95; transform: scale(1); }

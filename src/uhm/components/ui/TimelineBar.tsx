@@ -145,6 +145,161 @@ export default function TimelineBar({
         onTimeRangeChange(Math.max(0, Math.min(30, safe)));
     };
 
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener("resize", checkMobile);
+        return () => window.removeEventListener("resize", checkMobile);
+    }, []);
+
+    useEffect(() => {
+        if (isMobile && typeof timeRange === "number" && timeRange !== 0 && onTimeRangeChange) {
+            onTimeRangeChange(0);
+        }
+    }, [isMobile, timeRange, onTimeRangeChange]);
+
+    if (isMobile) {
+        return (
+            <div
+                style={{
+                    position: "absolute",
+                    zIndex: style?.zIndex ?? 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    pointerEvents: "none",
+                    ...style,
+                    left: style?.left ?? 18,
+                    right: style?.right ?? 18,
+                    bottom: style?.bottom ?? 16,
+                }}
+                title={helperText || undefined}
+            >
+                {/* Year Controls row above */}
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 12,
+                        margin: "0 auto",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: "0px",
+                        padding: "6px 0",
+                        pointerEvents: "auto",
+                        boxShadow: "none",
+                        backdropFilter: "none",
+                        WebkitBackdropFilter: "none",
+                    }}
+                >
+                    {typeof filterEnabled === "boolean" && onFilterEnabledChange ? (
+                        <>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={filterEnabled}
+                                aria-label="Toggle timeline filter"
+                                title={filterEnabled ? "Đang bật lọc timeline" : "Đang tắt lọc timeline (hiển thị tất cả geometry)"}
+                                className={`${styles.toggleContainer} ${effectiveDisabled ? styles.disabled : ""}`}
+                                onClick={() => onFilterEnabledChange(!filterEnabled)}
+                                disabled={effectiveDisabled}
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className={`${styles.toggleTrack} ${filterEnabled ? styles.toggleTrackActive : ""}`}
+                                >
+                                    <span
+                                        className={`${styles.toggleThumb} ${filterEnabled ? styles.toggleThumbActive : ""}`}
+                                    />
+                                </span>
+                            </button>
+                            <div style={{ width: 1, height: 16, backgroundColor: "rgba(255, 255, 255, 0.15)" }} />
+                        </>
+                    ) : null}
+
+                    {/* Adjust decrease button on the left of input */}
+                    <button
+                        type="button"
+                        onMouseDown={() => startChangingYear(-1)}
+                        onMouseUp={stopChangingYear}
+                        onMouseLeave={stopChangingYear}
+                        onTouchStart={() => startChangingYear(-1)}
+                        onTouchEnd={stopChangingYear}
+                        disabled={effectiveDisabled}
+                        className={styles.adjustBtn}
+                        style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16 }}
+                        title="Giảm 1 năm"
+                        aria-label="Giảm 1 năm"
+                    >
+                        -
+                    </button>
+
+                    {/* Year Input */}
+                    <input
+                        type="number"
+                        min={lower}
+                        max={upper}
+                        step={1}
+                        value={displayYear}
+                        onChange={(event) => handleLocalYearChange(Number(event.target.value))}
+                        onBlur={finishLocalYearChange}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                finishLocalYearChange();
+                            }
+                        }}
+                        disabled={effectiveDisabled}
+                        className={styles.numberInput}
+                        style={{ width: 90, textAlign: "center", height: 32, padding: "0 6px" }}
+                        aria-label="Timeline exact year"
+                    />
+
+                    {/* Adjust increase button on the right of input */}
+                    <button
+                        type="button"
+                        onMouseDown={() => startChangingYear(1)}
+                        onMouseUp={stopChangingYear}
+                        onMouseLeave={stopChangingYear}
+                        onTouchStart={() => startChangingYear(1)}
+                        onTouchEnd={stopChangingYear}
+                        disabled={effectiveDisabled}
+                        className={styles.adjustBtn}
+                        style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16 }}
+                        title="Tăng 1 năm"
+                        aria-label="Tăng 1 năm"
+                    >
+                        +
+                    </button>
+                </div>
+
+                {/* Ruler row below: full width */}
+                <div
+                    className={`${styles.container} ${isLoading ? styles.containerLoading : ""} ${effectiveDisabled ? styles.disabled : ""}`}
+                    style={{
+                        position: "static", // Override absolute positioning of .container
+                        padding: "8px 12px",
+                        pointerEvents: "auto",
+                        width: "100%",
+                        borderRadius: "24px",
+                    }}
+                >
+                    <div className={styles.flexWrapper} style={{ width: "100%", display: "flex" }}>
+                        <CanvasTimelineRuler
+                            year={displayYear}
+                            onYearChange={handleLocalYearChange}
+                            onYearCommit={finishLocalYearChange}
+                            minYear={lower}
+                            maxYear={upper}
+                            disabled={effectiveDisabled}
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             className={`${styles.container} ${isLoading ? styles.containerLoading : ""} ${effectiveDisabled ? styles.disabled : ""}`}
@@ -298,6 +453,10 @@ function CanvasTimelineRuler({
         hasDragged: boolean;
     } | null>(null);
 
+    const activePointersRef = useRef<Record<number, { clientX: number; clientY: number }>>({});
+    const initialPinchDistanceRef = useRef<number | null>(null);
+    const initialSpanRef = useRef<number | null>(null);
+
     // Sync dimensions using ResizeObserver
     useEffect(() => {
         const container = containerRef.current;
@@ -325,7 +484,7 @@ function CanvasTimelineRuler({
         const width = dimensions.width;
         const height = dimensions.height;
 
-        ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
         ctx.scale(dpr, dpr);
@@ -501,49 +660,85 @@ function CanvasTimelineRuler({
             e.currentTarget.setPointerCapture(e.pointerId);
         } catch {}
 
-        dragRef.current = {
-            isDragging: true,
-            startX: e.clientX,
-            startYear: displayYearRef.current,
-            hasDragged: false,
-        };
+        activePointersRef.current[e.pointerId] = { clientX: e.clientX, clientY: e.clientY };
+
+        const activePointerIds = Object.keys(activePointersRef.current);
+        if (activePointerIds.length === 2) {
+            const p1 = activePointersRef.current[Number(activePointerIds[0])];
+            const p2 = activePointersRef.current[Number(activePointerIds[1])];
+            const dx = p1.clientX - p2.clientX;
+            const dy = p1.clientY - p2.clientY;
+            initialPinchDistanceRef.current = Math.sqrt(dx * dx + dy * dy);
+            initialSpanRef.current = span;
+            
+            if (dragRef.current) {
+                dragRef.current.isDragging = false;
+            }
+        } else {
+            dragRef.current = {
+                isDragging: true,
+                startX: e.clientX,
+                startYear: displayYearRef.current,
+                hasDragged: false,
+            };
+        }
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!dragRef.current || !dragRef.current.isDragging) return;
+        if (disabled) return;
         e.preventDefault();
 
-        const dx = e.clientX - dragRef.current.startX;
-        if (Math.abs(dx) > 3) {
-            dragRef.current.hasDragged = true;
-        }
+        activePointersRef.current[e.pointerId] = { clientX: e.clientX, clientY: e.clientY };
 
-        const yearsPerPixel = span / dimensions.width;
-        const deltaYears = -dx * yearsPerPixel;
-        const nextYear = clampYearValue(Math.round(dragRef.current.startYear + deltaYears), minYear, maxYear);
+        const activePointerIds = Object.keys(activePointersRef.current);
+        if (activePointerIds.length === 2 && initialPinchDistanceRef.current !== null && initialSpanRef.current !== null) {
+            const p1 = activePointersRef.current[Number(activePointerIds[0])];
+            const p2 = activePointersRef.current[Number(activePointerIds[1])];
+            const dx = p1.clientX - p2.clientX;
+            const dy = p1.clientY - p2.clientY;
+            const currentDist = Math.sqrt(dx * dx + dy * dy);
+            if (currentDist > 5) {
+                const zoomFactor = initialPinchDistanceRef.current / currentDist;
+                const nextSpan = Math.max(10, Math.min(10000, initialSpanRef.current * zoomFactor));
+                setSpan(Math.round(nextSpan));
+            }
+        } else if (dragRef.current && dragRef.current.isDragging) {
+            const dx = e.clientX - dragRef.current.startX;
+            if (Math.abs(dx) > 3) {
+                dragRef.current.hasDragged = true;
+            }
 
-        if (nextYear !== displayYearRef.current) {
-            displayYearRef.current = nextYear;
-            // Draw synchronously at 60fps
-            requestAnimationFrame(() => {
-                drawYear(displayYearRef.current);
-            });
-            onYearChange(nextYear);
+            const yearsPerPixel = span / dimensions.width;
+            const deltaYears = -dx * yearsPerPixel;
+            const nextYear = clampYearValue(Math.round(dragRef.current.startYear + deltaYears), minYear, maxYear);
+
+            if (nextYear !== displayYearRef.current) {
+                displayYearRef.current = nextYear;
+                requestAnimationFrame(() => {
+                    drawYear(displayYearRef.current);
+                });
+                onYearChange(nextYear);
+            }
         }
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!dragRef.current) return;
         e.preventDefault();
         try {
             e.currentTarget.releasePointerCapture(e.pointerId);
         } catch {}
 
+        delete activePointersRef.current[e.pointerId];
+        if (Object.keys(activePointersRef.current).length < 2) {
+            initialPinchDistanceRef.current = null;
+            initialSpanRef.current = null;
+        }
+
+        if (!dragRef.current) return;
         const dragInfo = dragRef.current;
         dragRef.current = null;
 
-        if (!dragInfo.hasDragged) {
-            // Click to jump
+        if (dragInfo.isDragging && !dragInfo.hasDragged) {
             const canvas = canvasRef.current;
             if (canvas) {
                 const rect = canvas.getBoundingClientRect();

@@ -63,8 +63,6 @@ export function usePublicPreviewData(options: {
             try {
                 next = await fetchGeometriesByBBox({ ...WORLD_BBOX, time: timelineYear, timeRange });
                 if (disposed || requestId !== timelineFetchRequestRef.current) return;
-                setRelations(EMPTY_PREVIEW_RELATIONS);
-                setData(next);
             } catch (err) {
                 if (err instanceof ApiError) {
                     console.error("Load public map geometries failed", err.body);
@@ -89,8 +87,11 @@ export function usePublicPreviewData(options: {
                 .map((feature) => String(feature.properties.id))
                 .filter((id) => Boolean(id) && UUID_REGEX.test(id));
             if (!geometryIds.length) {
-                setRelations(EMPTY_PREVIEW_RELATIONS);
-                setReplays([]);
+                if (!disposed && requestId === timelineFetchRequestRef.current) {
+                    setData(next);
+                    setRelations(EMPTY_PREVIEW_RELATIONS);
+                    setReplays([]);
+                }
                 return;
             }
 
@@ -120,7 +121,6 @@ export function usePublicPreviewData(options: {
                 fetchedReplays = Array.from(uniqueReplaysMap.values());
 
                 if (disposed || requestId !== timelineFetchRequestRef.current) return;
-                setReplays(fetchedReplays);
             } catch (err) {
                 if (err instanceof ApiError) {
                     console.error("Load public map geometry-entity relations failed", err.body);
@@ -128,7 +128,9 @@ export function usePublicPreviewData(options: {
                     console.error("Load public map geometry-entity relations failed", err);
                 }
                 if (!disposed && requestId === timelineFetchRequestRef.current) {
+                    setData(next); // Fallback to new geometry even if relations failed
                     setRelations(EMPTY_PREVIEW_RELATIONS);
+                    setReplays([]);
                     setRelationsStatus("Không tải được liên kết entity/wiki cho bản đồ.");
                     setIsRelationsLoading(false);
                 }
@@ -143,7 +145,11 @@ export function usePublicPreviewData(options: {
             const entityOnlyRelations = buildPublicPreviewRelationIndex(
                 buildRelationInputFromGeometryRelations(next, entitiesByGeometryId, {})
             );
+            
+            // Apply BOTH geometries and relations at the exact same React render cycle!
+            setData(next);
             setRelations(entityOnlyRelations);
+            setReplays(fetchedReplays);
             
             // Mark loading as complete immediately so map transitions and becomes interactive
             setIsRelationsLoading(false);

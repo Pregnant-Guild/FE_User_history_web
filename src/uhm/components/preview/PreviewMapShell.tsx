@@ -1,6 +1,9 @@
 "use client";
+import Image from "next/image";
 
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState, useEffect } from "react";
+import { apiGetCurrentUser } from "@/service/auth";
+import ChatbotWidget from "@/components/ui/chat/ChatbotWidget";
 import Map, { type MapFeaturePayload } from "@/uhm/components/Map";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
@@ -51,6 +54,10 @@ type Props = {
     onLoad?: () => void;
     instantLoad?: boolean;
     onToggleInstantLoad?: (val: boolean) => void;
+    isLayerPanelVisible?: boolean;
+    onLayerPanelVisibleChange?: (visible: boolean) => void;
+    sidebarHeight?: number;
+    onSidebarHeightChange?: (height: number) => void;
 };
 
 export default function PreviewMapShell({
@@ -92,8 +99,42 @@ export default function PreviewMapShell({
     onLoad,
     instantLoad = true,
     onToggleInstantLoad,
+    isLayerPanelVisible: propsLayerPanelVisible,
+    onLayerPanelVisibleChange,
+    sidebarHeight,
+    onSidebarHeightChange,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [localLayerPanelVisible, setLocalLayerPanelVisible] = useState(true);
+    const isLayerPanelVisible = propsLayerPanelVisible ?? localLayerPanelVisible;
+    const setIsLayerPanelVisible = onLayerPanelVisibleChange ?? setLocalLayerPanelVisible;
+    const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
+
+    useEffect(() => {
+        const checkDevice = () => setIsMobileOrTablet(window.innerWidth < 1024);
+        checkDevice();
+        window.addEventListener("resize", checkDevice);
+        return () => window.removeEventListener("resize", checkDevice);
+    }, []);
+
+    useEffect(() => {
+        const fetchUserAvatar = async () => {
+            try {
+                const userData = await apiGetCurrentUser();
+                console.log("PreviewMapShell: Fetched userData:", userData);
+                if (userData?.data?.profile?.avatar_url) {
+                    console.log("PreviewMapShell: Setting avatarUrl to:", userData.data.profile.avatar_url);
+                    setAvatarUrl(userData.data.profile.avatar_url);
+                } else {
+                    console.log("PreviewMapShell: No avatar_url in profile:", userData?.data?.profile);
+                }
+            } catch (err) {
+                console.error("PreviewMapShell: Failed to fetch user avatar:", err);
+            }
+        };
+        fetchUserAvatar();
+    }, []);
 
     const menuOptionStyle: CSSProperties = {
         width: 46,
@@ -133,6 +174,7 @@ export default function PreviewMapShell({
                     getHoverPopupContent={getHoverPopupContent}
                     onPlayPreviewReplay={onPlayPreviewReplay}
                     onLoad={onLoad}
+                    showViewportControls={false}
                 />
 
                 <TimelineBar
@@ -165,7 +207,7 @@ export default function PreviewMapShell({
                     style={{
                         position: "absolute",
                         top: 10,
-                        bottom: 20,
+                        bottom: (activeEntity && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
                         left: 18,
                         zIndex: 18,
                         display: "flex",
@@ -173,6 +215,7 @@ export default function PreviewMapShell({
                         gap: 12,
                         width: 58,
                         pointerEvents: "none",
+                        transition: "bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
                 >
                     <div
@@ -193,9 +236,8 @@ export default function PreviewMapShell({
                                 width: 46,
                                 height: 46,
                                 backgroundColor: "#1e293b",
-                                color: "#f8fafc",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: 12,
+                                border: "1px solid rgba(255, 255, 255, 0.15)",
+                                borderRadius: "50%",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -204,21 +246,21 @@ export default function PreviewMapShell({
                                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
                                 backdropFilter: "blur(8px)",
                                 flexShrink: 0,
+                                overflow: "hidden",
+                                padding: 0,
                             }}
                         >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                            </svg>
+                            <Image
+                                src={avatarUrl || "/images/no-images.jpg"}
+                                alt="Cài đặt"
+                                width={46}
+                                height={46}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                }}
+                            />
                         </button>
 
                         {isMenuOpen && (
@@ -233,9 +275,19 @@ export default function PreviewMapShell({
                             >
                                 <button
                                     type="button"
-                                    onClick={() => { window.location.href = "/user"; }}
-                                    title="Quản trị & Chỉnh sửa (Edit)"
-                                    style={menuOptionStyle}
+                                    onClick={() => {
+                                        if (isMobileOrTablet) {
+                                            alert("Tính năng quản trị và chỉnh sửa chỉ hỗ trợ trên máy tính (Desktop)");
+                                        } else {
+                                            window.location.href = "/user";
+                                        }
+                                    }}
+                                    title={isMobileOrTablet ? "Tính năng này chỉ hoạt động trên Desktop" : "Quản trị & Chỉnh sửa (Edit)"}
+                                    style={{
+                                        ...menuOptionStyle,
+                                        opacity: isMobileOrTablet ? 0.5 : 1,
+                                        cursor: isMobileOrTablet ? "not-allowed" : "pointer",
+                                    }}
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -255,6 +307,19 @@ export default function PreviewMapShell({
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill={instantLoad ? "#fbbf24" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                    </svg>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent("toggle-chatbot"));
+                                    }}
+                                    title="Trợ lý AI Lịch sử (Chatbot)"
+                                    style={menuOptionStyle}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                                     </svg>
                                 </button>
 
@@ -281,33 +346,110 @@ export default function PreviewMapShell({
                                         <line x1="12" y1="8" x2="12.01" y2="8" />
                                     </svg>
                                 </button>
+
+                                {!isLayerPanelVisible && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLayerPanelVisible(true)}
+                                        title="Hiện bảng lớp bản đồ"
+                                        style={{
+                                            ...menuOptionStyle,
+                                            color: "#10b981",
+                                            border: "1px solid rgba(16, 185, 129, 0.3)",
+                                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.15)",
+                                        }}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                            <circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    <div
-                        style={{
-                            flexGrow: 1,
-                            flexShrink: 1,
-                            minHeight: 0,
-                            display: "flex",
-                            flexDirection: "column",
-                            pointerEvents: "auto",
-                        }}
-                    >
-                        <ReplayPreviewLayerPanel
-                            backgroundVisibility={backgroundVisibility}
-                            geometryVisibility={geometryVisibility}
-                            onToggleBackground={onToggleBackground}
-                            onToggleGeometry={onToggleGeometry}
-                        />
-                    </div>
+                    {isLayerPanelVisible && (
+                        <div
+                            style={{
+                                flexGrow: 1,
+                                flexShrink: 1,
+                                minHeight: 0,
+                                display: "flex",
+                                flexDirection: "column",
+                                pointerEvents: "auto",
+                            }}
+                        >
+                            <ReplayPreviewLayerPanel
+                                backgroundVisibility={backgroundVisibility}
+                                geometryVisibility={geometryVisibility}
+                                onToggleBackground={onToggleBackground}
+                                onToggleGeometry={onToggleGeometry}
+                                onHide={() => setIsLayerPanelVisible(false)}
+                            />
+                        </div>
+                    )}
                 </aside>
+
+                {onPlayPreviewReplay ? (
+                    <button
+                        type="button"
+                        onClick={onPlayPreviewReplay}
+                        style={{
+                            position: "absolute",
+                            top: 10,
+                            right: 18,
+                            width: 46,
+                            height: 46,
+                            backgroundColor: "#1e293b",
+                            border: "1px solid rgba(56, 189, 248, 0.3)",
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            color: "#38bdf8",
+                            transition: "all 0.2s ease",
+                            boxShadow: "0 4px 12px rgba(56, 189, 248, 0.15)",
+                            backdropFilter: "blur(8px)",
+                            zIndex: 22,
+                        }}
+                        title="Play replay của geometry đang chọn"
+                        aria-label="Play selected replay"
+                    >
+                        <span
+                            aria-hidden="true"
+                            style={{
+                                width: 0,
+                                height: 0,
+                                borderTop: "6px solid transparent",
+                                borderBottom: "6px solid transparent",
+                                borderLeft: "9px solid currentColor",
+                                marginLeft: "3px",
+                            }}
+                        />
+                    </button>
+                ) : null}
                 
                 {overlay}
 
                 {activeEntity ? (
-                    <aside className="absolute bottom-4 right-4 top-4 z-20 max-w-[calc(100vw-2rem)]">
+                    <aside
+                        className={isMobileOrTablet ? "" : "absolute bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]"}
+                        style={isMobileOrTablet ? {
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            top: "auto",
+                            height: `${sidebarHeight || 400}px`,
+                            maxHeight: "90vh",
+                            width: "100%",
+                            maxWidth: "100%",
+                            zIndex: 20,
+                            // Do not transition height during drag resizing for butter smoothness
+                        } : undefined}
+                    >
                         <PublicWikiSidebar
                             entity={activeEntity}
                             wiki={activeWiki}
@@ -319,10 +461,13 @@ export default function PreviewMapShell({
                             onSidebarWidthChange={onSidebarWidthChange}
                             maxDragWidth={maxSidebarDragWidth}
                             compactHeader
+                            sidebarHeight={sidebarHeight}
+                            onSidebarHeightChange={onSidebarHeightChange}
                         />
                     </aside>
                 ) : null}
 
+                <ChatbotWidget hideFloatingButton />
                 {children}
             </div>
         </div>

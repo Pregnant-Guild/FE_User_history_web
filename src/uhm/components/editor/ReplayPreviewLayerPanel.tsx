@@ -9,6 +9,7 @@ type Props = {
     geometryVisibility: Record<string, boolean>;
     onToggleBackground: (id: BackgroundLayerId) => void;
     onToggleGeometry: (typeKey: string) => void;
+    onHide?: () => void;
 };
 
 // Map each layer ID/geometry type to a premium inline SVG icon
@@ -172,6 +173,7 @@ export default function ReplayPreviewLayerPanel({
     geometryVisibility,
     onToggleBackground,
     onToggleGeometry,
+    onHide,
 }: Props) {
     // Categorize geometry types for logical grouping
     const polygonKeys = ["country", "state", "faction", "rebellion_zone"];
@@ -196,10 +198,10 @@ export default function ReplayPreviewLayerPanel({
 
     const renderStyles = () => (
         <style dangerouslySetInnerHTML={{ __html: `
-            .replay-preview-layer-panel::-webkit-scrollbar {
+            .replay-preview-layer-panel-scroll::-webkit-scrollbar {
                 display: none;
             }
-            .replay-preview-layer-panel {
+            .replay-preview-layer-panel-scroll {
                 scrollbar-width: none;
                 -ms-overflow-style: none;
             }
@@ -212,7 +214,6 @@ export default function ReplayPreviewLayerPanel({
             style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
                 background: "linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.8))",
                 border: "1px solid rgba(148, 163, 184, 0.22)",
                 borderRadius: 20,
@@ -222,96 +223,134 @@ export default function ReplayPreviewLayerPanel({
                 boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
                 backdropFilter: "blur(12px)",
                 maxHeight: "100%",
-                overflowY: "auto",
-                overflowX: "hidden",
+                overflow: "hidden",
             }}
         >
             {renderStyles()}
 
-            {/* Background layers */}
-            <div style={groupHeaderStyle}>Map</div>
-            <div style={gridStyle}>
-                {BACKGROUND_LAYER_OPTIONS.map((layer) => {
-                    const active = Boolean(backgroundVisibility[layer.id]);
-                    return (
-                        <button
-                            key={layer.id}
-                            type="button"
-                            title={layer.label}
-                            onClick={() => onToggleBackground(layer.id)}
-                            style={getButtonStyles(active, "56, 189, 248")} // sky-400
-                        >
-                            {LAYER_ICONS[layer.id] || "?"}
-                        </button>
-                    );
-                })}
+            <div
+                className="replay-preview-layer-panel-scroll"
+                style={{
+                    flexGrow: 1,
+                    overflowY: "auto",
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                }}
+            >
+                {/* Background layers */}
+                <div style={groupHeaderStyle}>Map</div>
+                <div style={gridStyle}>
+                    {BACKGROUND_LAYER_OPTIONS.map((layer) => {
+                        const active = Boolean(backgroundVisibility[layer.id]);
+                        return (
+                            <button
+                                key={layer.id}
+                                type="button"
+                                title={layer.label}
+                                onClick={() => onToggleBackground(layer.id)}
+                                style={getButtonStyles(active, "56, 189, 248")} // sky-400
+                            >
+                                {LAYER_ICONS[layer.id] || "?"}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <div style={dividerStyle} />
+
+                {/* Territories / Polygons */}
+                <div style={groupHeaderStyle}>Areas</div>
+                <div style={gridStyle}>
+                    {polygonKeys.map((typeKey) => {
+                        const active = geometryVisibility[typeKey] !== false;
+                        const label = typeKey.replace("_", " ").toUpperCase();
+                        return (
+                            <button
+                                key={typeKey}
+                                type="button"
+                                title={label}
+                                onClick={() => onToggleGeometry(typeKey)}
+                                style={getButtonStyles(active, "249, 115, 22")} // orange-500
+                            >
+                                {LAYER_ICONS[typeKey] || "?"}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <div style={dividerStyle} />
+
+                {/* Routes / Lines */}
+                <div style={groupHeaderStyle}>Routes</div>
+                <div style={gridStyle}>
+                    {lineKeys.map((typeKey) => {
+                        const active = geometryVisibility[typeKey] !== false;
+                        const label = typeKey.replace("_", " ").toUpperCase();
+                        return (
+                            <button
+                                key={typeKey}
+                                type="button"
+                                title={label}
+                                onClick={() => onToggleGeometry(typeKey)}
+                                style={getButtonStyles(active, "192, 132, 252")} // purple-400
+                            >
+                                {LAYER_ICONS[typeKey] || "?"}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <div style={dividerStyle} />
+
+                {/* Places & Events / Points */}
+                <div style={groupHeaderStyle}>Points</div>
+                <div style={gridStyle}>
+                    {pointKeys.map((typeKey) => {
+                        const active = geometryVisibility[typeKey] !== false;
+                        const label = typeKey.replace("_", " ").toUpperCase();
+                        return (
+                            <button
+                                key={typeKey}
+                                type="button"
+                                title={label}
+                                onClick={() => onToggleGeometry(typeKey)}
+                                style={getButtonStyles(active, "245, 158, 11")} // amber-500
+                            >
+                                {LAYER_ICONS[typeKey] || "?"}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
-            <div style={dividerStyle} />
-
-            {/* Territories / Polygons */}
-            <div style={groupHeaderStyle}>Areas</div>
-            <div style={gridStyle}>
-                {polygonKeys.map((typeKey) => {
-                    const active = geometryVisibility[typeKey] !== false;
-                    const label = typeKey.replace("_", " ").toUpperCase();
-                    return (
-                        <button
-                            key={typeKey}
-                            type="button"
-                            title={label}
-                            onClick={() => onToggleGeometry(typeKey)}
-                            style={getButtonStyles(active, "249, 115, 22")} // orange-500
-                        >
-                            {LAYER_ICONS[typeKey] || "?"}
-                        </button>
-                    );
-                })}
-            </div>
-
-            <div style={dividerStyle} />
-
-            {/* Routes / Lines */}
-            <div style={groupHeaderStyle}>Routes</div>
-            <div style={gridStyle}>
-                {lineKeys.map((typeKey) => {
-                    const active = geometryVisibility[typeKey] !== false;
-                    const label = typeKey.replace("_", " ").toUpperCase();
-                    return (
-                        <button
-                            key={typeKey}
-                            type="button"
-                            title={label}
-                            onClick={() => onToggleGeometry(typeKey)}
-                            style={getButtonStyles(active, "192, 132, 252")} // purple-400
-                        >
-                            {LAYER_ICONS[typeKey] || "?"}
-                        </button>
-                    );
-                })}
-            </div>
-
-            <div style={dividerStyle} />
-
-            {/* Places & Events / Points */}
-            <div style={groupHeaderStyle}>Points</div>
-            <div style={gridStyle}>
-                {pointKeys.map((typeKey) => {
-                    const active = geometryVisibility[typeKey] !== false;
-                    const label = typeKey.replace("_", " ").toUpperCase();
-                    return (
-                        <button
-                            key={typeKey}
-                            type="button"
-                            title={label}
-                            onClick={() => onToggleGeometry(typeKey)}
-                            style={getButtonStyles(active, "245, 158, 11")} // amber-500
-                        >
-                            {LAYER_ICONS[typeKey] || "?"}
-                        </button>
-                    );
-                })}
-            </div>
+            {onHide && (
+                <div
+                    style={{
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        marginTop: 6,
+                        flexShrink: 0,
+                    }}
+                >
+                    <div style={dividerStyle} />
+                    <button
+                        type="button"
+                        title="Ẩn bảng lớp bản đồ"
+                        onClick={onHide}
+                        style={getButtonStyles(true, "239, 68, 68")}
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

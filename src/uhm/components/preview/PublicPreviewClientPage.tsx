@@ -40,8 +40,8 @@ interface PublicPreviewClientPageProps {
     toggleInstantLoad: (val: boolean) => void;
 }
 
-export default function PublicPreviewClientPage({ 
-    userHasEntered, 
+export default function PublicPreviewClientPage({
+    userHasEntered,
     onEnter,
     instantLoad,
     toggleInstantLoad
@@ -69,8 +69,25 @@ export default function PublicPreviewClientPage({
         }
         return 420;
     });
+    const [sidebarHeight, setSidebarHeight] = useState<number>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("public-wiki-sidebar-height");
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed >= 200 && parsed <= 1200) return parsed;
+            }
+        }
+        return 400;
+    });
+    const handleSidebarHeightChange = (height: number) => {
+        setSidebarHeight(height);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("public-wiki-sidebar-height", String(height));
+        }
+    };
     const [isLargeScreen, setIsLargeScreen] = useState(false);
     const [loadInteractiveMap, setLoadInteractiveMap] = useState(false);
+    const [isLayerPanelVisible, setIsLayerPanelVisible] = useState(true);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -100,7 +117,7 @@ export default function PublicPreviewClientPage({
             setLoadInteractiveMap(true);
         }
     }, [userHasEntered]);
-    
+
     const mapHandleRef = useRef<MapHandle>(null);
     const isFirstMount = useRef(true);
     const [replayMode, setReplayMode] = useState<"idle" | "playing">("idle");
@@ -376,13 +393,16 @@ export default function PublicPreviewClientPage({
     const displayedActiveWiki = isSidebarOpen ? activeWiki : null;
 
     const computedTimelineStyle = useMemo(() => {
+        const leftMargin = isLayerPanelVisible ? 88 : 18;
         const rightMargin = (displayedActiveEntity && isLargeScreen) ? sidebarWidth + 32 : 18;
+        const bottomOffset = (displayedActiveEntity && !isLargeScreen) ? `${sidebarHeight + 16}px` : undefined;
         return {
-            left: "88px",
+            left: `${leftMargin}px`,
             right: `${rightMargin}px`,
-            transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            bottom: bottomOffset,
+            transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         };
-    }, [displayedActiveEntity, isLargeScreen, sidebarWidth]);
+    }, [isLayerPanelVisible, displayedActiveEntity, isLargeScreen, sidebarWidth, sidebarHeight]);
 
     return (
         <>
@@ -396,6 +416,8 @@ export default function PublicPreviewClientPage({
                     onSelectFeatureIds={setSelectedFeatureIds}
                     instantLoad={instantLoad}
                     onToggleInstantLoad={toggleInstantLoad}
+                    isLayerPanelVisible={isLayerPanelVisible}
+                    onLayerPanelVisibleChange={setIsLayerPanelVisible}
                     backgroundVisibility={backgroundVisibility}
                     geometryVisibility={geometryVisibility}
                     onToggleBackground={handleToggleBackgroundLayer}
@@ -423,6 +445,8 @@ export default function PublicPreviewClientPage({
                     sidebarWidth={sidebarWidth}
                     onSidebarWidthChange={setSidebarWidth}
                     maxSidebarDragWidth={maxDragWidth}
+                    sidebarHeight={sidebarHeight}
+                    onSidebarHeightChange={handleSidebarHeightChange}
                     onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
                     timelineDisabled={replayMode === "playing"}
                     overlay={
@@ -450,7 +474,8 @@ export default function PublicPreviewClientPage({
                         style={{
                             position: "absolute",
                             top: 10,
-                            left: 80,
+                            left: "50%",
+                            transform: "translateX(-50%)",
                             zIndex: 18,
                             display: "flex",
                             gap: "10px",
@@ -467,6 +492,7 @@ export default function PublicPreviewClientPage({
                                 position: "relative",
                                 top: 0,
                                 left: 0,
+                                transform: "none",
                                 width: "min(392px, calc(100vw - 120px))",
                             }}
                         />
@@ -475,7 +501,7 @@ export default function PublicPreviewClientPage({
             )}
 
             {/* Smooth transition loading overlay */}
-            <div 
+            <div
                 style={{
                     position: "fixed",
                     inset: 0,

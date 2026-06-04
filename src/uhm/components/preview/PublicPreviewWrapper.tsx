@@ -95,10 +95,24 @@ export default function PublicPreviewWrapper() {
         window.addEventListener("touchstart", handleInteraction, { passive: true, once: true });
         window.addEventListener("keydown", handleInteraction, { passive: true, once: true });
 
+        // Auto enter after 3 seconds on mobile
+        let timerId: ReturnType<typeof setTimeout> | null = null;
+        if (typeof window !== "undefined") {
+            const isMobile = window.innerWidth < 768 || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+            if (isMobile) {
+                timerId = setTimeout(() => {
+                    handleEnter();
+                }, 3000);
+            }
+        }
+
         return () => {
             window.removeEventListener("click", handleInteraction);
             window.removeEventListener("touchstart", handleInteraction);
             window.removeEventListener("keydown", handleInteraction);
+            if (timerId) {
+                clearTimeout(timerId);
+            }
         };
     }, [mapEntered]);
 
@@ -111,9 +125,9 @@ export default function PublicPreviewWrapper() {
     }
 
     return (
-        <PublicPreviewClientPage 
-            userHasEntered={mapEntered} 
-            onEnter={handleEnter} 
+        <PublicPreviewClientPage
+            userHasEntered={mapEntered}
+            onEnter={handleEnter}
             instantLoad={instantLoad}
             toggleInstantLoad={toggleInstantLoad}
         />

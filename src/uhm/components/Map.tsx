@@ -416,6 +416,11 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 cursor: pointer;
                                 outline: none;
                             }
+                            @media (max-width: 768px) {
+                                .premium-zoom-slider {
+                                    display: none !important;
+                                }
+                            }
                             .premium-zoom-slider::-webkit-slider-runnable-track {
                                 width: 100%;
                                 height: 6px;
@@ -514,6 +519,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                     minWidth: "40px",
                                     transition: "color 0.25s ease",
                                 }}
+                                className="hidden sm:block"
                             >
                                 {isGlobeProjection ? "Globe" : "Flat"}
                             </span>
@@ -613,69 +619,71 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                             </button>
                         ) : null}
 
-                        <button
-                            type="button"
-                            onClick={() => handleZoomByStep(-0.8)}
-                            className="premium-zoom-btn"
-                            style={{ flexShrink: 0 }}
-                            aria-label="Zoom out"
-                        >
-                            -
-                        </button>
+                        <div className="hidden sm:flex items-center gap-[10px] flex-shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => handleZoomByStep(-0.8)}
+                                className="premium-zoom-btn"
+                                style={{ flexShrink: 0 }}
+                                aria-label="Zoom out"
+                            >
+                                -
+                            </button>
 
-                        <input
-                            type="range"
-                            min={zoomBounds.min}
-                            max={zoomBounds.max}
-                            step={0.1}
-                            value={zoomLevel}
-                            className="premium-zoom-slider"
-                            onPointerDown={(event) => {
-                                event.stopPropagation();
-                                try {
-                                    event.currentTarget.setPointerCapture(event.pointerId);
-                                } catch {
-                                    // Browser may reject capture for non-primary pointers; drag lock still works.
-                                }
-                                beginZoomSliderDrag();
-                            }}
-                            onPointerUp={(event) => {
-                                event.stopPropagation();
-                                try {
-                                    event.currentTarget.releasePointerCapture(event.pointerId);
-                                } catch {
-                                    // Ignore if capture was already released.
-                                }
-                                endZoomSliderDrag();
-                            }}
-                            onPointerCancel={endZoomSliderDrag}
-                            onBlur={endZoomSliderDrag}
-                            onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
-                            aria-label="Map zoom"
-                        />
+                            <input
+                                type="range"
+                                min={zoomBounds.min}
+                                max={zoomBounds.max}
+                                step={0.1}
+                                value={zoomLevel}
+                                className="premium-zoom-slider"
+                                onPointerDown={(event) => {
+                                    event.stopPropagation();
+                                    try {
+                                        event.currentTarget.setPointerCapture(event.pointerId);
+                                    } catch {
+                                        // Browser may reject capture for non-primary pointers; drag lock still works.
+                                    }
+                                    beginZoomSliderDrag();
+                                }}
+                                onPointerUp={(event) => {
+                                    event.stopPropagation();
+                                    try {
+                                        event.currentTarget.releasePointerCapture(event.pointerId);
+                                    } catch {
+                                        // Ignore if capture was already released.
+                                    }
+                                    endZoomSliderDrag();
+                                }}
+                                onPointerCancel={endZoomSliderDrag}
+                                onBlur={endZoomSliderDrag}
+                                onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
+                                aria-label="Map zoom"
+                            />
 
-                        <button
-                            type="button"
-                            onClick={() => handleZoomByStep(0.8)}
-                            className="premium-zoom-btn"
-                            style={{ flexShrink: 0 }}
-                            aria-label="Zoom in"
-                        >
-                            +
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => handleZoomByStep(0.8)}
+                                className="premium-zoom-btn"
+                                style={{ flexShrink: 0 }}
+                                aria-label="Zoom in"
+                            >
+                                +
+                            </button>
 
-                        <div
-                            style={{
-                                minWidth: "48px",
-                                textAlign: "right",
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#94a3b8",
-                                fontVariantNumeric: "tabular-nums",
-                                flexShrink: 0,
-                            }}
-                        >
-                            {zoomLevel.toFixed(1)}x
+                            <div
+                                style={{
+                                    minWidth: "48px",
+                                    textAlign: "right",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    color: "#94a3b8",
+                                    fontVariantNumeric: "tabular-nums",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {zoomLevel.toFixed(1)}x
+                            </div>
                         </div>
                     </div>
                 </div>
