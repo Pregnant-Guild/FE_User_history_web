@@ -20,7 +20,7 @@ const srOnlyStyle: React.CSSProperties = {
 
 export default function Page() {
     return (
-        <div style={{ position: "relative", width: "100%", height: "100vh", overflow: "hidden", backgroundColor: "#0b1220" }}>
+        <div style={{ position: "relative", width: "100%", height: "100svh", overflow: "hidden", backgroundColor: "#0b1220" }}>
             {/* Preload LCP image */}
             <link rel="preload" as="image" href="/images/map_placeholder.webp" fetchPriority="high" />
 

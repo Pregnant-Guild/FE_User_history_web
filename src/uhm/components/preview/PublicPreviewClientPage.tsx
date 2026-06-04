@@ -404,6 +404,46 @@ export default function PublicPreviewClientPage({
         };
     }, [isLayerPanelVisible, displayedActiveEntity, isLargeScreen, sidebarWidth, sidebarHeight]);
 
+    const searchBarWidth = useMemo(() => {
+        if (isLargeScreen) {
+            return "min(392px, calc(100vw - 120px))";
+        }
+        if (isLayerPanelVisible) {
+            return `calc(100vw - 104px)`;
+        } else {
+            return `calc(100vw - 36px)`;
+        }
+    }, [isLargeScreen, isLayerPanelVisible]);
+
+    const searchBarWrapperStyle = useMemo(() => {
+        if (isLargeScreen) {
+            return {
+                position: "absolute" as const,
+                top: 10,
+                left: "50%",
+                transform: "translateX(-50%)",
+                right: "auto",
+                zIndex: 18,
+                display: "flex",
+                gap: "10px",
+                alignItems: "flex-start",
+                pointerEvents: "auto" as const,
+            };
+        }
+        return {
+            position: "absolute" as const,
+            top: 10,
+            left: "auto",
+            right: 18,
+            transform: "none",
+            zIndex: 18,
+            display: "flex",
+            gap: "10px",
+            alignItems: "flex-start",
+            pointerEvents: "auto" as const,
+        };
+    }, [isLargeScreen]);
+
     return (
         <>
             {isBackgroundVisibilityReady && loadInteractiveMap && (
@@ -470,19 +510,7 @@ export default function PublicPreviewClientPage({
                         ) : null
                     }
                 >
-                    <div
-                        style={{
-                            position: "absolute",
-                            top: 10,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            zIndex: 18,
-                            display: "flex",
-                            gap: "10px",
-                            alignItems: "flex-start",
-                            pointerEvents: "auto",
-                        }}
-                    >
+                    <div style={searchBarWrapperStyle}>
                         <PresentPlaceSearch
                             focusedPlace={focusedPresentPlace}
                             onFocusPlace={handleFocusPresentPlace}
@@ -493,7 +521,7 @@ export default function PublicPreviewClientPage({
                                 top: 0,
                                 left: 0,
                                 transform: "none",
-                                width: "min(392px, calc(100vw - 120px))",
+                                width: searchBarWidth,
                             }}
                         />
                     </div>

@@ -15,6 +15,7 @@ type Props = {
     filterEnabled?: boolean;
     onFilterEnabledChange?: (enabled: boolean) => void;
     style?: React.CSSProperties;
+    onPlayReplay?: () => void;
 };
 
 export default function TimelineBar({
@@ -28,6 +29,7 @@ export default function TimelineBar({
     filterEnabled,
     onFilterEnabledChange,
     style,
+    onPlayReplay,
 }: Props) {
     const lower = FIXED_TIMELINE_START_YEAR;
     const upper = FIXED_TIMELINE_END_YEAR;
@@ -272,6 +274,40 @@ export default function TimelineBar({
                     >
                         +
                     </button>
+
+                    {onPlayReplay ? (
+                        <>
+                            <div style={{ width: 1, height: 16, backgroundColor: "rgba(255, 255, 255, 0.15)" }} />
+                            <button
+                                type="button"
+                                onClick={onPlayReplay}
+                                style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "50%",
+                                    backgroundColor: "#2563eb",
+                                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                    flexShrink: 0,
+                                }}
+                                title="Xem diễn biến lịch sử (Replay)"
+                            >
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                >
+                                    <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
+                            </button>
+                        </>
+                    ) : null}
                 </div>
 
                 {/* Ruler row below: full width */}
@@ -336,6 +372,7 @@ export default function TimelineBar({
                     maxYear={upper}
                     disabled={effectiveDisabled}
                 />
+
                 <div className={styles.numberWrapper}>
                     <input
                         type="number"
@@ -385,6 +422,39 @@ export default function TimelineBar({
                         </button>
                     </div>
                 </div>
+
+                {onPlayReplay ? (
+                    <button
+                        type="button"
+                        onClick={onPlayReplay}
+                        style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            backgroundColor: "#2563eb",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            color: "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            marginLeft: 8,
+                            marginRight: 8,
+                            flexShrink: 0,
+                        }}
+                        title="Xem diễn biến lịch sử (Replay)"
+                    >
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                        >
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                    </button>
+                ) : null}
                 {typeof timeRange === "number" && onTimeRangeChange ? (
                     <label
                         title="time_range (0-30)"

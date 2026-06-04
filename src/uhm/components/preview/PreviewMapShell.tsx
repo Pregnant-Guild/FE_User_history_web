@@ -153,8 +153,8 @@ export default function PreviewMapShell({
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-gray-950 text-gray-100">
-            <div className="relative min-h-screen">
+        <div className="relative overflow-hidden bg-gray-950 text-gray-100" style={{ minHeight: "100svh", height: "100svh" }}>
+            <div className="relative" style={{ minHeight: "100svh", height: "100svh" }}>
                 <Map
                     ref={mapHandleRef}
                     mode="preview"
@@ -175,6 +175,7 @@ export default function PreviewMapShell({
                     onPlayPreviewReplay={onPlayPreviewReplay}
                     onLoad={onLoad}
                     showViewportControls={false}
+                    height="100svh"
                 />
 
                 <TimelineBar
@@ -188,6 +189,7 @@ export default function PreviewMapShell({
                     filterEnabled={timelineFilterEnabled}
                     onFilterEnabledChange={onTimelineFilterEnabledChange}
                     style={timelineStyle}
+                    onPlayReplay={onPlayPreviewReplay}
                 />
 
                 <style dangerouslySetInnerHTML={{ __html: `
@@ -408,45 +410,7 @@ export default function PreviewMapShell({
                     )}
                 </aside>
 
-                {onPlayPreviewReplay ? (
-                    <button
-                        type="button"
-                        onClick={onPlayPreviewReplay}
-                        style={{
-                            position: "absolute",
-                            top: 10,
-                            right: 18,
-                            width: 46,
-                            height: 46,
-                            backgroundColor: "#1e293b",
-                            border: "1px solid rgba(56, 189, 248, 0.3)",
-                            borderRadius: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            color: "#38bdf8",
-                            transition: "all 0.2s ease",
-                            boxShadow: "0 4px 12px rgba(56, 189, 248, 0.15)",
-                            backdropFilter: "blur(8px)",
-                            zIndex: 22,
-                        }}
-                        title="Play replay của geometry đang chọn"
-                        aria-label="Play selected replay"
-                    >
-                        <span
-                            aria-hidden="true"
-                            style={{
-                                width: 0,
-                                height: 0,
-                                borderTop: "6px solid transparent",
-                                borderBottom: "6px solid transparent",
-                                borderLeft: "9px solid currentColor",
-                                marginLeft: "3px",
-                            }}
-                        />
-                    </button>
-                ) : null}
+
                 
                 {overlay}
 
