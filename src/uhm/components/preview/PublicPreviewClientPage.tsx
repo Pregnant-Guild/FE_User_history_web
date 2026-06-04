@@ -242,6 +242,21 @@ export default function PublicPreviewClientPage({
             localStorage.setItem("timeline-year", String(timelineYear));
         }
     }, [timelineYear]);
+
+    // Prevent global browser zoom on multi-touch pinch gestures for this entire route
+    useEffect(() => {
+        const preventZoom = (e: TouchEvent) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        };
+
+        document.addEventListener("touchmove", preventZoom, { passive: false });
+        return () => {
+            document.removeEventListener("touchmove", preventZoom);
+        };
+    }, []);
+
     useEffect(() => {
         if (!loadInteractiveMap) return;
         const timeoutId = window.setTimeout(() => {
@@ -408,12 +423,8 @@ export default function PublicPreviewClientPage({
         if (isLargeScreen) {
             return "min(392px, calc(100vw - 120px))";
         }
-        if (isLayerPanelVisible) {
-            return `calc(100vw - 104px)`;
-        } else {
-            return `calc(100vw - 36px)`;
-        }
-    }, [isLargeScreen, isLayerPanelVisible]);
+        return "min(280px, calc(100vw - 86px))";
+    }, [isLargeScreen]);
 
     const searchBarWrapperStyle = useMemo(() => {
         if (isLargeScreen) {

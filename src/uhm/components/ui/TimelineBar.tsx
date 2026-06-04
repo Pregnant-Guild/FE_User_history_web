@@ -227,8 +227,14 @@ export default function TimelineBar({
                         onMouseDown={() => startChangingYear(-1)}
                         onMouseUp={stopChangingYear}
                         onMouseLeave={stopChangingYear}
-                        onTouchStart={() => startChangingYear(-1)}
-                        onTouchEnd={stopChangingYear}
+                        onTouchStart={(e) => {
+                            e.preventDefault();
+                            startChangingYear(-1);
+                        }}
+                        onTouchEnd={(e) => {
+                            e.preventDefault();
+                            stopChangingYear();
+                        }}
                         disabled={effectiveDisabled}
                         className={styles.adjustBtn}
                         style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16 }}
@@ -264,8 +270,14 @@ export default function TimelineBar({
                         onMouseDown={() => startChangingYear(1)}
                         onMouseUp={stopChangingYear}
                         onMouseLeave={stopChangingYear}
-                        onTouchStart={() => startChangingYear(1)}
-                        onTouchEnd={stopChangingYear}
+                        onTouchStart={(e) => {
+                            e.preventDefault();
+                            startChangingYear(1);
+                        }}
+                        onTouchEnd={(e) => {
+                            e.preventDefault();
+                            stopChangingYear();
+                        }}
                         disabled={effectiveDisabled}
                         className={styles.adjustBtn}
                         style={{ width: 32, height: 32, borderRadius: 8, fontSize: 16 }}
@@ -397,8 +409,14 @@ export default function TimelineBar({
                             onMouseDown={() => startChangingYear(-1)}
                             onMouseUp={stopChangingYear}
                             onMouseLeave={stopChangingYear}
-                            onTouchStart={() => startChangingYear(-1)}
-                            onTouchEnd={stopChangingYear}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                startChangingYear(-1);
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                stopChangingYear();
+                            }}
                             disabled={effectiveDisabled}
                             className={styles.adjustBtn}
                             title="Giảm 1 năm"
@@ -411,8 +429,14 @@ export default function TimelineBar({
                             onMouseDown={() => startChangingYear(1)}
                             onMouseUp={stopChangingYear}
                             onMouseLeave={stopChangingYear}
-                            onTouchStart={() => startChangingYear(1)}
-                            onTouchEnd={stopChangingYear}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                startChangingYear(1);
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                stopChangingYear();
+                            }}
                             disabled={effectiveDisabled}
                             className={styles.adjustBtn}
                             title="Tăng 1 năm"
@@ -714,6 +738,8 @@ function CanvasTimelineRuler({
         }
     }, [year, drawYear]);
 
+
+
     const handleWheel = (e: React.WheelEvent) => {
         if (disabled) return;
         e.preventDefault();
@@ -840,6 +866,7 @@ function CanvasTimelineRuler({
                 border: "1px solid rgba(255, 255, 255, 0.08)",
                 overflow: "hidden",
                 cursor: disabled ? "not-allowed" : "ew-resize",
+                touchAction: "none",
             }}
             onWheel={handleWheel}
         >
@@ -849,6 +876,7 @@ function CanvasTimelineRuler({
                     display: "block",
                     width: "100%",
                     height: "100%",
+                    touchAction: "none",
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}

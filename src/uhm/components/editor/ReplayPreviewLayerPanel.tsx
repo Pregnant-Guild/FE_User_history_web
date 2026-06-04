@@ -219,11 +219,13 @@ export default function ReplayPreviewLayerPanel({
                 borderRadius: 20,
                 padding: "14px 10px",
                 width: 58,
+                boxSizing: "border-box",
                 alignItems: "center",
                 boxShadow: "0 20px 48px rgba(2, 6, 23, 0.45)",
                 backdropFilter: "blur(12px)",
                 maxHeight: "100%",
-                overflow: "hidden",
+                overflowX: "hidden",
+                overflowY: "hidden",
             }}
         >
             {renderStyles()}
@@ -233,7 +235,9 @@ export default function ReplayPreviewLayerPanel({
                 style={{
                     flexGrow: 1,
                     overflowY: "auto",
+                    overflowX: "hidden",
                     width: "100%",
+                    boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",

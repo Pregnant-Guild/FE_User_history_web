@@ -205,47 +205,7 @@ function PublicWikiSidebar({
         window.addEventListener("pointerup", onUp);
     };
 
-    const handleHeightPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        const startY = event.clientY;
-        const startHeight = sidebarHeight || 400;
 
-        // Tạo đường ghost ảo nằm ngang chỉ vị trí kéo chiều cao
-        const ghost = document.createElement("div");
-        ghost.style.position = "fixed";
-        ghost.style.left = "0";
-        ghost.style.right = "0";
-        ghost.style.height = "4px";
-        ghost.style.backgroundColor = "#38bdf8";
-        ghost.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.8)";
-        ghost.style.zIndex = "99999";
-        ghost.style.cursor = "row-resize";
-        ghost.style.pointerEvents = "none";
-        
-        const startScreenY = window.innerHeight - startHeight;
-        ghost.style.top = `${startScreenY}px`;
-        document.body.appendChild(ghost);
-
-        const onMove = (e: PointerEvent) => {
-            ghost.style.top = `${e.clientY}px`;
-        };
-
-        const onUp = (e: PointerEvent) => {
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
-            if (ghost.parentNode) {
-                ghost.parentNode.removeChild(ghost);
-            }
-            const deltaY = startY - e.clientY;
-            const nextHeight = Math.max(200, Math.min(window.innerHeight * 0.9, startHeight + deltaY));
-            if (onSidebarHeightChange) {
-                onSidebarHeightChange(nextHeight);
-            }
-        };
-
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-    };
 
     const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
     const processedWiki = useMemo(() => {
@@ -327,6 +287,27 @@ function PublicWikiSidebar({
         return () => root.removeEventListener("click", handleClick);
     }, [onWikiLinkRequest, renderHtml]);
 
+    const isExpanded = useMemo(() => {
+        if (typeof window === "undefined") return false;
+        const fullHeight = Math.round(window.innerHeight * 0.70);
+        return (sidebarHeight || 400) >= fullHeight;
+    }, [sidebarHeight]);
+
+    const handleHeightToggle = () => {
+        if (typeof window === "undefined") return;
+        const halfHeight = Math.round(window.innerHeight * 0.45);
+        const fullHeight = Math.round(window.innerHeight * 0.85);
+        const currentHeight = sidebarHeight || 400;
+
+        const nextHeight = Math.abs(currentHeight - halfHeight) < Math.abs(currentHeight - fullHeight)
+            ? fullHeight
+            : halfHeight;
+
+        if (onSidebarHeightChange) {
+            onSidebarHeightChange(nextHeight);
+        }
+    };
+
     const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
     useEffect(() => {
         const checkDevice = () => setIsMobileOrTablet(window.innerWidth < 1024);
@@ -359,17 +340,18 @@ function PublicWikiSidebar({
             {/* Grab Handle for bottom sheet on mobile */}
             {isMobileOrTablet ? (
                 <div
-                    onPointerDown={handleHeightPointerDown}
+                    onClick={handleHeightToggle}
                     style={{
                         width: "100%",
-                        height: 24,
+                        height: 28,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        cursor: "row-resize",
+                        cursor: "pointer",
                         zIndex: 60,
                         userSelect: "none",
                         flexShrink: 0,
+                        gap: 8,
                     }}
                 >
                     <div
@@ -380,6 +362,22 @@ function PublicWikiSidebar({
                             backgroundColor: "rgba(255, 255, 255, 0.3)",
                         }}
                     />
+                    <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="rgba(255, 255, 255, 0.5)"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{
+                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform 0.3s ease",
+                        }}
+                    >
+                        <polyline points="18 15 12 9 6 15" />
+                    </svg>
                 </div>
             ) : null}
 
