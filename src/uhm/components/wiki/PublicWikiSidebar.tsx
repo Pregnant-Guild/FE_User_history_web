@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, memo } from "react";
-import "react-quill-new/dist/quill.snow.css";
+// Loaded dynamically inside the component to prevent render-blocking
 
 import type { Entity } from "@/uhm/api/entities";
 import type { Wiki } from "@/uhm/api/wikis";
@@ -138,6 +138,10 @@ function PublicWikiSidebar({
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
     const tocContainerRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        import("react-quill-new/dist/quill.snow.css");
+    }, []);
 
     const [localWidth, setLocalWidth] = useState<number>(() => {
         if (typeof window !== "undefined") {

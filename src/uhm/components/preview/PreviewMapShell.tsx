@@ -49,6 +49,8 @@ type Props = {
     overlay?: ReactNode;
     children?: ReactNode;
     onLoad?: () => void;
+    instantLoad?: boolean;
+    onToggleInstantLoad?: (val: boolean) => void;
 };
 
 export default function PreviewMapShell({
@@ -88,6 +90,8 @@ export default function PreviewMapShell({
     overlay,
     children,
     onLoad,
+    instantLoad = true,
+    onToggleInstantLoad,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -235,6 +239,22 @@ export default function PreviewMapShell({
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                    </svg>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => onToggleInstantLoad?.(!instantLoad)}
+                                    title="Bật lên để load nhanh hơn"
+                                    style={{
+                                        ...menuOptionStyle,
+                                        color: instantLoad ? "#fbbf24" : "#cbd5e1",
+                                        border: instantLoad ? "1px solid rgba(251, 191, 36, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                                        boxShadow: instantLoad ? "0 0 12px rgba(251, 191, 36, 0.25)" : "0 2px 8px rgba(0, 0, 0, 0.12)",
+                                    }}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill={instantLoad ? "#fbbf24" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                                     </svg>
                                 </button>
 

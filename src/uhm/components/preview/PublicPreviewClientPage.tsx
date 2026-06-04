@@ -36,9 +36,16 @@ const CURRENT_YEAR = new Date().getUTCFullYear();
 interface PublicPreviewClientPageProps {
     userHasEntered: boolean;
     onEnter: () => void;
+    instantLoad: boolean;
+    toggleInstantLoad: (val: boolean) => void;
 }
 
-export default function PublicPreviewClientPage({ userHasEntered, onEnter }: PublicPreviewClientPageProps) {
+export default function PublicPreviewClientPage({ 
+    userHasEntered, 
+    onEnter,
+    instantLoad,
+    toggleInstantLoad
+}: PublicPreviewClientPageProps) {
     const [selectedFeatureIds, setSelectedFeatureIds] = useState<(string | number)[]>([]);
     const [timelineYear, setTimelineYear] = useState<number>(1000);
     const [timelineDraftYear, setTimelineDraftYear] = useState<number>(1000);
@@ -64,7 +71,6 @@ export default function PublicPreviewClientPage({ userHasEntered, onEnter }: Pub
     });
     const [isLargeScreen, setIsLargeScreen] = useState(false);
     const [loadInteractiveMap, setLoadInteractiveMap] = useState(false);
-    const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -78,8 +84,22 @@ export default function PublicPreviewClientPage({ userHasEntered, onEnter }: Pub
                 }
             }
         }
-        setLoadInteractiveMap(true);
-    }, []);
+
+        if (instantLoad) {
+            setLoadInteractiveMap(true);
+        } else {
+            const timer = setTimeout(() => {
+                setLoadInteractiveMap(true);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [instantLoad]);
+
+    useEffect(() => {
+        if (userHasEntered) {
+            setLoadInteractiveMap(true);
+        }
+    }, [userHasEntered]);
     
     const mapHandleRef = useRef<MapHandle>(null);
     const isFirstMount = useRef(true);
@@ -374,6 +394,8 @@ export default function PublicPreviewClientPage({ userHasEntered, onEnter }: Pub
                     labelTimelineYear={currentTimelineYear}
                     selectedFeatureIds={selectedFeatureIds}
                     onSelectFeatureIds={setSelectedFeatureIds}
+                    instantLoad={instantLoad}
+                    onToggleInstantLoad={toggleInstantLoad}
                     backgroundVisibility={backgroundVisibility}
                     geometryVisibility={geometryVisibility}
                     onToggleBackground={handleToggleBackgroundLayer}
@@ -403,7 +425,6 @@ export default function PublicPreviewClientPage({ userHasEntered, onEnter }: Pub
                     maxSidebarDragWidth={maxDragWidth}
                     onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
                     timelineDisabled={replayMode === "playing"}
-                    onLoad={() => setIsMapLoaded(true)}
                     overlay={
                         replayMode === "playing" ? (
                             <ReplayPreviewOverlay
@@ -459,13 +480,13 @@ export default function PublicPreviewClientPage({ userHasEntered, onEnter }: Pub
                     position: "fixed",
                     inset: 0,
                     zIndex: 9999,
-                    pointerEvents: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "none" : "auto",
-                    opacity: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? 0 : 1,
-                    visibility: userHasEntered && isMapLoaded && isBackgroundVisibilityReady && loadInteractiveMap ? "hidden" : "visible",
+                    pointerEvents: userHasEntered ? "none" : "auto",
+                    opacity: userHasEntered ? 0 : 1,
+                    visibility: userHasEntered ? "hidden" : "visible",
                     transition: "opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s",
                 }}
             >
-                <MapPlaceholder isLoaderOnly={userHasEntered} onEnter={onEnter} />
+                <MapPlaceholder onEnter={onEnter} />
             </div>
 
             {linkEntityPopup ? (

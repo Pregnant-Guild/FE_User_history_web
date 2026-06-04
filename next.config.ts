@@ -27,11 +27,43 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
-  webpack(config) {
+  webpack(config, { isServer }) {
     config.module.rules.push({
       test: /\.svg$/,
       use: ["@svgr/webpack"],
     });
+
+    if (!isServer) {
+      // Split heavy third-party vendor libraries into their own dedicated chunks
+      config.optimization.splitChunks.cacheGroups = {
+        ...config.optimization.splitChunks.cacheGroups,
+        maplibre: {
+          test: /[\\/]node_modules[\\/]maplibre-gl[\\/]/,
+          name: "maplibre",
+          chunks: "all",
+          priority: 40,
+        },
+        quill: {
+          test: /[\\/]node_modules[\\/](react-quill-new|quill|quill-blot-formatter)[\\/]/,
+          name: "quill",
+          chunks: "all",
+          priority: 35,
+        },
+        charts: {
+          test: /[\\/]node_modules[\\/](apexcharts|react-apexcharts)[\\/]/,
+          name: "charts",
+          chunks: "all",
+          priority: 30,
+        },
+        calendar: {
+          test: /[\\/]node_modules[\\/]@fullcalendar[\\/]/,
+          name: "calendar",
+          chunks: "all",
+          priority: 25,
+        },
+      };
+    }
+
     return config;
   },
 

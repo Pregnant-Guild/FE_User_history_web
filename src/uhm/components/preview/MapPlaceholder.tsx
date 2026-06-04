@@ -3,98 +3,10 @@
 import React from "react";
 
 interface MapPlaceholderProps {
-    isLoaderOnly?: boolean;
     onEnter?: () => void;
 }
 
-export default function MapPlaceholder({ isLoaderOnly = true, onEnter }: MapPlaceholderProps) {
-    if (isLoaderOnly) {
-        return (
-            <div 
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    backgroundColor: "#060a13",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    zIndex: 9999,
-                }}
-            >
-                {/* Background Image */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src="/images/map_placeholder.webp"
-                    alt="Map Loading Placeholder"
-                    fetchPriority="high"
-                    loading="eager"
-                    decoding="sync"
-                    width={1920}
-                    height={1080}
-                    style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        zIndex: 1,
-                        filter: "brightness(0.3) contrast(1.1)",
-                        backgroundImage: "url('data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQAgCdASoQAAkAAgA0JbACdAD0j9ruBiEAAP71e6Hb3PzxBzEI1XGXkdQ3Wq1ek8XLa1nPPm65FhrFIjmR0%2BxZwNUJBvg15I7CuzvhuunZ%2FUF83IaP8Evo6gAAAA%3D%3D')",
-                        backgroundSize: "cover",
-                    }}
-                />
-
-                {/* Dark overlay & Spinner */}
-                <div 
-                    style={{
-                        position: "relative",
-                        zIndex: 2,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "16px",
-                        backgroundColor: "rgba(6, 10, 19, 0.8)",
-                        padding: "24px 32px",
-                        borderRadius: "16px",
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(217, 119, 6, 0.15)",
-                        boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-                    }}
-                >
-                    <div 
-                        style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "50%",
-                            border: "3px solid rgba(217, 119, 6, 0.1)",
-                            borderTopColor: "#d97706",
-                            animation: "placeholder-spin 1.2s linear infinite",
-                        }}
-                    />
-                    <style dangerouslySetInnerHTML={{ __html: `
-                        @keyframes placeholder-spin {
-                            to { transform: rotate(360deg); }
-                        }
-                    `}} />
-                    <span 
-                        style={{
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            letterSpacing: "0.15em",
-                            color: "#eab308",
-                            textShadow: "0 0 10px rgba(234, 179, 7, 0.3)",
-                            fontFamily: "Georgia, serif",
-                        }}
-                    >
-                        ĐANG TẢI DỮ LIỆU...
-                    </span>
-                </div>
-            </div>
-        );
-    }
-
+export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
     return (
         <div 
             onClick={onEnter}
