@@ -66,5 +66,6 @@ export const API = {
   },
   Chatbot:{
     CHAT: `${API_URL_ROOT}/chatbot/chat`,
+    HISTORY: `${API_URL_ROOT}/chatbot/history`,
   }
 }

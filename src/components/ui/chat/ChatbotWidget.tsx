@@ -2,14 +2,18 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChatbotPayload } from "@/interface/chatbot";
-import { apiChatbot } from "@/service/chatbotService";
+import { apiChatbot, apiChatbotHistory } from "@/service/chatbotService";
 import { AxiosError } from "axios";
-
 
 type Message = {
   id: string;
   sender: "user" | "bot";
   text: string;
+};
+
+const cleanAnswer = (text: string) => {
+  if (!text) return "";
+  return text.replace(/<\/?answer>/gi, "").trim();
 };
 
 export default function ChatbotWidget({
@@ -20,21 +24,22 @@ export default function ChatbotWidget({
   hideFloatingButton?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init",
-      sender: "bot",
-      text: "Xin chào! Tôi là trợ lý lịch sử thân thiện. Tôi có thể giúp gì cho bạn?",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [preCursor, setPreCursor] = useState<string | null>(null);
+  const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const prevMessagesLength = useRef(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Toggle chatbot visibility via window event
   useEffect(() => {
     const handleToggle = () => setIsOpen((prev) => !prev);
     window.addEventListener("toggle-chatbot", handleToggle);
@@ -43,19 +48,83 @@ export default function ChatbotWidget({
     };
   }, []);
 
+  // Fetch history from API
+  const loadHistory = async (cursor?: string) => {
+    setIsFetchingHistory(true);
+    try {
+      const res = await apiChatbotHistory({ cursor, limit: 10 });
+      if (res && res.status && res.data) {
+        const historyItems = res.data.items || [];
+        const newMessages: Message[] = [];
+
+        // Parse questions and answers from history items
+        historyItems.forEach((item: any) => {
+          newMessages.push({
+            id: `${item.id}_q`,
+            sender: "user",
+            text: item.question,
+          });
+          newMessages.push({
+            id: `${item.id}_a`,
+            sender: "bot",
+            text: cleanAnswer(item.answer),
+          });
+        });
+
+        if (cursor) {
+          // Prepended older messages should go to the top of the conversation list
+          setMessages((prev) => [...newMessages, ...prev]);
+        } else {
+          setMessages(newMessages);
+          setHasLoadedHistory(true);
+        }
+
+        setPreCursor(res.data.pre_cursor || null);
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+    } finally {
+      setIsFetchingHistory(false);
+    }
+  };
+
+  // Load history when chatbot is first opened
+  useEffect(() => {
+    if (isOpen && !hasLoadedHistory) {
+      loadHistory();
+    }
+  }, [isOpen, hasLoadedHistory]);
+
+  // Scroll to bottom when first opened
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
     }
-  }, [messages, isOpen]);
+  }, [isOpen]);
+
+  // Scroll to bottom only when new live messages are added at the end (not when older history is prepended)
+  useEffect(() => {
+    if (messages.length > prevMessagesLength.current) {
+      scrollToBottom();
+    }
+    prevMessagesLength.current = messages.length;
+  }, [messages]);
+
+  // Auto focus input when opened or loading ends
+  useEffect(() => {
+    if (isOpen && !isLoading) {
+      inputRef.current?.focus();
+    }
+  }, [isOpen, isLoading]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
+    const userText = input.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: "user",
-      text: input.trim(),
+      text: userText,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -65,7 +134,7 @@ export default function ChatbotWidget({
     try {
       const payload: ChatbotPayload = {
         project_id: projectId,
-        question: userMessage.text,
+        question: userText,
       };
 
       const res = await apiChatbot(payload);
@@ -74,7 +143,7 @@ export default function ChatbotWidget({
         id: (Date.now() + 1).toString(),
         sender: "bot",
         text: res?.status
-          ? res?.data
+          ? cleanAnswer(res?.data)
           : "Xin lỗi, tôi không thể trả lời lúc này.",
       };
 
@@ -90,7 +159,6 @@ export default function ChatbotWidget({
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-
       setIsLoading(false);
     }
   };
@@ -100,6 +168,14 @@ export default function ChatbotWidget({
       handleSend();
     }
   };
+
+  const initMessage: Message = {
+    id: "init",
+    sender: "bot",
+    text: "Xin chào! Tôi là trợ lý lịch sử thân thiện. Tôi có thể giúp gì cho bạn?",
+  };
+
+  const allMessages = [initMessage, ...messages];
 
   return (
     <div className="fixed bottom-8 right-8 z-50">
@@ -146,11 +222,11 @@ export default function ChatbotWidget({
                   d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"
                 />
               </svg>
-              Trợ lý lịch sử.
+              <span>Trợ lý lịch sử</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="p-1.5 hover:bg-brand-600 rounded-lg transition-colors text-white"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -171,18 +247,32 @@ export default function ChatbotWidget({
 
           {/* Nội dung Chat */}
           <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-gray-50 dark:bg-[#0d1117] text-sm">
-            {messages.map((msg) => (
+            {/* Load older messages button */}
+            {preCursor && (
+              <div className="flex justify-center mb-1">
+                <button
+                  onClick={() => loadHistory(preCursor)}
+                  disabled={isFetchingHistory}
+                  className="text-xs text-brand-500 hover:text-brand-600 font-medium py-1 px-3 bg-brand-50 dark:bg-brand-950/20 rounded-full transition-colors disabled:opacity-50"
+                >
+                  {isFetchingHistory ? "Đang tải..." : "Xem tin nhắn cũ hơn"}
+                </button>
+              </div>
+            )}
+
+            {allMessages.map((msg) => (
               <div
                 key={msg.id}
                 className={`max-w-[85%] rounded-2xl px-4 py-2 shadow-sm ${
                   msg.sender === "user"
-                    ? "bg-brand-500 text-white self-end rounded-br-sm"
-                    : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 self-start rounded-bl-sm"
+                    ? "bg-brand-500 text-white self-end rounded-br-sm animate-in fade-in duration-200 slide-in-from-bottom-1"
+                    : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-300 border border-gray-100 dark:border-gray-700 self-start rounded-bl-sm animate-in fade-in duration-200 slide-in-from-bottom-1"
                 }`}
               >
                 {msg.text}
               </div>
             ))}
+
             {isLoading && (
               <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 self-start rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-1.5 max-w-[80%]">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
@@ -196,6 +286,13 @@ export default function ChatbotWidget({
                 ></div>
               </div>
             )}
+
+            {isFetchingHistory && !preCursor && (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
@@ -203,6 +300,7 @@ export default function ChatbotWidget({
           <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2">
               <input
+                ref={inputRef}
                 type="text"
                 placeholder="Nhập câu hỏi..."
                 value={input}
