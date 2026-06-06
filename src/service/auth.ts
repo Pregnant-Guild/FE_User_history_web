@@ -1,4 +1,5 @@
 import api from "@/config/config";
+import type { AxiosRequestConfig } from "axios";
 import { API } from "../../api";
 import { clearStoredTokens, extractTokensFromResponsePayload, setStoredTokens } from "@/auth/tokenStore";
 
@@ -62,7 +63,13 @@ export const apiResetPassword = async (payload: ResetPasswordPayload) => {
   return response.data;
 };
 
-export const apiGetCurrentUser = async (config?: any) => {
+type AuthRequestConfig = AxiosRequestConfig & {
+  skipAuth?: boolean;
+  skipRefresh?: boolean;
+  authToken?: string | null;
+};
+
+export const apiGetCurrentUser = async (config?: AuthRequestConfig) => {
   const response = await api.get(API.User.CURRENT, config);
   return response?.data;
 };
@@ -71,4 +78,3 @@ export const apiChangePassword = async (payload: ChangePasswordPayload) => {
   const response = await api.patch(API.User.CHANGE_PASSWORD, payload);
   return response?.data;
 };
-

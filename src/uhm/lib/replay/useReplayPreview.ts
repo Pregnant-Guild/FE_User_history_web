@@ -62,7 +62,6 @@ export function useReplayPreview({
 }: UseReplayPreviewOptions) {
     const [isPlaying, setIsPlaying] = useState(false);
     const isPlayingRef = useRef(false);
-    isPlayingRef.current = isPlaying;
     const [dialog, setDialog] = useState<DialogState | null>(null);
     const dialogRef = useRef<DialogState | null>(null);
     const setDialogWithRef = useCallback((d: DialogState | null) => {
@@ -104,6 +103,10 @@ export function useReplayPreview({
     }, [selectedStageId, selectedStepIndex]);
 
     const flatSteps = useMemo(() => flattenReplaySteps(replay), [replay]);
+
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+    }, [isPlaying]);
 
     useEffect(() => {
         playbackSpeedRef.current = playbackSpeed;
@@ -164,6 +167,7 @@ export function useReplayPreview({
     }, []);
 
     const restorePreviewState = useCallback(() => {
+        isPlayingRef.current = false;
         setIsPlaying(false);
         setActiveCursor({ stageId: null, stepIndex: null });
         setActiveStepNumber(null);
@@ -215,11 +219,13 @@ export function useReplayPreview({
 
     useEffect(() => {
         runIdRef.current += 1;
-        restorePreviewState();
+        const timeoutId = window.setTimeout(() => {
+            restorePreviewState();
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
     }, [replay?.id, restorePreviewState]);
 
-    const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
-    controllersRef.current = {
+    const controllers = useMemo<Parameters<typeof dispatchReplayAction>[0]>(() => ({
         map: getMapInstance(),
         draft,
         effects,
@@ -284,10 +290,20 @@ export function useReplayPreview({
         },
         setDialog: setDialogWithRef,
         getDialog: () => dialogRef.current,
-    };
+    }), [
+        addToast,
+        draft,
+        effects,
+        getMapInstance,
+        setDialogWithRef,
+    ]);
+
+    const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
+    useEffect(() => {
+        controllersRef.current = controllers;
+    }, [controllers]);
 
     const playFromIndex = useCallback(async (startIndex: number) => {
-        console.log("playFromIndex starting at:", startIndex, "flatSteps count:", flatSteps.length);
         if (!flatSteps.length) return;
 
         const map = getMapInstance();
@@ -321,11 +337,11 @@ export function useReplayPreview({
 
         const runId = runIdRef.current + 1;
         runIdRef.current = runId;
+        isPlayingRef.current = true;
         setIsPlaying(true);
 
         for (let index = safeStartIndex; index < flatSteps.length; index += 1) {
             if (runIdRef.current !== runId) {
-                console.log("playFromIndex loop aborted because runId changed");
                 return;
             }
 
@@ -339,7 +355,6 @@ export function useReplayPreview({
 
             const controllers = controllersRef.current;
             if (!controllers) {
-                console.warn("playFromIndex aborted: controllersRef.current is null!");
                 return;
             }
             controllers.map = getMapInstance();
@@ -388,7 +403,6 @@ export function useReplayPreview({
 
     const playFromSelection = useCallback(() => {
         const selectedIndex = findReplayStepIndex(flatSteps, selectedStageIdRef.current, selectedStepIndexRef.current);
-        console.log("playFromSelection called: selectedIndex =", selectedIndex, "selectedStageId =", selectedStageIdRef.current, "selectedStepIndex =", selectedStepIndexRef.current);
         void playFromIndex(selectedIndex >= 0 ? selectedIndex : 0);
     }, [flatSteps, playFromIndex]);
 
@@ -427,6 +441,8 @@ export function useReplayPreview({
         },
     };
 }
+
+export type ReplayPreviewController = ReturnType<typeof useReplayPreview>;
 
 function flattenReplaySteps(replay: BattleReplay | null): FlattenedReplayStep[] {
     if (!replay) return [];

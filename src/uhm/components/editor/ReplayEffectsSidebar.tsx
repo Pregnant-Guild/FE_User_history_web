@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, type ComponentProps } from "react";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
+import type ReactQuill from "react-quill-new";
 import type {
     BattleReplay,
     GeoFunctionName,
@@ -16,10 +17,12 @@ import { Panel } from "./Panel";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
-import { fetchWikiBySlug, searchWikisByTitle } from "@/uhm/api/wikis";
+import { fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { useEditorStore } from "@/uhm/store/editorStore";
 
-const ReactQuillEditor = dynamic<any>(() => import("react-quill-new"), {
+type ReactQuillEditorProps = ComponentProps<typeof ReactQuill>;
+
+const ReactQuillEditor = dynamic<ReactQuillEditorProps>(() => import("react-quill-new"), {
     ssr: false,
     loading: () => <div style={{ height: "120px", background: "#0b1220", borderRadius: "8px" }} className="animate-pulse" />,
 });
@@ -46,6 +49,25 @@ type ActionGroupKey = "use_UI_function" | "use_map_function" | "use_geo_function
 type ActionValue = string | boolean | string[];
 type ActionFormValues = Record<string, ActionValue>;
 type AnyReplayAction = ReplayAction<UIOptionName | MapFunctionName | GeoFunctionName | NarrativeFunctionName>;
+type QuillRange = {
+    index: number;
+    length: number;
+};
+type QuillLike = {
+    getSelection?: () => QuillRange | null;
+    getFormat?: (indexOrRange?: number | QuillRange, length?: number) => Record<string, unknown>;
+    getText?: (index: number, length: number) => string;
+    setSelection?: (index: number, length: number, source?: string) => void;
+    formatText?: (index: number, length: number, name: string, value: unknown, source?: string) => void;
+    insertText?: (index: number, text: string, formats?: Record<string, unknown>, source?: string) => void;
+    format?: (name: string, value: unknown, source?: string) => void;
+};
+type WikiLinkCandidate = {
+    key: string;
+    title: string;
+    slug: string;
+    source: "local" | "global";
+};
 
 type ActionFieldConfig = {
     name: string;
@@ -157,7 +179,7 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
         ],
         create: () => ({ function_name: "set_dialog", params: [{ text: "", image_url: "" }] }),
         deserialize: (params) => {
-            const data: any = params[0];
+            const data = params[0] as { text?: unknown; image_url?: unknown } | null | undefined;
             if (data === null) {
                 return {
                     clear: true,
@@ -175,7 +197,10 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
             if (values.clear) {
                 return [null];
             }
-            const data: any = {
+            const data: {
+                text: string;
+                image_url?: string;
+            } = {
                 text: asString(values.text),
             };
             if (values.image_url) {
@@ -202,8 +227,8 @@ export default function ReplayEffectsSidebar({
 
     // Quill: custom link UI (link-to-wiki by slug).
     const wikiLinkIntentRef = useRef<{
-        quill: any;
-        range: any;
+        quill: QuillLike;
+        range: QuillRange | null;
         existingHref: string | null;
     } | null>(null);
 
@@ -211,12 +236,12 @@ export default function ReplayEffectsSidebar({
     const [wikiLinkQuery, setWikiLinkQuery] = useState("");
     const [wikiLinkSearchMode, setWikiLinkSearchMode] = useState<"title" | "slug">("title");
     const [wikiLinkError, setWikiLinkError] = useState<string | null>(null);
-    const [globalWikiResults, setGlobalWikiResults] = useState<any[]>([]);
+    const [globalWikiResults, setGlobalWikiResults] = useState<Wiki[]>([]);
     const [isGlobalWikiSearching, setIsGlobalWikiSearching] = useState(false);
     const [globalWikiSearchError, setGlobalWikiSearchError] = useState<string | null>(null);
     const globalWikiSearchRequestRef = useRef(0);
 
-    const handleLinkClick = useCallback((quill: any) => {
+    const handleLinkClick = useCallback((quill: QuillLike | null | undefined) => {
         if (!quill) return;
         const range = quill.getSelection?.() ?? null;
         const existingHref =
@@ -304,9 +329,9 @@ export default function ReplayEffectsSidebar({
         };
     }, [isWikiLinkOpen, wikiLinkQuery, wikiLinkSearchMode]);
 
-    const globalWikiLinkCandidates = useMemo(() => {
+    const globalWikiLinkCandidates = useMemo<WikiLinkCandidate[]>(() => {
         if (!isWikiLinkOpen) return [];
-        const out: any[] = [];
+        const out: WikiLinkCandidate[] = [];
         for (const row of globalWikiResults || []) {
             const slug = typeof row?.slug === "string" ? row.slug.trim() : "";
             if (!slug.length) continue;
@@ -1158,7 +1183,7 @@ function ActionGroupEditor<T extends string>({
     createOnSelect?: boolean;
     emptyOptionLabel?: string;
     onUpdateActions: (nextActions: ReplayAction<T>[], label: string) => void;
-    onLinkClick?: (quill: any) => void;
+    onLinkClick?: (quill: QuillLike | null | undefined) => void;
     resetKey?: string;
 }) {
     const functionNames = useMemo(() => Object.keys(definitions) as T[], [definitions]);
@@ -1173,7 +1198,7 @@ function ActionGroupEditor<T extends string>({
     );
 
     const lastResetKeyRef = useRef<string | undefined>(undefined);
-    const lastLoadedActionsRef = useRef<any>(null);
+    const lastLoadedActionsRef = useRef<ReplayAction<T>[] | null>(null);
 
     useEffect(() => {
         const resetKeyChanged = resetKey !== lastResetKeyRef.current;
@@ -1183,18 +1208,21 @@ function ActionGroupEditor<T extends string>({
         lastResetKeyRef.current = resetKey;
         lastLoadedActionsRef.current = actions;
 
-        if (actions.length > 0) {
-            const first = actions[0];
-            setComposerFunctionName(first.function_name);
-            const def = definitions[first.function_name];
-            if (def) {
-                setComposerDraftValues(def.deserialize(first.params));
+        const timeoutId = window.setTimeout(() => {
+            if (actions.length > 0) {
+                const first = actions[0];
+                setComposerFunctionName(first.function_name);
+                const def = definitions[first.function_name];
+                if (def) {
+                    setComposerDraftValues(def.deserialize(first.params));
+                }
+            } else {
+                const defaultFun = createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T);
+                setComposerFunctionName(defaultFun);
+                setComposerDraftValues(buildActionComposerDraft(definitions, defaultFun));
             }
-        } else {
-            const defaultFun = createOnSelect && functionNames.length > 1 ? "" : (functionNames[0] as T);
-            setComposerFunctionName(defaultFun);
-            setComposerDraftValues(buildActionComposerDraft(definitions, defaultFun));
-        }
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
     }, [actions, definitions, createOnSelect, functionNames, resetKey]);
 
     const composerDefinition = composerFunctionName
@@ -1349,7 +1377,7 @@ function FieldInput({
     geometryChoices: Choice[];
     wikiChoices: Choice[];
     onChange: (nextValue: ActionValue) => void;
-    onLinkClick?: (quill: any) => void;
+    onLinkClick?: (quill: QuillLike | null | undefined) => void;
 }) {
     const onLinkClickRef = useRef(onLinkClick);
     useEffect(() => {
@@ -1366,7 +1394,7 @@ function FieldInput({
                     ["clean"],
                 ],
                 handlers: {
-                    link: function (this: { quill?: any }) {
+                    link: function (this: { quill?: QuillLike }) {
                         onLinkClickRef.current?.(this?.quill);
                     },
                 },

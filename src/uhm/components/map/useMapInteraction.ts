@@ -66,10 +66,15 @@ export function useMapInteraction({
     const mapCleanupFnsRef = useRef<Array<() => void>>([]);
 
     const allowGeometryEditingRef = useRef(allowGeometryEditing);
-    allowGeometryEditingRef.current = allowGeometryEditing;
-
     const allowFeatureSelectionRef = useRef(allowFeatureSelection);
-    allowFeatureSelectionRef.current = allowFeatureSelection;
+
+    useEffect(() => {
+        allowGeometryEditingRef.current = allowGeometryEditing;
+    }, [allowGeometryEditing]);
+
+    useEffect(() => {
+        allowFeatureSelectionRef.current = allowFeatureSelection;
+    }, [allowFeatureSelection]);
 
     useEffect(() => {
         if (!editingEngineRef.current) {
@@ -132,7 +137,7 @@ export function useMapInteraction({
     }, [mode, mapRef]);
 
     const setupMapInteractions = (map: maplibregl.Map) => {
-        (map as any)._renderDraftRef = renderDraftRef;
+        (map as MapWithRenderDraftRef)._renderDraftRef = renderDraftRef;
         const drawingEngine = initDrawing(
             map,
             () => modeRef.current,
@@ -354,6 +359,10 @@ export function useMapInteraction({
         cleanupMapInteractions,
     };
 }
+
+type MapWithRenderDraftRef = maplibregl.Map & {
+    _renderDraftRef?: React.MutableRefObject<FeatureCollection>;
+};
 
 function buildDuplicatedFeatureShapeOnly(
     feature: FeatureCollection["features"][number]

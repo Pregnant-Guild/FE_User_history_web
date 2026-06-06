@@ -41,9 +41,12 @@ export function ModeHint({ mode }: { mode: EditorMode }) {
             <div style={{ marginTop: 6, fontSize: 12, color: "#93c5fd" }}>
                 <div style={{ marginBottom: 4 }}>Click vào hình trên map để Chọn (Select).</div>
                 <ul style={{ paddingLeft: 16, margin: 0, opacity: 0.85 }}>
+                    <li><b>Giữ Shift + click</b>: Chọn nhiều hình hoặc bỏ chọn hình đang chọn</li>
+                    <li><b>Chuột phải</b>: Mở menu chỉnh sửa / xóa / duplicate / replay</li>
                     <li>Trong chế độ Sửa đỉnh:
                         <ul style={{ paddingLeft: 16, margin: "2px 0 0 0" }}>
                             <li><b>Enter</b>: Lưu hình đã sửa</li>
+                            <li><b>Esc</b>: Hủy chỉnh sửa</li>
                             <li><b>Delete</b>: Bật/Tắt chế độ Xóa đỉnh (click để xóa)</li>
                             <li><b>Giữ Shift</b>: Bắt dính (Snap) điểm đang kéo</li>
                         </ul>

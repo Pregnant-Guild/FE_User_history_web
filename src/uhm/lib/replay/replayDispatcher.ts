@@ -3,10 +3,15 @@ import type { FeatureCollection } from "@/uhm/types/geo";
 import type {
     ReplayAction,
     DialogState,
+    GeoFunctionName,
+    MapFunctionName,
+    NarrativeFunctionName,
+    UIOptionName,
 } from "@/uhm/types/projects";
 import { mapActions } from "./mapActions";
 import { uiActions } from "./uiActions";
 import { narrativeActions } from "./narrativeActions";
+import type { ReplayMapEffects } from "./replayMapEffects";
 
 /**
  * Interface định nghĩa các controller cần thiết để thực thi Replay.
@@ -15,7 +20,7 @@ import { narrativeActions } from "./narrativeActions";
 export interface ReplayControllers {
     map: maplibregl.Map | null;
     draft: FeatureCollection;
-    effects: any; // Type helper for ReplayMapEffects to avoid circular dependency
+    effects: ReplayMapEffects;
     
     // UI Setters
     setTimelineVisible: (v: boolean) => void;
@@ -45,7 +50,7 @@ export interface ReplayControllers {
  */
 export const dispatchReplayAction = (
     controllers: ReplayControllers,
-    rawAction: ReplayAction<any> | { function_name: string; params: unknown[] }
+    rawAction: ReplayAction<ReplayFunctionName> | { function_name: string; params: unknown[] }
 ) => {
     const action = normalizeSingleAction(rawAction);
     if (!action) return;
@@ -192,16 +197,25 @@ export const dispatchReplayAction = (
  * Lớp tương thích ngược (Backward Compatibility)
  * Chuẩn hóa các action cũ thành 16 action chính thức.
  */
-function normalizeSingleAction(action: any): ReplayAction<any> | null {
+type ReplayFunctionName = UIOptionName | MapFunctionName | GeoFunctionName | NarrativeFunctionName;
+type ReplayActionLike = {
+    function_name?: unknown;
+    params?: unknown;
+};
+
+function normalizeSingleAction(action: unknown): ReplayAction<ReplayFunctionName> | null {
     if (!action || typeof action !== "object") return null;
 
-    let { function_name, params } = action;
-    if (!Array.isArray(params)) {
-        params = [];
-    }
+    let { function_name } = action as ReplayActionLike;
+    let params: unknown[] = Array.isArray((action as ReplayActionLike).params)
+        ? (action as { params: unknown[] }).params
+        : [];
+    if (typeof function_name !== "string") return null;
 
     if (function_name === "UI") {
-        function_name = params[0];
+        const legacyFunctionName = params[0];
+        if (typeof legacyFunctionName !== "string") return null;
+        function_name = legacyFunctionName;
         params = params.slice(1);
     }
 

@@ -207,7 +207,7 @@ export default function ReplayTimelineSidebar({
         event.target.value = "";
     };
 
-function getBackgroundGeometryIdsFromReplay(replay: any): Set<string> {
+function getBackgroundGeometryIdsFromReplay(replay: BattleReplay | null): Set<string> {
     const bgIds = new Set<string>();
     if (!replay || !Array.isArray(replay.detail)) return bgIds;
     for (const stage of replay.detail) {

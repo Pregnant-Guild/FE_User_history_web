@@ -1223,8 +1223,9 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
                 const data = params[0];
                 if (data && typeof data === "object") {
                     hasDialog = true;
-                    text = String((data as any).text || text);
-                    image_url = String((data as any).image_url || image_url);
+                    const dialogData = data as { text?: unknown; image_url?: unknown };
+                    text = String(dialogData.text || text);
+                    image_url = String(dialogData.image_url || image_url);
                 } else if (data === null) {
                     isCleared = true;
                 }
@@ -1271,7 +1272,10 @@ function normalizeReplayNarrativeActions(actions: unknown): ReplayAction<Narrati
     }
 
     if (hasDialog) {
-        const dialogData: any = {
+        const dialogData: {
+            text: string;
+            image_url?: string;
+        } = {
             text,
         };
         if (image_url) {

@@ -93,7 +93,7 @@ export function useMapInstance() {
                 }
             };
 
-            let throttleTimeout: any = null;
+            let throttleTimeout: ReturnType<typeof setTimeout> | null = null;
 
             const syncZoomLevelImmediate = () => {
                 if (isZoomSliderDraggingRef.current) return;

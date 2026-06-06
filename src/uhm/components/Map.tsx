@@ -57,6 +57,7 @@ type MapProps = {
     onFeatureClick?: ((payload: MapFeaturePayload | null) => void) | undefined;
     hoverPopupEnabled?: boolean;
     getHoverPopupContent?: (feature: Feature) => MapHoverPopupContent | null;
+    onHoverFeatureChange?: (feature: Feature | null) => void;
     allowFeatureSelection?: boolean;
     focusFeatureCollection?: FeatureCollection | null;
     focusRequestKey?: string | number | null;
@@ -98,6 +99,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     onFeatureClick,
     hoverPopupEnabled = false,
     getHoverPopupContent,
+    onHoverFeatureChange,
     allowFeatureSelection = true,
     focusFeatureCollection = null,
     focusRequestKey = null,
@@ -126,6 +128,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     // Ref callback click feature mới nhất cho tooltip/panel ngoài map.
     const onFeatureClickRef = useRef<MapProps["onFeatureClick"]>(onFeatureClick);
     const getHoverPopupContentRef = useRef<MapProps["getHoverPopupContent"]>(getHoverPopupContent);
+    const onHoverFeatureChangeRef = useRef<MapProps["onHoverFeatureChange"]>(onHoverFeatureChange);
     // Ref callback create mới nhất khi drawing engine tạo feature.
     const onCreateRef = useRef<MapProps["onCreateFeature"]>(onCreateFeature);
     // Ref callback add geometry global vào project mới nhất cho context menu select.
@@ -151,6 +154,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     onSetModeRef.current = onSetMode;
     onFeatureClickRef.current = onFeatureClick;
     getHoverPopupContentRef.current = getHoverPopupContent;
+    onHoverFeatureChangeRef.current = onHoverFeatureChange;
     onCreateRef.current = onCreateFeature;
     onAddFeatureToProjectRef.current = onAddFeatureToProject;
     onDeleteRef.current = onDeleteFeature;
@@ -249,6 +253,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
         enabled: hoverPopupEnabled,
         renderDraftRef,
         getContentRef: getHoverPopupContentRef,
+        onHoverFeatureChangeRef,
     });
 
     useEffect(() => {

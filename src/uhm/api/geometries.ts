@@ -61,6 +61,10 @@ function buildBBoxQueryString(params: GeometriesBBoxQuery): string {
         query.set("entity_id", params.entity_id);
     }
 
+    if (typeof params.hasBound === "boolean") {
+        query.set("has_bound", String(params.hasBound));
+    }
+
     return query.toString();
 }
 
@@ -68,6 +72,16 @@ export async function fetchGeometriesByBBox(params: GeometriesBBoxQuery): Promis
     const url = `${API_ENDPOINTS.geometries}?${buildBBoxQueryString(params)}`;
     // API mới trả về list geometries, FE cần chuyển thành GeoJSON FeatureCollection.
     const rows = await requestJson<GeometryRow[]>(url);
+    return geometriesToFeatureCollection(rows);
+}
+
+export async function fetchGeometriesByBoundWith(parentGeometryId: string): Promise<FeatureCollection> {
+    const id = String(parentGeometryId || "").trim();
+    if (!id) return { type: "FeatureCollection", features: [] };
+
+    const rows = await requestJson<GeometryRow[]>(
+        `${API_ENDPOINTS.geometries}/bound-with/${encodeURIComponent(id)}`
+    );
     return geometriesToFeatureCollection(rows);
 }
 
@@ -129,6 +143,7 @@ type GeometryRow = {
         max_lng: number;
         max_lat: number;
     } | null;
+    replay_ids?: string[] | null;
     entity_id?: string | null;
     entity_name?: string | null;
     entity_description?: string | null;
@@ -175,6 +190,7 @@ function geometriesToFeatureCollection(rows: GeometryRow[]): FeatureCollection {
             type: typeKey,
             time_start: row.time_start ?? null,
             time_end: row.time_end ?? null,
+            replay_ids: normalizeStringArray(row.replay_ids),
             bound_with: boundWith,
             ...(entityPreviews.length
                 ? {
@@ -258,6 +274,13 @@ function normalizeString(value: unknown): string {
 function normalizeNullableString(value: unknown): string | null {
     const normalized = normalizeString(value);
     return normalized.length ? normalized : null;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => normalizeString(item))
+        .filter((item) => item.length > 0);
 }
 
 function normalizeNumber(value: unknown): number | null {

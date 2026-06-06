@@ -18,6 +18,7 @@ import PresentPlaceSearch, {
     type HistoricalGeometryFocusPayload,
     type PresentPlaceSelection,
 } from "@/uhm/components/editor/PresentPlaceSearch";
+import { type Wiki } from "@/uhm/api/wikis";
 import type { FeatureCollection } from "@/uhm/types/geo";
 import {
     type BackgroundLayerId,
@@ -143,6 +144,7 @@ export default function PublicPreviewClientPage({
         isRelationsLoading,
         relationsStatus,
         replays,
+        ensureChildrenForGeometry,
     } = usePublicPreviewData({ timelineYear: searchTimelineYear, timeRange, enabled: loadInteractiveMap });
 
     const activeReplay = useMemo(() => {
@@ -200,6 +202,7 @@ export default function PublicPreviewClientPage({
         linkEntityPopupRef,
         getHoverPopupContent,
         selectEntity,
+        selectWiki,
         handleWikiLinkRequest,
         closeWikiSidebar,
         setLinkEntityPopup,
@@ -210,9 +213,17 @@ export default function PublicPreviewClientPage({
         setRelations,
         selectedFeatureIds,
         setSelectedFeatureIds,
+        timelineYear: replayMode === "playing" ? replayPreview.timelineYear : timelineDraftYear,
         replayActiveWikiId: replayPreview.activeWikiId,
         replayMode,
     });
+
+    useEffect(() => {
+        if (!selectedFeatureIds.length) return;
+        for (const featureId of selectedFeatureIds) {
+            void ensureChildrenForGeometry(featureId);
+        }
+    }, [ensureChildrenForGeometry, selectedFeatureIds]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -362,6 +373,23 @@ export default function PublicPreviewClientPage({
         }
     }, [relations.geometryEntityIds, selectEntity, setSelectedFeatureIds]);
 
+    const handleFocusWiki = useCallback((wiki: Wiki) => {
+        setFocusedPresentPlace(null);
+        selectWiki(wiki);
+
+        // Focus geometries if any
+        const entityIds = relations.wikiEntityIdsById[wiki.id] || [];
+        if (entityIds.length > 0) {
+            const geometries = relations.entityGeometriesById[entityIds[0]];
+            const map = mapHandleRef.current?.getMap();
+            if (map && geometries && geometries.features.length > 0) {
+                import("@/uhm/components/map/mapUtils").then(({ fitMapToFeatureCollection }) => {
+                    fitMapToFeatureCollection(map, geometries, 84, { duration: 1000 });
+                });
+            }
+        }
+    }, [relations.wikiEntityIdsById, relations.entityGeometriesById, selectWiki]);
+
     const filteredRenderDraft = useMemo(() => {
         if (replayMode !== "playing" || !replayPreview.hiddenGeometryIds?.length) {
             return renderDraft;
@@ -402,22 +430,22 @@ export default function PublicPreviewClientPage({
 
     const isSidebarOpen = replayMode === "playing"
         ? (replayPreview.sidebarOpen || isManualSidebarOpen)
-        : Boolean(activeEntity);
+        : Boolean(activeEntity || activeWiki || isManualSidebarOpen);
 
     const displayedActiveEntity = isSidebarOpen ? activeEntity : null;
     const displayedActiveWiki = isSidebarOpen ? activeWiki : null;
 
     const computedTimelineStyle = useMemo(() => {
         const leftMargin = isLayerPanelVisible ? 88 : 18;
-        const rightMargin = (displayedActiveEntity && isLargeScreen) ? sidebarWidth + 32 : 18;
-        const bottomOffset = (displayedActiveEntity && !isLargeScreen) ? `${sidebarHeight + 16}px` : undefined;
+        const rightMargin = ((displayedActiveEntity || displayedActiveWiki) && isLargeScreen) ? sidebarWidth + 32 : 18;
+        const bottomOffset = ((displayedActiveEntity || displayedActiveWiki) && !isLargeScreen) ? `${sidebarHeight + 16}px` : undefined;
         return {
             left: `${leftMargin}px`,
             right: `${rightMargin}px`,
             bottom: bottomOffset,
             transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         };
-    }, [isLayerPanelVisible, displayedActiveEntity, isLargeScreen, sidebarWidth, sidebarHeight]);
+    }, [isLayerPanelVisible, displayedActiveEntity, displayedActiveWiki, isLargeScreen, sidebarWidth, sidebarHeight]);
 
     const searchBarWidth = useMemo(() => {
         if (isLargeScreen) {
@@ -431,9 +459,9 @@ export default function PublicPreviewClientPage({
             return {
                 position: "absolute" as const,
                 top: 10,
-                left: "50%",
-                transform: "translateX(-50%)",
+                left: 84,
                 right: "auto",
+                transform: "none",
                 zIndex: 18,
                 display: "flex",
                 gap: "10px",
@@ -526,6 +554,7 @@ export default function PublicPreviewClientPage({
                             focusedPlace={focusedPresentPlace}
                             onFocusPlace={handleFocusPresentPlace}
                             onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                            onFocusWiki={handleFocusWiki}
                             onClearFocus={clearPresentPlaceFocus}
                             style={{
                                 position: "relative",
@@ -590,4 +619,3 @@ export default function PublicPreviewClientPage({
         </>
     );
 }
-

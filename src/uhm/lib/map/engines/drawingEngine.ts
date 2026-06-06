@@ -1,7 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import type { ModeGetter } from "@/uhm/lib/map/engines/engineTypes";
-import { snapToNearestGeometryDetailed, tracePathBetweenPoints, getRingWithSnaps } from "@/uhm/lib/map/engines/snapUtils";
+import { getSnapVertexCoordinate, snapToNearestGeometryDetailed, tracePathBetweenPoints } from "@/uhm/lib/map/engines/snapUtils";
 
 // Khởi tạo engine vẽ polygon tự do theo chuỗi click.
 export function initDrawing(
@@ -21,12 +21,7 @@ export function initDrawing(
         startIdx: number;
         targetFeatureId: string | number;
         targetFeatureRing: [number, number][];
-        snap1: {
-            type: "vertex" | "edge";
-            vertexIdx?: number;
-            edgeIdx?: number;
-            lngLat: { lng: number; lat: number };
-        };
+        targetVertexIdx: number;
     } | null = null;
 
     const clearPreview = () => {
@@ -107,30 +102,16 @@ export function initDrawing(
         if (traceStartState) {
             const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, null, traceStartState.targetFeatureId);
             if (
-                targetSnap.type !== "none" &&
+                targetSnap.type === "vertex" &&
                 targetSnap.featureId !== undefined &&
                 String(targetSnap.featureId) === String(traceStartState.targetFeatureId) &&
-                targetSnap.ringCoords
+                targetSnap.vertexIdx !== undefined
             ) {
-                // Hợp lệ, tiến hành trace dọc biên giới
-                const snap1 = traceStartState.snap1;
-                const snap2 = {
-                    type: targetSnap.type as "vertex" | "edge",
-                    vertexIdx: targetSnap.vertexIdx,
-                    edgeIdx: targetSnap.edgeIdx,
-                    lngLat: { lng: targetSnap.lngLat.lng, lat: targetSnap.lngLat.lat }
-                };
-
-                const { ring, idx1, idx2 } = getRingWithSnaps(
-                    traceStartState.targetFeatureRing,
-                    snap1,
-                    snap2
-                );
-
+                // Hợp lệ, trace dọc các vertex gốc của biên giới.
                 const path = tracePathBetweenPoints(
-                    ring as [number, number][],
-                    idx1,
-                    idx2
+                    traceStartState.targetFeatureRing,
+                    traceStartState.targetVertexIdx,
+                    targetSnap.vertexIdx
                 );
 
                 if (path.length > 0) {
@@ -141,7 +122,12 @@ export function initDrawing(
                     }
                 }
             } else {
-                // Không tìm thấy điểm kết thúc hợp lệ trên cùng Geo, đặt điểm vẽ tự do bình thường
+                if (e.originalEvent.shiftKey) {
+                    update(coords);
+                    return;
+                }
+
+                // Không tìm thấy vertex kết thúc hợp lệ trên cùng Geo, đặt điểm vẽ tự do bình thường
                 coords.push(currentPoint);
                 coordMeta.push({ isTrace: false });
             }
@@ -152,23 +138,32 @@ export function initDrawing(
 
         // 2. Nếu chưa có trace, kiểm tra xem click này có kích hoạt tạo điểm bắt đầu trace không (Shift + T)
         const isShiftT = e.originalEvent.shiftKey && isTKeyDown;
-        if (isShiftT && snapRes && snapRes.type !== "none" && snapRes.featureId !== undefined && snapRes.ringCoords) {
-            coords.push(currentPoint);
+        const traceStartCoordinate = snapRes ? getSnapVertexCoordinate(snapRes) : null;
+        if (
+            isShiftT &&
+            snapRes &&
+            snapRes.type === "vertex" &&
+            snapRes.featureId !== undefined &&
+            snapRes.ringCoords &&
+            snapRes.vertexIdx !== undefined &&
+            traceStartCoordinate
+        ) {
+            coords.push(traceStartCoordinate);
             coordMeta.push({ isTrace: false }); // start point của trace vẫn tính là điểm bình thường
             
             traceStartState = {
-                startCoord: currentPoint,
+                startCoord: traceStartCoordinate,
                 startIdx: coords.length - 1,
                 targetFeatureId: snapRes.featureId,
                 targetFeatureRing: snapRes.ringCoords as [number, number][],
-                snap1: {
-                    type: snapRes.type as "vertex" | "edge",
-                    vertexIdx: snapRes.vertexIdx,
-                    edgeIdx: snapRes.edgeIdx,
-                    lngLat: { lng: snapRes.lngLat.lng, lat: snapRes.lngLat.lat }
-                }
+                targetVertexIdx: snapRes.vertexIdx
             };
         } else {
+            if (isShiftT) {
+                update(coords);
+                return;
+            }
+
             // Click bình thường
             coords.push(currentPoint);
             coordMeta.push({ isTrace: false });
@@ -196,35 +191,19 @@ export function initDrawing(
         if (traceStartState) {
             const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, null, traceStartState.targetFeatureId);
             if (
-                targetSnap.type !== "none" &&
+                targetSnap.type === "vertex" &&
                 targetSnap.featureId !== undefined &&
                 String(targetSnap.featureId) === String(traceStartState.targetFeatureId) &&
-                targetSnap.ringCoords
+                targetSnap.vertexIdx !== undefined
             ) {
-                const snap1 = traceStartState.snap1;
-                const snap2 = {
-                    type: targetSnap.type as "vertex" | "edge",
-                    vertexIdx: targetSnap.vertexIdx,
-                    edgeIdx: targetSnap.edgeIdx,
-                    lngLat: { lng: targetSnap.lngLat.lng, lat: targetSnap.lngLat.lat }
-                };
-
-                const { ring, idx1, idx2 } = getRingWithSnaps(
-                    traceStartState.targetFeatureRing,
-                    snap1,
-                    snap2
-                );
-
                 const path = tracePathBetweenPoints(
-                    ring as [number, number][],
-                    idx1,
-                    idx2
+                    traceStartState.targetFeatureRing,
+                    traceStartState.targetVertexIdx,
+                    targetSnap.vertexIdx
                 );
 
                 if (path.length > 0) {
                     const previewCoords = [...coords];
-                    const traceStartOffset = coords.length;
-                    
                     for (let i = 1; i < path.length; i++) {
                         previewCoords.push(path[i]);
                     }

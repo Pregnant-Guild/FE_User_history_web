@@ -22,6 +22,7 @@ export type FeatureProperties = {
     geometry_preset?: GeometryPreset | null;
     time_start?: number | null;
     time_end?: number | null;
+    replay_ids?: string[];
     bound_with?: string | null;
     entity_id?: string | null;
     entity_ids?: string[];
@@ -33,6 +34,7 @@ export type FeatureProperties = {
     point_label?: string | null;
     line_label?: string | null;
     polygon_label?: string | null;
+    entity_color?: string;
 };
 
 export type EntityLabelCandidate = {

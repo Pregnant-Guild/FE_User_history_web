@@ -44,3 +44,7 @@ export async function searchEntitiesByName(
     // API mới không có `/entities/search`, search qua query string.
     return requestJson<Entity[]>(`${API_ENDPOINTS.entities}?${params.toString()}`);
 }
+
+export async function fetchEntityById(id: string): Promise<Entity> {
+    return requestJson<Entity>(`${API_ENDPOINTS.entities}/${id}`);
+}

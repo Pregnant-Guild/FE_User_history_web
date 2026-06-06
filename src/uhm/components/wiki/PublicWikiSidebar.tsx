@@ -319,8 +319,8 @@ function PublicWikiSidebar({
     return (
         <div
             style={{
-                width: "100%",
-                maxWidth: isMobileOrTablet ? "100%" : `${width}px`,
+                width: isMobileOrTablet ? "100%" : `${width}px`,
+                maxWidth: "100%",
                 display: "flex",
                 flexDirection: "column",
                 height: "100%",

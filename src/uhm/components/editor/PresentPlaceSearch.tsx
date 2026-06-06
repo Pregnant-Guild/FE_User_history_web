@@ -11,6 +11,7 @@ import {
     type PresentPlaceSelection,
 } from "@/uhm/api/goongPlaces";
 import { getGeometryRepresentativePoint } from "@/uhm/components/map/mapUtils";
+import { searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 
 export type { PresentPlaceSelection } from "@/uhm/api/goongPlaces";
 
@@ -21,7 +22,7 @@ export type HistoricalGeometryFocusPayload = {
     adminLabel: string | null;
 };
 
-type SearchMode = "present" | "history";
+type SearchMode = "present" | "history" | "wiki";
 
 type AdminLabelState = {
     status: "loading" | "loaded" | "error";
@@ -33,6 +34,7 @@ type Props = {
     focusedPlace: PresentPlaceSelection | null;
     onFocusPlace: (place: PresentPlaceSelection) => void;
     onFocusHistoricalGeometry: (payload: HistoricalGeometryFocusPayload) => void;
+    onFocusWiki?: (wiki: Wiki) => void;
     onClearFocus: () => void;
     leftOffset?: number;
     style?: CSSProperties;
@@ -42,11 +44,12 @@ export default function PresentPlaceSearch({
     focusedPlace,
     onFocusPlace,
     onFocusHistoricalGeometry,
+    onFocusWiki,
     onClearFocus,
     leftOffset = 18,
     style,
 }: Props) {
-    const [mode, setMode] = useState<SearchMode>("present");
+    const [mode, setMode] = useState<SearchMode>("history");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<PresentPlacePrediction[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -61,14 +64,20 @@ export default function PresentPlaceSearch({
     const [selectingGeometryId, setSelectingGeometryId] = useState<string | null>(null);
     const [adminLabels, setAdminLabels] = useState<Record<string, AdminLabelState>>({});
 
+    const [wikiQuery, setWikiQuery] = useState("");
+    const [wikiResults, setWikiResults] = useState<Wiki[]>([]);
+    const [isWikiLoading, setIsWikiLoading] = useState(false);
+    const [wikiError, setWikiError] = useState<string | null>(null);
+
     const [isOpen, setIsOpen] = useState(false);
     const requestSeqRef = useRef(0);
     const historicalRequestSeqRef = useRef(0);
+    const wikiRequestSeqRef = useRef(0);
     const hasApiKey = hasSearchMapApiKey();
 
-    const activeQuery = mode === "present" ? query : historicalQuery;
-    const activeError = mode === "present" ? error : historicalError;
-    const activeLoading = mode === "present" ? isLoading : isHistoricalLoading;
+    const activeQuery = mode === "present" ? query : mode === "history" ? historicalQuery : wikiQuery;
+    const activeError = mode === "present" ? error : mode === "history" ? historicalError : wikiError;
+    const activeLoading = mode === "present" ? isLoading : mode === "history" ? isHistoricalLoading : isWikiLoading;
 
     const expandedItem = useMemo(() => {
         if (!expandedEntityId) return null;
@@ -163,6 +172,43 @@ export default function PresentPlaceSearch({
     }, [historicalQuery, mode]);
 
     useEffect(() => {
+        if (mode !== "wiki") return;
+
+        const keyword = wikiQuery.trim();
+        if (!keyword || keyword.length < 2) {
+            setWikiResults([]);
+            setIsWikiLoading(false);
+            setWikiError(null);
+            return;
+        }
+
+        const seq = wikiRequestSeqRef.current + 1;
+        wikiRequestSeqRef.current = seq;
+        const timer = window.setTimeout(() => {
+            setIsWikiLoading(true);
+            setWikiError(null);
+            searchWikisByTitle(keyword, { limit: 12 })
+                .then((nextResults) => {
+                    if (wikiRequestSeqRef.current !== seq) return;
+                    setWikiResults(nextResults || []);
+                    setIsOpen(true);
+                })
+                .catch((err) => {
+                    if (wikiRequestSeqRef.current !== seq) return;
+                    setWikiResults([]);
+                    setWikiError(err instanceof Error ? err.message : "Không search được wiki.");
+                })
+                .finally(() => {
+                    if (wikiRequestSeqRef.current === seq) {
+                        setIsWikiLoading(false);
+                    }
+                });
+        }, 260);
+
+        return () => window.clearTimeout(timer);
+    }, [wikiQuery, mode]);
+
+    useEffect(() => {
         if (mode !== "history" || !expandedItem || expandedItem.geometries.length <= 1 || !hasApiKey) {
             return;
         }
@@ -255,26 +301,48 @@ export default function PresentPlaceSearch({
         setSelectingGeometryId(null);
     };
 
+    const selectWiki = (wiki: Wiki) => {
+        if (onFocusWiki) {
+            onFocusWiki(wiki);
+        }
+        setWikiQuery(wiki.title || "");
+        setWikiResults([]);
+        setIsOpen(false);
+    };
+
     const clearSearch = () => {
         if (mode === "present") {
             setQuery("");
             setResults([]);
             setError(null);
-        } else {
+        } else if (mode === "history") {
             setHistoricalQuery("");
             setHistoricalResults([]);
             setHistoricalError(null);
             setExpandedEntityId(null);
+        } else {
+            setWikiQuery("");
+            setWikiResults([]);
+            setWikiError(null);
         }
         setIsOpen(false);
         onClearFocus();
     };
 
-    const switchMode = (nextMode: SearchMode) => {
+    const cycleMode = () => {
+        let nextMode: SearchMode;
+        if (mode === "history") {
+            nextMode = "present";
+        } else if (mode === "present") {
+            nextMode = "wiki";
+        } else {
+            nextMode = "history";
+        }
         setMode(nextMode);
         setIsOpen(true);
         setError(null);
         setHistoricalError(null);
+        setWikiError(null);
     };
 
     return (
@@ -295,20 +363,22 @@ export default function PresentPlaceSearch({
                 <div style={searchInputRowStyle}>
                     <button
                         type="button"
-                        onClick={() => switchMode(mode === "present" ? "history" : "present")}
-                        title={mode === "present" ? "Switch to history search" : "Switch to present search"}
-                        aria-label={mode === "present" ? "Switch to history search" : "Switch to present search"}
+                        onClick={cycleMode}
+                        title={`Switch search mode (current: ${mode})`}
+                        aria-label={`Switch search mode (current: ${mode})`}
                         style={modeSwitchStyle}
                     >
-                        {mode === "present" ? "Present" : "History"}
+                        {mode === "present" ? "Present" : mode === "history" ? "History" : "Wiki"}
                     </button>
                     <input
                         value={activeQuery}
                         onChange={(event) => {
                             if (mode === "present") {
                                 setQuery(event.target.value);
-                            } else {
+                            } else if (mode === "history") {
                                 setHistoricalQuery(event.target.value);
+                            } else {
+                                setWikiQuery(event.target.value);
                             }
                             setIsOpen(true);
                         }}
@@ -327,10 +397,20 @@ export default function PresentPlaceSearch({
                                     event.preventDefault();
                                     selectHistoricalEntity(historicalResults[0]);
                                 }
+                                if (mode === "wiki" && wikiResults[0]) {
+                                    event.preventDefault();
+                                    selectWiki(wikiResults[0]);
+                                }
                             }
                         }}
                         disabled={mode === "present" && !hasApiKey}
-                        placeholder={mode === "present" ? "Tìm địa điểm hiện tại" : "Tìm entity lịch sử"}
+                        placeholder={
+                            mode === "present"
+                                ? "Tìm địa điểm hiện tại"
+                                : mode === "history"
+                                    ? "Tìm entity lịch sử"
+                                    : "Tìm bài viết wiki"
+                        }
                         style={inputStyle}
                     />
                     {activeQuery || focusedPlace ? (
@@ -347,7 +427,7 @@ export default function PresentPlaceSearch({
                 </div>
             </div>
 
-            {isOpen && shouldRenderResults(mode, activeQuery, activeLoading, activeError, results, historicalResults) ? (
+            {isOpen && shouldRenderResults(mode, activeQuery, activeLoading, activeError, results, historicalResults, wikiResults) ? (
                 <div style={resultsPanelStyle}>
                     {mode === "present" ? (
                         <PresentResults
@@ -358,7 +438,7 @@ export default function PresentPlaceSearch({
                             selectingPlaceId={selectingPlaceId}
                             onSelect={selectPrediction}
                         />
-                    ) : (
+                    ) : mode === "history" ? (
                         <HistoricalResults
                             isLoading={isHistoricalLoading}
                             error={historicalError}
@@ -370,6 +450,14 @@ export default function PresentPlaceSearch({
                             hasApiKey={hasApiKey}
                             onSelectEntity={selectHistoricalEntity}
                             onSelectGeometry={selectHistoricalGeometry}
+                        />
+                    ) : (
+                        <WikiResults
+                            isLoading={isWikiLoading}
+                            error={wikiError}
+                            query={wikiQuery}
+                            results={wikiResults}
+                            onSelect={selectWiki}
                         />
                     )}
                 </div>
@@ -520,16 +608,61 @@ function HistoricalResults({
     );
 }
 
+function WikiResults({
+    isLoading,
+    error,
+    query,
+    results,
+    onSelect,
+}: {
+    isLoading: boolean;
+    error: string | null;
+    query: string;
+    results: Wiki[];
+    onSelect: (wiki: Wiki) => void;
+}) {
+    if (isLoading) return <div style={statusStyle}>Đang tìm wiki...</div>;
+    if (error) return <div style={{ ...statusStyle, color: "#fecaca" }}>{error}</div>;
+    if (!results.length && query.trim().length >= 2) return <div style={statusStyle}>Không tìm thấy bài viết.</div>;
+
+    return (
+        <>
+            {results.map((wiki) => (
+                <button
+                    key={wiki.id}
+                    type="button"
+                    onClick={() => onSelect(wiki)}
+                    style={resultButtonStyle}
+                    onMouseEnter={(event) => {
+                        event.currentTarget.style.background = "rgba(56, 189, 248, 0.1)";
+                    }}
+                    onMouseLeave={(event) => {
+                        event.currentTarget.style.background = "transparent";
+                    }}
+                >
+                    <span style={primaryResultTextStyle}>{wiki.title || wiki.slug || "Không có tiêu đề"}</span>
+                    {wiki.slug && (
+                        <span style={secondaryResultTextStyle}>/wiki/{wiki.slug}</span>
+                    )}
+                </button>
+            ))}
+        </>
+    );
+}
+
 function shouldRenderResults(
     mode: SearchMode,
     query: string,
     isLoading: boolean,
     error: string | null,
     presentResults: PresentPlacePrediction[],
-    historicalResults: EntityGeometriesSearchItem[]
+    historicalResults: EntityGeometriesSearchItem[],
+    wikiResults: Wiki[]
 ): boolean {
     if (isLoading || error || query.trim().length >= 2) return true;
-    return mode === "present" ? presentResults.length > 0 : historicalResults.length > 0;
+    if (mode === "present") return presentResults.length > 0;
+    if (mode === "history") return historicalResults.length > 0;
+    return wikiResults.length > 0;
 }
 
 function formatAdminLabel(state: AdminLabelState | undefined): string {

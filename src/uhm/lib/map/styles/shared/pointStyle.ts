@@ -14,13 +14,13 @@ export const POINT_GEOTYPE_IDS = [
 export type PointGeotypeId = (typeof POINT_GEOTYPE_IDS)[number];
 
 export const POINT_GEOTYPE_ICON_PATHS: Partial<Record<PointGeotypeId, string>> = {
-    person_event: "/images/mapIcon/point/flag.png",
-    temple: "/images/mapIcon/point/temple.png",
-    capital: "/images/mapIcon/point/capital.png",
-    city: "/images/mapIcon/point/city.png",
-    fortification: "/images/mapIcon/point/castle.png",
-    ruin: "/images/mapIcon/point/ruin.png",
-    port: "/images/mapIcon/point/port.png",
+    person_event: "/images/mapIcon/point/flag.webp",
+    temple: "/images/mapIcon/point/temple.webp",
+    capital: "/images/mapIcon/point/capital.webp",
+    city: "/images/mapIcon/point/city.webp",
+    fortification: "/images/mapIcon/point/castle.webp",
+    ruin: "/images/mapIcon/point/ruin.webp",
+    port: "/images/mapIcon/point/port.webp",
 };
 
 
@@ -473,5 +473,4 @@ function drawAnchorGlyph(ctx: CanvasRenderingContext2D) {
         ctx.stroke();
     }
 }
-
 

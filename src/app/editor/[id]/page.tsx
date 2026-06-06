@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useShallow } from "zustand/react/shallow";
-import Map, { type MapHandle } from "@/uhm/components/Map";
+import Map, { type MapFeaturePayload, type MapHandle } from "@/uhm/components/Map";
 import Editor from "@/uhm/components/Editor";
 import BackgroundLayersPanel from "@/uhm/components/editor/BackgroundLayersPanel";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
@@ -423,6 +423,14 @@ function EditorPageContent() {
     const isViewerPreviewMode = mode === "preview";
     const isReplayPreviewMode = mode === "replay_preview";
     const isAnyPreviewMode = isViewerPreviewMode || isReplayPreviewMode;
+    const isEditingGeometryOrReplay =
+        mode === "draw" ||
+        mode === "add-point" ||
+        mode === "add-line" ||
+        mode === "add-path" ||
+        mode === "add-circle" ||
+        mode === "replay" ||
+        (mode === "select" && selectedFeatureIds.length > 0);
     const previewReturnModeRef = useRef<EditorMode>("select");
     const replayPreviewReturnRef = useRef<{
         mode: "replay" | "preview";
@@ -1172,12 +1180,12 @@ function EditorPageContent() {
         }
     }, [isReplayPreviewMode, isViewerPreviewMode, exitReplayPreview, openSelectedViewerReplayPreview, viewerPreviewSelectedReplay]);
 
-    const handleMapFeatureClick = useCallback((payload: any) => {
+    const handleMapFeatureClick = useCallback((payload: MapFeaturePayload | null) => {
         previewLayoutRef.current?.handleFeatureClick(payload);
     }, []);
 
-    const handleMapHoverPopupContent = useCallback((payload: any) => {
-        return previewLayoutRef.current?.getHoverPopupContent(payload) ?? null;
+    const handleMapHoverPopupContent = useCallback((feature: Feature) => {
+        return previewLayoutRef.current?.getHoverPopupContent(feature) ?? null;
     }, []);
 
     const handleMapPlayPreviewReplay = useCallback(() => {
@@ -2393,7 +2401,7 @@ function EditorPageContent() {
     const handleCreateFeature = useCallback((feature: Feature) => {
         editor.createFeature(feature);
         setSelectedFeatureIds([feature.properties.id]);
-    }, [editor]);
+    }, [editor, setSelectedFeatureIds]);
 
     // Base draft for label lookup only. It must not decide which geometry is rendered.
     const labelContextBaseDraft = useMemo(() => {
@@ -2746,7 +2754,7 @@ function EditorPageContent() {
                         year={activeTimelineYear}
                         onYearChange={handleTimelineYearChange}
                         isLoading={false}
-                        disabled={false}
+                        disabled={isEditingGeometryOrReplay}
                         statusText={null}
                         filterEnabled={activeTimelineFilterEnabled}
                         onFilterEnabledChange={setTimelineFilterEnabled}
@@ -2921,49 +2929,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
     const tagName = target.tagName.toLowerCase();
     return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
-}
-
-function buildEntityLabelContextDraft(draft: FeatureCollection, entities: Entity[]): FeatureCollection {
-    if (!draft.features.length) return draft;
-
-    const entityById = new globalThis.Map<string, Entity>();
-    for (const entity of entities || []) {
-        const id = String(entity?.id || "").trim();
-        if (!id) continue;
-        entityById.set(id, entity);
-    }
-
-    return {
-        ...draft,
-        features: draft.features.map((feature) => {
-            const entityIds = normalizeFeatureEntityIds(feature);
-            if (!entityIds.length) return feature;
-
-            const candidates = entityIds.map((id) => {
-                const entity = entityById.get(id) || null;
-                const name = String(entity?.name || id).trim();
-                if (!name) return null;
-                return {
-                    id,
-                    name,
-                    time_start: normalizeTimelineYearValue(entity?.time_start),
-                    time_end: normalizeTimelineYearValue(entity?.time_end),
-                };
-            }).filter((candidate) => candidate !== null);
-
-            return {
-                ...feature,
-                properties: {
-                    ...feature.properties,
-                    entity_id: entityIds[0] || null,
-                    entity_ids: entityIds,
-                    entity_name: candidates[0]?.name || null,
-                    entity_names: candidates.map((candidate) => candidate.name),
-                    entity_label_candidates: candidates,
-                },
-            };
-        }),
-    };
 }
 
 function buildEntityRefsForFeature(feature: Feature, entities: Entity[]): Entity[] {

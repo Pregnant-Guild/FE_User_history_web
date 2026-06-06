@@ -1,11 +1,12 @@
 import maplibregl from "maplibre-gl";
-import { PATH_ARROW_SOURCE_ID } from "@/uhm/lib/map/constants";
 
 // SHIFT/ALT snap should be forgiving while drawing quickly.
 // Vertices get a larger radius and always win over edges when both are available.
 const VERTEX_SNAP_THRESHOLD_PX = 34;
 const EDGE_SNAP_THRESHOLD_PX = 24;
 const QUERY_THRESHOLD_PX = Math.max(VERTEX_SNAP_THRESHOLD_PX, EDGE_SNAP_THRESHOLD_PX);
+const COORDINATE_EPSILON = 1e-10;
+const SEGMENT_ENDPOINT_EPSILON = 1e-7;
 
 type Coordinate = [number, number];
 type GeometryWithCoordinates = Exclude<GeoJSON.Geometry, GeoJSON.GeometryCollection> & {
@@ -20,6 +21,12 @@ export type SnapResult = {
     vertexIdx?: number;
     edgeIdx?: number;
 };
+
+export function getSnapVertexCoordinate(snap: SnapResult): [number, number] | null {
+    if (snap.type !== "vertex" || snap.vertexIdx === undefined || !snap.ringCoords) return null;
+    const coordinate = snap.ringCoords[snap.vertexIdx];
+    return coordinate ? [coordinate[0], coordinate[1]] : null;
+}
 
 export function snapToNearestGeometry(
     map: maplibregl.Map,
@@ -65,21 +72,28 @@ export function snapToNearestGeometryDetailed(
         return (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
     };
 
-    // Tìm điểm gần nhất trên đoạn thẳng [a, b] so với điểm p (tính trên pixel màn hình)
-    const getClosestPointOnSegment = (p: maplibregl.Point, a: maplibregl.Point, b: maplibregl.Point): maplibregl.Point => {
+    // Tìm t của điểm gần nhất trên đoạn thẳng [a, b] so với điểm p (tính trên pixel màn hình)
+    const getClosestTOnSegment = (p: maplibregl.Point, a: maplibregl.Point, b: maplibregl.Point): number => {
         const atob = { x: b.x - a.x, y: b.y - a.y };
         const atop = { x: p.x - a.x, y: p.y - a.y };
         const lenSq = atob.x * atob.x + atob.y * atob.y;
-        if (lenSq === 0) return new maplibregl.Point(a.x, a.y);
+        if (lenSq === 0) return 0;
         
         let t = (atop.x * atob.x + atop.y * atob.y) / lenSq;
         t = Math.max(0, Math.min(1, t));
-        
-        return new maplibregl.Point(a.x + atob.x * t, a.y + atob.y * t);
+
+        return t;
     };
 
-    // Tìm điểm gần nhất trên đoạn thẳng kinh vĩ độ [a, b] so với tọa độ con trỏ p (bảo toàn độ chính xác 64-bit)
-    const getClosestPointOnLngLatSegment = (p: maplibregl.LngLat, a: Coordinate, b: Coordinate): maplibregl.LngLat => {
+    const getPointOnSegment = (a: maplibregl.Point, b: maplibregl.Point, t: number): maplibregl.Point => {
+        return new maplibregl.Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    };
+
+    // Nội suy trên Mercator bằng đúng t pixel đã chọn để điểm snap nằm ổn định trên đoạn gốc.
+    const getPointOnLngLatSegment = (a: Coordinate, b: Coordinate, t: number): maplibregl.LngLat => {
+        if (t <= SEGMENT_ENDPOINT_EPSILON) return new maplibregl.LngLat(a[0], a[1]);
+        if (t >= 1 - SEGMENT_ENDPOINT_EPSILON) return new maplibregl.LngLat(b[0], b[1]);
+
         const toMercatorY = (lat: number) => {
             if (lat > 85.0511) lat = 85.0511;
             if (lat < -85.0511) lat = -85.0511;
@@ -90,21 +104,13 @@ export function snapToNearestGeometryDetailed(
             return (360 / Math.PI) * Math.atan(Math.exp(y)) - 90;
         };
 
-        const ax = a[0], ay = toMercatorY(a[1]);
-        const bx = b[0], by = toMercatorY(b[1]);
-        const px = p.lng, py = toMercatorY(p.lat);
+        const ax = a[0];
+        const ay = toMercatorY(a[1]);
+        const bx = b[0];
+        const by = toMercatorY(b[1]);
 
-        const dx = bx - ax;
-        const dy = by - ay;
-        const lenSq = dx * dx + dy * dy;
-
-        if (lenSq === 0) return new maplibregl.LngLat(a[0], a[1]);
-
-        let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-        t = Math.max(0, Math.min(1, t));
-
-        const resultLng = ax + dx * t;
-        const resultLat = fromMercatorY(ay + dy * t);
+        const resultLng = ax + (bx - ax) * t;
+        const resultLat = fromMercatorY(ay + (by - ay) * t);
 
         return new maplibregl.LngLat(resultLng, resultLat);
     };
@@ -125,31 +131,37 @@ export function snapToNearestGeometryDetailed(
         }
     };
 
-    const processLineString = (line: number[][], featureId: string | number | undefined) => {
+    const processLineString = (line: number[][], featureId: string | number | undefined, forceClosed = false) => {
         if (!line || line.length < 2) return;
-        const lineCoords = line.map(c => toCoordinate(c)).filter((c): c is Coordinate => c !== null);
-        for (let i = 0; i < lineCoords.length - 1; i++) {
-            const start = lineCoords[i];
-            const end = lineCoords[i + 1];
+        const parsedCoords = line.map(c => toCoordinate(c)).filter((c): c is Coordinate => c !== null);
+        const treatAsClosed = forceClosed || isClosedRing(parsedCoords);
+        const lineCoords = treatAsClosed ? removeClosingCoordinate(parsedCoords) : parsedCoords;
+        if (lineCoords.length < 2) return;
 
-            processVertex(start, featureId, lineCoords, i);
-            if (i === lineCoords.length - 2) {
-                processVertex(end, featureId, lineCoords, i + 1);
-            }
+        const ringForSnap = treatAsClosed ? closeRing(lineCoords) : lineCoords;
+        for (let i = 0; i < lineCoords.length; i++) {
+            processVertex(lineCoords[i], featureId, ringForSnap, i);
+        }
+
+        const segmentCount = treatAsClosed ? lineCoords.length : lineCoords.length - 1;
+        for (let i = 0; i < segmentCount; i++) {
+            const start = lineCoords[i];
+            const end = lineCoords[(i + 1) % lineCoords.length];
 
             const p1LngLat = new maplibregl.LngLat(start[0], start[1]);
             const p2LngLat = new maplibregl.LngLat(end[0], end[1]);
             const p1 = map.project(p1LngLat);
             const p2 = map.project(p2LngLat);
             
-            const closestPx = getClosestPointOnSegment(pointPx, p1, p2);
+            const closestT = getClosestTOnSegment(pointPx, p1, p2);
+            const closestPx = getPointOnSegment(p1, p2, closestT);
             const distSq = getDistSq(pointPx, closestPx);
             
             if (distSq < nearestEdgeDist && distSq <= EDGE_SNAP_THRESHOLD_PX ** 2) {
                 nearestEdgeDist = distSq;
-                nearestEdgeLngLat = getClosestPointOnLngLatSegment(lngLat, start, end);
+                nearestEdgeLngLat = getPointOnLngLatSegment(start, end, closestT);
                 nearestEdgeFeatureId = featureId;
-                nearestEdgeRing = lineCoords;
+                nearestEdgeRing = ringForSnap;
                 nearestEdgeIdx = i;
             }
         }
@@ -194,10 +206,10 @@ export function snapToNearestGeometryDetailed(
 
         // Xử lý cả Polygon và LineString vì viền bản đồ (border) đôi khi được render dưới dạng LineString
         if (type === "Polygon") {
-            for (const ring of asCoordinateMatrix(coords)) processLineString(ring, fId);
+            for (const ring of asCoordinateMatrix(coords)) processLineString(ring, fId, true);
         } else if (type === "MultiPolygon") {
             for (const poly of asCoordinateTensor(coords)) {
-                for (const ring of poly) processLineString(ring, fId);
+                for (const ring of poly) processLineString(ring, fId, true);
             }
         } else if (type === "LineString") {
             processLineString(asCoordinateArray(coords), fId);
@@ -234,7 +246,7 @@ export function snapToNearestGeometryDetailed(
 }
 
 function getSnapLayerIds(map: maplibregl.Map): string[] {
-    const systemGeometrySources = new Set(["countries", "places", PATH_ARROW_SOURCE_ID]);
+    const systemGeometrySources = new Set(["countries", "places"]);
     const style = map.getStyle();
     if (!style?.layers?.length) return [];
 
@@ -284,45 +296,50 @@ export function tracePathBetweenPoints(
     startIdx: number,
     endIdx: number
 ): [number, number][] {
-    const n = ring.length;
-    if (startIdx < 0 || startIdx >= n || endIdx < 0 || endIdx >= n) {
+    const isClosed = isClosedRing(ring);
+    const workingRing = (isClosed ? ring.slice(0, -1) : ring) as [number, number][];
+    const n = workingRing.length;
+    const normalizedStartIdx = isClosed && startIdx === ring.length - 1 ? 0 : startIdx;
+    const normalizedEndIdx = isClosed && endIdx === ring.length - 1 ? 0 : endIdx;
+
+    if (normalizedStartIdx < 0 || normalizedStartIdx >= n || normalizedEndIdx < 0 || normalizedEndIdx >= n) {
         return [];
     }
 
-    const isClosed = n > 2 &&
-        Math.abs(ring[0][0] - ring[n - 1][0]) < 1e-9 &&
-        Math.abs(ring[0][1] - ring[n - 1][1]) < 1e-9;
+    if (normalizedStartIdx === normalizedEndIdx) {
+        return [workingRing[normalizedStartIdx]];
+    }
 
     if (!isClosed) {
         // Case LineString
-        if (startIdx <= endIdx) {
-            return ring.slice(startIdx, endIdx + 1);
+        if (normalizedStartIdx <= normalizedEndIdx) {
+            return workingRing.slice(normalizedStartIdx, normalizedEndIdx + 1);
         } else {
-            return ring.slice(endIdx, startIdx + 1).reverse();
+            return workingRing.slice(normalizedEndIdx, normalizedStartIdx + 1).reverse();
         }
     }
 
     // Case Closed Polygon
     // Path 1: Forward
     const path1: [number, number][] = [];
-    let idx = startIdx;
-    while (idx !== endIdx) {
-        path1.push(ring[idx]);
+    let idx = normalizedStartIdx;
+    while (idx !== normalizedEndIdx) {
+        path1.push(workingRing[idx]);
         idx = (idx + 1) % n;
     }
-    path1.push(ring[endIdx]);
+    path1.push(workingRing[normalizedEndIdx]);
 
     // Path 2: Backward
     const path2: [number, number][] = [];
-    idx = startIdx;
-    while (idx !== endIdx) {
-        path2.push(ring[idx]);
+    idx = normalizedStartIdx;
+    while (idx !== normalizedEndIdx) {
+        path2.push(workingRing[idx]);
         idx = (idx - 1 + n) % n;
     }
-    path2.push(ring[endIdx]);
+    path2.push(workingRing[normalizedEndIdx]);
 
-    const poly1 = [...path1, ring[startIdx]];
-    const poly2 = [...path2, ring[startIdx]];
+    const poly1 = [...path1, workingRing[normalizedStartIdx]];
+    const poly2 = [...path2, workingRing[normalizedStartIdx]];
 
     const area1 = getArea(poly1);
     const area2 = getArea(poly2);
@@ -335,65 +352,131 @@ export function getRingWithSnaps(
     snap1: { type: "vertex" | "edge"; vertexIdx?: number; edgeIdx?: number; lngLat: { lng: number; lat: number } },
     snap2: { type: "vertex" | "edge"; vertexIdx?: number; edgeIdx?: number; lngLat: { lng: number; lat: number } }
 ): { ring: Coordinate[]; idx1: number; idx2: number } {
-    let tempRing = [...ring];
-    
-    const coord1: Coordinate = [snap1.lngLat.lng, snap1.lngLat.lat];
-    const coord2: Coordinate = [snap2.lngLat.lng, snap2.lngLat.lat];
+    const closed = isClosedRing(ring);
+    const sourceRing = removeClosingCoordinate(ring);
+    const insertionGroups = new Map<number, Array<{ coord: Coordinate; t: number; owners: Set<1 | 2> }>>();
 
-    let idx1 = -1;
-    let idx2 = -1;
+    type NormalizedSnap =
+        | { type: "vertex"; vertexIdx: number }
+        | { type: "edge"; edgeIdx: number; coord: Coordinate; owner: 1 | 2; t: number };
 
-    if (snap1.type === "vertex" && snap2.type === "vertex") {
-        idx1 = snap1.vertexIdx!;
-        idx2 = snap2.vertexIdx!;
-    } else if (snap1.type === "vertex" && snap2.type === "edge") {
-        idx1 = snap1.vertexIdx!;
-        const eIdx2 = snap2.edgeIdx!;
-        tempRing.splice(eIdx2 + 1, 0, coord2);
-        idx2 = eIdx2 + 1;
-        if (idx1 > eIdx2) {
-            idx1 += 1;
+    const normalizeSnap = (
+        snap: typeof snap1,
+        owner: 1 | 2
+    ): NormalizedSnap | null => {
+        const coord: Coordinate = [snap.lngLat.lng, snap.lngLat.lat];
+        if (snap.type === "vertex") {
+            const vertexIdx = normalizeVertexIndex(snap.vertexIdx, sourceRing.length, closed);
+            return vertexIdx === null ? null : { type: "vertex", vertexIdx };
         }
-    } else if (snap1.type === "edge" && snap2.type === "vertex") {
-        idx2 = snap2.vertexIdx!;
-        const eIdx1 = snap1.edgeIdx!;
-        tempRing.splice(eIdx1 + 1, 0, coord1);
-        idx1 = eIdx1 + 1;
-        if (idx2 > eIdx1) {
-            idx2 += 1;
-        }
-    } else {
-        const eIdx1 = snap1.edgeIdx!;
-        const eIdx2 = snap2.edgeIdx!;
 
-        if (eIdx1 < eIdx2) {
-            tempRing.splice(eIdx2 + 1, 0, coord2);
-            tempRing.splice(eIdx1 + 1, 0, coord1);
-            idx1 = eIdx1 + 1;
-            idx2 = eIdx2 + 2;
-        } else if (eIdx1 > eIdx2) {
-            tempRing.splice(eIdx1 + 1, 0, coord1);
-            tempRing.splice(eIdx2 + 1, 0, coord2);
-            idx1 = eIdx1 + 2;
-            idx2 = eIdx2 + 1;
+        const edgeIdx = snap.edgeIdx;
+        if (edgeIdx === undefined || edgeIdx < 0 || edgeIdx >= sourceRing.length) return null;
+        if (!closed && edgeIdx >= sourceRing.length - 1) return null;
+
+        const startIdx = edgeIdx;
+        const endIdx = (edgeIdx + 1) % sourceRing.length;
+        const start = sourceRing[startIdx];
+        const end = sourceRing[endIdx];
+        if (coordinatesAlmostEqual(coord, start)) return { type: "vertex", vertexIdx: startIdx };
+        if (coordinatesAlmostEqual(coord, end)) return { type: "vertex", vertexIdx: endIdx };
+
+        return {
+            type: "edge",
+            edgeIdx,
+            coord,
+            owner,
+            t: segmentProgress(coord, start, end),
+        };
+    };
+
+    const normalized1 = normalizeSnap(snap1, 1);
+    const normalized2 = normalizeSnap(snap2, 2);
+
+    for (const normalized of [normalized1, normalized2]) {
+        if (!normalized || normalized.type !== "edge") continue;
+        const group = insertionGroups.get(normalized.edgeIdx) || [];
+        const existing = group.find((item) => coordinatesAlmostEqual(item.coord, normalized.coord));
+        if (existing) {
+            existing.owners.add(normalized.owner);
         } else {
-            const segStart = ring[eIdx1];
-            const dist1 = Math.hypot(coord1[0] - segStart[0], coord1[1] - segStart[1]);
-            const dist2 = Math.hypot(coord2[0] - segStart[0], coord2[1] - segStart[1]);
-
-            if (dist1 <= dist2) {
-                tempRing.splice(eIdx1 + 1, 0, coord1, coord2);
-                idx1 = eIdx1 + 1;
-                idx2 = eIdx1 + 2;
-            } else {
-                tempRing.splice(eIdx1 + 1, 0, coord2, coord1);
-                idx1 = eIdx1 + 2;
-                idx2 = eIdx1 + 1;
-            }
+            group.push({ coord: normalized.coord, t: normalized.t, owners: new Set([normalized.owner]) });
         }
+        insertionGroups.set(normalized.edgeIdx, group);
     }
 
-    return { ring: tempRing, idx1, idx2 };
+    const builtRing: Coordinate[] = [];
+    const vertexIndexMap = new Map<number, number>();
+    const edgeIndexMap = new Map<1 | 2, number>();
+
+    for (let i = 0; i < sourceRing.length; i++) {
+        vertexIndexMap.set(i, builtRing.length);
+        builtRing.push(sourceRing[i]);
+
+        const group = insertionGroups.get(i);
+        if (!group) continue;
+
+        group
+            .sort((a, b) => a.t - b.t)
+            .forEach((item) => {
+                const existingIdx = builtRing.findIndex((coord) => coordinatesAlmostEqual(coord, item.coord));
+                const idx = existingIdx >= 0 ? existingIdx : builtRing.length;
+                if (existingIdx < 0) builtRing.push(item.coord);
+                for (const owner of item.owners) {
+                    edgeIndexMap.set(owner, idx);
+                }
+            });
+    }
+
+    if (closed) {
+        builtRing.push(builtRing[0]);
+    }
+
+    const resolveIndex = (normalized: NormalizedSnap | null, owner: 1 | 2): number => {
+        if (!normalized) return -1;
+        if (normalized.type === "vertex") return vertexIndexMap.get(normalized.vertexIdx) ?? -1;
+        return edgeIndexMap.get(owner) ?? -1;
+    };
+
+    return {
+        ring: builtRing,
+        idx1: resolveIndex(normalized1, 1),
+        idx2: resolveIndex(normalized2, 2),
+    };
+}
+
+function coordinatesAlmostEqual(a: Coordinate, b: Coordinate, epsilon = COORDINATE_EPSILON): boolean {
+    return Math.abs(a[0] - b[0]) <= epsilon && Math.abs(a[1] - b[1]) <= epsilon;
+}
+
+function isClosedRing(ring: Coordinate[]): boolean {
+    return ring.length > 2 && coordinatesAlmostEqual(ring[0], ring[ring.length - 1]);
+}
+
+function removeClosingCoordinate(ring: Coordinate[]): Coordinate[] {
+    if (!isClosedRing(ring)) return [...ring];
+    return ring.slice(0, -1);
+}
+
+function closeRing(ring: Coordinate[]): Coordinate[] {
+    if (ring.length === 0 || isClosedRing(ring)) return [...ring];
+    return [...ring, ring[0]];
+}
+
+function normalizeVertexIndex(idx: number | undefined, uniqueLength: number, closed: boolean): number | null {
+    if (idx === undefined || uniqueLength <= 0) return null;
+    if (idx >= 0 && idx < uniqueLength) return idx;
+    if (closed && idx === uniqueLength) return 0;
+    return null;
+}
+
+function segmentProgress(coord: Coordinate, start: Coordinate, end: Coordinate): number {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return 0;
+    const t = ((coord[0] - start[0]) * dx + (coord[1] - start[1]) * dy) / lenSq;
+    return Math.max(0, Math.min(1, t));
 }
 
 export function getOriginalFeature(
@@ -403,59 +486,95 @@ export function getOriginalFeature(
 ): GeoJSON.Feature | null {
     if (featureId === undefined || featureId === null) return null;
 
-    // 1. Prioritize direct lookup inside the React/Zustand draft ref attached to the map instance.
-    // This contains the exact, unsimplified 64-bit coordinates for all local, baseline, and global features.
-    const renderDraft = (map as any)._renderDraftRef?.current;
+    // 1. Prefer the exact GeoJSON data for the rendered source. This avoids mixing geometries
+    // when different sources/layers reuse the same feature id.
+    const source = map.getSource(sourceId) as SourceWithInternalData | undefined;
+    if (source && source._data) {
+        const found = findFeatureInSourceData(source._data, featureId);
+        if (found) return found;
+    }
+
+    // 2. Fallback to the React/Zustand draft ref attached to the map instance.
+    const renderDraft = (map as MapWithRenderDraft)._renderDraftRef?.current;
     if (renderDraft && Array.isArray(renderDraft.features)) {
-        const found = renderDraft.features.find((f: any) => {
+        const found = renderDraft.features.find((f) => {
             const id = f.properties?.id ?? f.id;
             return id !== undefined && String(id) === String(featureId);
         });
         if (found) {
-            console.log(`[DEBUG] getOriginalFeature: found featureId=${featureId} in map._renderDraftRef`);
             return found;
         }
     }
 
-    // 2. Fallback to MapLibre's GeoJSONSource internal cache.
-    const source = map.getSource(sourceId) as any;
-    if (!source || !source._data) {
-        console.log(`[DEBUG] getOriginalFeature: sourceId=${sourceId} source/data not found`);
-        return null;
-    }
+    return null;
+}
 
-    const data = source._data;
-
+function findFeatureInSourceData(
+    data: unknown,
+    featureId: string | number
+): GeoJSON.Feature | null {
     // MapLibre v5 updateable Map lookup
-    if (data.updateable instanceof Map) {
-        const found = data.updateable.get(featureId) || data.updateable.get(String(featureId)) || data.updateable.get(Number(featureId));
+    const updateable = getObjectProperty(data, "updateable");
+    if (updateable instanceof Map) {
+        const featureMap = updateable as Map<string | number, GeoJSON.Feature>;
+        const found = featureMap.get(featureId) || featureMap.get(String(featureId)) || featureMap.get(Number(featureId));
         if (found) {
-            console.log(`[DEBUG] getOriginalFeature: sourceId=${sourceId}, featureId=${featureId}, found in updateable Map`);
             return found;
         }
     }
 
     // Resolve GeoJSON object (MapLibre v5 stores geojson under data.geojson)
-    const geojson = data.geojson || data;
+    const geojson = getObjectProperty(data, "geojson") || data;
 
-    if (typeof geojson === "object" && geojson !== null) {
-        if (geojson.type === "FeatureCollection" && Array.isArray(geojson.features)) {
-            const found = geojson.features.find((f: any) => {
-                const id = f.properties?.id ?? f.id;
-                return id !== undefined && String(id) === String(featureId);
-            });
-            console.log(`[DEBUG] getOriginalFeature: sourceId=${sourceId}, featureId=${featureId}, found in geojson collection=${!!found}`);
-            return found || null;
-        } else if (geojson.type === "Feature") {
-            const id = geojson.properties?.id ?? geojson.id;
-            const matches = id !== undefined && String(id) === String(featureId);
-            console.log(`[DEBUG] getOriginalFeature: sourceId=${sourceId}, featureId=${featureId}, matched_single=${matches}`);
-            if (matches) {
-                return geojson;
-            }
+    if (isFeatureCollection(geojson)) {
+        const found = geojson.features.find((f: GeoJSON.Feature) => {
+            const id = f.properties?.id ?? f.id;
+            return id !== undefined && String(id) === String(featureId);
+        });
+        return found || null;
+    }
+
+    if (isFeature(geojson)) {
+        const id = geojson.properties?.id ?? geojson.id;
+        const matches = id !== undefined && String(id) === String(featureId);
+        if (matches) {
+            return geojson;
         }
     }
 
-    console.log(`[DEBUG] getOriginalFeature: sourceId=${sourceId}, data format not recognized`, data);
     return null;
+}
+
+type MapWithRenderDraft = maplibregl.Map & {
+    _renderDraftRef?: {
+        current?: {
+            features?: GeoJSON.Feature[];
+        };
+    };
+};
+
+type SourceWithInternalData = maplibregl.Source & {
+    _data?: unknown;
+};
+
+function getObjectProperty(value: unknown, key: string): unknown {
+    if (!value || typeof value !== "object") return undefined;
+    return (value as Record<string, unknown>)[key];
+}
+
+function isFeatureCollection(value: unknown): value is GeoJSON.FeatureCollection {
+    return Boolean(
+        value &&
+        typeof value === "object" &&
+        (value as { type?: unknown }).type === "FeatureCollection" &&
+        Array.isArray((value as { features?: unknown }).features)
+    );
+}
+
+function isFeature(value: unknown): value is GeoJSON.Feature {
+    return Boolean(
+        value &&
+        typeof value === "object" &&
+        (value as { type?: unknown }).type === "Feature"
+    );
 }

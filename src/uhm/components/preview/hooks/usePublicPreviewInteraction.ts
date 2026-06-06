@@ -11,6 +11,7 @@ import {
 } from "@/uhm/api/wikis";
 import type { MapHoverPopupContent } from "@/uhm/components/map/useMapHoverPopup";
 import type { PreviewRelationIndex } from "@/uhm/lib/preview/types";
+import { isTimelineYearWithinEntityTimeRange } from "@/uhm/lib/utils/entityTime";
 import type { Feature, FeatureCollection } from "@/uhm/types/geo";
 import type { BattleReplay } from "@/uhm/types/projects";
 
@@ -36,10 +37,11 @@ export function usePublicPreviewInteraction(options: {
     setRelations: React.Dispatch<React.SetStateAction<PreviewRelationIndex>>;
     selectedFeatureIds: (string | number)[];
     setSelectedFeatureIds: React.Dispatch<React.SetStateAction<(string | number)[]>>;
+    timelineYear?: number | null;
     replayActiveWikiId?: string | null;
     replayMode?: "idle" | "playing";
 }) {
-    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, replayActiveWikiId, replayMode } = options;
+    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, timelineYear, replayActiveWikiId, replayMode } = options;
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
     const [isManualSidebarOpen, setIsManualSidebarOpen] = useState(false);
@@ -53,7 +55,6 @@ export function usePublicPreviewInteraction(options: {
     const [activeWikiError, setActiveWikiError] = useState<string | null>(null);
     const [linkEntityPopup, setLinkEntityPopup] = useState<LinkEntityPopupState | null>(null);
     const linkEntityPopupRef = useRef<HTMLDivElement | null>(null);
-    const loadedWikiEntityIdsRef = useRef<Set<string>>(new Set());
     const hoverWikiPreviewRequestsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -86,7 +87,7 @@ export function usePublicPreviewInteraction(options: {
         return wikiCache[activeWikiSlug] || relations.wikiBySlug[activeWikiSlug] || null;
     }, [activeWikiSlug, relations.wikiBySlug, wikiCache]);
 
-    const selectEntity = useCallback((
+    const selectEntity = useCallback(async (
         entityId: string,
         selectOptions?: {
             sourceFeatureId?: string | number | null;
@@ -94,11 +95,77 @@ export function usePublicPreviewInteraction(options: {
             selectGeometry?: boolean;
         }
     ) => {
-        const entity = relations.entitiesById[entityId] || null;
-        if (!entity) return;
+        let entity = relations.entitiesById[entityId] || null;
+        let linkedWikis = relations.entityWikisById[entityId] || [];
 
-        const linkedWikis = relations.entityWikisById[entityId] || [];
+        if (!entity) {
+            try {
+                const { fetchEntityById } = await import("@/uhm/api/entities");
+                entity = await fetchEntityById(entityId);
+                const { fetchWikisByEntityIdsWithPreviews } = await import("@/uhm/api/relations");
+                const wikisRes = await fetchWikisByEntityIdsWithPreviews([entityId]);
+                linkedWikis = wikisRes[entityId] || [];
+
+                setRelations((prev) => {
+                    const wikiById = { ...prev.wikiById };
+                    const wikiBySlug = { ...prev.wikiBySlug };
+                    const wikiEntityIdsById = { ...prev.wikiEntityIdsById };
+                    const wikiEntityIdsBySlug = { ...prev.wikiEntityIdsBySlug };
+
+                    for (const w of linkedWikis) {
+                        wikiById[w.id] = w;
+                        if (w.slug) {
+                            wikiBySlug[w.slug] = w;
+                            if (!wikiEntityIdsBySlug[w.slug]) wikiEntityIdsBySlug[w.slug] = [];
+                            if (!wikiEntityIdsBySlug[w.slug].includes(entityId)) {
+                                wikiEntityIdsBySlug[w.slug].push(entityId);
+                            }
+                        }
+                        if (!wikiEntityIdsById[w.id]) wikiEntityIdsById[w.id] = [];
+                        if (!wikiEntityIdsById[w.id].includes(entityId)) {
+                            wikiEntityIdsById[w.id].push(entityId);
+                        }
+                    }
+
+                    return {
+                        ...prev,
+                        entitiesById: {
+                            ...prev.entitiesById,
+                            [entityId]: entity,
+                        },
+                        entityWikisById: {
+                            ...prev.entityWikisById,
+                            [entityId]: linkedWikis,
+                        },
+                        wikiById,
+                        wikiBySlug,
+                        wikiEntityIdsById,
+                        wikiEntityIdsBySlug,
+                    };
+                });
+            } catch (err) {
+                console.error("Failed to lazy load entity/wikis:", err);
+                return;
+            }
+        }
+
         const preferredWikiSlug = String(selectOptions?.preferredWikiSlug || "").trim();
+        if (!linkedWikis.length || (preferredWikiSlug && !linkedWikis.some((wiki) => String(wiki.slug || "").trim() === preferredWikiSlug))) {
+            try {
+                const fetchedWikis = await fetchRelationWikisForEntity(entityId);
+                if (fetchedWikis.length) {
+                    linkedWikis = fetchedWikis;
+                    setRelations((prev) => mergeEntityWikisIntoRelations(prev, entityId, fetchedWikis));
+                    setWikiCache((prev) => ({
+                        ...wikisBySlug(fetchedWikis),
+                        ...prev,
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to load entity wikis before selecting:", err);
+            }
+        }
+
         const nextWikiSlug =
             (preferredWikiSlug && linkedWikis.some((wiki) => String(wiki.slug || "").trim() === preferredWikiSlug)
                 ? preferredWikiSlug
@@ -113,7 +180,35 @@ export function usePublicPreviewInteraction(options: {
         if (selectOptions?.selectGeometry && selectOptions?.sourceFeatureId != null) {
             setSelectedFeatureIds([selectOptions.sourceFeatureId]);
         }
-    }, [relations.entitiesById, relations.entityWikisById, setSelectedFeatureIds]);
+    }, [relations.entitiesById, relations.entityWikisById, setRelations, setSelectedFeatureIds]);
+
+    const selectWiki = useCallback(async (
+        wiki: Wiki
+    ) => {
+        const entityIds = relations.wikiEntityIdsById[wiki.id] || [];
+        if (entityIds.length > 0) {
+            await selectEntity(entityIds[0], {
+                preferredWikiSlug: wiki.slug,
+            });
+            return;
+        }
+
+        if (wiki.slug) {
+            const slug = wiki.slug;
+            setWikiCache((prev) => ({
+                ...prev,
+                [slug]: {
+                    ...wiki,
+                    __fetched: false,
+                },
+            }));
+            setActiveWikiSlug(slug);
+        }
+        setActiveEntityId(null);
+        setActiveWikiError(null);
+        setLinkEntityPopup(null);
+        setIsManualSidebarOpen(true);
+    }, [relations.wikiEntityIdsById, selectEntity]);
 
     useEffect(() => {
         if (!selectedFeatureIds.length) return;
@@ -142,30 +237,15 @@ export function usePublicPreviewInteraction(options: {
                 }));
             }
 
-            const rows = await Promise.all(
-                wikis.map(async (wiki) => {
-                    const presetQuote = String(wiki.preview_quote || "").trim();
-                    const fullWiki = presetQuote ? wiki : await fetchFullWikiContent(wiki);
-                    const quote = presetQuote
-                        ? cleanPreviewQuoteText(presetQuote)
-                        : extractWikiBlockquoteText(fullWiki.content);
-                    if (fullWiki.slug) {
-                        setWikiCache((prev) => ({
-                            ...prev,
-                            [String(fullWiki.slug)]: {
-                                ...fullWiki,
-                                __fetched: true,
-                            },
-                        }));
-                    }
-                    return { wiki: fullWiki, quote };
-                })
-            );
+            const rows = wikis.map((wiki) => ({
+                wiki,
+                quote: cleanPreviewQuoteText(wiki.preview_quote),
+            }));
 
             setHoverWikiPreviewByEntityId((prev) => ({
                 ...prev,
                 [entityId]: {
-                    rows: rows.filter((row) => row.quote.trim().length > 0),
+                    rows,
                     isLoaded: true,
                 },
             }));
@@ -187,6 +267,64 @@ export function usePublicPreviewInteraction(options: {
             .filter((entity): entity is Entity => Boolean(entity));
         if (!entities.length) return null;
 
+        type GroupedHoverRow = MapHoverPopupContent["rows"][number] & { isTimelineMatch: boolean };
+        const groupedRows: GroupedHoverRow[] = entities.flatMap((entity): GroupedHoverRow[] => {
+            const isTimelineMatch = isTimelineYearWithinEntityTimeRange(timelineYear, entity.time_start, entity.time_end);
+            const preview = hoverWikiPreviewByEntityId[entity.id] ||
+                buildPresetHoverPreview(relations.entityWikisById[entity.id] || []);
+            if (!preview && !hoverWikiPreviewRequestsRef.current.has(entity.id)) {
+                hoverWikiPreviewRequestsRef.current.add(entity.id);
+                void loadHoverWikiPreviewForEntity(entity.id);
+            }
+
+            const baseClick = (preferredWikiSlug: string | null = null) => {
+                selectEntity(entity.id, {
+                    sourceFeatureId: featureId,
+                    preferredWikiSlug,
+                    selectGeometry: true,
+                });
+            };
+
+            const entityHeaderRow = {
+                title: entity.name,
+                description: entity.description,
+                isGroupHeader: true,
+                isTimelineMatch,
+            };
+
+            if (preview?.rows.length) {
+                return [
+                    entityHeaderRow,
+                    ...preview.rows.map((row) => ({
+                        title: getWikiHoverTitle(row.wiki, entity.name),
+                        isTimelineMatch,
+                        quote: row.quote,
+                        onClick: () => baseClick(String(row.wiki.slug || "").trim() || null),
+                    })),
+                ];
+            }
+
+            if (preview?.isLoaded) {
+                return [entityHeaderRow, {
+                    title: "(chưa có wiki)",
+                    titleTone: "danger",
+                    isTimelineMatch,
+                    quoteTone: "danger",
+                }];
+            }
+
+            return [entityHeaderRow, {
+                title: "Đang tải wiki...",
+                isTimelineMatch,
+                quote: "Đang tải trích dẫn wiki...",
+                onClick: () => baseClick(null),
+            }];
+        });
+
+        const timelineMatchedRows = groupedRows.filter((row) => row.isTimelineMatch);
+        const otherRows = groupedRows.filter((row) => !row.isTimelineMatch);
+        const stripGroupFlag = ({ isTimelineMatch: _isTimelineMatch, ...row }: GroupedHoverRow) => row;
+
         return {
             key: entities
                 .map((entity) => {
@@ -194,40 +332,14 @@ export function usePublicPreviewInteraction(options: {
                         buildPresetHoverPreview(relations.entityWikisById[entity.id] || []);
                     return `${entity.id}:${preview?.isLoaded ? "loaded" : "loading"}:${preview?.rows.map((row) => row.quote).join("/") || ""}`;
                 })
-                .join("|"),
-            rows: entities.flatMap((entity) => {
-                const preview = hoverWikiPreviewByEntityId[entity.id] ||
-                    buildPresetHoverPreview(relations.entityWikisById[entity.id] || []);
-                if (!preview && !hoverWikiPreviewRequestsRef.current.has(entity.id)) {
-                    hoverWikiPreviewRequestsRef.current.add(entity.id);
-                    void loadHoverWikiPreviewForEntity(entity.id);
-                }
-
-                const baseClick = () => {
-                    const preferredWikiSlug = preview?.rows
-                        .map((row) => String(row.wiki.slug || "").trim())
-                        .find((slug) => slug.length > 0) || null;
-                    selectEntity(entity.id, {
-                        sourceFeatureId: featureId,
-                        preferredWikiSlug,
-                        selectGeometry: true,
-                    });
-                };
-
-                if (preview?.rows.length) {
-                    return preview.rows.map((row) => ({
-                        title: entity.name,
-                        quote: row.quote,
-                        onClick: baseClick,
-                    }));
-                }
-
-                return [{
-                    title: entity.name,
-                    quote: preview?.isLoaded ? "" : "Đang tải trích dẫn wiki...",
-                    onClick: baseClick,
-                }];
-            }),
+                .join("|") + `:${timelineYear ?? "none"}`,
+            rows: [
+                ...timelineMatchedRows.map(stripGroupFlag),
+                ...otherRows.map((row, index) => ({
+                    ...stripGroupFlag(row),
+                    separatorBefore: index === 0 && timelineMatchedRows.length > 0,
+                })),
+            ],
         };
     }, [
         hoverWikiPreviewByEntityId,
@@ -236,6 +348,7 @@ export function usePublicPreviewInteraction(options: {
         relations.entityWikisById,
         relations.geometryEntityIds,
         selectEntity,
+        timelineYear,
     ]);
 
     useEffect(() => {
@@ -268,9 +381,6 @@ export function usePublicPreviewInteraction(options: {
             return;
         }
 
-        if (loadedWikiEntityIdsRef.current.has(activeEntityId)) return;
-        loadedWikiEntityIdsRef.current.add(activeEntityId);
-
         let disposed = false;
         (async () => {
             setIsActiveWikiLoading(true);
@@ -295,7 +405,6 @@ export function usePublicPreviewInteraction(options: {
                     setActiveWikiError("Không tìm thấy wiki cho entity đã chọn.");
                 }
             } catch (err) {
-                loadedWikiEntityIdsRef.current.delete(activeEntityId);
                 if (!disposed) {
                     console.error("Load entity wikis failed", err);
                     setActiveWikiError(err instanceof Error ? err.message : "Không tải được wiki cho entity đã chọn.");
@@ -420,6 +529,7 @@ export function usePublicPreviewInteraction(options: {
         linkEntityPopupRef,
         getHoverPopupContent,
         selectEntity,
+        selectWiki,
         handleWikiLinkRequest,
         closeWikiSidebar,
         setLinkEntityPopup,
@@ -459,29 +569,8 @@ function buildPresetHoverPreview(wikis: Wiki[]): HoverWikiPreview | undefined {
         .map((wiki) => ({
             wiki,
             quote: cleanPreviewQuoteText(wiki.preview_quote),
-        }))
-        .filter((row) => row.quote.length > 0);
+        }));
     return rows.length ? { rows, isLoaded: true } : undefined;
-}
-
-async function fetchFullWikiContent(wiki: Wiki): Promise<Wiki> {
-    const slug = String(wiki.slug || "").trim();
-    let row = wiki;
-    if (slug) {
-        row = await fetchWikiBySlug(slug) || wiki;
-    }
-
-    let versionContent = row.content;
-    try {
-        if (row.content_sample?.[0]?.id) {
-            const res = await getContentByVersionWikiId(row.content_sample[0].id);
-            if (res?.data?.content) versionContent = res.data.content;
-        }
-    } catch (err) {
-        console.error("Failed to fetch hover wiki version content:", err);
-    }
-
-    return { ...row, content: versionContent };
 }
 
 function extractWikiBlockquoteText(content: string | null | undefined): string {
@@ -553,6 +642,10 @@ function wikisBySlug(wikis: Wiki[]): Record<string, Wiki> {
 
 function firstWikiSlug(wikis: Wiki[]): string | null {
     return wikis.map((wiki) => String(wiki.slug || "").trim()).find((slug) => slug.length > 0) || null;
+}
+
+function getWikiHoverTitle(wiki: Wiki | null | undefined, fallbackTitle: string): string {
+    return String(wiki?.title || "").trim() || fallbackTitle;
 }
 
 function cloneStringArrayRecord(source: Record<string, string[]>): Record<string, string[]> {

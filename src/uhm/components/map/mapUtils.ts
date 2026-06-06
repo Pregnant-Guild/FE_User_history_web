@@ -318,7 +318,7 @@ export function decorateLineFeaturesWithLabels(
     return changed ? { ...fc, features: nextFeatures } : fc;
 }
 
-const polygonLabelFeaturesCache = new WeakMap<any, { label: string; feature: Feature }>();
+const polygonLabelFeaturesCache = new WeakMap<Feature, { label: string; feature: Feature }>();
 
 export function buildPolygonLabelFeatureCollection(
     fc: FeatureCollection,
@@ -484,7 +484,7 @@ export function getGeometryRepresentativePoint(geometry: Geometry): Coordinate |
     return null;
 }
 
-const pathArrowGeometriesCache = new WeakMap<any, Geometry[]>();
+const pathArrowGeometriesCache = new WeakMap<Geometry, Geometry[]>();
 
 export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureCollection {
     const features: Feature[] = [];
@@ -1161,7 +1161,7 @@ function getLineCoordinateGroups(geometry: Geometry): Coordinate[][] {
     return [];
 }
 
-const polygonLabelPointCache = new WeakMap<any, Coordinate | null>();
+const polygonLabelPointCache = new WeakMap<Geometry, Coordinate | null>();
 
 function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
     if (polygonLabelPointCache.has(geometry)) {
@@ -1282,7 +1282,7 @@ export function decorateFeaturesWithEntityColors(fc: FeatureCollection): Feature
             }
         }
 
-        if ((feature.properties as any).entity_color === entity_color) {
+        if (feature.properties.entity_color === entity_color) {
             return feature;
         }
         changed = true;

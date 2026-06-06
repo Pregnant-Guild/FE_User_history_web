@@ -38,6 +38,7 @@ type Props = {
     onFeatureClick?: (payload: MapFeaturePayload | null) => void;
     hoverPopupEnabled?: boolean;
     getHoverPopupContent?: (feature: Feature) => MapHoverPopupContent | null;
+    onHoverFeatureChange?: (feature: Feature | null) => void;
     activeEntity?: Entity | null;
     activeWiki?: Wiki | null;
     isWikiLoading?: boolean;
@@ -83,6 +84,7 @@ export default function PreviewMapShell({
     onFeatureClick,
     hoverPopupEnabled = false,
     getHoverPopupContent,
+    onHoverFeatureChange,
     activeEntity = null,
     activeWiki = null,
     isWikiLoading = false,
@@ -121,16 +123,11 @@ export default function PreviewMapShell({
     useEffect(() => {
         const fetchUserAvatar = async () => {
             try {
-                const userData = await apiGetCurrentUser({ skipRefresh: true } as any);
-                console.log("PreviewMapShell: Fetched userData:", userData);
-                if (userData?.data?.profile?.avatar_url) {
-                    console.log("PreviewMapShell: Setting avatarUrl to:", userData.data.profile.avatar_url);
-                    setAvatarUrl(userData.data.profile.avatar_url);
-                } else {
-                    console.log("PreviewMapShell: No avatar_url in profile:", userData?.data?.profile);
-                }
-            } catch (err) {
-                console.log("PreviewMapShell: No active session (user is guest)");
+                const userData = await apiGetCurrentUser({ skipRefresh: true });
+                const nextAvatarUrl = getCurrentUserAvatarUrl(userData);
+                if (nextAvatarUrl) setAvatarUrl(nextAvatarUrl);
+            } catch {
+                // Guest preview does not need an authenticated profile.
             }
         };
         fetchUserAvatar();
@@ -172,9 +169,10 @@ export default function PreviewMapShell({
                     onFeatureClick={onFeatureClick}
                     hoverPopupEnabled={hoverPopupEnabled}
                     getHoverPopupContent={getHoverPopupContent}
+                    onHoverFeatureChange={onHoverFeatureChange}
                     onPlayPreviewReplay={onPlayPreviewReplay}
                     onLoad={onLoad}
-                    showViewportControls={false}
+                    showViewportControls={!isMobileOrTablet}
                     height="100svh"
                 />
 
@@ -209,7 +207,7 @@ export default function PreviewMapShell({
                     style={{
                         position: "absolute",
                         top: 10,
-                        bottom: (activeEntity && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
+                        bottom: ((activeEntity || activeWiki) && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
                         left: 18,
                         zIndex: 18,
                         display: "flex",
@@ -414,9 +412,9 @@ export default function PreviewMapShell({
                 
                 {overlay}
 
-                {activeEntity ? (
+                {activeEntity || activeWiki ? (
                     <aside
-                        className={isMobileOrTablet ? "" : "absolute bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]"}
+                        className={isMobileOrTablet ? "uhm-public-wiki-sidebar" : "uhm-public-wiki-sidebar absolute bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]"}
                         style={isMobileOrTablet ? {
                             position: "absolute",
                             bottom: 0,
@@ -429,7 +427,9 @@ export default function PreviewMapShell({
                             maxWidth: "100%",
                             zIndex: 20,
                             // Do not transition height during drag resizing for butter smoothness
-                        } : undefined}
+                        } : {
+                            width: `min(${sidebarWidth || 420}px, calc(100vw - 2rem))`,
+                        }}
                     >
                         <PublicWikiSidebar
                             entity={activeEntity}
@@ -453,4 +453,14 @@ export default function PreviewMapShell({
             </div>
         </div>
     );
+}
+
+function getCurrentUserAvatarUrl(value: unknown): string | null {
+    if (!value || typeof value !== "object") return null;
+    const data = (value as { data?: unknown }).data;
+    if (!data || typeof data !== "object") return null;
+    const profile = (data as { profile?: unknown }).profile;
+    if (!profile || typeof profile !== "object") return null;
+    const avatarUrl = (profile as { avatar_url?: unknown }).avatar_url;
+    return typeof avatarUrl === "string" && avatarUrl.trim() ? avatarUrl : null;
 }

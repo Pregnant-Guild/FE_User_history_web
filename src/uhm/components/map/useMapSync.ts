@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
 import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
-import { EMPTY_FEATURE_COLLECTION } from "@/uhm/lib/map/geo/constants";
 import { FEATURE_STATE_SOURCE_IDS, PATH_ARROW_SOURCE_ID, POLYGON_LABEL_SOURCE_ID } from "@/uhm/lib/map/constants";
 import {
     applyBackgroundLayerVisibility,
@@ -80,18 +79,53 @@ export function useMapSync({
     const focusPaddingRef = useRef<number | maplibregl.PaddingOptions | undefined>(focusPadding);
     const isPreviewModeRef = useRef(isPreviewMode);
 
-    renderDraftRef.current = renderDraft;
-    labelContextDraftRef.current = labelContextDraft;
-    labelTimelineYearRef.current = labelTimelineYear;
-    backgroundVisibilityRef.current = backgroundVisibility;
-    geometryVisibilityRef.current = geometryVisibility;
-    selectedFeatureIdsRef.current = selectedFeatureIds;
-    applyGeometryBindingFilterRef.current = applyGeometryBindingFilter;
-    fitToDraftBoundsRef.current = fitToDraftBounds;
-    imageOverlayRef.current = imageOverlay || null;
-    focusFeatureCollectionRef.current = focusFeatureCollection;
-    focusPaddingRef.current = focusPadding;
-    isPreviewModeRef.current = isPreviewMode;
+    useEffect(() => {
+        renderDraftRef.current = renderDraft;
+    }, [renderDraft]);
+
+    useEffect(() => {
+        labelContextDraftRef.current = labelContextDraft;
+    }, [labelContextDraft]);
+
+    useEffect(() => {
+        labelTimelineYearRef.current = labelTimelineYear;
+    }, [labelTimelineYear]);
+
+    useEffect(() => {
+        backgroundVisibilityRef.current = backgroundVisibility;
+    }, [backgroundVisibility]);
+
+    useEffect(() => {
+        geometryVisibilityRef.current = geometryVisibility;
+    }, [geometryVisibility]);
+
+    useEffect(() => {
+        selectedFeatureIdsRef.current = selectedFeatureIds;
+    }, [selectedFeatureIds]);
+
+    useEffect(() => {
+        applyGeometryBindingFilterRef.current = applyGeometryBindingFilter;
+    }, [applyGeometryBindingFilter]);
+
+    useEffect(() => {
+        fitToDraftBoundsRef.current = fitToDraftBounds;
+    }, [fitToDraftBounds]);
+
+    useEffect(() => {
+        imageOverlayRef.current = imageOverlay || null;
+    }, [imageOverlay]);
+
+    useEffect(() => {
+        focusFeatureCollectionRef.current = focusFeatureCollection;
+    }, [focusFeatureCollection]);
+
+    useEffect(() => {
+        focusPaddingRef.current = focusPadding;
+    }, [focusPadding]);
+
+    useEffect(() => {
+        isPreviewModeRef.current = isPreviewMode;
+    }, [isPreviewMode]);
 
     const fitBoundsAppliedRef = useRef(false);
     const lastCountriesStrRef = useRef("");
@@ -102,7 +136,7 @@ export function useMapSync({
     useEffect(() => {
         const map = mapRef.current;
         if (map) {
-            (map as any)._renderDraftRef = renderDraftRef;
+            (map as MapWithRenderDraftRef)._renderDraftRef = renderDraftRef;
         }
     }, [mapRef]);
 
@@ -299,3 +333,7 @@ export function useMapSync({
         },
     };
 }
+
+type MapWithRenderDraftRef = maplibregl.Map & {
+    _renderDraftRef?: React.MutableRefObject<FeatureCollection>;
+};

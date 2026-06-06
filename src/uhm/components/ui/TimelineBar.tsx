@@ -447,38 +447,6 @@ export default function TimelineBar({
                     </div>
                 </div>
 
-                {onPlayReplay ? (
-                    <button
-                        type="button"
-                        onClick={onPlayReplay}
-                        style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            backgroundColor: "#2563eb",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            color: "white",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            marginLeft: 8,
-                            marginRight: 8,
-                            flexShrink: 0,
-                        }}
-                        title="Xem diễn biến lịch sử (Replay)"
-                    >
-                        <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                        >
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                    </button>
-                ) : null}
                 {typeof timeRange === "number" && onTimeRangeChange ? (
                     <label
                         title="time_range (0-30)"

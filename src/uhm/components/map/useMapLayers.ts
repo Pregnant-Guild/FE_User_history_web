@@ -9,7 +9,6 @@ import {
     ensurePathArrowIcon,
 } from "./mapUtils";
 import { BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
-import { FeatureCollection } from "@/uhm/lib/editor/state/useEditorState";
 
 export function getBaseMapStyle(): maplibregl.StyleSpecification {
     return {
@@ -224,6 +223,7 @@ export function setupMapLayers(
                 "delete", "#ef4444",
                 "vertex", "#22c55e",
                 "edge", "#eab308",
+                "unknown", "#22c55e",
                 "#3b82f6" // default none
             ],
             "circle-radius": 22,
@@ -243,6 +243,7 @@ export function setupMapLayers(
                 "delete", "#ef4444",
                 "vertex", "#22c55e",
                 "edge", "#eab308",
+                "unknown", "#22c55e",
                 "#3b82f6" // default none
             ],
             "circle-radius": 12,
@@ -252,6 +253,7 @@ export function setupMapLayers(
                 "delete", "#7f1d1d",
                 "vertex", "#14532d",
                 "edge", "#713f12",
+                "unknown", "#14532d",
                 "#0f172a" // default none
             ],
             "circle-stroke-width": 3,

@@ -48,7 +48,7 @@ export function initSelect(
         }
     }
 
-    // Chọn hoặc toggle đối tượng; giữ Alt để chọn cộng dồn/tắt chọn.
+    // Chọn hoặc toggle đối tượng; giữ Shift để chọn cộng dồn/tắt chọn.
     function selectFeature(feature: maplibregl.MapGeoJSONFeature, additive: boolean) {
         const id = feature.properties?.id ?? feature.id;
         if (id === undefined || id === null) return false;
@@ -61,7 +61,7 @@ export function initSelect(
         const isAlreadySelected = idToRemove !== undefined;
 
         if (additive && isAlreadySelected) {
-            // Alt + click on an already selected feature removes it from the selection
+            // Shift + click on an already selected feature removes it from the selection
             setSelectionStateForId(idToRemove, false);
             selectedIds.delete(idToRemove);
             onSelectIds?.(Array.from(selectedIds));
@@ -74,7 +74,7 @@ export function initSelect(
         return true;
     }
 
-    // Chọn feature theo click trái, hỗ trợ additive bằng Alt.
+    // Chọn feature theo click trái, hỗ trợ additive bằng Shift.
     function onClick(e: maplibregl.MapLayerMouseEvent) {
         const mode = getMode();
         if (mode !== "select" && mode !== "replay" && mode !== "preview" && mode !== "replay_preview") return;

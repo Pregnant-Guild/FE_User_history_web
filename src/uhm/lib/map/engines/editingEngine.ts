@@ -1,7 +1,13 @@
 import maplibregl from "maplibre-gl";
 import { Geometry } from "@/uhm/lib/editor/state/useEditorState";
 import { buildCircleRing, destinationPoint, distanceMeters } from "@/uhm/lib/map/geo/geoMath";
-import { snapToNearestGeometry, snapToNearestGeometryDetailed, getRingWithSnaps, tracePathBetweenPoints } from "@/uhm/lib/map/engines/snapUtils";
+import { getSnapVertexCoordinate, snapToNearestGeometry, snapToNearestGeometryDetailed, tracePathBetweenPoints } from "@/uhm/lib/map/engines/snapUtils";
+
+const HANDLE_VERTEX_MATCH_EPSILON_DEGREES = 1e-12;
+const HANDLE_EDGE_MATCH_EPSILON_METERS = 0.05;
+const SNAP_STATUS_SOURCE_IDS = ["countries", "places"] as const;
+
+type HandleStatus = "unknown" | "none" | "vertex" | "edge" | "delete";
 
 export type EditingHandle = {
     id: string | number;
@@ -29,7 +35,10 @@ export function createEditingEngine(options: {
     const editingRef = { current: null as EditingHandle | null };
     const dragStateRef = { current: null as { idx: number } | null };
     const deleteVertexModeRef = { current: false };
-    let vertexSnapStatuses: ("vertex" | "edge" | "none")[] = [];
+    let vertexSnapCache = new WeakMap<[number, number], HandleStatus>();
+    let lastHandlesJson = "";
+    let lastShapeJson = "";
+    let needsCacheClear = false;
     let deleteRangeStartIdx: number | null = null;
     let deleteRangeHoverIdx: number | null = null;
     let deleteRangeIndices: number[] = [];
@@ -37,6 +46,7 @@ export function createEditingEngine(options: {
     let lastMousePointPx: maplibregl.Point | null = null;
     let contextMenu: HTMLDivElement | null = null;
     let docClickHandler: ((ev: MouseEvent) => void) | null = null;
+    let pendingSnapStatusRefresh = false;
 
     // Trạng thái vẽ tiếp (Continue Draw) để vẽ nối tiếp/sửa từ một đỉnh
     let isDrawingContinued = false;
@@ -48,12 +58,7 @@ export function createEditingEngine(options: {
         startIdx: number;
         targetFeatureId: string | number;
         targetFeatureRing: [number, number][];
-        snap1: {
-            type: "vertex" | "edge";
-            vertexIdx?: number;
-            edgeIdx?: number;
-            lngLat: { lng: number; lat: number };
-        };
+        targetVertexIdx: number;
     } | null = null;
     let currentTraceGroupId = 1;
 
@@ -73,7 +78,10 @@ export function createEditingEngine(options: {
         }
         editingRef.current = null;
         dragStateRef.current = null;
-        vertexSnapStatuses = [];
+        vertexSnapCache = new WeakMap();
+        lastHandlesJson = "";
+        lastShapeJson = "";
+        needsCacheClear = false;
         setDeleteVertexMode(false);
         hideContextMenu();
         const map = mapRef.current;
@@ -83,12 +91,41 @@ export function createEditingEngine(options: {
         (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(empty);
     };
 
+    const coordinatesAlmostEqual = (
+        a: [number, number],
+        b: [number, number],
+        epsilon: number
+    ) => Math.abs(a[0] - b[0]) <= epsilon && Math.abs(a[1] - b[1]) <= epsilon;
+
+    const areSnapStatusSourcesReady = (map: maplibregl.Map) => {
+        if (map.isMoving() || !map.areTilesLoaded()) return false;
+        return SNAP_STATUS_SOURCE_IDS.every((sourceId) => {
+            if (!map.getSource(sourceId)) return false;
+            return map.isSourceLoaded(sourceId);
+        });
+    };
+
+    const scheduleSnapStatusRefresh = (map: maplibregl.Map) => {
+        if (pendingSnapStatusRefresh) return;
+        pendingSnapStatusRefresh = true;
+        map.once("idle", () => {
+            pendingSnapStatusRefresh = false;
+            updateEditSources();
+        });
+    };
+
     // Đồng bộ polygon/line/point tạm và các handle point lên map source.
     const updateEditSources = () => {
         const editing = editingRef.current;
         const map = mapRef.current;
-        console.log("updateEditSources: editing:", editing, "map loaded:", map?.isStyleLoaded());
         if (!editing || !map || !map.isStyleLoaded()) return;
+        const snapSourcesReady = areSnapStatusSourcesReady(map);
+        if (!snapSourcesReady) {
+            scheduleSnapStatusRefresh(map);
+        } else if (needsCacheClear) {
+            vertexSnapCache = new WeakMap();
+            needsCacheClear = false;
+        }
 
         let shape: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.LineString | GeoJSON.Point>;
         let handles: GeoJSON.FeatureCollection<GeoJSON.Point>;
@@ -96,7 +133,7 @@ export function createEditingEngine(options: {
         const geomType = editing.geometryType || "Polygon";
 
         const getHandleProperties = (idx: number, coordinate: [number, number], extraProps = {}) => {
-            let status: "none" | "vertex" | "edge" | "delete" = "none";
+            let status: HandleStatus = snapSourcesReady ? "none" : "unknown";
             if (deleteVertexModeRef.current) {
                 if (deleteRangeStartIdx !== null) {
                     if (idx === deleteRangeStartIdx || idx === deleteRangeHoverIdx) {
@@ -110,28 +147,32 @@ export function createEditingEngine(options: {
                     status = "delete";
                 }
             } else {
-                const isDragging = dragStateRef.current !== null;
                 const isDraggedVertex = dragStateRef.current?.idx === idx;
                 
-                if (isDragging && !isDraggedVertex && vertexSnapStatuses[idx]) {
-                    status = vertexSnapStatuses[idx];
+                if (!isDraggedVertex && vertexSnapCache.has(coordinate) && vertexSnapCache.get(coordinate) !== "unknown") {
+                    status = vertexSnapCache.get(coordinate)!;
+                } else if (!snapSourcesReady) {
+                    status = "unknown";
                 } else {
                     const lngLat = new maplibregl.LngLat(coordinate[0], coordinate[1]);
                     const pointPx = map.project(lngLat);
                     const snapResult = snapToNearestGeometryDetailed(map, lngLat, pointPx, editing.id);
                     
-                    if (snapResult.type !== "none") {
+                    if (snapResult.type === "vertex") {
+                        const snapCoordinate = getSnapVertexCoordinate(snapResult);
+                        status = snapCoordinate && coordinatesAlmostEqual(
+                            coordinate,
+                            snapCoordinate,
+                            HANDLE_VERTEX_MATCH_EPSILON_DEGREES
+                        ) ? "vertex" : "none";
+                    } else if (snapResult.type === "edge") {
                         const dist = distanceMeters(coordinate, [snapResult.lngLat.lng, snapResult.lngLat.lat]);
-                        if (dist <= 1.0) {
-                            status = snapResult.type;
-                        } else {
-                            status = "none";
-                        }
+                        status = dist <= HANDLE_EDGE_MATCH_EPSILON_METERS ? "edge" : "none";
                     } else {
                         status = "none";
                     }
                     
-                    vertexSnapStatuses[idx] = status;
+                    vertexSnapCache.set(coordinate, status);
                 }
             }
             return {
@@ -238,8 +279,17 @@ export function createEditingEngine(options: {
             };
         }
 
-        (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(shape);
-        (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(handles);
+        const shapeJson = JSON.stringify(shape);
+        if (shapeJson !== lastShapeJson) {
+            lastShapeJson = shapeJson;
+            (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(shape);
+        }
+
+        const handlesJson = JSON.stringify(handles);
+        if (handlesJson !== lastHandlesJson) {
+            lastHandlesJson = handlesJson;
+            (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData(handles);
+        }
     };
 
     // Chốt chỉnh sửa và emit geometry mới cho caller.
@@ -297,16 +347,12 @@ export function createEditingEngine(options: {
 
     // Bắt đầu chỉnh sửa từ feature polygon/line/point được chọn.
     const beginEditing = (feature: maplibregl.MapGeoJSONFeature) => {
-        console.log("beginEditing called with feature:", feature);
         if (!feature || !feature.geometry) {
-            console.warn("beginEditing: feature or feature.geometry is missing");
             return;
         }
         const geom = feature.geometry as Geometry;
         const type = geom.type;
-        console.log("beginEditing: geometry type is", type);
         if (type !== "Polygon" && type !== "LineString" && type !== "Point") {
-            console.warn("beginEditing: unsupported geometry type:", type);
             return;
         }
 
@@ -315,26 +361,20 @@ export function createEditingEngine(options: {
         let ring: [number, number][] = [];
         if (type === "Polygon") {
             const coords = (geom.coordinates?.[0] ?? []) as [number, number][];
-            console.log("beginEditing Polygon coords:", coords);
             if (coords.length < 4) {
-                console.warn("beginEditing: Polygon coords length is less than 4");
                 return;
             }
             // remove duplicated closing point
             ring = coords.slice(0, -1).map((c) => [c[0], c[1]] as [number, number]);
         } else if (type === "LineString") {
             const coords = (geom.coordinates ?? []) as [number, number][];
-            console.log("beginEditing LineString coords:", coords);
             if (coords.length < 2) {
-                console.warn("beginEditing: LineString coords length is less than 2");
                 return;
             }
             ring = coords.map((c) => [c[0], c[1]] as [number, number]);
         } else if (type === "Point") {
             const coords = (geom.coordinates ?? []) as [number, number];
-            console.log("beginEditing Point coords:", coords);
             if (coords.length < 2) {
-                console.warn("beginEditing: Point coords length is less than 2");
                 return;
             }
             ring = [[coords[0], coords[1]]];
@@ -349,7 +389,8 @@ export function createEditingEngine(options: {
             circleRadius: geom.circle_radius,
             geometryType: type,
         };
-        console.log("beginEditing: initialized editingRef.current:", editingRef.current);
+        vertexSnapCache = new WeakMap();
+        needsCacheClear = false;
         setDeleteVertexMode(false);
         updateEditSources();
     };
@@ -450,7 +491,6 @@ export function createEditingEngine(options: {
             const sortedIndices = [...deleteRangeIndices].sort((a, b) => b - a);
             for (const idx of sortedIndices) {
                 editing.ring.splice(idx, 1);
-                vertexSnapStatuses.splice(idx, 1);
             }
         }
 
@@ -632,18 +672,12 @@ export function createEditingEngine(options: {
                 finishEditing();
             } else if (e.key === "Delete" && editing.geometryType !== "Point" && !editing.isCircle) {
                 e.preventDefault();
+                if (e.repeat) return;
                 setDeleteVertexMode(!deleteVertexModeRef.current);
             } else if (e.key === "Escape") {
                 if (deleteVertexModeRef.current) {
                     e.preventDefault();
-                    if (deleteRangeStartIdx !== null) {
-                        deleteRangeStartIdx = null;
-                        deleteRangeHoverIdx = null;
-                        deleteRangeIndices = [];
-                        updateEditSources();
-                    } else {
-                        setDeleteVertexMode(false);
-                    }
+                    setDeleteVertexMode(false);
                     return;
                 }
                 cancelEditing();
@@ -688,6 +722,12 @@ export function createEditingEngine(options: {
             }
         };
 
+        const onMapViewportChange = () => {
+            if (!editingRef.current) return;
+            needsCacheClear = true;
+            updateEditSources();
+        };
+
         map.on("mousedown", "edit-handles-circle", onHandleDown);
         map.on("contextmenu", "edit-handles-circle", onHandleContextMenu);
         map.on("mouseenter", "edit-handles-circle", onHandleMouseEnter);
@@ -696,14 +736,14 @@ export function createEditingEngine(options: {
         map.on("click", onGeneralMapClick);
         map.on("mousemove", onHandleMove);
         map.on("mouseup", stopDragging);
+        map.on("moveend", onMapViewportChange);
+        map.on("zoomend", onMapViewportChange);
         document.addEventListener("keydown", onKeyDown);
         document.addEventListener("keyup", onKeyUp);
         window.addEventListener("blur", onWindowBlur);
         
         const canvas = map.getCanvas();
         if (canvas) {
-            canvas.addEventListener("keydown", onKeyDown);
-            canvas.addEventListener("keyup", onKeyUp);
             canvas.addEventListener("mouseleave", onCanvasLeave);
         }
 
@@ -719,14 +759,14 @@ export function createEditingEngine(options: {
             map.off("click", onGeneralMapClick);
             map.off("mousemove", onHandleMove);
             map.off("mouseup", stopDragging);
+            map.off("moveend", onMapViewportChange);
+            map.off("zoomend", onMapViewportChange);
             document.removeEventListener("keydown", onKeyDown);
             document.removeEventListener("keyup", onKeyUp);
             window.removeEventListener("blur", onWindowBlur);
             try {
                 const canvas = map.getCanvas();
                 if (canvas) {
-                    canvas.removeEventListener("keydown", onKeyDown);
-                    canvas.removeEventListener("keyup", onKeyUp);
                     canvas.removeEventListener("mouseleave", onCanvasLeave);
                 }
             } catch {
@@ -774,6 +814,8 @@ export function createEditingEngine(options: {
             };
         }
 
+        lastShapeJson = "";
+        lastHandlesJson = "";
         (map.getSource("edit-shape") as maplibregl.GeoJSONSource | undefined)?.setData(shape);
         (map.getSource("edit-handles") as maplibregl.GeoJSONSource | undefined)?.setData({
             type: "FeatureCollection",
@@ -929,7 +971,7 @@ export function createEditingEngine(options: {
                 map,
                 e.lngLat,
                 e.point,
-                null,
+                editing.id,
                 traceStartState ? traceStartState.targetFeatureId : null
             )
             : null;
@@ -942,31 +984,17 @@ export function createEditingEngine(options: {
 
         // 1. Thử chốt trace dọc biên giới
         if (traceStartState) {
-            const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, null, traceStartState.targetFeatureId);
+            const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, editing.id, traceStartState.targetFeatureId);
             if (
-                targetSnap.type !== "none" &&
+                targetSnap.type === "vertex" &&
                 targetSnap.featureId !== undefined &&
                 String(targetSnap.featureId) === String(traceStartState.targetFeatureId) &&
-                targetSnap.ringCoords
+                targetSnap.vertexIdx !== undefined
             ) {
-                const snap1 = traceStartState.snap1;
-                const snap2 = {
-                    type: targetSnap.type as "vertex" | "edge",
-                    vertexIdx: targetSnap.vertexIdx,
-                    edgeIdx: targetSnap.edgeIdx,
-                    lngLat: { lng: targetSnap.lngLat.lng, lat: targetSnap.lngLat.lat }
-                };
-
-                const { ring, idx1, idx2 } = getRingWithSnaps(
-                    traceStartState.targetFeatureRing,
-                    snap1,
-                    snap2
-                );
-
                 const path = tracePathBetweenPoints(
-                    ring as [number, number][],
-                    idx1,
-                    idx2
+                    traceStartState.targetFeatureRing,
+                    traceStartState.targetVertexIdx,
+                    targetSnap.vertexIdx
                 );
 
                 if (path.length > 0) {
@@ -985,27 +1013,40 @@ export function createEditingEngine(options: {
                     return;
                 }
             }
+            if (e.originalEvent.shiftKey) {
+                updateEditSources();
+                return;
+            }
         }
 
         // 2. Shift + T để kích hoạt start trace
         const isShiftT = e.originalEvent.shiftKey && isTKeyDown;
-        if (isShiftT && snapRes && snapRes.type !== "none" && snapRes.featureId !== undefined && snapRes.ringCoords) {
-            drawnPoints.push(currentPoint);
+        const traceStartCoordinate = snapRes ? getSnapVertexCoordinate(snapRes) : null;
+        if (
+            isShiftT &&
+            snapRes &&
+            snapRes.type === "vertex" &&
+            snapRes.featureId !== undefined &&
+            snapRes.ringCoords &&
+            snapRes.vertexIdx !== undefined &&
+            traceStartCoordinate
+        ) {
+            drawnPoints.push(traceStartCoordinate);
             coordMeta.push({ isTrace: false });
             
             traceStartState = {
-                startCoord: currentPoint,
+                startCoord: traceStartCoordinate,
                 startIdx: drawnPoints.length - 1,
                 targetFeatureId: snapRes.featureId,
                 targetFeatureRing: snapRes.ringCoords as [number, number][],
-                snap1: {
-                    type: snapRes.type as "vertex" | "edge",
-                    vertexIdx: snapRes.vertexIdx,
-                    edgeIdx: snapRes.edgeIdx,
-                    lngLat: { lng: snapRes.lngLat.lng, lat: snapRes.lngLat.lat }
-                }
+                targetVertexIdx: snapRes.vertexIdx
             };
         } else {
+            if (isShiftT) {
+                updateEditSources();
+                return;
+            }
+
             drawnPoints.push(currentPoint);
             coordMeta.push({ isTrace: false });
             traceStartState = null;
@@ -1029,7 +1070,7 @@ export function createEditingEngine(options: {
                 map,
                 e.lngLat,
                 e.point,
-                null,
+                editing.id,
                 traceStartState ? traceStartState.targetFeatureId : null
             )
             : null;
@@ -1043,31 +1084,17 @@ export function createEditingEngine(options: {
 
         // Nếu đang trong quá trình trace, tìm đường đi nháp
         if (traceStartState) {
-            const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, null, traceStartState.targetFeatureId);
+            const targetSnap = snapToNearestGeometryDetailed(map, e.lngLat, e.point, editing.id, traceStartState.targetFeatureId);
             if (
-                targetSnap.type !== "none" &&
+                targetSnap.type === "vertex" &&
                 targetSnap.featureId !== undefined &&
                 String(targetSnap.featureId) === String(traceStartState.targetFeatureId) &&
-                targetSnap.ringCoords
+                targetSnap.vertexIdx !== undefined
             ) {
-                const snap1 = traceStartState.snap1;
-                const snap2 = {
-                    type: targetSnap.type as "vertex" | "edge",
-                    vertexIdx: targetSnap.vertexIdx,
-                    edgeIdx: targetSnap.edgeIdx,
-                    lngLat: { lng: targetSnap.lngLat.lng, lat: targetSnap.lngLat.lat }
-                };
-
-                const { ring, idx1, idx2 } = getRingWithSnaps(
-                    traceStartState.targetFeatureRing,
-                    snap1,
-                    snap2
-                );
-
                 const path = tracePathBetweenPoints(
-                    ring as [number, number][],
-                    idx1,
-                    idx2
+                    traceStartState.targetFeatureRing,
+                    traceStartState.targetVertexIdx,
+                    targetSnap.vertexIdx
                 );
 
                 if (path.length > 0) {
@@ -1140,7 +1167,7 @@ export function createEditingEngine(options: {
     ): [number, number][] => {
         if (!continueDrawConfig) return activeDrawn;
 
-        let combined = prefix.concat(activeDrawn).concat(suffix);
+        const combined = prefix.concat(activeDrawn).concat(suffix);
 
         // Đối với polygon khép kín nếu bị quấn vòng qua điểm bắt đầu/kết thúc
         if (!isLine && combined.length > 1) {
@@ -1292,7 +1319,6 @@ export function createEditingEngine(options: {
         if (editing.ring.length <= minLength) return;
         if (idx < 0 || idx >= editing.ring.length) return;
         editing.ring.splice(idx, 1);
-        vertexSnapStatuses.splice(idx, 1);
         updateEditSources();
     };
 
@@ -1310,7 +1336,6 @@ export function createEditingEngine(options: {
             (current[1] + prev[1]) / 2,
         ];
         editing.ring.splice(idx, 0, midpoint);
-        vertexSnapStatuses.splice(idx, 0, "none");
         updateEditSources();
     };
 
@@ -1328,7 +1353,6 @@ export function createEditingEngine(options: {
             (current[1] + next[1]) / 2,
         ];
         editing.ring.splice(idx + 1, 0, midpoint);
-        vertexSnapStatuses.splice(idx + 1, 0, "none");
         updateEditSources();
     };
 

@@ -21,7 +21,9 @@ import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { type BackgroundLayerVisibility } from "@/uhm/lib/map/styles/backgroundLayers";
 import { normalizeFeatureEntityIds } from "@/uhm/lib/editor/snapshot/editorSnapshot";
 import type { PreviewRelationIndex } from "@/uhm/lib/preview/types";
+import { isTimelineYearWithinEntityTimeRange } from "@/uhm/lib/utils/entityTime";
 import type { Feature } from "@/uhm/lib/editor/state/useEditorState";
+import type { ReplayPreviewController } from "@/uhm/lib/replay/useReplayPreview";
 
 type Props = {
     projectId: string;
@@ -47,7 +49,7 @@ type Props = {
     selectedStepIndex?: number | null;
     autoplayMode?: "start" | "selection" | null;
 
-    replayPreview: any;
+    replayPreview: ReplayPreviewController;
     mapHandleRef?: RefObject<MapHandle | null>;
     previewRelations: PreviewRelationIndex;
     previewActiveEntityId: string | null;
@@ -116,13 +118,16 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
 
     // Clear preview states when currentActiveReplay or mode changes
     useEffect(() => {
-        setPreviewWikiCache({});
-        setPreviewWikiError(null);
-        setIsPreviewWikiLoading(false);
-        setPreviewPinnedWikiPopupAnchor(null);
-        setPreviewActiveEntityId(null);
-        setIsPreviewEntitySidebarOpen(false);
-        setPreviewLinkEntityPopup(null);
+        const timeoutId = window.setTimeout(() => {
+            setPreviewWikiCache({});
+            setPreviewWikiError(null);
+            setIsPreviewWikiLoading(false);
+            setPreviewPinnedWikiPopupAnchor(null);
+            setPreviewActiveEntityId(null);
+            setIsPreviewEntitySidebarOpen(false);
+            setPreviewLinkEntityPopup(null);
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
     }, [currentActiveReplay, mode, setPreviewActiveEntityId, setPreviewWikiCache]);
 
     const autoplayedReplayIdRef = useRef<string | number | null>(null);
@@ -180,40 +185,73 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     // Load active wiki content if needed
     useEffect(() => {
         if (!mode || !replayPreviewSidebarOpen) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
+            const timeoutId = window.setTimeout(() => {
+                setPreviewWikiError(null);
+                setIsPreviewWikiLoading(false);
+            }, 0);
+            return () => window.clearTimeout(timeoutId);
         }
+
+        const setWikiIdle = (error: string | null = null) => {
+            const timeoutId = window.setTimeout(() => {
+                setPreviewWikiError(error);
+                setIsPreviewWikiLoading(false);
+            }, 0);
+            return () => window.clearTimeout(timeoutId);
+        };
+
+        const setWikiLoading = () => {
+            const timeoutId = window.setTimeout(() => {
+                setPreviewWikiError(null);
+                setIsPreviewWikiLoading(true);
+            }, 0);
+            return () => window.clearTimeout(timeoutId);
+        };
+
+        let pendingStateCleanup: (() => void) | null = null;
+        const cleanupPendingState = () => {
+            pendingStateCleanup?.();
+            pendingStateCleanup = null;
+        };
+
+        const scheduleWikiIdle = (error: string | null = null) => {
+            cleanupPendingState();
+            pendingStateCleanup = setWikiIdle(error);
+        };
+
+        const scheduleWikiLoading = () => {
+            cleanupPendingState();
+            pendingStateCleanup = setWikiLoading();
+        };
+
+        const cleanupEffect = () => {
+            cleanupPendingState();
+        };
 
         const activeWikiId = String(replayPreviewActiveWikiId || "").trim();
         if (!activeWikiId.length) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
+            scheduleWikiIdle();
+            return cleanupEffect;
         }
 
         const localWiki = wikis.find((item) => item.id === activeWikiId) || null;
         if (!localWiki) {
-            setPreviewWikiError("Không tìm thấy wiki trong snapshot preview.");
-            setIsPreviewWikiLoading(false);
-            return;
+            scheduleWikiIdle("Không tìm thấy wiki trong snapshot preview.");
+            return cleanupEffect;
         }
 
         if (typeof localWiki.doc === "string") {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
+            scheduleWikiIdle();
+            return cleanupEffect;
         }
 
         if (previewWikiCache[activeWikiId]) {
-            setPreviewWikiError(null);
-            setIsPreviewWikiLoading(false);
-            return;
+            scheduleWikiIdle();
+            return cleanupEffect;
         }
 
         let disposed = false;
-        setPreviewWikiError(null);
-        setIsPreviewWikiLoading(true);
+        scheduleWikiLoading();
         void fetchWikiById(activeWikiId)
             .then((row) => {
                 if (disposed) return;
@@ -231,12 +269,14 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
 
         return () => {
             disposed = true;
+            cleanupEffect();
         };
     }, [
         mode,
         previewWikiCache,
         replayPreviewActiveWikiId,
         replayPreviewSidebarOpen,
+        setPreviewWikiCache,
         wikis,
     ]);
 
@@ -401,25 +441,67 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     // Hover popup content provider
     const getPreviewHoverPopupContent = useCallback((feature: Feature) => {
         const entityIds = normalizeFeatureEntityIds(feature);
+        const sourceFeatureId = (feature as { id?: string | number }).id ?? null;
         const entitiesForFeature = entityIds
             .map((entityId) => previewRelations.entitiesById[entityId] || null)
             .filter((entity): entity is Entity => Boolean(entity));
         if (!entitiesForFeature.length) return null;
 
-        return {
-            rows: entitiesForFeature.flatMap((entity) => {
-                const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
-                if (!linkedWikis.length) {
-                    return [{ title: entity.name || String(entity.id), quote: "" }];
-                }
+        type GroupedHoverRow = MapHoverPopupContent["rows"][number] & { isTimelineMatch: boolean };
+        const groupedRows: GroupedHoverRow[] = entitiesForFeature.flatMap((entity): GroupedHoverRow[] => {
+            const title = entity.name || String(entity.id);
+            const isTimelineMatch = isTimelineYearWithinEntityTimeRange(
+                activeTimelineYear,
+                entity.time_start,
+                entity.time_end
+            );
+            const linkedWikis = previewRelations.entityWikisById[entity.id] || [];
+            const entityHeaderRow = {
+                title,
+                description: entity.description,
+                isGroupHeader: true,
+                isTimelineMatch,
+            };
 
-                return linkedWikis.map((wiki) => ({
-                    title: entity.name || String(entity.id),
+            if (!linkedWikis.length) {
+                return [entityHeaderRow, {
+                    title: "(chưa có wiki)",
+                    titleTone: "danger",
+                    isTimelineMatch,
+                    quoteTone: "danger",
+                }];
+            }
+
+            return [
+                entityHeaderRow,
+                ...linkedWikis.map((wiki) => ({
+                    title: getWikiHoverTitle(wiki, title),
+                    isTimelineMatch,
                     quote: extractWikiBlockquoteText(wiki.content),
-                }));
-            }),
+                    onClick: () => selectReplayPreviewEntity(entity.id, {
+                        sourceFeatureId,
+                        preferredWikiId: wiki.id,
+                        focusMap: false,
+                        selectGeometry: false,
+                    }),
+                })),
+            ];
+        });
+        const timelineMatchedRows = groupedRows.filter((row) => row.isTimelineMatch);
+        const otherRows = groupedRows.filter((row) => !row.isTimelineMatch);
+        const stripGroupFlag = ({ isTimelineMatch: _isTimelineMatch, ...row }: GroupedHoverRow) => row;
+
+        return {
+            key: `${activeTimelineYear}:${groupedRows.map((row) => `${row.title}:${row.description || ""}:${row.isTimelineMatch ? "in" : "out"}`).join("|")}`,
+            rows: [
+                ...timelineMatchedRows.map(stripGroupFlag),
+                ...otherRows.map((row, index) => ({
+                    ...stripGroupFlag(row),
+                    separatorBefore: index === 0 && timelineMatchedRows.length > 0,
+                })),
+            ],
         };
-    }, [previewRelations.entitiesById, previewRelations.entityWikisById]);
+    }, [activeTimelineYear, previewRelations.entitiesById, previewRelations.entityWikisById, selectReplayPreviewEntity]);
 
     // Wiki inner links click handler
     const handleReplayPreviewWikiLinkRequest = useCallback(({ slug, rect }: { slug: string; rect: DOMRect }) => {
@@ -514,6 +596,33 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         }
     }, [mapHandleRef, previewRelations.geometryEntityIds, selectReplayPreviewEntity, setPreviewEntityFocusToken]);
 
+    const handleFocusWiki = useCallback((wiki: Wiki) => {
+        setFocusedPresentPlace(null);
+
+        const entityIds = previewRelations.wikiEntityIdsById[wiki.id] || [];
+        if (entityIds.length > 0) {
+            selectReplayPreviewEntity(entityIds[0], {
+                preferredWikiId: wiki.id,
+                focusMap: true,
+            });
+
+            // Focus geometries if any
+            const geometries = previewRelations.entityGeometriesById[entityIds[0]];
+            const map = mapHandleRef?.current?.getMap();
+            if (map && geometries && geometries.features.length > 0) {
+                fitMapToFeatureCollection(map, geometries, 84, { duration: 1000 });
+            }
+        } else {
+            // Direct wiki select without entity
+            setPreviewActiveEntityId(null);
+            setIsPreviewEntitySidebarOpen(true);
+            setPreviewWikiError(null);
+            setPreviewPinnedWikiPopupAnchor(null);
+            setPreviewLinkEntityPopup(null);
+            openReplayPreviewWikiPanelById(wiki.id);
+        }
+    }, [previewRelations, selectReplayPreviewEntity, setPreviewActiveEntityId, openReplayPreviewWikiPanelById, mapHandleRef]);
+
     const effectiveGeometryVisibility = useMemo(() => {
         return geometryVisibility;
     }, [geometryVisibility]);
@@ -566,6 +675,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                 focusedPlace={focusedPresentPlace}
                 onFocusPlace={handleFocusPresentPlace}
                 onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                onFocusWiki={handleFocusWiki}
                 onClearFocus={clearPresentPlaceFocus}
             />
 
@@ -596,6 +706,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                         right: 16,
                         bottom: 16,
                         left: isLargeScreen ? "auto" : 16,
+                        width: isLargeScreen ? `min(${previewSidebarWidth}px, calc(100vw - 2rem))` : "auto",
                         maxWidth: "calc(100vw - 2rem)",
                         zIndex: 20,
                     }}
@@ -725,6 +836,8 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     );
 });
 
+PreviewLayout.displayName = "PreviewLayout";
+
 export default PreviewLayout;
 
 // ==========================================
@@ -749,6 +862,10 @@ function extractWikiBlockquoteText(content: string | null | undefined): string {
         .replace(/&#39;/g, "'")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+function getWikiHoverTitle(wiki: { title?: string | null } | null | undefined, fallbackTitle: string): string {
+    return String(wiki?.title || "").trim() || fallbackTitle;
 }
 
 function computeFixedPopupPosition(rect: DOMRect, width: number, height: number) {

@@ -1,5 +1,6 @@
 import type { ApiEnvelope } from "@/uhm/types/api";
 import api from "@/config/config";
+import type { AxiosError, AxiosRequestConfig } from "axios";
 
 export class ApiError extends Error {
     status: number;
@@ -21,6 +22,8 @@ type RequestJsonOptions = {
     authToken?: string | null; // Override bearer token (used for refresh).
 };
 
+type AuthAxiosRequestConfig = AxiosRequestConfig & RequestJsonOptions;
+
 export async function requestJson<T>(
     input: RequestInfo | URL,
     init?: RequestInit,
@@ -40,16 +43,17 @@ export async function requestJson<T>(
     }
 
     try {
-        const response = await api.request({
+        const requestConfig: AuthAxiosRequestConfig = {
             url,
             method,
             data,
-            headers: init?.headers as any,
+            headers: normalizeRequestHeaders(init?.headers),
             // Custom properties for our axios interceptor.
             skipAuth: options?.skipAuth,
             authToken: options?.authToken,
             skipRefresh: options?.skipRefresh,
-        } as any);
+        };
+        const response = await api.request(requestConfig);
 
         const payload = response.data;
         const envelope = isApiEnvelopeLike<T>(payload) ? payload : null;
@@ -64,13 +68,14 @@ export async function requestJson<T>(
         }
 
         return payload as T;
-    } catch (err: any) {
+    } catch (err: unknown) {
         if (err instanceof ApiError) throw err;
 
-        const status = err.response?.status || 0;
-        const payload = err.response?.data;
+        const axiosError = err as AxiosError<unknown>;
+        const status = axiosError.response?.status || 0;
+        const payload = axiosError.response?.data;
         const envelope = isApiEnvelopeLike<T>(payload) ? payload : null;
-        const message = extractErrorMessage(payload, envelope) || err.message || "Request failed";
+        const message = extractErrorMessage(payload, envelope) || (err instanceof Error ? err.message : "") || "Request failed";
         const body = envelope ? stringifyPayload(envelope) : stringifyPayload(payload);
         const errors = envelope?.errors ? normalizeErrors(envelope.errors) : [];
 
@@ -99,14 +104,30 @@ function normalizeErrors(value: unknown): unknown[] {
 }
 
 function extractErrorMessage(payload: unknown, envelope: ApiEnvelope<unknown> | null): string | null {
+    const payloadRecord = isRecord(payload) ? payload : null;
     const msg =
         (typeof envelope?.message === "string" && envelope.message.trim()) ||
-        (typeof (payload as any)?.message === "string" && String((payload as any).message).trim());
+        (typeof payloadRecord?.message === "string" && payloadRecord.message.trim());
     if (msg) return msg;
-    const errors = envelope?.errors ?? (payload as any)?.errors;
+    const errors = envelope?.errors ?? payloadRecord?.errors;
     if (typeof errors === "string" && errors.trim()) return errors.trim();
     if (Array.isArray(errors) && typeof errors[0] === "string") return errors[0];
     return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeRequestHeaders(headers: RequestInit["headers"]): Record<string, string> | undefined {
+    if (!headers) return undefined;
+    if (headers instanceof Headers) {
+        return Object.fromEntries(headers.entries());
+    }
+    if (Array.isArray(headers)) {
+        return Object.fromEntries(headers.map(([key, value]) => [key, value]));
+    }
+    return headers;
 }
 
 function stringifyPayload(payload: unknown): string {
