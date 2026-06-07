@@ -14,9 +14,9 @@ import type {
     UIOptionName,
 } from "@/uhm/types/projects";
 import { Panel } from "./Panel";
-import { Modal } from "@/components/ui/modal";
-import Button from "@/components/ui/button/Button";
-import Label from "@/components/form/Label";
+import { Modal } from "@/uhm/components/ui/Modal";
+import Button from "@/uhm/components/ui/Button";
+import Label from "@/uhm/components/ui/Label";
 import { fetchWikiBySlug, searchWikisByTitle, type Wiki } from "@/uhm/api/wikis";
 import { useEditorStore } from "@/uhm/store/editorStore";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useSidebar } from "@/context/SidebarContext";
-import AppHeader from "@/layout/AppHeader";
+import { SidebarProvider, useSidebar } from "@/context/SidebarContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { apiGetCurrentUser } from "@/service/auth";
@@ -10,6 +10,20 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import ChatbotWidget from "@/components/ui/chat/ChatbotWidget";
 export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ThemeProvider>
+      <SidebarProvider>
+        <AdminLayoutContent>{children}</AdminLayoutContent>
+      </SidebarProvider>
+    </ThemeProvider>
+  );
+}
+
+function AdminLayoutContent({
   children,
 }: {
   children: React.ReactNode;
@@ -27,7 +41,7 @@ export default function AdminLayout({
       }
     };
     fetchUser();
-  }, [])
+  }, [dispatch])
 
 
   const mainContentMargin = isMobileOpen

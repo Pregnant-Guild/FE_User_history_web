@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
 import { useShallow } from "zustand/react/shallow";
 
-import { Modal } from "@/components/ui/modal";
-import Button from "@/components/ui/button/Button";
-import Label from "@/components/form/Label";
+import { Modal } from "@/uhm/components/ui/Modal";
+import Button from "@/uhm/components/ui/Button";
+import Label from "@/uhm/components/ui/Label";
 
 import type { WikiSnapshot } from "@/uhm/types/wiki";
 import { newId } from "@/uhm/lib/utils/id";

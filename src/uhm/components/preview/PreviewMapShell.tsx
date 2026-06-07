@@ -3,7 +3,7 @@ import Image from "next/image";
 
 import { type CSSProperties, type ReactNode, useState, useEffect } from "react";
 import { apiGetCurrentUser } from "@/service/auth";
-import ChatbotWidget from "@/components/ui/chat/ChatbotWidget";
+import ChatbotWidget from "@/uhm/components/ui/ChatbotWidget";
 import Map, { type MapFeaturePayload } from "@/uhm/components/Map";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";

@@ -1,6 +1,17 @@
+# Third-party notices
+
+This project includes portions of TailAdmin.
+
+TailAdmin
+Copyright (c) 2023 TailAdmin
+Licensed under the MIT License.
+Website: https://tailadmin.com
+
+## TailAdmin MIT License
+
 MIT License
 
-Copyright (c) 2026 Pregnant guide
+Copyright (c) 2023 TailAdmin
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
