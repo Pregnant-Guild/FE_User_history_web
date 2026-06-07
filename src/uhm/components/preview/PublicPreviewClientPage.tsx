@@ -9,6 +9,7 @@ const PreviewMapShell = dynamic(
 
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import MapPlaceholder from "@/uhm/components/preview/MapPlaceholder";
+import FirstVisitGuideModal from "@/uhm/components/preview/FirstVisitGuideModal";
 import GeometrySelectionPanel, {
     type GeometrySelectionRow,
 } from "@/uhm/components/preview/GeometrySelectionPanel";
@@ -878,6 +879,7 @@ export default function PublicPreviewClientPage({
                             />
                         ) : null}
                     </div>
+                    <FirstVisitGuideModal />
                 </PreviewMapShell>
             )}
 
