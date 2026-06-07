@@ -504,9 +504,16 @@ export default function PublicPreviewClientPage({
     }, []);
 
     const handleResetPreviewReplay = useCallback(() => {
-        setReplayMode("idle");
-        replayPreview.resetPreview();
-    }, [replayPreview]);
+        if (!activeReplay) {
+            setReplayMode("idle");
+            replayPreview.resetPreview();
+            return;
+        }
+        setReplayMode("playing");
+        setSelectedReplayStageId(activeReplay.stageId);
+        setSelectedReplayStepIndex(activeReplay.stepIndex);
+        replayPreview.playFromStart();
+    }, [activeReplay, replayPreview]);
 
     const handleExitReplay = useCallback(() => {
         setReplayMode("idle");

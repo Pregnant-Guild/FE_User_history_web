@@ -56,8 +56,8 @@ export default function ReplayPreviewOverlay({
             style={{
                 position: "absolute",
                 inset: 0,
-                zIndex: 15,
-                pointerEvents: "none",
+                zIndex: 60,
+                pointerEvents: isPreviewMode ? "auto" : "none",
             }}
         >
             {toasts.length ? (
@@ -272,7 +272,7 @@ export default function ReplayPreviewOverlay({
                                         onClick={onResetPreview}
                                         style={previewButtonStyle("#1e3a8a")}
                                     >
-                                        Reset
+                                        Phát lại từ đầu
                                     </button>
                                 </>
                             ) : (

@@ -133,6 +133,13 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     }, [currentActiveReplay, mode, setPreviewActiveEntityId, setPreviewWikiCache]);
 
     const autoplayedReplayIdRef = useRef<string | number | null>(null);
+    const playFromStartRef = useRef(replayPreview.playFromStart);
+    const playFromSelectionRef = useRef(replayPreview.playFromSelection);
+
+    useEffect(() => {
+        playFromStartRef.current = replayPreview.playFromStart;
+        playFromSelectionRef.current = replayPreview.playFromSelection;
+    }, [replayPreview.playFromSelection, replayPreview.playFromStart]);
 
     // Autoplay replay on mount/session load
     useEffect(() => {
@@ -143,12 +150,16 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         if (autoplayedReplayIdRef.current === currentActiveReplay.id) return;
         autoplayedReplayIdRef.current = currentActiveReplay.id;
 
-        if (autoplayMode === "selection") {
-            replayPreview.playFromSelection();
-        } else {
-            replayPreview.playFromStart();
-        }
-    }, [autoplayMode, isReplayPreviewMode, currentActiveReplay, replayPreview]);
+        const timeoutId = window.setTimeout(() => {
+            if (autoplayMode === "selection") {
+                playFromSelectionRef.current();
+            } else {
+                playFromStartRef.current();
+            }
+        }, 30);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [autoplayMode, isReplayPreviewMode, currentActiveReplay]);
 
     const {
         timelineYear: replayPreviewTimelineYear,
@@ -644,6 +655,24 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         };
     }, [isReplayPreviewRightPanelOpen, isLargeScreen, previewSidebarWidth]);
 
+    const searchBarWrapperStyle = useMemo(() => {
+        return {
+            position: "absolute" as const,
+            top: 10,
+            left: 84,
+            right: (isReplayPreviewRightPanelOpen && isLargeScreen) ? previewSidebarWidth + 32 : 18,
+            zIndex: 18,
+            display: "flex",
+            alignItems: "flex-start",
+            pointerEvents: "none" as const,
+            maxWidth: "calc(100vw - 102px)",
+        };
+    }, [isLargeScreen, isReplayPreviewRightPanelOpen, previewSidebarWidth]);
+
+    const searchBarWidth = useMemo(() => {
+        return "min(392px, calc(100vw - 120px))";
+    }, []);
+
 
 
     // WikiSelectionPanel rows
@@ -673,13 +702,22 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     return (
         <>
 
-            <PresentPlaceSearch
-                focusedPlace={focusedPresentPlace}
-                onFocusPlace={handleFocusPresentPlace}
-                onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
-                onFocusWiki={handleFocusWiki}
-                onClearFocus={clearPresentPlaceFocus}
-            />
+            <div style={searchBarWrapperStyle}>
+                <PresentPlaceSearch
+                    focusedPlace={focusedPresentPlace}
+                    onFocusPlace={handleFocusPresentPlace}
+                    onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                    onFocusWiki={handleFocusWiki}
+                    onClearFocus={clearPresentPlaceFocus}
+                    style={{
+                        position: "relative",
+                        top: 0,
+                        left: 0,
+                        transform: "none",
+                        width: searchBarWidth,
+                    }}
+                />
+            </div>
 
             {isReplayPreviewMode ? (
                 <ReplayPreviewOverlay
@@ -695,7 +733,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                     totalSteps={replayPreview.totalSteps}
                     onPlayPreview={replayPreview.playFromStart}
                     onStopPreview={replayPreview.stopPreview}
-                    onResetPreview={replayPreview.resetPreview}
+                    onResetPreview={replayPreview.playFromStart}
                     onExitPreview={handleExitReplayPreview}
                 />
             ) : null}

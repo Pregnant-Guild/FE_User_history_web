@@ -38,7 +38,7 @@ const guideItems: GuideItem[] = [
     {
         title: "Nếu đối tượng có replay, nhấn nút phát để xem diễn biến.",
         details: [
-            "Trong quá trình replay có thể dừng và tương tác như bình thường.",
+            "Trong quá trình replay có thể dừng và tương tác như bình thường(những vì vấn đề kĩ thuật chúng tôi chưa thể làm việc đó mà không xảy ra lỗi, nên hiện tại chức năng replay bị hạn chế tương tác).",
         ],
     },
     {
