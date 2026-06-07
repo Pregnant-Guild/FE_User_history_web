@@ -214,8 +214,10 @@ export function useReplayPreview({
 
     const stopPreview = useCallback(() => {
         runIdRef.current += 1;
-        restorePreviewState();
-    }, [restorePreviewState]);
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        getMapInstance()?.stop();
+    }, [getMapInstance]);
 
     useEffect(() => {
         runIdRef.current += 1;

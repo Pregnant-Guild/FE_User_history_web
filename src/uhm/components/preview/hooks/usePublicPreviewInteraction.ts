@@ -39,9 +39,10 @@ export function usePublicPreviewInteraction(options: {
     setSelectedFeatureIds: React.Dispatch<React.SetStateAction<(string | number)[]>>;
     timelineYear?: number | null;
     replayActiveWikiId?: string | null;
-    replayMode?: "idle" | "playing";
+    replayMode?: "idle" | "playing" | "paused";
+    onWikiLinkNavigate?: (wiki: Wiki) => void | Promise<void>;
 }) {
-    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, timelineYear, replayActiveWikiId, replayMode } = options;
+    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, timelineYear, replayActiveWikiId, replayMode, onWikiLinkNavigate } = options;
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
     const [isManualSidebarOpen, setIsManualSidebarOpen] = useState(false);
@@ -50,15 +51,20 @@ export function usePublicPreviewInteraction(options: {
         setIsManualSidebarOpen(false);
     }, [replayMode]);
     const [wikiCache, setWikiCache] = useState<Record<string, CachedWiki>>({});
+    const [visibleWiki, setVisibleWiki] = useState<CachedWiki | null>(null);
     const [hoverWikiPreviewByEntityId, setHoverWikiPreviewByEntityId] = useState<Record<string, HoverWikiPreview>>({});
     const [isActiveWikiLoading, setIsActiveWikiLoading] = useState(false);
     const [activeWikiError, setActiveWikiError] = useState<string | null>(null);
     const [linkEntityPopup, setLinkEntityPopup] = useState<LinkEntityPopupState | null>(null);
     const linkEntityPopupRef = useRef<HTMLDivElement | null>(null);
     const hoverWikiPreviewRequestsRef = useRef<Set<string>>(new Set());
+    const wikiLinkRequestSeqRef = useRef(0);
+    const wikiLinkInFlightSlugRef = useRef<string | null>(null);
+    const fullWikiFetchAttemptedSlugRef = useRef<Set<string>>(new Set());
+    const suppressSelectedFeatureAutoSelectRef = useRef(false);
 
     useEffect(() => {
-        if (replayMode === "playing" && replayActiveWikiId) {
+        if (replayMode !== "idle" && replayActiveWikiId) {
             const activeWikiEntityIds = relations.wikiEntityIdsById[String(replayActiveWikiId)] || [];
             const entityId = activeWikiEntityIds[0] || null;
             const wikiSlug = relations.wikiById[String(replayActiveWikiId)]?.slug || null;
@@ -83,9 +89,15 @@ export function usePublicPreviewInteraction(options: {
 
     const activeEntity = activeEntityId ? relations.entitiesById[activeEntityId] || null : null;
     const activeWiki = useMemo(() => {
+        if (visibleWiki) return visibleWiki;
         if (!activeWikiSlug) return null;
-        return wikiCache[activeWikiSlug] || relations.wikiBySlug[activeWikiSlug] || null;
-    }, [activeWikiSlug, relations.wikiBySlug, wikiCache]);
+        const cachedWiki = findWikiBySlug(wikiCache, activeWikiSlug) || null;
+        const relationWiki = findWikiBySlug(relations.wikiBySlug, activeWikiSlug) || null;
+        if (!cachedWiki) return relationWiki;
+        if (hasWikiContent(cachedWiki) || cachedWiki.id === "__not_found__") return cachedWiki;
+        if (relationWiki && hasWikiContent(relationWiki)) return relationWiki;
+        return cachedWiki;
+    }, [activeWikiSlug, relations.wikiBySlug, visibleWiki, wikiCache]);
 
     const selectEntity = useCallback(async (
         entityId: string,
@@ -172,15 +184,17 @@ export function usePublicPreviewInteraction(options: {
                 : "") ||
             firstWikiSlug(linkedWikis);
 
+        const cachedFullWiki = nextWikiSlug ? findWikiWithContentBySlug(wikiCache, nextWikiSlug) || null : null;
         setActiveEntityId(entityId);
         setActiveWikiSlug(nextWikiSlug);
+        setVisibleWiki(cachedFullWiki);
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setIsManualSidebarOpen(true);
         if (selectOptions?.selectGeometry && selectOptions?.sourceFeatureId != null) {
             setSelectedFeatureIds([selectOptions.sourceFeatureId]);
         }
-    }, [relations.entitiesById, relations.entityWikisById, setRelations, setSelectedFeatureIds]);
+    }, [relations.entitiesById, relations.entityWikisById, setRelations, setSelectedFeatureIds, wikiCache]);
 
     const selectWiki = useCallback(async (
         wiki: Wiki
@@ -195,23 +209,30 @@ export function usePublicPreviewInteraction(options: {
 
         if (wiki.slug) {
             const slug = wiki.slug;
+            const cachedFullWiki = findWikiWithContentBySlug(wikiCache, slug) || null;
             setWikiCache((prev) => ({
                 ...prev,
-                [slug]: {
+                [slug]: cachedFullWiki || {
                     ...wiki,
                     __fetched: false,
                 },
             }));
             setActiveWikiSlug(slug);
+            setVisibleWiki(cachedFullWiki);
         }
         setActiveEntityId(null);
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setIsManualSidebarOpen(true);
-    }, [relations.wikiEntityIdsById, selectEntity]);
+    }, [relations.wikiEntityIdsById, selectEntity, wikiCache]);
 
     useEffect(() => {
-        if (!selectedFeatureIds.length) return;
+        if (!selectedFeatureIds.length) {
+            suppressSelectedFeatureAutoSelectRef.current = false;
+            return;
+        }
+        if (suppressSelectedFeatureAutoSelectRef.current) return;
+
         const linkedEntityIds = relations.geometryEntityIds[String(selectedFeatureIds[0])] || [];
         if (linkedEntityIds.length !== 1) return;
 
@@ -422,17 +443,99 @@ export function usePublicPreviewInteraction(options: {
         };
     }, [activeEntityId, activeWikiSlug, relations.entityWikisById, setRelations]);
 
-    const cachedWiki = activeWikiSlug ? wikiCache[activeWikiSlug] : undefined;
+    const cachedWiki = activeWikiSlug ? findWikiBySlug(wikiCache, activeWikiSlug) : undefined;
+    const fetchFullWikiBySlug = useCallback(async (slug: string): Promise<Wiki | null> => {
+        const row = await fetchWikiBySlug(slug);
+        if (!row) return null;
+
+        let versionContent = row.content;
+        try {
+            if (row.content_sample?.[0]?.id) {
+                const res = await getContentByVersionWikiId(row.content_sample[0].id);
+                const content = extractWikiContentFromResponse(res);
+                if (content) versionContent = content;
+            }
+        } catch (err) {
+            console.error("Failed to fetch version content:", err);
+        }
+
+        return { ...row, content: versionContent };
+    }, []);
+
+    const focusWikiLinkAfterPaint = useCallback((wiki: Wiki) => {
+        if (!onWikiLinkNavigate) return;
+
+        const run = () => {
+            void Promise.resolve(onWikiLinkNavigate(wiki)).catch((err) => {
+                console.error("Failed to focus map for wiki link:", err);
+            });
+        };
+
+        if (typeof window === "undefined") {
+            run();
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(run);
+        });
+    }, [onWikiLinkNavigate]);
+
+    const publishWikiToPanel = useCallback((wiki: Wiki, requestedSlug?: string | null): CachedWiki => {
+        const canonicalSlug = String(wiki.slug || "").trim() || String(requestedSlug || "").trim();
+        const fullWiki: CachedWiki = {
+            ...wiki,
+            slug: canonicalSlug,
+            __fetched: true,
+        };
+        if (requestedSlug) fullWikiFetchAttemptedSlugRef.current.add(requestedSlug);
+        if (canonicalSlug) fullWikiFetchAttemptedSlugRef.current.add(canonicalSlug);
+
+        setWikiCache((prev) => cacheWikiBySlug(prev, fullWiki, requestedSlug));
+        setActiveWikiSlug(canonicalSlug);
+        setVisibleWiki(fullWiki);
+        setActiveWikiError(hasWikiContent(fullWiki) ? null : "Wiki này chưa có nội dung.");
+        setIsActiveWikiLoading(false);
+        return fullWiki;
+    }, []);
+
+    const prepareManualWikiNavigation = useCallback(() => {
+        suppressSelectedFeatureAutoSelectRef.current = true;
+        setSelectedFeatureIds([]);
+        setActiveEntityId(null);
+        setActiveWikiError(null);
+        setLinkEntityPopup(null);
+        setIsManualSidebarOpen(true);
+    }, [setSelectedFeatureIds]);
+
     useEffect(() => {
         if (!activeWikiSlug) {
+            setIsActiveWikiLoading(false);
+            setActiveWikiError(null);
+            setVisibleWiki(null);
+            return;
+        }
+
+        if (wikiLinkInFlightSlugRef.current === activeWikiSlug) {
+            return;
+        }
+
+        if (cachedWiki?.id === "__not_found__") {
+            setIsActiveWikiLoading(false);
+            setActiveWikiError("Không tìm thấy wiki cho entity đã chọn.");
+            return;
+        }
+
+        if (cachedWiki && cachedWiki.__fetched && hasWikiContent(cachedWiki)) {
+            setVisibleWiki(cachedWiki);
             setIsActiveWikiLoading(false);
             setActiveWikiError(null);
             return;
         }
 
-        if (cachedWiki && (cachedWiki.__fetched || cachedWiki.id === "__not_found__")) {
+        if (cachedWiki?.__fetched && fullWikiFetchAttemptedSlugRef.current.has(activeWikiSlug)) {
             setIsActiveWikiLoading(false);
-            setActiveWikiError(cachedWiki.id === "__not_found__" ? "Không tìm thấy wiki cho entity đã chọn." : null);
+            setActiveWikiError(hasWikiContent(cachedWiki) ? null : "Wiki này chưa có nội dung.");
             return;
         }
 
@@ -441,26 +544,13 @@ export function usePublicPreviewInteraction(options: {
             setIsActiveWikiLoading(true);
             setActiveWikiError(null);
             try {
-                const row = await fetchWikiBySlug(activeWikiSlug);
+                const row = await fetchFullWikiBySlug(activeWikiSlug);
                 if (disposed) return;
 
                 if (row) {
-                    let versionContent = row.content;
-                    try {
-                        if (row.content_sample?.[0]?.id) {
-                            const res = await getContentByVersionWikiId(row.content_sample[0].id);
-                            if (res?.data?.content) versionContent = res.data.content;
-                        }
-                    } catch (err) {
-                        console.error("Failed to fetch version content:", err);
-                    }
-
-                    if (disposed) return;
-                    setWikiCache((prev) => ({
-                        ...prev,
-                        [activeWikiSlug]: { ...row, content: versionContent, __fetched: true },
-                    }));
+                    publishWikiToPanel(row, activeWikiSlug);
                 } else {
+                    fullWikiFetchAttemptedSlugRef.current.add(activeWikiSlug);
                     setWikiCache((prev) => ({
                         ...prev,
                         [activeWikiSlug]: { id: "__not_found__", project_id: "" },
@@ -478,45 +568,66 @@ export function usePublicPreviewInteraction(options: {
         return () => {
             disposed = true;
         };
-    }, [activeWikiSlug, cachedWiki]);
+    }, [activeWikiSlug, cachedWiki, fetchFullWikiBySlug, publishWikiToPanel]);
 
     const handleWikiLinkRequest = useCallback(async ({ slug, rect }: { slug: string; rect: DOMRect }) => {
-        const linkedEntityIds = relations.wikiEntityIdsBySlug[slug] || [];
-        const linkedEntities = linkedEntityIds
-            .map((entityId) => relations.entitiesById[entityId] || null)
-            .filter((entity): entity is Entity => Boolean(entity));
+        const nextSlug = String(slug || "").trim();
+        if (!nextSlug) return;
 
-        if (linkedEntities.length === 1) {
-            selectEntity(linkedEntities[0].id, { preferredWikiSlug: slug });
+        const requestSeq = ++wikiLinkRequestSeqRef.current;
+        wikiLinkInFlightSlugRef.current = nextSlug;
+        prepareManualWikiNavigation();
+
+        const cachedWikiForSlug =
+            findWikiWithContentBySlug(wikiCache, nextSlug) ||
+            findWikiWithContentBySlug(relations.wikiBySlug, nextSlug) ||
+            null;
+
+        if (cachedWikiForSlug && cachedWikiForSlug.id !== "__not_found__" && hasWikiContent(cachedWikiForSlug)) {
+            wikiLinkInFlightSlugRef.current = null;
+            const fullWiki = publishWikiToPanel(cachedWikiForSlug, nextSlug);
+            focusWikiLinkAfterPaint(fullWiki);
             return;
         }
 
-        if (!wikiCache[slug] && !relations.wikiBySlug[slug]) {
-            try {
-                const row = await fetchWikiBySlug(slug);
-                if (row) setWikiCache((prev) => ({ ...prev, [slug]: row }));
-            } catch (err) {
-                console.error("Load wiki by slug failed", err);
-            }
+        setIsActiveWikiLoading(true);
+
+        let row: Wiki | null = null;
+        try {
+            row = await fetchFullWikiBySlug(nextSlug);
+        } catch (err) {
+            console.error("Load wiki by slug failed", err);
+            if (requestSeq !== wikiLinkRequestSeqRef.current) return;
+            if (wikiLinkInFlightSlugRef.current === nextSlug) wikiLinkInFlightSlugRef.current = null;
+            setActiveWikiError(err instanceof Error ? err.message : "Không tải được wiki.");
+            setIsActiveWikiLoading(false);
+            return;
         }
 
-        if (!linkedEntities.length) return;
+        if (requestSeq !== wikiLinkRequestSeqRef.current) return;
+        if (wikiLinkInFlightSlugRef.current === nextSlug) wikiLinkInFlightSlugRef.current = null;
 
-        const popupWidth = 240;
-        const popupHeight = Math.min(240, linkedEntities.length * 44 + 20);
-        const { top, left } = computeFixedPopupPosition(rect, popupWidth, popupHeight);
+        if (!row) {
+            setActiveWikiError("Không tìm thấy wiki.");
+            setIsActiveWikiLoading(false);
+            return;
+        }
 
-        setLinkEntityPopup({
-            slug,
-            entities: linkedEntities,
-            top,
-            left,
-        });
-    }, [relations.entitiesById, relations.wikiBySlug, relations.wikiEntityIdsBySlug, selectEntity, wikiCache]);
+        const fullWiki = publishWikiToPanel(row, nextSlug);
+        focusWikiLinkAfterPaint(fullWiki);
+    }, [
+        fetchFullWikiBySlug,
+        focusWikiLinkAfterPaint,
+        prepareManualWikiNavigation,
+        publishWikiToPanel,
+        relations.wikiBySlug,
+        wikiCache,
+    ]);
 
     const closeWikiSidebar = useCallback(() => {
         setActiveEntityId(null);
         setActiveWikiSlug(null);
+        setVisibleWiki(null);
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setSelectedFeatureIds([]);
@@ -526,6 +637,7 @@ export function usePublicPreviewInteraction(options: {
     const closeWikiSidebarPreserveSelection = useCallback(() => {
         setActiveEntityId(null);
         setActiveWikiSlug(null);
+        setVisibleWiki(null);
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setIsManualSidebarOpen(false);
@@ -553,6 +665,113 @@ export function usePublicPreviewInteraction(options: {
 async function fetchRelationWikisForEntity(entityId: string): Promise<Wiki[]> {
     const rows = await fetchWikisByEntityIdsWithPreviews([entityId]);
     return rows[entityId] || [];
+}
+
+function extractWikiContentFromResponse(response: unknown): string {
+    if (typeof response === "string") return response;
+    if (!response || typeof response !== "object") return "";
+    const source = response as Record<string, unknown>;
+    if (typeof source.content === "string") return source.content;
+    const data = source.data;
+    if (data && typeof data === "object" && typeof (data as Record<string, unknown>).content === "string") {
+        return (data as Record<string, unknown>).content as string;
+    }
+    return "";
+}
+
+function hasWikiContent(wiki: Wiki | null | undefined): boolean {
+    return typeof wiki?.content === "string" && wiki.content.trim().length > 0;
+}
+
+function cacheWikiBySlug(
+    prev: Record<string, CachedWiki>,
+    wiki: CachedWiki,
+    requestedSlug?: string | null
+): Record<string, CachedWiki> {
+    const next = { ...prev };
+    for (const key of wikiSlugCacheKeys(requestedSlug, wiki.slug)) {
+        next[key] = wiki;
+    }
+    return next;
+}
+
+function findWikiWithContentBySlug<T extends Wiki>(
+    source: Record<string, T>,
+    slug: string | null | undefined
+): T | undefined {
+    const direct = findWikiBySlug(source, slug);
+    if (direct && hasWikiContent(direct)) return direct;
+
+    const targetKey = normalizeWikiSlugForCompare(slug);
+    if (!targetKey) return undefined;
+    for (const [key, wiki] of Object.entries(source)) {
+        if (!hasWikiContent(wiki)) continue;
+        const keyMatches = normalizeWikiSlugForCompare(key) === targetKey;
+        const slugMatches = normalizeWikiSlugForCompare(wiki.slug) === targetKey;
+        if (keyMatches || slugMatches) return wiki;
+    }
+    return undefined;
+}
+
+function findWikiBySlug<T extends Wiki>(
+    source: Record<string, T>,
+    slug: string | null | undefined
+): T | undefined {
+    const keys = wikiSlugCacheKeys(slug);
+    for (const key of keys) {
+        const direct = source[key];
+        if (direct) return direct;
+    }
+
+    const targetKey = normalizeWikiSlugForCompare(slug);
+    if (!targetKey) return undefined;
+    for (const [key, wiki] of Object.entries(source)) {
+        const keyMatches = normalizeWikiSlugForCompare(key) === targetKey;
+        const slugMatches = normalizeWikiSlugForCompare(wiki.slug) === targetKey;
+        if (keyMatches || slugMatches) return wiki;
+    }
+    return undefined;
+}
+
+function wikiSlugCacheKeys(...values: Array<string | null | undefined>): string[] {
+    const keys = new Set<string>();
+    for (const value of values) {
+        const raw = String(value || "").trim();
+        if (!raw) continue;
+        keys.add(raw);
+
+        let decoded = raw;
+        try {
+            decoded = decodeURIComponent(raw);
+        } catch {
+            decoded = raw;
+        }
+        decoded = decoded.replace(/^\/+/, "").replace(/^wiki\//i, "").trim();
+        if (!decoded) continue;
+
+        keys.add(decoded);
+        keys.add(decoded.replace(/_/g, " "));
+        keys.add(decoded.replace(/\s+/g, "_"));
+        keys.add(normalizeWikiSlugForCompare(decoded));
+    }
+    return Array.from(keys).filter((key) => key.length > 0);
+}
+
+function normalizeWikiSlugForCompare(value: string | null | undefined): string {
+    let raw = String(value || "").trim();
+    if (!raw) return "";
+    try {
+        raw = decodeURIComponent(raw);
+    } catch {
+        // Keep the original value if it is not valid percent-encoded text.
+    }
+    return raw
+        .replace(/^\/+/, "")
+        .replace(/^wiki\//i, "")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLocaleLowerCase("vi-VN");
 }
 
 function cleanPreviewQuoteText(content: string | null | undefined): string {

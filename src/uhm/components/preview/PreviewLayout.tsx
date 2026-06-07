@@ -519,7 +519,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     const handleReplayPreviewWikiLinkRequest = useCallback(({ slug, rect }: { slug: string; rect: DOMRect }) => {
         const nextSlug = String(slug || "").trim();
         if (!nextSlug.length) return;
-        
+
         const localWiki = wikis.find((item) => String(item.slug || "").trim() === nextSlug) || null;
         if (!localWiki) {
             setPreviewWikiError(`Wiki /wiki/${nextSlug} không có trong snapshot preview.`);
@@ -527,34 +527,28 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         }
 
         const linkedEntityIds = previewRelations.wikiEntityIdsBySlug[nextSlug] || [];
-        const linkedEntities = linkedEntityIds
-            .map((entityId) => previewRelations.entitiesById[entityId] || null)
-            .filter((entity): entity is Entity => Boolean(entity));
+        const firstEntityId = linkedEntityIds[0] || null;
+        if (!firstEntityId) return;
 
-        if (linkedEntities.length === 1) {
-            selectReplayPreviewEntity(linkedEntities[0].id, {
-                preferredWikiId: localWiki.id,
-                focusMap: false,
-            });
-            return;
+        setPreviewActiveEntityId(firstEntityId);
+        setIsPreviewEntitySidebarOpen(true);
+        setPreviewRightPanelMode("wiki");
+        setPreviewWikiSelectionPanelAnchor(null);
+        setPreviewWikiError(null);
+        setPreviewLinkEntityPopup(null);
+        openReplayPreviewWikiPanelById(localWiki.id);
+
+        const geometries = previewRelations.entityGeometriesById[firstEntityId];
+        const map = mapHandleRef?.current?.getMap();
+        if (map && geometries && geometries.features.length > 0) {
+            fitMapToFeatureCollection(map, geometries, 96, { duration: 1000, maxZoom: 8, pointZoom: 6 });
         }
-
-        if (!linkedEntities.length) return;
-
-        const popupWidth = 240;
-        const popupHeight = Math.min(240, linkedEntities.length * 44 + 20);
-        const { top, left } = computeFixedPopupPosition(rect, popupWidth, popupHeight);
-
-        setPreviewLinkEntityPopup({
-            slug: nextSlug,
-            entities: linkedEntities,
-            top,
-            left,
-        });
     }, [
-        previewRelations.entitiesById,
+        mapHandleRef,
+        openReplayPreviewWikiPanelById,
+        previewRelations.entityGeometriesById,
         previewRelations.wikiEntityIdsBySlug,
-        selectReplayPreviewEntity,
+        setPreviewActiveEntityId,
         wikis,
     ]);
 

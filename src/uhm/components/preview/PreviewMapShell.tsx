@@ -45,6 +45,7 @@ type Props = {
     wikiError?: string | null;
     onCloseWikiSidebar?: () => void;
     onWikiLinkRequest?: (request: { slug: string; rect: DOMRect }) => void;
+    onWikiLinkEntitySelectionRequest?: (request: { slug: string; rect: DOMRect }) => void;
     sidebarWidth?: number;
     onSidebarWidthChange?: (width: number) => void;
     maxSidebarDragWidth?: number;
@@ -59,6 +60,7 @@ type Props = {
     onLayerPanelVisibleChange?: (visible: boolean) => void;
     sidebarHeight?: number;
     onSidebarHeightChange?: (height: number) => void;
+    showViewportControls?: boolean;
 };
 
 export default function PreviewMapShell({
@@ -91,6 +93,7 @@ export default function PreviewMapShell({
     wikiError = null,
     onCloseWikiSidebar,
     onWikiLinkRequest,
+    onWikiLinkEntitySelectionRequest,
     sidebarWidth,
     onSidebarWidthChange,
     maxSidebarDragWidth,
@@ -105,6 +108,7 @@ export default function PreviewMapShell({
     onLayerPanelVisibleChange,
     sidebarHeight,
     onSidebarHeightChange,
+    showViewportControls = true,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -132,6 +136,8 @@ export default function PreviewMapShell({
         };
         fetchUserAvatar();
     }, []);
+
+    const hasWikiSidebar = Boolean(activeEntity || activeWiki || isWikiLoading || wikiError);
 
     const menuOptionStyle: CSSProperties = {
         width: 46,
@@ -172,7 +178,7 @@ export default function PreviewMapShell({
                     onHoverFeatureChange={onHoverFeatureChange}
                     onPlayPreviewReplay={onPlayPreviewReplay}
                     onLoad={onLoad}
-                    showViewportControls={!isMobileOrTablet}
+                    showViewportControls={showViewportControls && !isMobileOrTablet}
                     height="100svh"
                 />
 
@@ -207,7 +213,7 @@ export default function PreviewMapShell({
                     style={{
                         position: "absolute",
                         top: 10,
-                        bottom: ((activeEntity || activeWiki) && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
+                        bottom: (hasWikiSidebar && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
                         left: 18,
                         zIndex: 18,
                         display: "flex",
@@ -412,7 +418,7 @@ export default function PreviewMapShell({
                 
                 {overlay}
 
-                {activeEntity || activeWiki ? (
+                {hasWikiSidebar ? (
                     <aside
                         className={isMobileOrTablet ? "uhm-public-wiki-sidebar" : "uhm-public-wiki-sidebar absolute bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]"}
                         style={isMobileOrTablet ? {
@@ -438,6 +444,7 @@ export default function PreviewMapShell({
                             error={wikiError}
                             onClose={onCloseWikiSidebar || (() => {})}
                             onWikiLinkRequest={onWikiLinkRequest || (() => {})}
+                            onWikiLinkEntitySelectionRequest={onWikiLinkEntitySelectionRequest}
                             sidebarWidth={sidebarWidth}
                             onSidebarWidthChange={onSidebarWidthChange}
                             maxDragWidth={maxSidebarDragWidth}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, memo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom";
 // Loaded dynamically inside the component to prevent render-blocking
 
 import type { Entity } from "@/uhm/api/entities";
@@ -19,6 +20,7 @@ type Props = {
     error?: string | null;
     onClose: () => void;
     onWikiLinkRequest: (request: { slug: string; rect: DOMRect }) => void;
+    onWikiLinkEntitySelectionRequest?: (request: { slug: string; rect: DOMRect }) => void;
     sidebarWidth?: number;
     onSidebarWidthChange?: (width: number) => void;
     maxDragWidth?: number;
@@ -73,6 +75,42 @@ function isExternalHref(href: string): boolean {
     );
 }
 
+function extractWikiSlugFromHref(href: string): string {
+    const raw = String(href || "").trim();
+    if (!raw.length || raw === "__missing__") return "";
+    if (raw.startsWith("#wiki:")) return raw.slice("#wiki:".length).trim();
+    if (raw.startsWith("#")) return "";
+
+    const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:/i.test(raw);
+    const baseOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+    if (isAbsoluteUrl) {
+        try {
+            const url = new URL(raw, baseOrigin);
+            if (typeof window !== "undefined" && url.origin !== window.location.origin) return "";
+            const path = url.pathname.replace(/\/+$/, "");
+            if (!path.startsWith("/wiki/")) return "";
+            return decodeWikiSlug(path.slice("/wiki/".length));
+        } catch {
+            return "";
+        }
+    }
+
+    const match = raw.match(/^([^?#]+)([?#].*)?$/);
+    let slug = String(match?.[1] || "").replace(/^\/+/, "").replace(/\/+$/, "").trim();
+    if (slug.startsWith("wiki/")) {
+        slug = slug.slice("wiki/".length).trim();
+    }
+    return decodeWikiSlug(slug);
+}
+
+function decodeWikiSlug(slug: string): string {
+    try {
+        return decodeURIComponent(slug).trim();
+    } catch {
+        return slug.trim();
+    }
+}
+
 function prepareWikiHtml(inputHtml: string): { html: string; toc: TocItem[] } {
     const parser = new DOMParser();
     const doc = parser.parseFromString(inputHtml, "text/html");
@@ -83,21 +121,18 @@ function prepareWikiHtml(inputHtml: string): { html: string; toc: TocItem[] } {
         const href = String(a.getAttribute("href") || "").trim();
         if (!href.length) continue;
         if (href === "__missing__") continue;
-        if (href.startsWith("#")) continue;
-        if (href.startsWith("/")) continue;
+        const slugPart = extractWikiSlugFromHref(href);
+        if (slugPart.length) {
+            a.setAttribute("href", `#wiki:${slugPart}`);
+            a.setAttribute("data-wiki-slug", slugPart);
+            a.setAttribute("target", "_self");
+            continue;
+        }
 
         if (isExternalHref(href)) {
             a.setAttribute("target", "_blank");
             a.setAttribute("rel", "noopener noreferrer");
-            continue;
         }
-
-        const match = href.match(/^([^?#]+)([?#].*)?$/);
-        const slugPart = String(match?.[1] || "").replace(/^\/+/, "").trim();
-        if (!slugPart.length) continue;
-        a.setAttribute("href", `#wiki:${slugPart}`);
-        a.setAttribute("data-wiki-slug", slugPart);
-        a.setAttribute("target", "_self");
     }
 
     const toc: TocItem[] = [];
@@ -133,6 +168,7 @@ function PublicWikiSidebar({
     error,
     onClose,
     onWikiLinkRequest,
+    onWikiLinkEntitySelectionRequest,
     sidebarWidth,
     onSidebarWidthChange,
     maxDragWidth,
@@ -142,6 +178,12 @@ function PublicWikiSidebar({
 }: Props) {
     const contentRootRef = useRef<HTMLDivElement | null>(null);
     const tocContainerRef = useRef<HTMLDivElement | null>(null);
+    const [wikiLinkMenu, setWikiLinkMenu] = useState<{
+        slug: string;
+        rect: DOMRect;
+        top: number;
+        left: number;
+    } | null>(null);
 
     useEffect(() => {
         import("react-quill-new/dist/quill.snow.css");
@@ -225,6 +267,15 @@ function PublicWikiSidebar({
         ? activeHeadingId
         : (toc[0]?.id ?? null);
 
+    useLayoutEffect(() => {
+        const firstHeadingId = toc[0]?.id ?? null;
+        setActiveHeadingId(firstHeadingId);
+
+        const scrollContainer = contentRootRef.current?.parentElement;
+        scrollContainer?.scrollTo({ top: 0, behavior: "auto" });
+        tocContainerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+    }, [wiki?.id, wiki?.slug, renderHtml, toc]);
+
     useEffect(() => {
         if (!toc.length) return;
         const root = contentRootRef.current;
@@ -236,19 +287,33 @@ function PublicWikiSidebar({
         if (!headings.length) return;
 
         const scrollContainer = root.parentElement;
+        const updateActiveHeading = () => {
+            const containerRect = scrollContainer?.getBoundingClientRect();
+            const topBoundary = (containerRect?.top ?? 0) + (containerRect?.height ?? window.innerHeight) * 0.18;
+            const bottomBoundary = (containerRect?.top ?? 0) + (containerRect?.height ?? window.innerHeight) * 0.82;
+            const visibleHeadings = headings
+                .map((heading) => ({ heading, rect: heading.getBoundingClientRect() }))
+                .filter(({ rect }) => rect.bottom >= topBoundary && rect.top <= bottomBoundary)
+                .sort((a, b) => {
+                    const aDistance = Math.abs(a.rect.top - topBoundary);
+                    const bDistance = Math.abs(b.rect.top - topBoundary);
+                    return aDistance - bDistance;
+                });
+            const nextHeading = visibleHeadings[0]?.heading || headings[0];
+            if (nextHeading?.id) setActiveHeadingId(nextHeading.id);
+        };
+
         const observer = new IntersectionObserver(
-            (entries) => {
-                const visible = entries
-                    .filter((entry) => entry.isIntersecting)
-                    .sort((a, b) => (a.boundingClientRect.top ?? 0) - (b.boundingClientRect.top ?? 0));
-                const top = visible[0]?.target as HTMLElement | undefined;
-                if (top?.id) setActiveHeadingId(top.id);
-            },
+            updateActiveHeading,
             { root: scrollContainer || null, rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] }
         );
 
         for (const heading of headings) observer.observe(heading);
-        return () => observer.disconnect();
+        scrollContainer?.addEventListener("scroll", updateActiveHeading, { passive: true });
+        return () => {
+            observer.disconnect();
+            scrollContainer?.removeEventListener("scroll", updateActiveHeading);
+        };
     }, [toc]);
 
     useEffect(() => {
@@ -275,17 +340,84 @@ function PublicWikiSidebar({
         const handleClick = (event: MouseEvent) => {
             const target = event.target as HTMLElement | null;
             const link = target?.closest?.("a[data-wiki-slug]") as HTMLAnchorElement | null;
-            if (!link) return;
-            event.preventDefault();
+            const fallbackLink = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+            const sourceLink = link || fallbackLink;
+            if (!sourceLink) return;
 
-            const slug = String(link.getAttribute("data-wiki-slug") || "").trim();
+            const slug = String(
+                sourceLink.getAttribute("data-wiki-slug") ||
+                extractWikiSlugFromHref(sourceLink.getAttribute("href") || "")
+            ).trim();
             if (!slug.length) return;
-            onWikiLinkRequest({ slug, rect: link.getBoundingClientRect() });
+
+            event.preventDefault();
+            onWikiLinkRequest({ slug, rect: sourceLink.getBoundingClientRect() });
         };
 
         root.addEventListener("click", handleClick);
         return () => root.removeEventListener("click", handleClick);
     }, [onWikiLinkRequest, renderHtml]);
+
+    useEffect(() => {
+        const root = contentRootRef.current;
+        if (!root) return;
+
+        const handleContextMenu = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            const link = target?.closest?.("a[data-wiki-slug]") as HTMLAnchorElement | null;
+            const fallbackLink = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+            const sourceLink = link || fallbackLink;
+            if (!sourceLink) return;
+
+            const slug = String(
+                sourceLink.getAttribute("data-wiki-slug") ||
+                extractWikiSlugFromHref(sourceLink.getAttribute("href") || "")
+            ).trim();
+            if (!slug.length) return;
+
+            event.preventDefault();
+            setWikiLinkMenu({
+                slug,
+                rect: sourceLink.getBoundingClientRect(),
+                ...computeContextMenuPosition(event.clientX, event.clientY, 220, 88),
+            });
+        };
+
+        root.addEventListener("contextmenu", handleContextMenu, true);
+        return () => root.removeEventListener("contextmenu", handleContextMenu, true);
+    }, [renderHtml]);
+
+    useEffect(() => {
+        if (!wikiLinkMenu) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.("[data-wiki-link-context-menu='true']")) return;
+            setWikiLinkMenu(null);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setWikiLinkMenu(null);
+        };
+        const closeMenu = () => setWikiLinkMenu(null);
+
+        window.addEventListener("pointerdown", handlePointerDown);
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("resize", closeMenu);
+        window.addEventListener("scroll", closeMenu, true);
+        return () => {
+            window.removeEventListener("pointerdown", handlePointerDown);
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("resize", closeMenu);
+            window.removeEventListener("scroll", closeMenu, true);
+        };
+    }, [wikiLinkMenu]);
+
+    const handleOpenStandaloneWiki = (slug: string) => {
+        if (typeof window === "undefined") return;
+        const url = `/wiki/${encodeURIComponent(slug)}`;
+        const nextWindow = window.open(url, "_blank", "noopener,noreferrer");
+        if (nextWindow) nextWindow.opener = null;
+    };
 
     const isExpanded = useMemo(() => {
         if (typeof window === "undefined") return false;
@@ -546,7 +678,7 @@ function PublicWikiSidebar({
                     overflowY: "auto",
                 }}
             >
-                {isLoading ? (
+                {isLoading && !wiki ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
                         <div
                             style={{ height: 16, width: 110, borderRadius: 4, background: "rgba(148, 163, 184, 0.15)" }}
@@ -566,18 +698,95 @@ function PublicWikiSidebar({
                         {error}
                     </div>
                 ) : wiki ? (
-                    <div
-                        ref={contentRootRef}
-                        className="uhm-wiki-sidebar-view ql-editor"
-                        style={{ fontSize: 14, color: "#cbd5e1" }}
-                        dangerouslySetInnerHTML={{ __html: renderHtml }}
-                    />
+                    <div style={{ position: "relative", minHeight: "100%" }}>
+                        {isLoading ? (
+                            <div
+                                aria-hidden="true"
+                                style={{
+                                    position: "sticky",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: 2,
+                                    zIndex: 2,
+                                    overflow: "hidden",
+                                    background: "rgba(56, 189, 248, 0.08)",
+                                }}
+                            >
+                                <div
+                                    className="uhm-wiki-sidebar-loading-bar"
+                                    style={{
+                                        height: "100%",
+                                        width: "42%",
+                                        background: "linear-gradient(90deg, transparent, #38bdf8, transparent)",
+                                    }}
+                                />
+                            </div>
+                        ) : null}
+                        <div
+                            ref={contentRootRef}
+                            className="uhm-wiki-sidebar-view ql-editor"
+                            style={{ fontSize: 14, color: "#cbd5e1" }}
+                            dangerouslySetInnerHTML={{ __html: renderHtml }}
+                        />
+                    </div>
                 ) : (
                     <div style={{ padding: 16, fontSize: 14, color: "#94a3b8" }}>
                         Entity này chưa có wiki liên kết.
                     </div>
                 )}
             </div>
+
+            {wikiLinkMenu && typeof document !== "undefined"
+                ? createPortal(
+                    <div
+                        data-wiki-link-context-menu="true"
+                        style={{
+                            position: "fixed",
+                            top: wikiLinkMenu.top,
+                            left: wikiLinkMenu.left,
+                            zIndex: 100000,
+                            width: 220,
+                            overflow: "hidden",
+                            borderRadius: 10,
+                            border: "1px solid rgba(148, 163, 184, 0.28)",
+                            background: "rgba(15, 23, 42, 0.98)",
+                            boxShadow: "0 18px 42px rgba(2, 6, 23, 0.48)",
+                            color: "#e2e8f0",
+                            padding: 6,
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                handleOpenStandaloneWiki(wikiLinkMenu.slug);
+                                setWikiLinkMenu(null);
+                            }}
+                            style={wikiLinkMenuButtonStyle}
+                            className="hover:bg-sky-500/15 hover:text-sky-100"
+                        >
+                            Mở wiki riêng
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const request = { slug: wikiLinkMenu.slug, rect: wikiLinkMenu.rect };
+                                if (onWikiLinkEntitySelectionRequest) {
+                                    onWikiLinkEntitySelectionRequest(request);
+                                } else {
+                                    onWikiLinkRequest(request);
+                                }
+                                setWikiLinkMenu(null);
+                            }}
+                            style={wikiLinkMenuButtonStyle}
+                            className="hover:bg-sky-500/15 hover:text-sky-100"
+                        >
+                            Mở bảng chọn entity
+                        </button>
+                    </div>,
+                    document.body
+                )
+                : null}
 
             <style jsx global>{`
                 .uhm-public-wiki-sidebar-content::-webkit-scrollbar {
@@ -605,6 +814,17 @@ function PublicWikiSidebar({
                 }
                 .uhm-public-wiki-toc-list::-webkit-scrollbar-thumb:hover {
                     background: rgba(148, 163, 184, 0.4);
+                }
+                @keyframes uhm-wiki-sidebar-loading-bar {
+                    from {
+                        transform: translateX(-120%);
+                    }
+                    to {
+                        transform: translateX(260%);
+                    }
+                }
+                .uhm-wiki-sidebar-loading-bar {
+                    animation: uhm-wiki-sidebar-loading-bar 1.1s ease-in-out infinite;
                 }
                 .uhm-wiki-sidebar-view.ql-editor {
                     height: auto;
@@ -724,6 +944,31 @@ function PublicWikiSidebar({
             `}</style>
         </div>
     );
+}
+
+const wikiLinkMenuButtonStyle = {
+    display: "block",
+    width: "100%",
+    border: 0,
+    borderRadius: 7,
+    background: "transparent",
+    padding: "9px 10px",
+    color: "inherit",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: "18px",
+    textAlign: "left" as const,
+};
+
+function computeContextMenuPosition(clientX: number, clientY: number, width: number, height: number) {
+    const margin = 8;
+    const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1440;
+    const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 900;
+    return {
+        left: Math.max(margin, Math.min(clientX, viewportWidth - width - margin)),
+        top: Math.max(margin, Math.min(clientY, viewportHeight - height - margin)),
+    };
 }
 
 export default memo(PublicWikiSidebar);

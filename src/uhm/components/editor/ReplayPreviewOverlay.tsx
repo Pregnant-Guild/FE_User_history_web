@@ -15,6 +15,7 @@ type Props = {
     activeStepLabel: string | null;
     activeStepNumber: number | null;
     totalSteps: number;
+    playButtonLabel?: string;
     onPlayPreview: () => void;
     onStopPreview: () => void;
     onResetPreview: () => void;
@@ -32,6 +33,7 @@ export default function ReplayPreviewOverlay({
     activeStepLabel,
     activeStepNumber,
     totalSteps,
+    playButtonLabel = "Phát lại",
     onPlayPreview,
     onStopPreview,
     onResetPreview,
@@ -279,7 +281,7 @@ export default function ReplayPreviewOverlay({
                                     onClick={onPlayPreview}
                                     style={previewButtonStyle("#166534")}
                                 >
-                                    Phát lại
+                                    {playButtonLabel}
                                 </button>
                             )}
                             <button

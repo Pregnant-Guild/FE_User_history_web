@@ -2,6 +2,7 @@ import { API_ENDPOINTS } from "@/uhm/api/config";
 import { requestJson } from "@/uhm/api/http";
 import type { Entity } from "@/uhm/api/entities";
 import type { Wiki } from "@/uhm/api/wikis";
+import type { Geometry } from "@/uhm/types/geo";
 
 const RELATION_BATCH_SIZE = 10;
 const RELATION_BATCH_CONCURRENCY = 4;
@@ -12,7 +13,41 @@ export type WikiContentPreview = {
     created_at?: string | null;
 };
 
+export type RelationGeometry = {
+    id: string;
+    draw_geometry: Geometry;
+    type?: string | null;
+    geo_type?: number | null;
+    bound_with?: string | null;
+    time_start?: number | null;
+    time_end?: number | null;
+};
+
+type RelationType =
+    | "wiki-entity"
+    | "entity-wiki"
+    | "geometry-entity"
+    | "entity-geometry"
+    | "entity-geometry-child"
+    | "entity-geometry-alone";
+
 const entitiesPromiseCache: Record<string, Promise<Entity[]>> = {};
+
+export async function fetchRelationMap<T>(type: RelationType, ids: string[]): Promise<Record<string, T[]>> {
+    const uniqueIds = uniqueStrings(ids);
+    if (!uniqueIds.length) return {};
+    return requestJson<Record<string, T[]>>(
+        `${API_ENDPOINTS.relations}?type=${encodeURIComponent(type)}&${buildArrayQuery("ids", uniqueIds)}`
+    );
+}
+
+export async function fetchEntitiesByWikiIds(ids: string[]): Promise<Record<string, Entity[]>> {
+    return fetchRelationMap<Entity>("wiki-entity", ids);
+}
+
+export async function fetchGeometriesByEntityIds(ids: string[]): Promise<Record<string, RelationGeometry[]>> {
+    return fetchRelationMap<RelationGeometry>("entity-geometry", ids);
+}
 
 export async function fetchEntitiesByGeometryIds(ids: string[]): Promise<Record<string, Entity[]>> {
     const uniqueIds = uniqueStrings(ids);
