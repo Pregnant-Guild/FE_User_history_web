@@ -307,7 +307,7 @@ export default function ChatbotWidget({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
-                className="flex-1 bg-gray-100 dark:bg-gray-800 border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-gray-900 focus:ring-1 focus:ring-brand-500/20 rounded-full px-4 py-2.5 text-sm outline-none transition-all"
+                className="flex-1 bg-gray-100 dark:bg-gray-800 border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-gray-900 focus:ring-1 focus:ring-brand-500/20 rounded-full px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none transition-all"
               />
               <button
                 onClick={handleSend}
