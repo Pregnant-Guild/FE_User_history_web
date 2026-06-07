@@ -441,31 +441,8 @@ function PublicWikiSidebar({
                                 color: "#f8fafc",
                             }}
                         >
-                            {entity?.name?.trim() || wiki?.title?.trim() || "Wiki"}
+                            {wiki?.title?.trim() || entity?.name?.trim() || "Wiki"}
                         </div>
-                        {entity?.description?.trim() ? (
-                            <div
-                                style={{
-                                    marginTop: 8,
-                                    fontSize: 13,
-                                    lineHeight: 1.5,
-                                    color: "#cbd5e1",
-                                }}
-                            >
-                                {entity.description.trim()}
-                            </div>
-                        ) : null}
-                        {!compactHeader && wiki?.title?.trim() && wiki.title.trim() !== entity?.name?.trim() ? (
-                            <div
-                                style={{
-                                    marginTop: 6,
-                                    fontSize: 12,
-                                    color: "#94a3b8",
-                                }}
-                            >
-                                {wiki.title.trim()}
-                            </div>
-                        ) : null}
                     </div>
 
                     <button

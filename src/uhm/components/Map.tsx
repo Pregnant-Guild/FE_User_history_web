@@ -298,22 +298,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
     }, [hasImageOverlay, isMapLoaded, mapRef]);
 
     return (
-        <div style={{ width: "100%", height, position: "relative", backgroundColor: "#0b1220" }}>
-            {/* Opaque map placeholder image for LCP optimization */}
-            <img
-                src="/images/map_placeholder.webp"
-                alt="Map Loading Placeholder"
-                fetchPriority="high"
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    zIndex: 0,
-                }}
-            />
-
+        <div style={{ width: "100%", height, position: "relative" }}>
             <div 
                 ref={containerRef} 
                 style={{ 

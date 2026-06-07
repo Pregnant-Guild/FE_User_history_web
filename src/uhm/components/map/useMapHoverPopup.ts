@@ -58,6 +58,7 @@ export function useMapHoverPopup({
         let currentContent: MapHoverPopupContent | null = null;
         let selectedRowIndex = 0;
         let selectionVisible = false;
+        let selectionDirection: "next" | "prev" | null = null;
         let lastSelectedRowClick: (() => void) | null = null;
         let lastSelectedRowAt = 0;
         let hoverLayerIds = getHoverLayerIds(map);
@@ -98,14 +99,23 @@ export function useMapHoverPopup({
             selectedRowIndex = wrapIndex(selectedRowIndex, rows.length);
             lastSelectedRowClick = rows[selectedRowIndex]?.onClick || null;
             lastSelectedRowAt = Date.now();
-            updatePopupRowSelection(popup, selectedRowIndex, selectionVisible);
+            updatePopupRowSelection(popup, selectedRowIndex, selectionVisible, selectionDirection);
         };
 
         const cyclePopupRow = (direction: "next" | "prev") => {
             const rows = getCurrentRows();
             if (!rows.length) return;
-            selectedRowIndex += direction === "prev" ? -1 : 1;
-            selectedRowIndex = wrapIndex(selectedRowIndex, rows.length);
+            const currentIndex = wrapIndex(selectedRowIndex, rows.length);
+            const nextIndex = direction === "prev"
+                ? Math.max(0, currentIndex - 1)
+                : Math.min(rows.length - 1, currentIndex + 1);
+            selectionDirection = direction;
+            if (nextIndex === currentIndex) {
+                selectedRowIndex = currentIndex;
+                syncSelectedRow();
+                return;
+            }
+            selectedRowIndex = nextIndex;
             syncSelectedRow();
         };
 
@@ -153,7 +163,7 @@ export function useMapHoverPopup({
                 if (event.repeat) return;
                 if (isEditableEventTarget(event.target)) return;
                 selectionVisible = true;
-                updatePopupRowSelection(popup, selectedRowIndex, selectionVisible);
+                updatePopupRowSelection(popup, selectedRowIndex, selectionVisible, selectionDirection);
                 requestPopupUpdateFromLastMouseEvent();
                 return;
             }
@@ -488,7 +498,7 @@ function buildPopupNode(content: MapHoverPopupContent, selectedRowIndex: number,
         grid.appendChild(card);
     });
 
-    updatePopupNodeRowSelection(root, selectedRowIndex, selectionVisible);
+    updatePopupNodeRowSelection(root, selectedRowIndex, selectionVisible, null);
 
     return root;
 }
@@ -598,11 +608,21 @@ function wrapIndex(index: number, length: number): number {
     return ((index % length) + length) % length;
 }
 
-function updatePopupRowSelection(popup: maplibregl.Popup, selectedRowIndex: number, selectionVisible: boolean) {
-    updatePopupNodeRowSelection(popup.getElement() || null, selectedRowIndex, selectionVisible);
+function updatePopupRowSelection(
+    popup: maplibregl.Popup,
+    selectedRowIndex: number,
+    selectionVisible: boolean,
+    selectionDirection: "next" | "prev" | null
+) {
+    updatePopupNodeRowSelection(popup.getElement() || null, selectedRowIndex, selectionVisible, selectionDirection);
 }
 
-function updatePopupNodeRowSelection(root: HTMLElement | null, selectedRowIndex: number, selectionVisible: boolean) {
+function updatePopupNodeRowSelection(
+    root: HTMLElement | null,
+    selectedRowIndex: number,
+    selectionVisible: boolean,
+    selectionDirection: "next" | "prev" | null
+) {
     if (!root) return;
     const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-hover-popup-row-index]"));
     let selectedCard: HTMLElement | null = null;
@@ -616,8 +636,8 @@ function updatePopupNodeRowSelection(root: HTMLElement | null, selectedRowIndex:
         }
     }
     if (selectedCard) {
-        ensurePopupRowVisible(selectedCard);
-        window.requestAnimationFrame(() => ensurePopupRowVisible(selectedCard));
+        ensurePopupRowVisible(selectedCard, selectionDirection);
+        window.requestAnimationFrame(() => ensurePopupRowVisible(selectedCard, selectionDirection));
     }
 }
 
@@ -627,20 +647,20 @@ function applyPopupRowStyle(card: HTMLElement, selected: boolean) {
     card.style.boxShadow = selected ? "inset 2px 0 0 rgba(56, 189, 248, 0.95)" : "none";
 }
 
-function ensurePopupRowVisible(card: HTMLElement) {
+function ensurePopupRowVisible(card: HTMLElement, direction: "next" | "prev" | null) {
     const scrollRoot = card.closest<HTMLElement>("[data-hover-popup-scroll-root='true']");
     if (!scrollRoot) return;
 
     const padding = 8;
-    const groupHeader = findPreviousGroupHeader(card);
+    const groupHeader = direction === "prev" ? findPreviousGroupHeader(card) : null;
     const cardTop = card.offsetTop;
     const cardBottom = cardTop + card.offsetHeight;
-    const contextTop = groupHeader?.offsetTop ?? cardTop;
+    const targetTop = groupHeader?.offsetTop ?? cardTop;
     const visibleTop = scrollRoot.scrollTop + padding;
     const visibleBottom = scrollRoot.scrollTop + scrollRoot.clientHeight - padding;
 
-    if (contextTop < visibleTop) {
-        scrollRoot.scrollTop = Math.max(0, contextTop - padding);
+    if (targetTop < visibleTop) {
+        scrollRoot.scrollTop = Math.max(0, targetTop - padding);
         return;
     }
 

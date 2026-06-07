@@ -20,31 +20,9 @@ const srOnlyStyle: React.CSSProperties = {
 
 export default function Page() {
     return (
-        <div style={{ position: "relative", width: "100%", height: "100svh", overflow: "hidden", backgroundColor: "#0b1220" }}>
+        <div style={{ position: "relative", width: "100%", height: "100svh", overflow: "hidden" }}>
             {/* Preload LCP image */}
             <link rel="preload" as="image" href="/images/map_placeholder.webp" fetchPriority="high" />
-
-            {/* Permanent, static LCP image that is NEVER hidden or unmounted */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-                src="/images/map_placeholder.webp"
-                alt="Map Background"
-                fetchPriority="high"
-                loading="eager"
-                decoding="sync"
-                width={1920}
-                height={1080}
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    zIndex: 0,
-                    backgroundImage: "url('data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQAgCdASoQAAkAAgA0JbACdAD0j9ruBiEAAP71e6Hb3PzxBzEI1XGXkdQ3Wq1ek8XLa1nPPm65FhrFIjmR0%2BxZwNUJBvg15I7CuzvhuunZ%2FUF83IaP8Evo6gAAAA%3D%3D')",
-                    backgroundSize: "cover",
-                }}
-            />
 
             {/* Header (SSR & SEO) */}
             <header style={srOnlyStyle}>

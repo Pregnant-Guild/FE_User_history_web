@@ -217,12 +217,15 @@ export function usePublicPreviewInteraction(options: {
 
         const onlyEntityId = linkedEntityIds[0];
         if (activeEntityId === onlyEntityId) return;
+        const linkedWikis = relations.entityWikisById[onlyEntityId] || [];
+        if (linkedWikis.length !== 1) return;
 
         selectEntity(onlyEntityId, {
             sourceFeatureId: selectedFeatureIds[0],
+            preferredWikiSlug: linkedWikis[0]?.slug,
             selectGeometry: false,
         });
-    }, [activeEntityId, relations.geometryEntityIds, selectEntity, selectedFeatureIds]);
+    }, [activeEntityId, relations.entityWikisById, relations.geometryEntityIds, selectEntity, selectedFeatureIds]);
 
     const loadHoverWikiPreviewForEntity = useCallback(async (entityId: string) => {
         try {
@@ -520,6 +523,14 @@ export function usePublicPreviewInteraction(options: {
         setIsManualSidebarOpen(false);
     }, [setSelectedFeatureIds]);
 
+    const closeWikiSidebarPreserveSelection = useCallback(() => {
+        setActiveEntityId(null);
+        setActiveWikiSlug(null);
+        setActiveWikiError(null);
+        setLinkEntityPopup(null);
+        setIsManualSidebarOpen(false);
+    }, []);
+
     return {
         activeEntity,
         activeWiki,
@@ -532,6 +543,7 @@ export function usePublicPreviewInteraction(options: {
         selectWiki,
         handleWikiLinkRequest,
         closeWikiSidebar,
+        closeWikiSidebarPreserveSelection,
         setLinkEntityPopup,
         isManualSidebarOpen,
         setIsManualSidebarOpen,

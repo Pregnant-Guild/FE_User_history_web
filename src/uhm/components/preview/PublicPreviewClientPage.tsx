@@ -9,9 +9,10 @@ const PreviewMapShell = dynamic(
 
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import MapPlaceholder from "@/uhm/components/preview/MapPlaceholder";
+import WikiSelectionPanel from "@/uhm/components/preview/WikiSelectionPanel";
 import { usePublicPreviewData } from "@/uhm/components/preview/hooks/usePublicPreviewData";
 import { useReplayPreview } from "@/uhm/lib/replay/useReplayPreview";
-import type { MapHandle } from "@/uhm/components/Map";
+import type { MapFeaturePayload, MapHandle } from "@/uhm/components/Map";
 import { useRef, useMemo, useCallback, useState, useEffect } from "react";
 import { usePublicPreviewInteraction } from "@/uhm/components/preview/hooks/usePublicPreviewInteraction";
 import PresentPlaceSearch, {
@@ -89,6 +90,8 @@ export default function PublicPreviewClientPage({
     const [isLargeScreen, setIsLargeScreen] = useState(false);
     const [loadInteractiveMap, setLoadInteractiveMap] = useState(false);
     const [isLayerPanelVisible, setIsLayerPanelVisible] = useState(true);
+    const [wikiSelectionPanelAnchor, setWikiSelectionPanelAnchor] = useState<MapFeaturePayload | null>(null);
+    const [rightPanelMode, setRightPanelMode] = useState<"wiki" | "selection" | null>(null);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -205,6 +208,7 @@ export default function PublicPreviewClientPage({
         selectWiki,
         handleWikiLinkRequest,
         closeWikiSidebar,
+        closeWikiSidebarPreserveSelection,
         setLinkEntityPopup,
         isManualSidebarOpen,
     } = usePublicPreviewInteraction({
@@ -375,6 +379,8 @@ export default function PublicPreviewClientPage({
 
     const handleFocusWiki = useCallback((wiki: Wiki) => {
         setFocusedPresentPlace(null);
+        setWikiSelectionPanelAnchor(null);
+        setRightPanelMode("wiki");
         selectWiki(wiki);
 
         // Focus geometries if any
@@ -389,6 +395,77 @@ export default function PublicPreviewClientPage({
             }
         }
     }, [relations.wikiEntityIdsById, relations.entityGeometriesById, selectWiki]);
+
+    const handleCloseWikiSidebar = useCallback(() => {
+        setRightPanelMode(null);
+        setWikiSelectionPanelAnchor(null);
+        closeWikiSidebar();
+    }, [closeWikiSidebar]);
+
+    const wikiSelectionPanelRows = useMemo(() => {
+        if (!wikiSelectionPanelAnchor) return [];
+
+        const entityIds = relations.geometryEntityIds[String(wikiSelectionPanelAnchor.featureId)] || [];
+        return entityIds.flatMap((entityId) => {
+            const entity = relations.entitiesById[entityId] || null;
+            if (!entity) return [];
+
+            const linkedWikis = relations.entityWikisById[entity.id] || [];
+            return linkedWikis.map((wiki) => ({
+                entity,
+                wiki,
+                quote: cleanWikiPreviewQuote(wiki.preview_quote) || extractWikiBlockquoteText(wiki.content),
+            }));
+        });
+    }, [wikiSelectionPanelAnchor, relations.entitiesById, relations.entityWikisById, relations.geometryEntityIds]);
+
+    const handleMapFeatureClick = useCallback((payload: MapFeaturePayload | null) => {
+        setLinkEntityPopup(null);
+
+        if (!payload) {
+            setWikiSelectionPanelAnchor(null);
+            setRightPanelMode(null);
+            return;
+        }
+
+        const entityIds = relations.geometryEntityIds[String(payload.featureId)] || [];
+        const rows = entityIds.flatMap((entityId) => {
+            const entity = relations.entitiesById[entityId] || null;
+            if (!entity) return [];
+
+            const linkedWikis = relations.entityWikisById[entity.id] || [];
+            return linkedWikis.map((wiki) => ({ entity, wiki }));
+        });
+
+        if (!rows.length) {
+            setWikiSelectionPanelAnchor(null);
+            setRightPanelMode(null);
+            return;
+        }
+
+        if (rows.length === 1) {
+            const row = rows[0];
+            selectEntity(row.entity.id, {
+                sourceFeatureId: payload.featureId,
+                preferredWikiSlug: row.wiki.slug,
+                selectGeometry: false,
+            });
+            setWikiSelectionPanelAnchor(null);
+            setRightPanelMode("wiki");
+            return;
+        }
+
+        closeWikiSidebarPreserveSelection();
+        setWikiSelectionPanelAnchor(payload);
+        setRightPanelMode("selection");
+    }, [
+        closeWikiSidebarPreserveSelection,
+        relations.entitiesById,
+        relations.entityWikisById,
+        relations.geometryEntityIds,
+        selectEntity,
+        setLinkEntityPopup,
+    ]);
 
     const filteredRenderDraft = useMemo(() => {
         if (replayMode !== "playing" || !replayPreview.hiddenGeometryIds?.length) {
@@ -428,24 +505,26 @@ export default function PublicPreviewClientPage({
         return `Stage #${replayPreview.activeCursor.stageId} · Step ${replayPreview.activeCursor.stepIndex + 1}`;
     }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
 
+    const isWikiChooserOpen = rightPanelMode === "selection" && Boolean(wikiSelectionPanelAnchor);
     const isSidebarOpen = replayMode === "playing"
         ? (replayPreview.sidebarOpen || isManualSidebarOpen)
         : Boolean(activeEntity || activeWiki || isManualSidebarOpen);
 
-    const displayedActiveEntity = isSidebarOpen ? activeEntity : null;
-    const displayedActiveWiki = isSidebarOpen ? activeWiki : null;
+    const displayedActiveEntity = rightPanelMode !== "selection" && isSidebarOpen ? activeEntity : null;
+    const displayedActiveWiki = rightPanelMode !== "selection" && isSidebarOpen ? activeWiki : null;
 
     const computedTimelineStyle = useMemo(() => {
         const leftMargin = isLayerPanelVisible ? 88 : 18;
-        const rightMargin = ((displayedActiveEntity || displayedActiveWiki) && isLargeScreen) ? sidebarWidth + 32 : 18;
-        const bottomOffset = ((displayedActiveEntity || displayedActiveWiki) && !isLargeScreen) ? `${sidebarHeight + 16}px` : undefined;
+        const rightPanelOpen = Boolean(displayedActiveEntity || displayedActiveWiki || isWikiChooserOpen);
+        const rightMargin = (rightPanelOpen && isLargeScreen) ? sidebarWidth + 32 : 18;
+        const bottomOffset = (rightPanelOpen && !isLargeScreen) ? `${sidebarHeight + 16}px` : undefined;
         return {
             left: `${leftMargin}px`,
             right: `${rightMargin}px`,
             bottom: bottomOffset,
             transition: "right 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         };
-    }, [isLayerPanelVisible, displayedActiveEntity, displayedActiveWiki, isLargeScreen, sidebarWidth, sidebarHeight]);
+    }, [isLayerPanelVisible, displayedActiveEntity, displayedActiveWiki, isWikiChooserOpen, isLargeScreen, sidebarWidth, sidebarHeight]);
 
     const searchBarWidth = useMemo(() => {
         if (isLargeScreen) {
@@ -513,13 +592,14 @@ export default function PublicPreviewClientPage({
                     isTimelineLoading={isTimelineLoading || isRelationsLoading}
                     timelineStatusText={relationsStatus || timelineStatus}
                     timelineStyle={computedTimelineStyle}
+                    onFeatureClick={handleMapFeatureClick}
                     hoverPopupEnabled
                     getHoverPopupContent={getHoverPopupContent}
                     activeEntity={displayedActiveEntity}
                     activeWiki={displayedActiveWiki}
                     isWikiLoading={isActiveWikiLoading}
                     wikiError={activeWikiError}
-                    onCloseWikiSidebar={closeWikiSidebar}
+                    onCloseWikiSidebar={handleCloseWikiSidebar}
                     onWikiLinkRequest={handleWikiLinkRequest}
                     sidebarWidth={sidebarWidth}
                     onSidebarWidthChange={setSidebarWidth}
@@ -604,6 +684,8 @@ export default function PublicPreviewClientPage({
                                     key={entity.id}
                                     type="button"
                                     onClick={() => {
+                                        setWikiSelectionPanelAnchor(null);
+                                        setRightPanelMode("wiki");
                                         selectEntity(entity.id, { preferredWikiSlug: linkEntityPopup.slug });
                                         setLinkEntityPopup(null);
                                     }}
@@ -616,6 +698,76 @@ export default function PublicPreviewClientPage({
                     </div>
                 </div>
             ) : null}
+
+            {isWikiChooserOpen ? (
+                <aside
+                    className={isLargeScreen ? "fixed bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]" : "fixed bottom-0 left-0 right-0 top-auto z-20"}
+                    style={isLargeScreen ? {
+                        width: `min(${sidebarWidth}px, calc(100vw - 2rem))`,
+                    } : {
+                        height: `${sidebarHeight || 400}px`,
+                        maxHeight: "90vh",
+                        width: "100%",
+                        maxWidth: "100%",
+                    }}
+                >
+                    <WikiSelectionPanel
+                        rows={wikiSelectionPanelRows}
+                        onClose={() => {
+                            setWikiSelectionPanelAnchor(null);
+                            setRightPanelMode(null);
+                        }}
+                        onSelectRow={(entityId, wikiId) => {
+                            const wiki = wikiSelectionPanelRows.find((row) => row.entity.id === entityId && row.wiki.id === wikiId)?.wiki || null;
+                            const sourceFeatureId = wikiSelectionPanelAnchor?.featureId ?? null;
+                            setWikiSelectionPanelAnchor(null);
+                            setRightPanelMode("wiki");
+                            selectEntity(entityId, {
+                                sourceFeatureId,
+                                preferredWikiSlug: wiki?.slug,
+                                selectGeometry: false,
+                            });
+                        }}
+                    />
+                </aside>
+            ) : null}
         </>
     );
+}
+
+function cleanWikiPreviewQuote(raw: string | null | undefined): string {
+    const decoded = decodeHtmlEntities(String(raw || ""));
+    const blockquote = extractWikiBlockquoteText(decoded);
+    return cleanWikiPlainText(blockquote || decoded);
+}
+
+function extractWikiBlockquoteText(content: string | null | undefined): string {
+    if (!content) return "";
+
+    const decoded = decodeHtmlEntities(content);
+    const blockquoteMatch = decoded.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i);
+    const rawText = blockquoteMatch?.[1]?.trim() || "";
+    if (!rawText) return "";
+
+    return cleanWikiPlainText(rawText);
+}
+
+function cleanWikiPlainText(raw: string): string {
+    return decodeHtmlEntities(raw)
+        .replace(/<[^>]*>/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function decodeHtmlEntities(raw: string): string {
+    return raw
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&#160;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/gi, "'");
 }
