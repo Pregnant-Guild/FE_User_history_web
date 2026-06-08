@@ -104,7 +104,7 @@ export default function WikiSelectionPanel({
                             outline: "none",
                         }}
                         className="hover:bg-slate-700/50 hover:text-slate-100"
-                        aria-label="Close wiki chooser"
+                        aria-label="Đóng bảng chọn wiki"
                     >
                         x
                     </button>

@@ -186,7 +186,7 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
         ) {
             return null;
         }
-        return `Stage #${replayPreviewActiveCursor.stageId} · Step ${replayPreviewActiveCursor.stepIndex + 1}`;
+        return `Cảnh #${replayPreviewActiveCursor.stageId} · Bước ${replayPreviewActiveCursor.stepIndex + 1}`;
     }, [replayPreviewActiveCursor.stageId, replayPreviewActiveCursor.stepIndex]);
 
     // Active wiki snapshot

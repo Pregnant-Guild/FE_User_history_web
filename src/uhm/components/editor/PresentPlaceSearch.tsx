@@ -117,7 +117,7 @@ export default function PresentPlaceSearch({
                 .catch((err) => {
                     if (controller.signal.aborted || requestSeqRef.current !== seq) return;
                     setResults([]);
-                    setError(err instanceof Error ? err.message : "Không search được địa điểm.");
+                    setError(err instanceof Error ? err.message : "Không tìm được địa điểm.");
                 })
                 .finally(() => {
                     if (requestSeqRef.current === seq) {
@@ -159,7 +159,7 @@ export default function PresentPlaceSearch({
                 .catch((err) => {
                     if (historicalRequestSeqRef.current !== seq) return;
                     setHistoricalResults([]);
-                    setHistoricalError(err instanceof Error ? err.message : "Không search được entity lịch sử.");
+                    setHistoricalError(err instanceof Error ? err.message : "Không tìm được thực thể lịch sử.");
                 })
                 .finally(() => {
                     if (historicalRequestSeqRef.current === seq) {
@@ -196,7 +196,7 @@ export default function PresentPlaceSearch({
                 .catch((err) => {
                     if (wikiRequestSeqRef.current !== seq) return;
                     setWikiResults([]);
-                    setWikiError(err instanceof Error ? err.message : "Không search được wiki.");
+                    setWikiError(err instanceof Error ? err.message : "Không tìm được bài viết wiki.");
                 })
                 .finally(() => {
                     if (wikiRequestSeqRef.current === seq) {
@@ -364,11 +364,11 @@ export default function PresentPlaceSearch({
                     <button
                         type="button"
                         onClick={cycleMode}
-                        title={`Switch search mode (current: ${mode})`}
-                        aria-label={`Switch search mode (current: ${mode})`}
+                        title={`Đổi chế độ tìm kiếm (hiện tại: ${getSearchModeLabel(mode)})`}
+                        aria-label={`Đổi chế độ tìm kiếm (hiện tại: ${getSearchModeLabel(mode)})`}
                         style={modeSwitchStyle}
                     >
-                        {mode === "present" ? "Present" : mode === "history" ? "History" : "Wiki"}
+                        {getSearchModeLabel(mode)}
                     </button>
                     <input
                         value={activeQuery}
@@ -408,7 +408,7 @@ export default function PresentPlaceSearch({
                             mode === "present"
                                 ? "Tìm địa điểm hiện tại"
                                 : mode === "history"
-                                    ? "Tìm entity lịch sử"
+                                    ? "Tìm thực thể lịch sử"
                                     : "Tìm bài viết wiki"
                         }
                         style={inputStyle}
@@ -417,8 +417,8 @@ export default function PresentPlaceSearch({
                         <button
                             type="button"
                             onClick={clearSearch}
-                            title="Clear"
-                            aria-label="Clear place search"
+                            title="Xóa tìm kiếm"
+                            aria-label="Xóa ô tìm kiếm"
                             style={clearButtonStyle}
                         >
                             x
@@ -535,9 +535,9 @@ function HistoricalResults({
     onSelectEntity: (item: EntityGeometriesSearchItem) => void;
     onSelectGeometry: (item: EntityGeometriesSearchItem, geometry: EntityGeometrySearchGeo) => void;
 }) {
-    if (isLoading) return <div style={statusStyle}>Đang tìm entity...</div>;
+    if (isLoading) return <div style={statusStyle}>Đang tìm thực thể...</div>;
     if (error) return <div style={{ ...statusStyle, color: "#fecaca" }}>{error}</div>;
-    if (!results.length && query.trim().length >= 2) return <div style={statusStyle}>Không có entity phù hợp.</div>;
+    if (!results.length && query.trim().length >= 2) return <div style={statusStyle}>Không có thực thể phù hợp.</div>;
 
     return (
         <>
@@ -563,8 +563,8 @@ function HistoricalResults({
                             <span style={primaryResultTextStyle}>{item.name || item.entity_id}</span>
                             <span style={secondaryResultTextStyle}>
                                 {item.geometries.length
-                                    ? `${item.geometries.length} geometry${item.geometries.length > 1 ? "s" : ""}`
-                                    : "Không có geometry"}
+                                    ? `${item.geometries.length} hình bản đồ`
+                                    : "Không có hình bản đồ"}
                                 {item.description ? ` · ${item.description}` : ""}
                             </span>
                         </button>
@@ -672,7 +672,7 @@ function formatAdminLabel(state: AdminLabelState | undefined): string {
 }
 
 function formatGeometryMeta(geometry: EntityGeometrySearchGeo): string {
-    const type = geometry.type || "geometry";
+    const type = geometry.type || "hình bản đồ";
     const timeStart = geometry.time_start ?? null;
     const timeEnd = geometry.time_end ?? null;
     const time =
@@ -780,3 +780,9 @@ const statusStyle = {
     fontSize: 12,
     fontWeight: 700,
 } satisfies CSSProperties;
+
+function getSearchModeLabel(mode: SearchMode): string {
+    if (mode === "present") return "Hiện tại";
+    if (mode === "history") return "Lịch sử";
+    return "Wiki";
+}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import PublicPreviewWrapper from "@/uhm/components/preview/PublicPreviewWrapper";
 
 export const metadata: Metadata = {
@@ -27,10 +28,10 @@ export default function Page() {
             {/* Header (SSR & SEO) */}
             <header style={srOnlyStyle}>
                 <nav>
-                    <a href="/">Trang chủ</a>
-                    <a href="/faq">Hướng dẫn / FAQ</a>
-                    <a href="/about-us">Về chúng tôi</a>
-                    <a href="/user">Quản trị viên</a>
+                    <Link href="/">Trang chủ</Link>
+                    <Link href="/faq">Hướng dẫn / Hỏi đáp</Link>
+                    <Link href="/about-us">Về chúng tôi</Link>
+                    <Link href="/user">Quản trị viên</Link>
                 </nav>
             </header>
 
@@ -43,9 +44,9 @@ export default function Page() {
                     </p>
                     <p>
                         Tính năng chính bao gồm:
-                        - Xem bản đồ lịch sử theo dòng thời gian (Timeline).
-                        - Trình phát diễn biến lịch sử và chiến trận (Replay).
-                        - Tra cứu thông tin sự kiện lịch sử (Wiki & Entities).
+                        - Xem bản đồ lịch sử theo dòng thời gian.
+                        - Trình phát diễn biến lịch sử và chiến trận.
+                        - Tra cứu thông tin sự kiện lịch sử.
                     </p>
                 </div>
 
@@ -55,7 +56,7 @@ export default function Page() {
 
             {/* Footer (SSR & SEO) */}
             <footer style={srOnlyStyle}>
-                <p>&copy; {new Date().getFullYear()} Ultimate History Map. All rights reserved.</p>
+                <p>&copy; {new Date().getFullYear()} Ultimate History Map. Đã đăng ký bản quyền.</p>
             </footer>
         </div>
     );

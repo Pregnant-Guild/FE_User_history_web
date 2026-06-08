@@ -83,7 +83,7 @@ export default function GeometrySelectionPanel({
                                 color: "#94a3b8",
                             }}
                         >
-                            Geometry
+                            Hình bản đồ
                         </div>
                         <div
                             style={{
@@ -94,7 +94,7 @@ export default function GeometrySelectionPanel({
                                 color: "#f8fafc",
                             }}
                         >
-                            Chọn entity để zoom
+                            Chọn thực thể để phóng tới
                         </div>
                         {wikiSlug ? (
                             <div
@@ -132,7 +132,7 @@ export default function GeometrySelectionPanel({
                             outline: "none",
                         }}
                         className="hover:bg-slate-700/50 hover:text-slate-100"
-                        aria-label="Close geometry chooser"
+                        aria-label="Đóng bảng chọn hình bản đồ"
                     >
                         x
                     </button>
@@ -234,7 +234,7 @@ export default function GeometrySelectionPanel({
                     </div>
                 ) : (
                     <div style={{ fontSize: 14, lineHeight: "20px", color: "#94a3b8" }}>
-                        Wiki này chưa có entity hoặc geometry liên quan.
+                        Wiki này chưa có thực thể hoặc hình bản đồ liên quan.
                     </div>
                 )}
             </div>

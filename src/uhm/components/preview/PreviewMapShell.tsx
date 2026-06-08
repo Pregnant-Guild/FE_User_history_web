@@ -300,12 +300,12 @@ export default function PreviewMapShell({
                                     type="button"
                                     onClick={() => {
                                         if (isMobileOrTablet) {
-                                            alert("Tính năng quản trị và chỉnh sửa chỉ hỗ trợ trên máy tính (Desktop)");
+                                            alert("Tính năng quản trị và chỉnh sửa chỉ hỗ trợ trên máy tính.");
                                         } else {
                                             window.location.href = "/user";
                                         }
                                     }}
-                                    title={isMobileOrTablet ? "Tính năng này chỉ hoạt động trên Desktop" : "Quản trị & Chỉnh sửa (Edit)"}
+                                    title={isMobileOrTablet ? "Tính năng này chỉ hoạt động trên máy tính" : "Quản trị và chỉnh sửa"}
                                     style={{
                                         ...menuOptionStyle,
                                         opacity: isMobileOrTablet ? 0.5 : 1,
@@ -349,7 +349,7 @@ export default function PreviewMapShell({
                                 <button
                                     type="button"
                                     onClick={() => { window.location.href = "/faq"; }}
-                                    title="Hỏi đáp & Hướng dẫn (FAQ)"
+                                    title="Hỏi đáp và hướng dẫn"
                                     style={menuOptionStyle}
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -360,7 +360,7 @@ export default function PreviewMapShell({
                                 <button
                                     type="button"
                                     onClick={() => { window.location.href = "/about-us"; }}
-                                    title="Về chúng tôi (About Us)"
+                                    title="Về chúng tôi"
                                     style={menuOptionStyle}
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -349,7 +349,7 @@ export default function PublicPreviewClientPage({
                     wikiSlug: nextSlug,
                     rows: [],
                     isLoading: false,
-                    error: "Wiki này chưa có entity liên quan.",
+                    error: "Wiki này chưa có thực thể liên quan.",
                 });
                 return;
             }
@@ -727,7 +727,7 @@ export default function PublicPreviewClientPage({
         ) {
             return null;
         }
-        return `Stage #${replayPreview.activeCursor.stageId} · Step ${replayPreview.activeCursor.stepIndex + 1}`;
+        return `Cảnh #${replayPreview.activeCursor.stageId} · Bước ${replayPreview.activeCursor.stepIndex + 1}`;
     }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
 
     const isWikiChooserOpen = rightPanelMode === "selection" && Boolean(wikiSelectionPanelAnchor);
@@ -1292,14 +1292,14 @@ function PublicMapZoomPanel({
                 type="button"
                 onClick={toggleProjection}
                 className="uhm-public-projection-toggle"
-                aria-label="Toggle globe projection"
-                title={isGlobeProjection ? "Dang o che do hinh cau (globe)" : "Dang o che do trai phang (flat)"}
+                aria-label="Chuyển chế độ hiển thị hình cầu"
+                title={isGlobeProjection ? "Đang ở chế độ hình cầu" : "Đang ở chế độ bản đồ phẳng"}
             >
                 <span className={`uhm-public-projection-track ${isGlobeProjection ? "active" : ""}`}>
                     <span className="uhm-public-projection-thumb" />
                 </span>
                 <span className={`uhm-public-projection-label ${isGlobeProjection ? "active" : ""}`}>
-                    {isGlobeProjection ? "Globe" : "Flat"}
+                    {isGlobeProjection ? "Cầu" : "Phẳng"}
                 </span>
             </button>
             {onPlayPreviewReplay ? (
@@ -1307,11 +1307,11 @@ function PublicMapZoomPanel({
                     type="button"
                     onClick={onPlayPreviewReplay}
                     className="uhm-public-play-btn"
-                    aria-label="Play selected replay"
-                    title="Play replay cua geometry dang chon"
+                    aria-label="Phát diễn biến đã chọn"
+                    title="Phát diễn biến của hình đang chọn"
                 >
                     <span aria-hidden="true" className="uhm-public-play-icon" />
-                    Play
+                    Phát
                 </button>
             ) : null}
             {onResumePreviewReplay ? (
@@ -1319,8 +1319,8 @@ function PublicMapZoomPanel({
                     type="button"
                     onClick={onResumePreviewReplay}
                     className="uhm-public-play-btn resume"
-                    aria-label="Resume selected replay"
-                    title="Tiep tuc replay dang tam dung"
+                    aria-label="Tiếp tục diễn biến đã chọn"
+                    title="Tiếp tục diễn biến đang tạm dừng"
                 >
                     <span aria-hidden="true" className="uhm-public-play-icon" />
                     Tiếp tục
@@ -1331,8 +1331,8 @@ function PublicMapZoomPanel({
                     type="button"
                     onClick={onStopPreviewReplay}
                     className="uhm-public-play-btn stop"
-                    aria-label="Stop selected replay"
-                    title="Dung replay dang phat"
+                    aria-label="Dừng diễn biến đã chọn"
+                    title="Dừng diễn biến đang phát"
                 >
                     <span aria-hidden="true" className="uhm-public-stop-icon" />
                     Dừng
@@ -1342,7 +1342,7 @@ function PublicMapZoomPanel({
                 type="button"
                 onClick={() => zoomByStep(-0.8)}
                 className="uhm-public-zoom-btn"
-                aria-label="Zoom out"
+                aria-label="Thu nhỏ bản đồ"
             >
                 -
             </button>
@@ -1368,13 +1368,13 @@ function PublicMapZoomPanel({
                     isDraggingRef.current = false;
                 }}
                 onChange={(event) => handleSliderChange(Number(event.target.value))}
-                aria-label="Map zoom"
+                aria-label="Mức thu phóng bản đồ"
             />
             <button
                 type="button"
                 onClick={() => zoomByStep(0.8)}
                 className="uhm-public-zoom-btn"
-                aria-label="Zoom in"
+                aria-label="Phóng to bản đồ"
             >
                 +
             </button>

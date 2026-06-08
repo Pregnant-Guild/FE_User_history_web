@@ -28,7 +28,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
                 src="/images/map_placeholder.webp"
-                alt="Map Background"
+                alt="Nền bản đồ"
                 fetchPriority="high"
                 loading="eager"
                 decoding="sync"
@@ -119,7 +119,7 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                         textShadow: "0 1px 2px rgba(0, 0, 0, 0.8)",
                     }}
                 >
-                    hiện dự án chỉ đang hỗ trợ người dùng máy tính, các phiên bản di động hiên không ổn định
+                    Hiện dự án chỉ hỗ trợ tốt trên máy tính; phiên bản di động chưa ổn định.
                 </p>
             </div>
 

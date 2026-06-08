@@ -596,7 +596,7 @@ function PublicWikiSidebar({
                             outline: "none",
                         }}
                         className="hover:bg-slate-700/50 hover:text-slate-100"
-                        aria-label="Close wiki sidebar"
+                        aria-label="Đóng khung wiki"
                     >
                         x
                     </button>

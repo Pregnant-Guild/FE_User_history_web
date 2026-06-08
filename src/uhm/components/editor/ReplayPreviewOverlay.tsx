@@ -121,7 +121,7 @@ export default function ReplayPreviewOverlay({
                         {dialog.image_url?.trim() ? (
                             <img
                                 src={dialog.image_url}
-                                alt="Historical"
+                                alt="Hình ảnh lịch sử"
                                 style={{
                                     width: "100%",
                                     display: "block",
@@ -212,7 +212,7 @@ export default function ReplayPreviewOverlay({
                                         textTransform: "uppercase",
                                     }}
                                 >
-                                    Preview
+                                    Xem trước
                                 </span>
                                 {activeStepLabel ? (
                                     <span
@@ -252,7 +252,7 @@ export default function ReplayPreviewOverlay({
                                         />
                                     </div>
                                     <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                                        Step {activeStepNumber || 0}/{totalSteps}
+                                        Bước {activeStepNumber || 0}/{totalSteps}
                                     </div>
                                 </div>
                             ) : null}
@@ -289,7 +289,7 @@ export default function ReplayPreviewOverlay({
                                 onClick={onExitPreview}
                                 style={previewButtonStyle("#334155")}
                             >
-                                Thoát preview
+                                Thoát xem trước
                             </button>
                         </div>
                     </div>

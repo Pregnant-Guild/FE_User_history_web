@@ -2,7 +2,6 @@
 
 import type { BackgroundLayerId } from "@/uhm/lib/map/styles/backgroundLayers";
 import { BACKGROUND_LAYER_OPTIONS } from "@/uhm/lib/map/styles/backgroundLayers";
-import { GEO_TYPE_KEYS } from "@/uhm/lib/map/geo/geoTypeMap";
 
 type Props = {
     backgroundVisibility: Record<string, boolean>;
@@ -165,9 +164,6 @@ const LAYER_ICONS: Record<string, React.ReactNode> = {
     ),
 };
 
-// Class name helper for tooltips using CSS
-const buttonClassName = "preview-layer-btn";
-
 export default function ReplayPreviewLayerPanel({
     backgroundVisibility,
     geometryVisibility,
@@ -245,7 +241,7 @@ export default function ReplayPreviewLayerPanel({
                 }}
             >
                 {/* Background layers */}
-                <div style={groupHeaderStyle}>Map</div>
+                <div style={groupHeaderStyle}>Bản đồ</div>
                 <div style={gridStyle}>
                     {BACKGROUND_LAYER_OPTIONS.map((layer) => {
                         const active = Boolean(backgroundVisibility[layer.id]);
@@ -266,11 +262,11 @@ export default function ReplayPreviewLayerPanel({
                 <div style={dividerStyle} />
 
                 {/* Territories / Polygons */}
-                <div style={groupHeaderStyle}>Areas</div>
+                <div style={groupHeaderStyle}>Khu vực</div>
                 <div style={gridStyle}>
                     {polygonKeys.map((typeKey) => {
                         const active = geometryVisibility[typeKey] !== false;
-                        const label = typeKey.replace("_", " ").toUpperCase();
+                        const label = getGeometryTypeLabel(typeKey);
                         return (
                             <button
                                 key={typeKey}
@@ -288,11 +284,11 @@ export default function ReplayPreviewLayerPanel({
                 <div style={dividerStyle} />
 
                 {/* Routes / Lines */}
-                <div style={groupHeaderStyle}>Routes</div>
+                <div style={groupHeaderStyle}>Tuyến</div>
                 <div style={gridStyle}>
                     {lineKeys.map((typeKey) => {
                         const active = geometryVisibility[typeKey] !== false;
-                        const label = typeKey.replace("_", " ").toUpperCase();
+                        const label = getGeometryTypeLabel(typeKey);
                         return (
                             <button
                                 key={typeKey}
@@ -310,11 +306,11 @@ export default function ReplayPreviewLayerPanel({
                 <div style={dividerStyle} />
 
                 {/* Places & Events / Points */}
-                <div style={groupHeaderStyle}>Points</div>
+                <div style={groupHeaderStyle}>Điểm</div>
                 <div style={gridStyle}>
                     {pointKeys.map((typeKey) => {
                         const active = geometryVisibility[typeKey] !== false;
-                        const label = typeKey.replace("_", " ").toUpperCase();
+                        const label = getGeometryTypeLabel(typeKey);
                         return (
                             <button
                                 key={typeKey}
@@ -383,3 +379,26 @@ const dividerStyle: React.CSSProperties = {
     width: "80%",
     margin: "6px 0",
 };
+
+function getGeometryTypeLabel(typeKey: string): string {
+    const labels: Record<string, string> = {
+        country: "Quốc gia",
+        state: "Nhà nước / vùng",
+        faction: "Phe phái",
+        rebellion_zone: "Vùng nổi dậy",
+        defense_line: "Tuyến phòng thủ",
+        military_route: "Đường hành quân",
+        retreat_route: "Đường rút lui",
+        migration_route: "Đường di cư",
+        trade_route: "Tuyến thương mại",
+        battle: "Trận đánh",
+        person_event: "Nhân vật / sự kiện",
+        temple: "Đền miếu",
+        capital: "Kinh đô",
+        city: "Thành phố",
+        fortification: "Công sự",
+        ruin: "Di tích",
+        port: "Cảng",
+    };
+    return labels[typeKey] || typeKey.replaceAll("_", " ");
+}

@@ -333,7 +333,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         }}
                     >
                         <div style={{ fontWeight: 800, marginBottom: "6px" }}>
-                            Map khong khoi tao duoc
+                            Không khởi tạo được bản đồ
                         </div>
                         <div style={{ color: "#cbd5e1", fontSize: "13px" }}>
                             {fatalInitError}
@@ -478,8 +478,8 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                         <label
                             title={
                                 isGlobeProjection
-                                    ? "Dang o che do hinh cau (globe)"
-                                    : "Dang o che do trai phang (flat)"
+                                    ? "Đang ở chế độ hình cầu"
+                                    : "Đang ở chế độ bản đồ phẳng"
                             }
                             style={{
                                 display: "inline-flex",
@@ -495,7 +495,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 type="checkbox"
                                 checked={isGlobeProjection}
                                 onChange={(e) => setIsGlobeProjection(e.target.checked)}
-                                aria-label="Toggle globe projection"
+                                aria-label="Chuyển chế độ hiển thị hình cầu"
                                 style={{ display: "none" }}
                             />
                             <div className={`premium-toggle-track ${isGlobeProjection ? "active" : ""}`}>
@@ -511,7 +511,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 }}
                                 className="hidden sm:block"
                             >
-                                {isGlobeProjection ? "Globe" : "Flat"}
+                                {isGlobeProjection ? "Cầu" : "Phẳng"}
                             </span>
                         </label>
 
@@ -532,7 +532,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                         transition: "background 150ms, color 150ms",
                                     }}
                                 >
-                                    LOCAL
+                                    CỤC BỘ
                                 </button>
                                 <button
                                     type="button"
@@ -549,7 +549,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                         transition: "background 150ms, color 150ms",
                                     }}
                                 >
-                                    GLOBAL
+                                    TOÀN CỤC
                                 </button>
                             </div>
                         ) : null}
@@ -568,10 +568,10 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                     color: isPreviewMode ? "#ffffff" : "#34d399",
                                     flexShrink: 0,
                                 }}
-                                aria-label={isPreviewMode ? "Exit preview" : "Enter preview"}
-                                title={isPreviewMode ? "Thoat preview" : "Xem nhu nguoi dung"}
+                                aria-label={isPreviewMode ? "Thoát xem trước" : "Vào chế độ xem trước"}
+                                title={isPreviewMode ? "Thoát xem trước" : "Xem như người dùng"}
                             >
-                                {isPreviewMode ? "Editor" : "Preview"}
+                                {isPreviewMode ? "Trình sửa" : "Xem trước"}
                             </button>
                         ) : null}
 
@@ -592,8 +592,8 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                     fontSize: "13px",
                                     flexShrink: 0,
                                 }}
-                                aria-label="Play selected replay"
-                                title="Play replay của geometry đang chọn"
+                                aria-label="Phát diễn biến đã chọn"
+                                title="Phát diễn biến của hình đang chọn"
                             >
                                 <span
                                     aria-hidden="true"
@@ -605,7 +605,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                         borderLeft: "8px solid currentColor",
                                     }}
                                 />
-                                Play
+                                Phát
                             </button>
                         ) : null}
 
@@ -615,7 +615,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 onClick={() => handleZoomByStep(-0.8)}
                                 className="premium-zoom-btn"
                                 style={{ flexShrink: 0 }}
-                                aria-label="Zoom out"
+                                aria-label="Thu nhỏ bản đồ"
                             >
                                 -
                             </button>
@@ -648,7 +648,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 onPointerCancel={endZoomSliderDrag}
                                 onBlur={endZoomSliderDrag}
                                 onChange={(event) => handleZoomSliderChange(Number(event.target.value))}
-                                aria-label="Map zoom"
+                                aria-label="Mức thu phóng bản đồ"
                             />
 
                             <button
@@ -656,7 +656,7 @@ const Map = memo(forwardRef<MapHandle, MapProps>(function Map({
                                 onClick={() => handleZoomByStep(0.8)}
                                 className="premium-zoom-btn"
                                 style={{ flexShrink: 0 }}
-                                aria-label="Zoom in"
+                                aria-label="Phóng to bản đồ"
                             >
                                 +
                             </button>
