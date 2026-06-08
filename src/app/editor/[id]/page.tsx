@@ -2696,7 +2696,7 @@ function EditorPageContent() {
                         onImageOverlayChange={setImageOverlay}
                         onBindGeometries={handleBindGeometries}
                         localFeatureIds={localFeatureIds}
-                        showViewportControls={!isReplayPreviewMode || replayPreview.zoomPanelVisible}
+                        showViewportControls={!isAnyPreviewMode}
                         isPreviewMode={isAnyPreviewMode}
                         onEnterPreview={handleEnterPreviewClick}
                         onExitPreview={isReplayPreviewMode ? exitReplayPreview : exitViewerPreview}

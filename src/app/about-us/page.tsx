@@ -63,6 +63,12 @@ export default function LandingPage() {
         <div className="text-xl font-bold tracking-widest text-[#2D3A3A] uppercase">
           <span className="text-[#A88B4C]">Geo</span>History
         </div>
+        <Link
+          href="/"
+          className="rounded-xl border border-[#A88B4C]/30 bg-[#FDFBF7]/80 px-4 py-2 text-sm font-bold text-[#2D3A3A] transition hover:bg-[#A88B4C] hover:text-white"
+        >
+          Quay lại bản đồ
+        </Link>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pt-8 pb-24 flex flex-col gap-32 w-full relative">
@@ -93,6 +99,12 @@ export default function LandingPage() {
               className="px-8 py-4 bg-[#A88B4C] text-white font-bold rounded-xl shadow-lg shadow-[#A88B4C]/20 hover:bg-[#8e743c]"
             >
               Khám phá sứ mệnh
+            </Link>
+            <Link
+              href="/"
+              className="px-8 py-4 border border-[#A88B4C]/30 bg-[#FDFBF7]/80 text-[#2D3A3A] font-bold rounded-xl hover:bg-[#2D3A3A] hover:text-white"
+            >
+              Về bản đồ
             </Link>
           </div>
         </section>

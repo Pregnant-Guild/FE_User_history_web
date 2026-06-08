@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type GuideSection = {
   id: string;
@@ -139,6 +139,18 @@ const troubleshooting = [
 export default function Page() {
   const [openSection, setOpenSection] = useState<string>('start');
   const [openTrouble, setOpenTrouble] = useState<number | null>(0);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const handleGuideNavClick = (sectionId: string) => {
+    setOpenSection(sectionId);
+
+    requestAnimationFrame(() => {
+      sectionRefs.current[sectionId]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -169,7 +181,7 @@ export default function Page() {
                 <button
                   key={section.id}
                   type="button"
-                  onClick={() => setOpenSection(section.id)}
+                  onClick={() => handleGuideNavClick(section.id)}
                   className={`rounded-md px-3 py-2 text-left text-sm font-medium transition ${
                     openSection === section.id
                       ? 'bg-blue-50 text-blue-700'
@@ -202,7 +214,13 @@ export default function Page() {
             {guideSections.map((section) => {
               const isOpen = openSection === section.id;
               return (
-                <div key={section.id} className="border-b border-slate-200 last:border-b-0">
+                <div
+                  key={section.id}
+                  ref={(element) => {
+                    sectionRefs.current[section.id] = element;
+                  }}
+                  className="scroll-mt-6 border-b border-slate-200 last:border-b-0"
+                >
                   <button
                     type="button"
                     onClick={() => setOpenSection(isOpen ? '' : section.id)}

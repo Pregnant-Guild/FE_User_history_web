@@ -7,6 +7,7 @@ import type { MapHoverPopupContent } from "@/uhm/components/map/useMapHoverPopup
 import PresentPlaceSearch, { type HistoricalGeometryFocusPayload, type PresentPlaceSelection } from "@/uhm/components/editor/PresentPlaceSearch";
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
+import { PublicMapZoomPanel } from "@/uhm/components/preview/PublicPreviewClientPage";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import RelatedEntityPopup from "./RelatedEntityPopup";
@@ -82,6 +83,8 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
     onGeometryVisibilityChange,
     activeReplay,
     autoplayMode = null,
+    viewMode = "local",
+    onViewModeChange,
 
     replayPreview,
     mapHandleRef,
@@ -663,6 +666,8 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
             right: (isReplayPreviewRightPanelOpen && isLargeScreen) ? previewSidebarWidth + 32 : 18,
             zIndex: 18,
             display: "flex",
+            flexWrap: "wrap" as const,
+            gap: "10px",
             alignItems: "flex-start",
             pointerEvents: "none" as const,
             maxWidth: "calc(100vw - 102px)",
@@ -717,6 +722,24 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
                         width: searchBarWidth,
                     }}
                 />
+                {isLargeScreen && (!isReplayPreviewMode || replayPreview.zoomPanelVisible) ? (
+                    <>
+                        <PublicMapZoomPanel
+                            mapHandleRef={mapHandleRef || { current: null }}
+                            onPlayPreviewReplay={
+                                !isReplayPreviewMode && currentActiveReplay
+                                    ? () => handlePlaySelectedReplay(currentActiveReplay)
+                                    : undefined
+                            }
+                        />
+                        <EditorPreviewModePanel
+                            isPreviewMode={isReplayPreviewMode}
+                            viewMode={viewMode}
+                            onViewModeChange={onViewModeChange}
+                            onExitPreview={onExitPreview}
+                        />
+                    </>
+                ) : null}
             </div>
 
             {isReplayPreviewMode ? (
@@ -886,6 +909,82 @@ const PreviewLayout = forwardRef<PreviewLayoutHandle, Props>(({
 PreviewLayout.displayName = "PreviewLayout";
 
 export default PreviewLayout;
+
+function EditorPreviewModePanel({
+    isPreviewMode,
+    viewMode,
+    onViewModeChange,
+    onExitPreview,
+}: {
+    isPreviewMode: boolean;
+    viewMode: "local" | "global";
+    onViewModeChange?: (mode: "local" | "global") => void;
+    onExitPreview: () => void;
+}) {
+    return (
+        <div
+            style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0,
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 50,
+                padding: "8px 10px",
+                color: "#f8fafc",
+                background: "linear-gradient(135deg, rgba(30, 30, 30, 0.72) 0%, rgba(20, 20, 20, 0.85) 100%)",
+                boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 1px 0 rgba(255, 255, 255, 0.05)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                pointerEvents: "auto",
+            }}
+        >
+            {onViewModeChange ? (
+                <div style={{ display: "flex", gap: 2, borderRadius: 999, padding: 2, background: "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(255, 255, 255, 0.15)" }}>
+                    {(["local", "global"] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            type="button"
+                            onClick={() => onViewModeChange(mode)}
+                            style={{
+                                border: 0,
+                                borderRadius: 999,
+                                padding: "4px 10px",
+                                background: viewMode === mode ? "#2563eb" : "transparent",
+                                color: viewMode === mode ? "#ffffff" : "#94a3b8",
+                                cursor: "pointer",
+                                fontSize: 12,
+                                fontWeight: 700,
+                            }}
+                        >
+                            {mode === "local" ? "CỤC BỘ" : "TOÀN CỤC"}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+            <button
+                type="button"
+                onClick={onExitPreview}
+                style={{
+                    height: 28,
+                    minWidth: 76,
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    background: isPreviewMode ? "rgba(51, 65, 85, 0.6)" : "rgba(16, 185, 129, 0.25)",
+                    color: isPreviewMode ? "#ffffff" : "#34d399",
+                    cursor: "pointer",
+                    padding: "0 12px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                }}
+                aria-label="Thoát xem trước"
+                title="Thoát xem trước"
+            >
+                Trình sửa
+            </button>
+        </div>
+    );
+}
 
 // ==========================================
 // Helper functions

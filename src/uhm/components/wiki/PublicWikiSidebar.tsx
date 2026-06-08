@@ -161,6 +161,10 @@ function prepareWikiHtml(inputHtml: string): { html: string; toc: TocItem[] } {
     return { html: doc.body.innerHTML, toc };
 }
 
+function getWikiContentScrollContainer(root: HTMLElement | null): HTMLElement | null {
+    return root?.closest<HTMLElement>(".uhm-public-wiki-sidebar-content") ?? null;
+}
+
 function PublicWikiSidebar({
     entity,
     wiki,
@@ -249,7 +253,6 @@ function PublicWikiSidebar({
 
 
 
-    const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
     const processedWiki = useMemo(() => {
         if (!wiki) return { html: "", toc: [] as TocItem[] };
 
@@ -263,58 +266,12 @@ function PublicWikiSidebar({
     }, [wiki]);
     const renderHtml = processedWiki.html;
     const toc = processedWiki.toc;
-    const effectiveActiveHeadingId = toc.some((item) => item.id === activeHeadingId)
-        ? activeHeadingId
-        : (toc[0]?.id ?? null);
 
     useLayoutEffect(() => {
-        const firstHeadingId = toc[0]?.id ?? null;
-        setActiveHeadingId(firstHeadingId);
-
-        const scrollContainer = contentRootRef.current?.parentElement;
+        const scrollContainer = getWikiContentScrollContainer(contentRootRef.current);
         scrollContainer?.scrollTo({ top: 0, behavior: "auto" });
         tocContainerRef.current?.scrollTo({ left: 0, behavior: "auto" });
     }, [wiki?.id, wiki?.slug, renderHtml, toc]);
-
-    useEffect(() => {
-        if (!toc.length) return;
-        const root = contentRootRef.current;
-        if (!root) return;
-
-        const headings = toc
-            .map((item) => root.querySelector<HTMLElement>(`#${CSS.escape(item.id)}`))
-            .filter((item): item is HTMLElement => Boolean(item));
-        if (!headings.length) return;
-
-        const scrollContainer = root.parentElement;
-        const updateActiveHeading = () => {
-            const containerRect = scrollContainer?.getBoundingClientRect();
-            const topBoundary = (containerRect?.top ?? 0) + (containerRect?.height ?? window.innerHeight) * 0.18;
-            const bottomBoundary = (containerRect?.top ?? 0) + (containerRect?.height ?? window.innerHeight) * 0.82;
-            const visibleHeadings = headings
-                .map((heading) => ({ heading, rect: heading.getBoundingClientRect() }))
-                .filter(({ rect }) => rect.bottom >= topBoundary && rect.top <= bottomBoundary)
-                .sort((a, b) => {
-                    const aDistance = Math.abs(a.rect.top - topBoundary);
-                    const bDistance = Math.abs(b.rect.top - topBoundary);
-                    return aDistance - bDistance;
-                });
-            const nextHeading = visibleHeadings[0]?.heading || headings[0];
-            if (nextHeading?.id) setActiveHeadingId(nextHeading.id);
-        };
-
-        const observer = new IntersectionObserver(
-            updateActiveHeading,
-            { root: scrollContainer || null, rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] }
-        );
-
-        for (const heading of headings) observer.observe(heading);
-        scrollContainer?.addEventListener("scroll", updateActiveHeading, { passive: true });
-        return () => {
-            observer.disconnect();
-            scrollContainer?.removeEventListener("scroll", updateActiveHeading);
-        };
-    }, [toc]);
 
     useEffect(() => {
         const container = tocContainerRef.current;
@@ -621,18 +578,16 @@ function PublicWikiSidebar({
                         }}
                     >
                         {toc.slice(0, 8).map((item) => {
-                            const isActive = effectiveActiveHeadingId === item.id;
                             return (
                                 <a
                                     key={item.id}
                                     href={`#${item.id}`}
                                     onClick={(e) => {
                                         e.preventDefault();
-                                        setActiveHeadingId(item.id);
                                         const root = contentRootRef.current;
                                         if (root) {
                                             const targetElement = root.querySelector(`#${CSS.escape(item.id)}`) as HTMLElement | null;
-                                            const scrollContainer = root.parentElement;
+                                            const scrollContainer = getWikiContentScrollContainer(root);
                                             if (targetElement && scrollContainer) {
                                                 const containerTop = scrollContainer.getBoundingClientRect().top;
                                                 const targetTop = targetElement.getBoundingClientRect().top;
@@ -652,15 +607,11 @@ function PublicWikiSidebar({
                                         fontWeight: 650,
                                         textDecoration: "none",
                                         transition: "all 0.2s",
-                                        background: isActive
-                                            ? "rgba(56, 189, 248, 0.15)"
-                                            : "rgba(30, 41, 59, 0.4)",
-                                        color: isActive ? "#38bdf8" : "#94a3b8",
-                                        border: isActive
-                                            ? "1px solid rgba(56, 189, 248, 0.3)"
-                                            : "1px solid rgba(148, 163, 184, 0.1)",
+                                        background: "rgba(30, 41, 59, 0.4)",
+                                        color: "#94a3b8",
+                                        border: "1px solid rgba(148, 163, 184, 0.1)",
                                     }}
-                                    className={isActive ? "" : "hover:bg-slate-700/40 hover:text-slate-200"}
+                                    className="hover:bg-slate-700/40 hover:text-slate-200"
                                 >
                                     {item.text}
                                 </a>

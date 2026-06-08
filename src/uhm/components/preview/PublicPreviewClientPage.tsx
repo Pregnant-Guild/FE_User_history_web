@@ -1009,7 +1009,7 @@ export default function PublicPreviewClientPage({
     );
 }
 
-function PublicMapZoomPanel({
+export function PublicMapZoomPanel({
     mapHandleRef,
     onPlayPreviewReplay,
     onResumePreviewReplay,
