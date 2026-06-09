@@ -23,6 +23,9 @@ import StickyHeader from "@/components/ui/StickyHeader";
 
 export type ProjectSortColumn = "created_at" | "updated_at" | "title";
 
+const IMPORT_JSON_MAX_BYTES = 2 * 1024 * 1024;
+const IMPORT_JSON_MAX_LABEL = "2MB";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -193,6 +196,14 @@ export default function ProjectsPage() {
 
   const handleImportJsonFile = async (file: File | null) => {
     if (!file) return;
+    if (file.size > IMPORT_JSON_MAX_BYTES) {
+      setImportSnapshot(null);
+      setImportSnapshotName(null);
+      if (importJsonInputRef.current) importJsonInputRef.current.value = "";
+      toast.error(`File JSON tối đa ${IMPORT_JSON_MAX_LABEL}.`);
+      return;
+    }
+
     try {
       const text = await file.text();
       const raw = JSON.parse(text) as unknown;
@@ -591,6 +602,9 @@ export default function ProjectsPage() {
             </div>
             <div>
               <Label>Khởi tạo từ JSON</Label>
+              <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                Chỉ hỗ trợ JSON snapshot tối đa {IMPORT_JSON_MAX_LABEL}.
+              </p>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -607,7 +621,7 @@ export default function ProjectsPage() {
               <input
                 ref={importJsonInputRef}
                 type="file"
-                accept="application/json"
+                accept="application/json,.json"
                 className="hidden"
                 onChange={(e) =>
                   handleImportJsonFile(e.target.files?.[0] || null)
