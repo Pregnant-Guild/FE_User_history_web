@@ -61,6 +61,7 @@ type Props = {
     sidebarHeight?: number;
     onSidebarHeightChange?: (height: number) => void;
     showViewportControls?: boolean;
+    hasAnyBottomPanel?: boolean;
 };
 
 export default function PreviewMapShell({
@@ -109,6 +110,7 @@ export default function PreviewMapShell({
     sidebarHeight,
     onSidebarHeightChange,
     showViewportControls = true,
+    hasAnyBottomPanel = false,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export default function PreviewMapShell({
     }, []);
 
     const hasWikiSidebar = Boolean(activeEntity || activeWiki || isWikiLoading || wikiError);
+    const hasBottomPanel = hasWikiSidebar || hasAnyBottomPanel;
 
     const menuOptionStyle: CSSProperties = {
         width: 46,
@@ -213,7 +216,7 @@ export default function PreviewMapShell({
                     style={{
                         position: "absolute",
                         top: 10,
-                        bottom: (hasWikiSidebar && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
+                        bottom: (hasBottomPanel && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
                         left: 18,
                         zIndex: 18,
                         display: "flex",

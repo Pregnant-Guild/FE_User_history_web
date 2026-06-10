@@ -840,6 +840,7 @@ export default function PublicPreviewClientPage({
                     showViewportControls={false}
                     onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
                     timelineDisabled={replayMode !== "idle"}
+                    hasAnyBottomPanel={isWikiChooserOpen || isGeometryChooserOpen}
                     overlay={
                         replayMode !== "idle" ? (
                             <ReplayPreviewOverlay
