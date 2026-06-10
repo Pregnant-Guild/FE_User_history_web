@@ -106,21 +106,6 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                     Hành trình khám phá biên giới, quốc gia và các sự kiện lịch sử thế giới qua bản đồ tương tác theo dòng thời gian.
                 </p>
 
-                <p
-                    className="map-placeholder-mobile-warning"
-                    style={{
-                        fontFamily: "Georgia, serif",
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        color: "#ef4444",
-                        lineHeight: 1.5,
-                        margin: 0,
-                        maxWidth: "520px",
-                        textShadow: "0 1px 2px rgba(0, 0, 0, 0.8)",
-                    }}
-                >
-                    Hiện dự án chỉ hỗ trợ tốt trên máy tính; phiên bản di động chưa ổn định.
-                </p>
             </div>
 
             {/* Bottom hint "nhấn vào chỗ bất kì để vào" with a slow breathing/fade pulse animation */}
@@ -155,12 +140,6 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 </div>
                 <style dangerouslySetInnerHTML={{
                     __html: `
-                    @media (min-width: 1024px) {
-                        .map-placeholder-mobile-warning {
-                            display: none;
-                        }
-                    }
-
                     @keyframes placeholder-pulse {
                         0%, 100% { opacity: 0.35; transform: scale(0.98); }
                         50% { opacity: 0.95; transform: scale(1); }
