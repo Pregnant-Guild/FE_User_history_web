@@ -173,7 +173,7 @@ export default function PreviewMapShell({
                     applyGeometryBindingFilter
                     isPreviewMode
                     onFeatureClick={onFeatureClick}
-                    hoverPopupEnabled={hoverPopupEnabled}
+                    hoverPopupEnabled={hoverPopupEnabled && !isMobileOrTablet}
                     getHoverPopupContent={getHoverPopupContent}
                     onHoverFeatureChange={onHoverFeatureChange}
                     onPlayPreviewReplay={onPlayPreviewReplay}

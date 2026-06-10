@@ -42,7 +42,11 @@ export function useMapHoverPopup({
 
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || !enabled) return;
+
+        // Disable hover popup if the device has no hover capability (mobile/tablet)
+        const hasHoverSupport = window.matchMedia("(hover: hover)").matches;
+        if (!hasHoverSupport) return;
 
         const popup = new maplibregl.Popup({
             closeButton: false,
@@ -312,7 +316,7 @@ export function useMapHoverPopup({
             window.removeEventListener("keyup", onKeyUp, { capture: true });
             popup.remove();
         };
-    }, [getContentRef, mapRef, onHoverFeatureChangeRef, renderDraftRef]);
+    }, [enabled, getContentRef, mapRef, onHoverFeatureChangeRef, renderDraftRef]);
 }
 
 function getHoverLayerIds(map: maplibregl.Map): string[] {
