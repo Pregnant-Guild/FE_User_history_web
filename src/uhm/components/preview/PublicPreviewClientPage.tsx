@@ -130,7 +130,7 @@ export default function PublicPreviewClientPage({
         } else {
             const timer = setTimeout(() => {
                 setLoadInteractiveMap(true);
-            }, 2000);
+            }, 2500);
             return () => clearTimeout(timer);
         }
     }, [instantLoad]);
@@ -794,102 +794,213 @@ export default function PublicPreviewClientPage({
 
     return (
         <>
-            {isBackgroundVisibilityReady && loadInteractiveMap && (
-                <PreviewMapShell
-                    mapHandleRef={mapHandleRef}
-                    renderDraft={filteredRenderDraft}
-                    labelContextDraft={filteredLabelContextDraft}
-                    labelTimelineYear={currentTimelineYear}
-                    selectedFeatureIds={selectedFeatureIds}
-                    onSelectFeatureIds={setSelectedFeatureIds}
-                    instantLoad={instantLoad}
-                    onToggleInstantLoad={toggleInstantLoad}
-                    isLayerPanelVisible={isLayerPanelVisible}
-                    onLayerPanelVisibleChange={setIsLayerPanelVisible}
-                    backgroundVisibility={backgroundVisibility}
-                    geometryVisibility={geometryVisibility}
-                    onToggleBackground={handleToggleBackgroundLayer}
-                    onToggleGeometry={(typeKey) => {
-                        setGeometryVisibility((prev) => ({
-                            ...prev,
-                            [typeKey]: prev[typeKey] === false,
-                        }));
-                    }}
-                    timelineYear={currentTimelineYear}
-                    onTimelineYearChange={handleTimelineYearChange}
-                    timelineTimeRange={timeRange}
-                    onTimelineTimeRangeChange={handleTimeRangeChange}
-                    isTimelineLoading={isTimelineLoading || isRelationsLoading}
-                    timelineStatusText={relationsStatus || timelineStatus}
-                    timelineStyle={computedTimelineStyle}
-                    onFeatureClick={handleMapFeatureClick}
-                    hoverPopupEnabled
-                    getHoverPopupContent={getHoverPopupContent}
-                    activeEntity={displayedActiveEntity}
-                    activeWiki={displayedActiveWiki}
-                    isWikiLoading={isActiveWikiLoading}
-                    wikiError={activeWikiError}
-                    onCloseWikiSidebar={handleCloseWikiSidebar}
-                    onWikiLinkRequest={handlePanelWikiLinkRequest}
-                    onWikiLinkEntitySelectionRequest={handlePanelWikiLinkEntitySelectionRequest}
-                    sidebarWidth={sidebarWidth}
-                    onSidebarWidthChange={setSidebarWidth}
-                    maxSidebarDragWidth={maxDragWidth}
-                    sidebarHeight={sidebarHeight}
-                    onSidebarHeightChange={handleSidebarHeightChange}
-                    showViewportControls={false}
-                    onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
-                    timelineDisabled={replayMode !== "idle"}
-                    hasAnyBottomPanel={isWikiChooserOpen || isGeometryChooserOpen}
-                    overlay={
-                        replayMode !== "idle" ? (
-                            <ReplayPreviewOverlay
-                                isPreviewMode={true}
-                                isPlaying={replayPreview.isPlaying}
-                                dialog={replayPreview.dialog}
-                                toasts={replayPreview.toasts}
-                                sidebarOpen={isSidebarOpen}
-                                sidebarWidth={sidebarWidth}
-                                playbackSpeed={replayPreview.playbackSpeed}
-                                activeStepLabel={activeStepLabel}
-                                activeStepNumber={replayPreview.activeStepNumber}
-                                totalSteps={replayPreview.totalSteps}
-                                playButtonLabel={replayMode === "paused" ? "Tiếp tục" : "Phát lại"}
-                                onPlayPreview={handleResumePreviewReplay}
-                                onStopPreview={handleStopPreviewReplay}
-                                onResetPreview={handleResetPreviewReplay}
-                                onExitPreview={handleExitReplay}
+            <div
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    visibility: userHasEntered ? "visible" : "hidden",
+                    opacity: userHasEntered ? 1 : 0,
+                    transition: "opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s",
+                }}
+            >
+                {isBackgroundVisibilityReady && loadInteractiveMap && (
+                    <PreviewMapShell
+                        mapHandleRef={mapHandleRef}
+                        renderDraft={filteredRenderDraft}
+                        labelContextDraft={filteredLabelContextDraft}
+                        labelTimelineYear={currentTimelineYear}
+                        selectedFeatureIds={selectedFeatureIds}
+                        onSelectFeatureIds={setSelectedFeatureIds}
+                        instantLoad={instantLoad}
+                        onToggleInstantLoad={toggleInstantLoad}
+                        isLayerPanelVisible={isLayerPanelVisible}
+                        onLayerPanelVisibleChange={setIsLayerPanelVisible}
+                        backgroundVisibility={backgroundVisibility}
+                        geometryVisibility={geometryVisibility}
+                        onToggleBackground={handleToggleBackgroundLayer}
+                        onToggleGeometry={(typeKey) => {
+                            setGeometryVisibility((prev) => ({
+                                ...prev,
+                                [typeKey]: prev[typeKey] === false,
+                            }));
+                        }}
+                        timelineYear={currentTimelineYear}
+                        onTimelineYearChange={handleTimelineYearChange}
+                        timelineTimeRange={timeRange}
+                        onTimelineTimeRangeChange={handleTimeRangeChange}
+                        isTimelineLoading={isTimelineLoading || isRelationsLoading}
+                        timelineStatusText={relationsStatus || timelineStatus}
+                        timelineStyle={computedTimelineStyle}
+                        onFeatureClick={handleMapFeatureClick}
+                        hoverPopupEnabled
+                        getHoverPopupContent={getHoverPopupContent}
+                        activeEntity={displayedActiveEntity}
+                        activeWiki={displayedActiveWiki}
+                        isWikiLoading={isActiveWikiLoading}
+                        wikiError={activeWikiError}
+                        onCloseWikiSidebar={handleCloseWikiSidebar}
+                        onWikiLinkRequest={handlePanelWikiLinkRequest}
+                        onWikiLinkEntitySelectionRequest={handlePanelWikiLinkEntitySelectionRequest}
+                        sidebarWidth={sidebarWidth}
+                        onSidebarWidthChange={setSidebarWidth}
+                        maxSidebarDragWidth={maxDragWidth}
+                        sidebarHeight={sidebarHeight}
+                        onSidebarHeightChange={handleSidebarHeightChange}
+                        showViewportControls={false}
+                        onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
+                        timelineDisabled={replayMode !== "idle"}
+                        hasAnyBottomPanel={isWikiChooserOpen || isGeometryChooserOpen}
+                        overlay={
+                            replayMode !== "idle" ? (
+                                <ReplayPreviewOverlay
+                                    isPreviewMode={true}
+                                    isPlaying={replayPreview.isPlaying}
+                                    dialog={replayPreview.dialog}
+                                    toasts={replayPreview.toasts}
+                                    sidebarOpen={isSidebarOpen}
+                                    sidebarWidth={sidebarWidth}
+                                    playbackSpeed={replayPreview.playbackSpeed}
+                                    activeStepLabel={activeStepLabel}
+                                    activeStepNumber={replayPreview.activeStepNumber}
+                                    totalSteps={replayPreview.totalSteps}
+                                    playButtonLabel={replayMode === "paused" ? "Tiếp tục" : "Phát lại"}
+                                    onPlayPreview={handleResumePreviewReplay}
+                                    onStopPreview={handleStopPreviewReplay}
+                                    onResetPreview={handleResetPreviewReplay}
+                                    onExitPreview={handleExitReplay}
+                                />
+                            ) : null
+                        }
+                    >
+                        <div style={searchBarWrapperStyle}>
+                            <PresentPlaceSearch
+                                focusedPlace={focusedPresentPlace}
+                                onFocusPlace={handleFocusPresentPlace}
+                                onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                                onFocusWiki={handleFocusWiki}
+                                onClearFocus={clearPresentPlaceFocus}
+                                style={{
+                                    position: "relative",
+                                    top: 0,
+                                    left: 0,
+                                    transform: "none",
+                                    width: searchBarWidth,
+                                }}
                             />
-                        ) : null
-                    }
-                >
-                    <div style={searchBarWrapperStyle}>
-                        <PresentPlaceSearch
-                            focusedPlace={focusedPresentPlace}
-                            onFocusPlace={handleFocusPresentPlace}
-                            onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
-                            onFocusWiki={handleFocusWiki}
-                            onClearFocus={clearPresentPlaceFocus}
-                            style={{
-                                position: "relative",
-                                top: 0,
-                                left: 0,
-                                transform: "none",
-                                width: searchBarWidth,
+                            {isLargeScreen ? (
+                                <PublicMapZoomPanel
+                                    mapHandleRef={mapHandleRef}
+                                    onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
+                                    onResumePreviewReplay={replayMode === "paused" ? handleResumePreviewReplay : undefined}
+                                    onStopPreviewReplay={replayMode === "playing" ? handleStopPreviewReplay : undefined}
+                                />
+                            ) : null}
+                        </div>
+                        <FirstVisitGuideModal />
+                    </PreviewMapShell>
+                )}
+
+                {linkEntityPopup ? (
+                    <div
+                        ref={linkEntityPopupRef}
+                        className="fixed z-[60] w-[240px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
+                        style={{ top: linkEntityPopup.top, left: linkEntityPopup.left }}
+                    >
+                        <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                Related Entities
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                /wiki/{linkEntityPopup.slug}
+                            </div>
+                        </div>
+                        <div className="max-h-[220px] overflow-y-auto p-2">
+                            {linkEntityPopup.entities.length ? (
+                                <div className="grid gap-1">
+                                    {linkEntityPopup.entities.map((entity) => (
+                                        <button
+                                            key={entity.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setWikiSelectionPanelAnchor(null);
+                                                setRightPanelMode("wiki");
+                                                selectEntity(entity.id, { preferredWikiSlug: linkEntityPopup.slug });
+                                                setLinkEntityPopup(null);
+                                            }}
+                                            className="rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-white/[0.04] dark:hover:text-white"
+                                        >
+                                            {entity.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                                    Không có entity liên quan.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
+
+                {isGeometryChooserOpen && geometrySelectionPanel ? (
+                    <aside
+                        className={isLargeScreen ? "fixed bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]" : "fixed bottom-0 left-0 right-0 top-auto z-20"}
+                        style={isLargeScreen ? {
+                            width: `min(${sidebarWidth}px, calc(100vw - 2rem))`,
+                        } : {
+                            height: `${sidebarHeight || 400}px`,
+                            maxHeight: "90vh",
+                            width: "100%",
+                            maxWidth: "100%",
+                        }}
+                    >
+                        <GeometrySelectionPanel
+                            wikiSlug={geometrySelectionPanel.wikiSlug}
+                            rows={geometrySelectionPanel.rows}
+                            isLoading={geometrySelectionPanel.isLoading}
+                            error={geometrySelectionPanel.error}
+                            onClose={() => {
+                                setGeometrySelectionPanel(null);
+                                setRightPanelMode(null);
+                            }}
+                            onSelectEntity={handleGeometrySelectionEntitySelect}
+                        />
+                    </aside>
+                ) : null}
+
+                {isWikiChooserOpen ? (
+                    <aside
+                        className={isLargeScreen ? "fixed bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]" : "fixed bottom-0 left-0 right-0 top-auto z-20"}
+                        style={isLargeScreen ? {
+                            width: `min(${sidebarWidth}px, calc(100vw - 2rem))`,
+                        } : {
+                            height: `${sidebarHeight || 400}px`,
+                            maxHeight: "90vh",
+                            width: "100%",
+                            maxWidth: "100%",
+                        }}
+                    >
+                        <WikiSelectionPanel
+                            rows={wikiSelectionPanelRows}
+                            onClose={() => {
+                                setWikiSelectionPanelAnchor(null);
+                                setRightPanelMode(null);
+                            }}
+                            onSelectRow={(entityId, wikiId) => {
+                                const wiki = wikiSelectionPanelRows.find((row) => row.entity.id === entityId && row.wiki.id === wikiId)?.wiki || null;
+                                const sourceFeatureId = wikiSelectionPanelAnchor?.featureId ?? null;
+                                setWikiSelectionPanelAnchor(null);
+                                setRightPanelMode("wiki");
+                                selectEntity(entityId, {
+                                    sourceFeatureId,
+                                    preferredWikiSlug: wiki?.slug,
+                                    selectGeometry: false,
+                                });
                             }}
                         />
-                        {isLargeScreen ? (
-                            <PublicMapZoomPanel
-                                mapHandleRef={mapHandleRef}
-                                onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
-                                onResumePreviewReplay={replayMode === "paused" ? handleResumePreviewReplay : undefined}
-                                onStopPreviewReplay={replayMode === "playing" ? handleStopPreviewReplay : undefined}
-                            />
-                        ) : null}
-                    </div>
-                    <FirstVisitGuideModal />
-                </PreviewMapShell>
-            )}
+                    </aside>
+                ) : null}
+            </div>
 
             {/* Smooth transition loading overlay */}
             <div
@@ -905,107 +1016,6 @@ export default function PublicPreviewClientPage({
             >
                 <MapPlaceholder onEnter={onEnter} />
             </div>
-
-            {linkEntityPopup ? (
-                <div
-                    ref={linkEntityPopupRef}
-                    className="fixed z-[60] w-[240px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950"
-                    style={{ top: linkEntityPopup.top, left: linkEntityPopup.left }}
-                >
-                    <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-800">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                            Related Entities
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            /wiki/{linkEntityPopup.slug}
-                        </div>
-                    </div>
-                    <div className="max-h-[220px] overflow-y-auto p-2">
-                        {linkEntityPopup.entities.length ? (
-                            <div className="grid gap-1">
-                                {linkEntityPopup.entities.map((entity) => (
-                                    <button
-                                        key={entity.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setWikiSelectionPanelAnchor(null);
-                                            setRightPanelMode("wiki");
-                                            selectEntity(entity.id, { preferredWikiSlug: linkEntityPopup.slug });
-                                            setLinkEntityPopup(null);
-                                        }}
-                                        className="rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-white/[0.04] dark:hover:text-white"
-                                    >
-                                        {entity.name}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                                Không có entity liên quan.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ) : null}
-
-            {isGeometryChooserOpen && geometrySelectionPanel ? (
-                <aside
-                    className={isLargeScreen ? "fixed bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]" : "fixed bottom-0 left-0 right-0 top-auto z-20"}
-                    style={isLargeScreen ? {
-                        width: `min(${sidebarWidth}px, calc(100vw - 2rem))`,
-                    } : {
-                        height: `${sidebarHeight || 400}px`,
-                        maxHeight: "90vh",
-                        width: "100%",
-                        maxWidth: "100%",
-                    }}
-                >
-                    <GeometrySelectionPanel
-                        wikiSlug={geometrySelectionPanel.wikiSlug}
-                        rows={geometrySelectionPanel.rows}
-                        isLoading={geometrySelectionPanel.isLoading}
-                        error={geometrySelectionPanel.error}
-                        onClose={() => {
-                            setGeometrySelectionPanel(null);
-                            setRightPanelMode(null);
-                        }}
-                        onSelectEntity={handleGeometrySelectionEntitySelect}
-                    />
-                </aside>
-            ) : null}
-
-            {isWikiChooserOpen ? (
-                <aside
-                    className={isLargeScreen ? "fixed bottom-4 right-4 top-4 left-auto z-20 max-w-[calc(100vw-2rem)]" : "fixed bottom-0 left-0 right-0 top-auto z-20"}
-                    style={isLargeScreen ? {
-                        width: `min(${sidebarWidth}px, calc(100vw - 2rem))`,
-                    } : {
-                        height: `${sidebarHeight || 400}px`,
-                        maxHeight: "90vh",
-                        width: "100%",
-                        maxWidth: "100%",
-                    }}
-                >
-                    <WikiSelectionPanel
-                        rows={wikiSelectionPanelRows}
-                        onClose={() => {
-                            setWikiSelectionPanelAnchor(null);
-                            setRightPanelMode(null);
-                        }}
-                        onSelectRow={(entityId, wikiId) => {
-                            const wiki = wikiSelectionPanelRows.find((row) => row.entity.id === entityId && row.wiki.id === wikiId)?.wiki || null;
-                            const sourceFeatureId = wikiSelectionPanelAnchor?.featureId ?? null;
-                            setWikiSelectionPanelAnchor(null);
-                            setRightPanelMode("wiki");
-                            selectEntity(entityId, {
-                                sourceFeatureId,
-                                preferredWikiSlug: wiki?.slug,
-                                selectGeometry: false,
-                            });
-                        }}
-                    />
-                </aside>
-            ) : null}
         </>
     );
 }

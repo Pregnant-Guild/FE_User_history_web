@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Ultimate History Map',
   description: 'Bản đồ tương tác lịch sử thế giới qua các thời kỳ',
 };
- 
+
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
   weight: ['400', '500', '600', '700'],

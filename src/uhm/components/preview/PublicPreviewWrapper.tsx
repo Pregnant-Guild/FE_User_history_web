@@ -88,14 +88,6 @@ export default function PublicPreviewWrapper() {
         };
     }, [handleEnter, mapEntered]);
 
-    if (!mapEntered && !instantLoad) {
-        return (
-            <MapPlaceholder
-                onEnter={handleEnter}
-            />
-        );
-    }
-
     return (
         <PublicPreviewClientPage
             userHasEntered={mapEntered}

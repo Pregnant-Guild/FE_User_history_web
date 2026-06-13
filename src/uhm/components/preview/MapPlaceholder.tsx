@@ -141,8 +141,8 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     @keyframes placeholder-pulse {
-                        0%, 100% { opacity: 0.35; transform: scale(0.98); }
-                        50% { opacity: 0.95; transform: scale(1); }
+                        0%, 100% { opacity: 0.35; }
+                        50% { opacity: 0.95; }
                     }
                 `}} />
             </div>
