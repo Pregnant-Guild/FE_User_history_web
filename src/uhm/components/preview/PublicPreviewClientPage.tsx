@@ -825,6 +825,7 @@ export default function PublicPreviewClientPage({
                         onSelectFeatureIds={setSelectedFeatureIds}
                         instantLoad={instantLoad}
                         onToggleInstantLoad={toggleInstantLoad}
+                        isReplayMode={replayMode !== "idle"}
                         isLayerPanelVisible={isLayerPanelVisible}
                         onLayerPanelVisibleChange={setIsLayerPanelVisible}
                         backgroundVisibility={backgroundVisibility}
@@ -888,30 +889,32 @@ export default function PublicPreviewClientPage({
                             ) : null
                         }
                     >
-                        <div style={searchBarWrapperStyle}>
-                            <PresentPlaceSearch
-                                focusedPlace={focusedPresentPlace}
-                                onFocusPlace={handleFocusPresentPlace}
-                                onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
-                                onFocusWiki={handleFocusWiki}
-                                onClearFocus={clearPresentPlaceFocus}
-                                style={{
-                                    position: "relative",
-                                    top: 0,
-                                    left: 0,
-                                    transform: "none",
-                                    width: searchBarWidth,
-                                }}
-                            />
-                            {isLargeScreen ? (
-                                <PublicMapZoomPanel
-                                    mapHandleRef={mapHandleRef}
-                                    onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
-                                    onResumePreviewReplay={replayMode === "paused" ? handleResumePreviewReplay : undefined}
-                                    onStopPreviewReplay={replayMode === "playing" ? handleStopPreviewReplay : undefined}
+                        {!(replayMode !== "idle" && !isLargeScreen) ? (
+                            <div style={searchBarWrapperStyle}>
+                                <PresentPlaceSearch
+                                    focusedPlace={focusedPresentPlace}
+                                    onFocusPlace={handleFocusPresentPlace}
+                                    onFocusHistoricalGeometry={handleFocusHistoricalGeometry}
+                                    onFocusWiki={handleFocusWiki}
+                                    onClearFocus={clearPresentPlaceFocus}
+                                    style={{
+                                        position: "relative",
+                                        top: 0,
+                                        left: 0,
+                                        transform: "none",
+                                        width: searchBarWidth,
+                                    }}
                                 />
-                            ) : null}
-                        </div>
+                                {isLargeScreen ? (
+                                    <PublicMapZoomPanel
+                                        mapHandleRef={mapHandleRef}
+                                        onPlayPreviewReplay={activeReplay && replayMode === "idle" ? handlePlayPreviewReplay : undefined}
+                                        onResumePreviewReplay={replayMode === "paused" ? handleResumePreviewReplay : undefined}
+                                        onStopPreviewReplay={replayMode === "playing" ? handleStopPreviewReplay : undefined}
+                                    />
+                                ) : null}
+                            </div>
+                        ) : null}
                         <FirstVisitGuideModal />
                     </PreviewMapShell>
                 )}

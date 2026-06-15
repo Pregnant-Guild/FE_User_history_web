@@ -24,6 +24,12 @@ export const uiActions = {
             setSidebarOpen(false);
             onSelectWiki("");
         } else {
+            // Hạn chế không tự động mở wiki trong chế độ Replay trên mobile/tablet để tránh đè giao diện
+            if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                setSidebarOpen(false);
+                onSelectWiki("");
+                return;
+            }
             setSidebarOpen(true);
             onSelectWiki(wikiId);
         }

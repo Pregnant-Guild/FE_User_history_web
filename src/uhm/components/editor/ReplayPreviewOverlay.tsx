@@ -136,19 +136,12 @@ export default function ReplayPreviewOverlay({
                               }
                             : {
                                   position: "absolute",
-                                  left: 18,
-                                  right: 18,
+                                  left: 16,
+                                  right: 16,
+                                  bottom: 20,
                                   pointerEvents: "none",
                                   display: "flex",
                                   justifyContent: "center",
-                                  ...(sidebarOpen
-                                      ? {
-                                            top: 130,
-                                            bottom: "auto",
-                                        }
-                                      : {
-                                            bottom: 110,
-                                        }),
                               }
                     }
                 >
@@ -226,10 +219,10 @@ export default function ReplayPreviewOverlay({
                 <div
                     style={{
                         position: "absolute",
-                        top: 64,
+                        top: isLargeScreen ? 64 : 16,
                         left: "50%",
                         transform: "translateX(-50%)",
-                        width: "min(520px, calc(100% - 72px))",
+                        width: isLargeScreen ? "min(520px, calc(100% - 72px))" : "min(520px, calc(100% - 32px))",
                         borderRadius: 18,
                         border: "1px solid rgba(148, 163, 184, 0.24)",
                         background: "rgba(15, 23, 42, 0.9)",

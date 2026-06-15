@@ -63,6 +63,7 @@ type Props = {
     onSidebarHeightChange?: (height: number) => void;
     showViewportControls?: boolean;
     hasAnyBottomPanel?: boolean;
+    isReplayMode?: boolean;
 };
 
 export default function PreviewMapShell({
@@ -113,6 +114,7 @@ export default function PreviewMapShell({
     onSidebarHeightChange,
     showViewportControls = true,
     hasAnyBottomPanel = false,
+    isReplayMode = false,
 }: Props) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -187,19 +189,21 @@ export default function PreviewMapShell({
                     height="100svh"
                 />
 
-                <TimelineBar
-                    year={timelineYear}
-                    onYearChange={onTimelineYearChange}
-                    timeRange={timelineTimeRange}
-                    onTimeRangeChange={onTimelineTimeRangeChange}
-                    isLoading={isTimelineLoading}
-                    disabled={timelineDisabled}
-                    statusText={timelineStatusText}
-                    filterEnabled={timelineFilterEnabled}
-                    onFilterEnabledChange={onTimelineFilterEnabledChange}
-                    style={timelineStyle}
-                    onPlayReplay={onPlayPreviewReplay}
-                />
+                {!(isReplayMode && isMobileOrTablet) ? (
+                    <TimelineBar
+                        year={timelineYear}
+                        onYearChange={onTimelineYearChange}
+                        timeRange={timelineTimeRange}
+                        onTimeRangeChange={onTimelineTimeRangeChange}
+                        isLoading={isTimelineLoading}
+                        disabled={timelineDisabled}
+                        statusText={timelineStatusText}
+                        filterEnabled={timelineFilterEnabled}
+                        onFilterEnabledChange={onTimelineFilterEnabledChange}
+                        style={timelineStyle}
+                        onPlayReplay={onPlayPreviewReplay}
+                    />
+                ) : null}
 
                 <style dangerouslySetInnerHTML={{ __html: `
                     @keyframes slideDown {
@@ -214,30 +218,31 @@ export default function PreviewMapShell({
                     }
                 `}} />
 
-                <aside
-                    style={{
-                        position: "absolute",
-                        top: 10,
-                        bottom: (hasBottomPanel && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
-                        left: 18,
-                        zIndex: 70,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 12,
-                        width: 58,
-                        pointerEvents: "none",
-                        transition: "bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                >
-                    <div
+                {!(isReplayMode && isMobileOrTablet) ? (
+                    <aside
                         style={{
+                            position: "absolute",
+                            top: 10,
+                            bottom: (hasBottomPanel && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
+                            left: 18,
+                            zIndex: 70,
                             display: "flex",
                             flexDirection: "column",
-                            gap: 8,
-                            alignItems: "center",
-                            pointerEvents: "auto",
+                            gap: 12,
+                            width: 58,
+                            pointerEvents: "none",
+                            transition: "bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                         }}
                     >
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 8,
+                                alignItems: "center",
+                                pointerEvents: "auto",
+                            }}
+                        >
                         <button
                             type="button"
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -418,6 +423,7 @@ export default function PreviewMapShell({
                         </div>
                     )}
                 </aside>
+                ) : null}
 
 
                 
@@ -461,7 +467,7 @@ export default function PreviewMapShell({
                     </aside>
                 ) : null}
 
-                <ChatbotWidget hideFloatingButton />
+                {!(isReplayMode && isMobileOrTablet) && <ChatbotWidget hideFloatingButton />}
                 {children}
             </div>
         </div>
