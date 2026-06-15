@@ -11,11 +11,14 @@ type Props = {
     toasts: ReplayPreviewToast[];
     sidebarOpen: boolean;
     sidebarWidth?: number;
+    sidebarHeight?: number;
+    isLargeScreen?: boolean;
     playbackSpeed: number;
     activeStepLabel: string | null;
     activeStepNumber: number | null;
     totalSteps: number;
     playButtonLabel?: string;
+    simplified?: boolean;
     onPlayPreview: () => void;
     onStopPreview: () => void;
     onResetPreview: () => void;
@@ -29,11 +32,14 @@ export default function ReplayPreviewOverlay({
     toasts,
     sidebarOpen,
     sidebarWidth = 420,
+    sidebarHeight = 400,
+    isLargeScreen = true,
     playbackSpeed,
     activeStepLabel,
     activeStepNumber,
     totalSteps,
     playButtonLabel = "Phát lại",
+    simplified = false,
     onPlayPreview,
     onStopPreview,
     onResetPreview,
@@ -57,11 +63,32 @@ export default function ReplayPreviewOverlay({
                 position: "absolute",
                 inset: 0,
                 zIndex: 60,
-                // Intentional feature: block map interaction during replay preview mode to prevent conflicts/bugs
-                // Tính năng có chủ ý: chặn tương tác với bản đồ trong lúc chạy replay để tránh lỗi/xung đột
-                pointerEvents: isPreviewMode ? "auto" : "none",
+                pointerEvents: "none",
             }}
         >
+            {/* Intentional feature: block map interaction during replay preview mode to prevent conflicts/bugs */}
+            {/* Tính năng có chủ ý: chặn tương tác với bản đồ trong lúc chạy replay để tránh lỗi/xung đột */}
+            {isPreviewMode && (
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        ...(isLargeScreen
+                            ? {
+                                  bottom: 0,
+                                  right: sidebarOpen ? sidebarWidth + 16 : 0,
+                              }
+                            : {
+                                  right: 0,
+                                  bottom: sidebarOpen ? sidebarHeight + 16 : 0,
+                              }),
+                        pointerEvents: "auto",
+                        background: "transparent",
+                    }}
+                />
+            )}
+
             {toasts.length ? (
                 <div
                     style={{
@@ -71,6 +98,7 @@ export default function ReplayPreviewOverlay({
                         display: "grid",
                         gap: 8,
                         width: 280,
+                        pointerEvents: "auto",
                     }}
                 >
                     {toasts.map((toast) => (
@@ -200,22 +228,24 @@ export default function ReplayPreviewOverlay({
                     >
                         <div style={{ display: "grid", gap: 6, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                <span
-                                    style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        padding: "3px 8px",
-                                        borderRadius: 999,
-                                        background: "rgba(34, 197, 94, 0.2)",
-                                        color: "#86efac",
-                                        fontWeight: 900,
-                                        fontSize: 11,
-                                        letterSpacing: 0.3,
-                                        textTransform: "uppercase",
-                                    }}
-                                >
-                                    Xem trước
-                                </span>
+                                {!simplified && (
+                                    <span
+                                        style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            padding: "3px 8px",
+                                            borderRadius: 999,
+                                            background: "rgba(34, 197, 94, 0.2)",
+                                            color: "#86efac",
+                                            fontWeight: 900,
+                                            fontSize: 11,
+                                            letterSpacing: 0.3,
+                                            textTransform: "uppercase",
+                                        }}
+                                    >
+                                        Xem trước
+                                    </span>
+                                )}
                                 {activeStepLabel ? (
                                     <span
                                         style={{
@@ -228,9 +258,11 @@ export default function ReplayPreviewOverlay({
                                         {activeStepLabel}
                                     </span>
                                 ) : null}
-                                <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                                    x{playbackSpeed.toFixed(2)}
-                                </span>
+                                {!simplified && (
+                                    <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                                        x{playbackSpeed.toFixed(2)}
+                                    </span>
+                                )}
                             </div>
                             {totalSteps > 0 ? (
                                 <div style={{ display: "grid", gap: 6 }}>
@@ -253,9 +285,11 @@ export default function ReplayPreviewOverlay({
                                             }}
                                         />
                                     </div>
-                                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                                        Bước {activeStepNumber || 0}/{totalSteps}
-                                    </div>
+                                    {!simplified && (
+                                        <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                                            Bước {activeStepNumber || 0}/{totalSteps}
+                                        </div>
+                                    )}
                                 </div>
                             ) : null}
                         </div>
@@ -291,7 +325,7 @@ export default function ReplayPreviewOverlay({
                                 onClick={onExitPreview}
                                 style={previewButtonStyle("#334155")}
                             >
-                                Thoát xem trước
+                                {simplified ? "Thoát trình chiếu" : "Thoát xem trước"}
                             </button>
                         </div>
                     </div>

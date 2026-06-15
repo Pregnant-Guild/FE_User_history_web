@@ -21,6 +21,7 @@ type Props = {
     onClose: () => void;
     onWikiLinkRequest: (request: { slug: string; rect: DOMRect }) => void;
     onWikiLinkEntitySelectionRequest?: (request: { slug: string; rect: DOMRect }) => void;
+    onWikiLinkInteraction?: () => void;
     sidebarWidth?: number;
     onSidebarWidthChange?: (width: number) => void;
     maxDragWidth?: number;
@@ -173,6 +174,7 @@ function PublicWikiSidebar({
     onClose,
     onWikiLinkRequest,
     onWikiLinkEntitySelectionRequest,
+    onWikiLinkInteraction,
     sidebarWidth,
     onSidebarWidthChange,
     maxDragWidth,
@@ -308,12 +310,13 @@ function PublicWikiSidebar({
             if (!slug.length) return;
 
             event.preventDefault();
+            onWikiLinkInteraction?.();
             onWikiLinkRequest({ slug, rect: sourceLink.getBoundingClientRect() });
         };
 
         root.addEventListener("click", handleClick);
         return () => root.removeEventListener("click", handleClick);
-    }, [onWikiLinkRequest, renderHtml]);
+    }, [onWikiLinkRequest, onWikiLinkInteraction, renderHtml]);
 
     useEffect(() => {
         const root = contentRootRef.current;
@@ -371,6 +374,7 @@ function PublicWikiSidebar({
 
     const handleOpenStandaloneWiki = (slug: string) => {
         if (typeof window === "undefined") return;
+        onWikiLinkInteraction?.();
         const url = `/wiki/${encodeURIComponent(slug)}`;
         const nextWindow = window.open(url, "_blank", "noopener,noreferrer");
         if (nextWindow) nextWindow.opener = null;
@@ -722,6 +726,7 @@ function PublicWikiSidebar({
                             type="button"
                             onClick={() => {
                                 const request = { slug: wikiLinkMenu.slug, rect: wikiLinkMenu.rect };
+                                onWikiLinkInteraction?.();
                                 if (onWikiLinkEntitySelectionRequest) {
                                     onWikiLinkEntitySelectionRequest(request);
                                 } else {

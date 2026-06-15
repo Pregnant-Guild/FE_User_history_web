@@ -728,12 +728,19 @@ export default function PublicPreviewClientPage({
     const activeStepLabel = useMemo(() => {
         if (
             replayPreview.activeCursor.stageId == null ||
-            replayPreview.activeCursor.stepIndex == null
+            replayPreview.activeCursor.stepIndex == null ||
+            !activeReplay?.replay
         ) {
             return null;
         }
-        return `Cảnh #${replayPreview.activeCursor.stageId} · Bước ${replayPreview.activeCursor.stepIndex + 1}`;
-    }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex]);
+        const stage = activeReplay.replay.detail?.find(
+            (s) => s.id === replayPreview.activeCursor.stageId
+        );
+        if (stage && stage.title?.trim()) {
+            return stage.title.trim();
+        }
+        return `Cảnh #${replayPreview.activeCursor.stageId}`;
+    }, [replayPreview.activeCursor.stageId, replayPreview.activeCursor.stepIndex, activeReplay]);
 
     const isWikiChooserOpen = rightPanelMode === "selection" && Boolean(wikiSelectionPanelAnchor);
     const isGeometryChooserOpen = rightPanelMode === "geometry-selection" && Boolean(geometrySelectionPanel);
@@ -846,6 +853,7 @@ export default function PublicPreviewClientPage({
                         onCloseWikiSidebar={handleCloseWikiSidebar}
                         onWikiLinkRequest={handlePanelWikiLinkRequest}
                         onWikiLinkEntitySelectionRequest={handlePanelWikiLinkEntitySelectionRequest}
+                        onWikiLinkInteraction={replayMode !== "idle" ? handleExitReplay : undefined}
                         sidebarWidth={sidebarWidth}
                         onSidebarWidthChange={setSidebarWidth}
                         maxSidebarDragWidth={maxDragWidth}
@@ -864,11 +872,14 @@ export default function PublicPreviewClientPage({
                                     toasts={replayPreview.toasts}
                                     sidebarOpen={isSidebarOpen}
                                     sidebarWidth={sidebarWidth}
+                                    sidebarHeight={sidebarHeight}
+                                    isLargeScreen={isLargeScreen}
                                     playbackSpeed={replayPreview.playbackSpeed}
                                     activeStepLabel={activeStepLabel}
                                     activeStepNumber={replayPreview.activeStepNumber}
                                     totalSteps={replayPreview.totalSteps}
                                     playButtonLabel={replayMode === "paused" ? "Tiếp tục" : "Phát lại"}
+                                    simplified={true}
                                     onPlayPreview={handleResumePreviewReplay}
                                     onStopPreview={handleStopPreviewReplay}
                                     onResetPreview={handleResetPreviewReplay}
@@ -927,6 +938,9 @@ export default function PublicPreviewClientPage({
                                             key={entity.id}
                                             type="button"
                                             onClick={() => {
+                                                if (replayMode !== "idle") {
+                                                    handleExitReplay();
+                                                }
                                                 setWikiSelectionPanelAnchor(null);
                                                 setRightPanelMode("wiki");
                                                 selectEntity(entity.id, { preferredWikiSlug: linkEntityPopup.slug });

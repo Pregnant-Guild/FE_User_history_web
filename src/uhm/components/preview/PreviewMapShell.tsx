@@ -46,6 +46,7 @@ type Props = {
     onCloseWikiSidebar?: () => void;
     onWikiLinkRequest?: (request: { slug: string; rect: DOMRect }) => void;
     onWikiLinkEntitySelectionRequest?: (request: { slug: string; rect: DOMRect }) => void;
+    onWikiLinkInteraction?: () => void;
     sidebarWidth?: number;
     onSidebarWidthChange?: (width: number) => void;
     maxSidebarDragWidth?: number;
@@ -95,6 +96,7 @@ export default function PreviewMapShell({
     onCloseWikiSidebar,
     onWikiLinkRequest,
     onWikiLinkEntitySelectionRequest,
+    onWikiLinkInteraction,
     sidebarWidth,
     onSidebarWidthChange,
     maxSidebarDragWidth,
@@ -218,7 +220,7 @@ export default function PreviewMapShell({
                         top: 10,
                         bottom: (hasBottomPanel && isMobileOrTablet) ? `${(sidebarHeight || 400) + 20}px` : 20,
                         left: 18,
-                        zIndex: 18,
+                        zIndex: 70,
                         display: "flex",
                         flexDirection: "column",
                         gap: 12,
@@ -448,6 +450,7 @@ export default function PreviewMapShell({
                             onClose={onCloseWikiSidebar || (() => {})}
                             onWikiLinkRequest={onWikiLinkRequest || (() => {})}
                             onWikiLinkEntitySelectionRequest={onWikiLinkEntitySelectionRequest}
+                            onWikiLinkInteraction={onWikiLinkInteraction}
                             sidebarWidth={sidebarWidth}
                             onSidebarWidthChange={onSidebarWidthChange}
                             maxDragWidth={maxSidebarDragWidth}

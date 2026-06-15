@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
 import StoreProvider from '@/store/StoreProvider';
+import { headers } from 'next/headers';
 
 export const metadata: Metadata = {
   title: 'Ultimate History Map',
@@ -16,14 +17,18 @@ const inter = Inter({
   display: 'swap',
 });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname') || '/';
+  const isPublicRoot = pathname === '/';
+
   return (
-    <html lang="en" className={inter.variable}>
-      <body className={`${inter.className} dark:bg-gray-900`}>
+    <html lang="en" className={isPublicRoot ? '' : inter.variable}>
+      <body className={`${isPublicRoot ? 'font-sans' : inter.className} dark:bg-gray-900`}>
         <StoreProvider>
           {children}
           <Toaster closeButton richColors position="top-right" />
