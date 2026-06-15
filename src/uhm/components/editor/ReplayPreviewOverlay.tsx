@@ -57,6 +57,8 @@ export default function ReplayPreviewOverlay({
                 position: "absolute",
                 inset: 0,
                 zIndex: 60,
+                // Intentional feature: block map interaction during replay preview mode to prevent conflicts/bugs
+                // Tính năng có chủ ý: chặn tương tác với bản đồ trong lúc chạy replay để tránh lỗi/xung đột
                 pointerEvents: isPreviewMode ? "auto" : "none",
             }}
         >

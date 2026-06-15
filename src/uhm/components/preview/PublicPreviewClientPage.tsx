@@ -275,6 +275,11 @@ export default function PublicPreviewClientPage({
         replayActiveWikiId: replayPreview.activeWikiId,
         replayMode,
         onWikiLinkNavigate: focusFirstWikiEntityGeometries,
+        onSelect: useCallback(() => {
+            setWikiSelectionPanelAnchor(null);
+            setGeometrySelectionPanel(null);
+            setRightPanelMode("wiki");
+        }, []),
     });
 
     const handlePanelWikiLinkRequest = useCallback((request: { slug: string; rect: DOMRect }) => {

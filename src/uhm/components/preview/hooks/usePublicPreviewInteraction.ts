@@ -41,8 +41,9 @@ export function usePublicPreviewInteraction(options: {
     replayActiveWikiId?: string | null;
     replayMode?: "idle" | "playing" | "paused";
     onWikiLinkNavigate?: (wiki: Wiki) => void | Promise<void>;
+    onSelect?: () => void;
 }) {
-    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, timelineYear, replayActiveWikiId, replayMode, onWikiLinkNavigate } = options;
+    const { data, relations, setRelations, selectedFeatureIds, setSelectedFeatureIds, timelineYear, replayActiveWikiId, replayMode, onWikiLinkNavigate, onSelect } = options;
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [activeWikiSlug, setActiveWikiSlug] = useState<string | null>(null);
     const [isManualSidebarOpen, setIsManualSidebarOpen] = useState(false);
@@ -194,7 +195,8 @@ export function usePublicPreviewInteraction(options: {
         if (selectOptions?.selectGeometry && selectOptions?.sourceFeatureId != null) {
             setSelectedFeatureIds([selectOptions.sourceFeatureId]);
         }
-    }, [relations.entitiesById, relations.entityWikisById, setRelations, setSelectedFeatureIds, wikiCache]);
+        onSelect?.();
+    }, [relations.entitiesById, relations.entityWikisById, setRelations, setSelectedFeatureIds, wikiCache, onSelect]);
 
     const selectWiki = useCallback(async (
         wiki: Wiki
@@ -224,7 +226,8 @@ export function usePublicPreviewInteraction(options: {
         setActiveWikiError(null);
         setLinkEntityPopup(null);
         setIsManualSidebarOpen(true);
-    }, [relations.wikiEntityIdsById, selectEntity, wikiCache]);
+        onSelect?.();
+    }, [relations.wikiEntityIdsById, selectEntity, wikiCache, onSelect]);
 
     useEffect(() => {
         if (!selectedFeatureIds.length) {
