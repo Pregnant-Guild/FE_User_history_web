@@ -123,15 +123,34 @@ export default function ReplayPreviewOverlay({
 
             {dialog && (dialog.text?.trim() || dialog.image_url?.trim()) ? (
                 <div
-                    style={{
-                        position: "absolute",
-                        left: 88,
-                        right: rightOffset,
-                        bottom: 96,
-                        pointerEvents: "none",
-                        display: "flex",
-                        justifyContent: "flex-start",
-                    }}
+                    style={
+                        isLargeScreen
+                            ? {
+                                  position: "absolute",
+                                  left: 88,
+                                  right: rightOffset,
+                                  bottom: 96,
+                                  pointerEvents: "none",
+                                  display: "flex",
+                                  justifyContent: "flex-start",
+                              }
+                            : {
+                                  position: "absolute",
+                                  left: 18,
+                                  right: 18,
+                                  pointerEvents: "none",
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  ...(sidebarOpen
+                                      ? {
+                                            top: 130,
+                                            bottom: "auto",
+                                        }
+                                      : {
+                                            bottom: 110,
+                                        }),
+                              }
+                    }
                 >
                     <div
                         style={{
@@ -145,7 +164,7 @@ export default function ReplayPreviewOverlay({
                             pointerEvents: "auto",
                             display: "flex",
                             flexDirection: "column",
-                            maxHeight: "calc(100vh - 180px)",
+                            maxHeight: isLargeScreen ? "calc(100vh - 180px)" : "220px",
                         }}
                     >
                         {dialog.image_url?.trim() ? (
@@ -155,7 +174,7 @@ export default function ReplayPreviewOverlay({
                                 style={{
                                     width: "100%",
                                     display: "block",
-                                    maxHeight: 140,
+                                    maxHeight: isLargeScreen ? 140 : 100,
                                     objectFit: "cover",
                                     background: "#020617",
                                 }}
@@ -170,7 +189,9 @@ export default function ReplayPreviewOverlay({
                                     fontSize: "14px",
                                     lineHeight: "1.6",
                                     overflowY: "auto",
-                                    maxHeight: dialog.image_url?.trim() ? "180px" : "140px",
+                                    maxHeight: dialog.image_url?.trim()
+                                        ? (isLargeScreen ? "180px" : "100px")
+                                        : (isLargeScreen ? "140px" : "120px"),
                                     minHeight: 0,
                                     background: "transparent",
                                 }}
