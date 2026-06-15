@@ -147,21 +147,21 @@ export default function TimelineBar({
         onTimeRangeChange(Math.max(0, Math.min(30, safe)));
     };
 
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
     useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener("resize", checkMobile);
-        return () => window.removeEventListener("resize", checkMobile);
+        const checkDevice = () => setIsMobileOrTablet(window.innerWidth < 1024);
+        checkDevice();
+        window.addEventListener("resize", checkDevice);
+        return () => window.removeEventListener("resize", checkDevice);
     }, []);
 
     useEffect(() => {
-        if (isMobile && typeof timeRange === "number" && timeRange !== 0 && onTimeRangeChange) {
+        if (isMobileOrTablet && typeof timeRange === "number" && timeRange !== 0 && onTimeRangeChange) {
             onTimeRangeChange(0);
         }
-    }, [isMobile, timeRange, onTimeRangeChange]);
+    }, [isMobileOrTablet, timeRange, onTimeRangeChange]);
 
-    if (isMobile) {
+    if (isMobileOrTablet) {
         return (
             <div
                 style={{
@@ -286,40 +286,6 @@ export default function TimelineBar({
                     >
                         +
                     </button>
-
-                    {onPlayReplay ? (
-                        <>
-                            <div style={{ width: 1, height: 16, backgroundColor: "rgba(255, 255, 255, 0.15)" }} />
-                            <button
-                                type="button"
-                                onClick={onPlayReplay}
-                                style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: "50%",
-                                    backgroundColor: "#2563eb",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    color: "white",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                    flexShrink: 0,
-                                }}
-                                title="Xem diễn biến lịch sử (Replay)"
-                            >
-                                <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                >
-                                    <polygon points="5 3 19 12 5 21 5 3" />
-                                </svg>
-                            </button>
-                        </>
-                    ) : null}
                 </div>
 
                 {/* Ruler row below: full width */}
@@ -331,9 +297,12 @@ export default function TimelineBar({
                         pointerEvents: "auto",
                         width: "100%",
                         borderRadius: "24px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
                     }}
                 >
-                    <div className={styles.flexWrapper} style={{ width: "100%", display: "flex" }}>
+                    <div className={styles.flexWrapper} style={{ flex: 1, display: "flex" }}>
                         <CanvasTimelineRuler
                             year={displayYear}
                             onYearChange={handleLocalYearChange}
@@ -343,6 +312,37 @@ export default function TimelineBar({
                             disabled={effectiveDisabled}
                         />
                     </div>
+                    {onPlayReplay ? (
+                        <button
+                            type="button"
+                            onClick={onPlayReplay}
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: "50%",
+                                backgroundColor: "#2563eb",
+                                border: "1px solid rgba(255, 255, 255, 0.2)",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                flexShrink: 0,
+                                boxShadow: "0 2px 8px rgba(37, 99, 235, 0.3)",
+                            }}
+                            title="Xem diễn biến lịch sử (Replay)"
+                        >
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                            >
+                                <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                        </button>
+                    ) : null}
                 </div>
             </div>
         );
