@@ -93,9 +93,9 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
                 {/* Subtitle / Description (Right below title, italic, elegant, muted color) */}
                 <p
                     style={{
-                        fontFamily: "Georgia, serif",
+                        fontFamily: '"Times New Roman", Times, serif',
                         fontStyle: "italic",
-                        fontSize: "min(16px, 4.5vw)",
+                        fontSize: "min(17px, 4.8vw)",
                         color: "#94a3b8",
                         lineHeight: "1.7",
                         margin: 0,
@@ -125,10 +125,10 @@ export default function MapPlaceholder({ onEnter }: MapPlaceholderProps) {
             >
                 <div
                     style={{
-                        fontFamily: "Georgia, serif",
-                        fontSize: "12px",
+                        fontFamily: '"Times New Roman", Times, serif',
+                        fontSize: "13px",
                         fontWeight: "normal",
-                        letterSpacing: "0.2em",
+                        letterSpacing: "0.15em",
                         color: "#d97706",
                         textTransform: "uppercase",
                         opacity: 0.8,
