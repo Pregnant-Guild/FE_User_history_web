@@ -7,11 +7,12 @@ import type { MapHoverPopupContent } from "@/uhm/components/map/useMapHoverPopup
 import PresentPlaceSearch, { type HistoricalGeometryFocusPayload, type PresentPlaceSelection } from "@/uhm/components/editor/PresentPlaceSearch";
 import ReplayPreviewOverlay from "@/uhm/components/editor/ReplayPreviewOverlay";
 import ReplayPreviewLayerPanel from "@/uhm/components/editor/ReplayPreviewLayerPanel";
-import { PublicMapZoomPanel } from "@/uhm/components/preview/PublicPreviewClientPage";
+import { PublicMapZoomPanel } from "@/uhm/components/preview/PublicMapZoomPanel";
 import PublicWikiSidebar from "@/uhm/components/wiki/PublicWikiSidebar";
 import TimelineBar from "@/uhm/components/ui/TimelineBar";
 import RelatedEntityPopup from "./RelatedEntityPopup";
 import WikiSelectionPanel from "./WikiSelectionPanel";
+import { cleanWikiPreviewQuote, extractWikiBlockquoteText } from "@/uhm/lib/preview/previewUtils";
 import { fitMapToFeatureCollection } from "@/uhm/components/map/mapUtils";
 
 import { fetchWikiById, type Wiki } from "@/uhm/api/wikis";
@@ -990,42 +991,7 @@ function EditorPreviewModePanel({
 // Helper functions
 // ==========================================
 
-function extractWikiBlockquoteText(content: string | null | undefined): string {
-    if (!content) return "";
 
-    const decoded = decodeHtmlEntities(content);
-    const blockquoteMatch = decoded.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i);
-    const rawText = blockquoteMatch?.[1]?.trim() || "";
-    if (!rawText) return "";
-
-    return cleanWikiPlainText(rawText);
-}
-
-function cleanWikiPreviewQuote(raw: string | null | undefined): string {
-    const decoded = decodeHtmlEntities(String(raw || ""));
-    const blockquote = extractWikiBlockquoteText(decoded);
-    return cleanWikiPlainText(blockquote || decoded);
-}
-
-function cleanWikiPlainText(raw: string): string {
-    return decodeHtmlEntities(raw)
-        .replace(/<[^>]*>/g, "")
-        .replace(/\u00a0/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function decodeHtmlEntities(raw: string): string {
-    return raw
-        .replace(/&nbsp;/gi, " ")
-        .replace(/&#160;/gi, " ")
-        .replace(/&amp;/gi, "&")
-        .replace(/&lt;/gi, "<")
-        .replace(/&gt;/gi, ">")
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&apos;/gi, "'");
-}
 
 function getWikiHoverTitle(wiki: { title?: string | null } | null | undefined, fallbackTitle: string): string {
     return String(wiki?.title || "").trim() || fallbackTitle;
