@@ -79,6 +79,15 @@ import {
     normalizeGeoSearchGeometry,
     normalizeReplaysForCompare,
     normalizeWikisForCompare,
+    hasPlayableReplaySteps,
+    buildReplayPreviewDraftFromSource,
+    readImageAspectRatio,
+    isTypingTarget,
+    buildEntityRefsForFeature,
+    toEntityRefSnapshot,
+    mergeSnapshotEntityRefs,
+    mergeEntityCatalogById,
+    parseOptionalEntityYearInput,
 } from "@/uhm/lib/editor/editorPageUtils";
 import {
     buildEntityLabelContextDraft as buildPreviewEntityLabelContextDraft,
@@ -2867,166 +2876,4 @@ function EditorPageContent() {
     );
 }
 
-function hasPlayableReplaySteps(replay: BattleReplay | null | undefined) {
-    return Boolean(
-        replay?.detail?.some((stage) => Array.isArray(stage?.steps) && stage.steps.length > 0)
-    );
-}
 
-function buildReplayPreviewDraftFromSource(sourceDraft: FeatureCollection, replay: BattleReplay): FeatureCollection {
-    const targetIds = normalizeReplayPreviewTargetGeometryIds(replay);
-    return {
-        type: "FeatureCollection",
-        features: targetIds
-            .map((id) =>
-                sourceDraft.features.find((feature) => String(feature.properties.id) === id) || null
-            )
-            .filter((feature): feature is Feature => Boolean(feature))
-            .map((feature) => ({
-                ...deepClone(feature),
-                properties: {
-                    ...deepClone(feature.properties),
-                    bound_with: null,
-                },
-            })),
-    };
-}
-
-function normalizeReplayPreviewTargetGeometryIds(replay: BattleReplay) {
-    const orderedIds: string[] = [];
-    const seen = new Set<string>();
-    const pushId = (rawId: string | number | null | undefined) => {
-        if (rawId == null) return;
-        const id = String(rawId).trim();
-        if (!id.length || seen.has(id)) return;
-        seen.add(id);
-        orderedIds.push(id);
-    };
-
-    pushId(replay.geometry_id);
-    for (const rawId of replay.target_geometry_ids || []) pushId(rawId);
-    return orderedIds;
-}
-
-function readImageAspectRatio(url: string): Promise<number> {
-    return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => {
-            const width = image.naturalWidth || image.width;
-            const height = image.naturalHeight || image.height;
-            if (!width || !height) {
-                reject(new Error("Image has invalid dimensions."));
-                return;
-            }
-            resolve(width / height);
-        };
-        image.onerror = () => reject(new Error("Image load failed."));
-        image.src = url;
-    });
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    const tagName = target.tagName.toLowerCase();
-    return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
-}
-
-function buildEntityRefsForFeature(feature: Feature, entities: Entity[]): Entity[] {
-    const entityIds = normalizeFeatureEntityIds(feature);
-    if (!entityIds.length) return [];
-
-    const entityById = new globalThis.Map<string, Entity>();
-    for (const entity of entities || []) {
-        const id = String(entity?.id || "").trim();
-        if (!id) continue;
-        entityById.set(id, entity);
-    }
-
-    const entityNames = Array.isArray(feature.properties.entity_names)
-        ? feature.properties.entity_names
-        : [];
-    const primaryName = typeof feature.properties.entity_name === "string"
-        ? feature.properties.entity_name.trim()
-        : "";
-
-    return entityIds.map((id, index) => {
-        const catalogEntity = entityById.get(id);
-        if (catalogEntity) return catalogEntity;
-
-        const name = String(entityNames[index] || (index === 0 ? primaryName : "") || id).trim() || id;
-        return {
-            id,
-            name,
-            description: null,
-            time_start: null,
-            time_end: null,
-            geometry_count: 0,
-        };
-    });
-}
-
-function toEntityRefSnapshot(entity: Entity): EntitySnapshot {
-    return {
-        id: String(entity.id),
-        source: "ref",
-        operation: "reference",
-        name: entity.name,
-        description: entity.description ?? null,
-        time_start: normalizeTimelineYearValue(entity.time_start),
-        time_end: normalizeTimelineYearValue(entity.time_end),
-    };
-}
-
-function mergeSnapshotEntityRefs(prev: EntitySnapshot[], refs: EntitySnapshot[]): EntitySnapshot[] {
-    if (!refs.length) return prev;
-
-    const refsById = new globalThis.Map<string, EntitySnapshot>();
-    for (const ref of refs) {
-        const id = String(ref?.id || "").trim();
-        if (!id) continue;
-        refsById.set(id, ref);
-    }
-    if (!refsById.size) return prev;
-
-    let changed = false;
-    const seen = new Set<string>();
-    const next = (prev || []).map((row) => {
-        const id = String(row?.id || "").trim();
-        if (!id || !refsById.has(id)) return row;
-        seen.add(id);
-        if (row.operation !== "delete") return row;
-        changed = true;
-        return refsById.get(id) || row;
-    });
-
-    const missing = Array.from(refsById.values()).filter((ref) => !seen.has(String(ref.id)));
-    if (missing.length) changed = true;
-    return changed ? [...missing, ...next] : prev;
-}
-
-function mergeEntityCatalogById(prev: Entity[], refs: Entity[]): Entity[] {
-    if (!refs.length) return prev;
-
-    const byId = new globalThis.Map<string, Entity>();
-    for (const entity of prev || []) {
-        const id = String(entity?.id || "").trim();
-        if (!id) continue;
-        byId.set(id, entity);
-    }
-    for (const entity of refs) {
-        const id = String(entity?.id || "").trim();
-        if (!id) continue;
-        byId.set(id, entity);
-    }
-    return Array.from(byId.values());
-}
-
-function parseOptionalEntityYearInput(value: string, fieldName: string): number | undefined {
-    const trimmed = String(value || "").trim();
-    if (!trimmed.length) return undefined;
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-        throw new Error(`${fieldName} phải là số nguyên.`);
-    }
-    return parsed;
-}
