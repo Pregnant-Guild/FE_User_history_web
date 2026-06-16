@@ -284,7 +284,7 @@ export function useMapInteraction({
                     type: "Feature",
                     properties: {
                         id,
-                        type: "attack_route",
+                        type: "military_route",
                         geometry_preset: "line",
                         entity_id: null,
                         entity_ids: [],
@@ -306,7 +306,7 @@ export function useMapInteraction({
                     type: "Feature",
                     properties: {
                         id,
-                        type: "war",
+                        type: "battle",
                         geometry_preset: "circle-area",
                         entity_id: null,
                         entity_ids: [],

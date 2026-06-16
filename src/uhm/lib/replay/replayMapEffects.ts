@@ -259,8 +259,11 @@ export function createReplayMapEffects() {
             const path = removeDuplicateCoordinates(coordinates);
             if (path.length === 0) return;
             if (path.length === 1) {
-                map.easeTo({
+                map.flyTo({
                     center: path[0],
+                    zoom: typeof zoom === "number" ? zoom : map.getZoom(),
+                    pitch: map.getPitch(),
+                    bearing: map.getBearing(),
                     duration: clampNumber(duration, 250, 60000, 5000),
                 });
                 return;
@@ -272,35 +275,73 @@ export function createReplayMapEffects() {
             if (totalDistance <= 0) return;
 
             const totalDuration = clampNumber(duration, 250, 60000, 5000);
-            const startedAt = performance.now();
+            
+            // Allocate flyDuration dynamically based on the total step duration
+            let flyDuration = 1500;
+            if (totalDuration < 3000) {
+                flyDuration = Math.round(totalDuration * 0.4);
+            } else if (totalDuration < 4500) {
+                flyDuration = 1200;
+            }
+            const followDuration = Math.max(100, totalDuration - flyDuration);
+            
             let rafId = 0;
+            let flyTimeoutId: NodeJS.Timeout | null = null;
             let unregister: Cleanup | null = null;
+            let onMoveStart: ((e: any) => void) | null = null;
 
             const stop = () => {
+                if (flyTimeoutId) {
+                    clearTimeout(flyTimeoutId);
+                    flyTimeoutId = null;
+                }
                 if (rafId) {
                     cancelAnimationFrame(rafId);
                     rafId = 0;
+                }
+                if (onMoveStart) {
+                    map.off("movestart", onMoveStart);
+                    onMoveStart = null;
                 }
                 unregister?.();
                 unregister = null;
             };
 
-            const tick = (now: number) => {
-                const progress = Math.min(1, (now - startedAt) / totalDuration);
-                const targetDistance = totalDistance * progress;
-                const center = interpolateMeasuredPath(measured, targetDistance);
-                map.jumpTo({
-                    center,
-                });
-                if (progress >= 1) {
-                    stop();
+            onMoveStart = (e: any) => {
+                if (e && e.isFollowPath) {
                     return;
                 }
-                rafId = requestAnimationFrame(tick);
+                stop();
             };
+            map.on("movestart", onMoveStart);
+
+            map.flyTo({
+                center: path[0],
+                zoom: typeof zoom === "number" ? zoom : map.getZoom(),
+                pitch: map.getPitch(),
+                bearing: map.getBearing(),
+                duration: flyDuration,
+            }, { isFollowPath: true });
+
+            flyTimeoutId = setTimeout(() => {
+                const startedAt = performance.now();
+                const tick = (now: number) => {
+                    const progress = Math.min(1, (now - startedAt) / followDuration);
+                    const targetDistance = totalDistance * progress;
+                    const center = interpolateMeasuredPath(measured, targetDistance);
+                    map.jumpTo({
+                        center,
+                    }, { isFollowPath: true });
+                    if (progress >= 1) {
+                        stop();
+                        return;
+                    }
+                    rafId = requestAnimationFrame(tick);
+                };
+                rafId = requestAnimationFrame(tick);
+            }, flyDuration);
 
             unregister = registerCleanup(stop);
-            rafId = requestAnimationFrame(tick);
         },
     };
 }
