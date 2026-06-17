@@ -201,7 +201,7 @@ const narrativeActionDefinitions: NarrativeActionDefinitionMap = {
                 text: string;
                 image_url?: string;
             } = {
-                text: asString(values.text),
+                text: asString(values.text).replace(/&nbsp;/g, " ").replace(/\u00a0/g, " "),
             };
             if (values.image_url) {
                 data.image_url = asString(values.image_url);
@@ -883,6 +883,26 @@ function GeoFunctionShortcutPanel({
                         }
                     />
                     <ShortcutButton
+                        label="Ẩn Toàn Bộ"
+                        tone="slate"
+                        onClick={() =>
+                            onAppendActions(
+                                [{ function_name: "hide_all_geometries", params: [] }],
+                                "Geo: ẩn toàn bộ"
+                            )
+                        }
+                    />
+                    <ShortcutButton
+                        label="Hiện Toàn Bộ"
+                        tone="green"
+                        onClick={() =>
+                            onAppendActions(
+                                [{ function_name: "show_all_geometries", params: [] }],
+                                "Geo: hiện toàn bộ"
+                            )
+                        }
+                    />
+                    <ShortcutButton
                         label="Đặt làm BG"
                         tone="teal"
                         disabled={!hasSelection}
@@ -1410,7 +1430,7 @@ function FieldInput({
 
     if (field.kind === "rich-text") {
         return (
-            <label style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "grid", gap: 6 }}>
                 {baseLabel}
                 <div style={{ background: "#0b1220", borderRadius: 6, border: "1px solid #334155" }} className="dark">
                     <ReactQuillEditor
@@ -1420,7 +1440,7 @@ function FieldInput({
                         modules={quillModules}
                     />
                 </div>
-            </label>
+            </div>
         );
     }
 
@@ -1717,7 +1737,12 @@ function replaceUiActionsByGroup(
 
     const nextGroupActions = groupOptions
         .filter((option) => {
-            if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
+            if (
+                option === "timeline" ||
+                option === "layer_panel" ||
+                option === "zoom_panel" ||
+                option === "wiki"
+            ) {
                 return true;
             }
             return draft.selected[option];
@@ -1734,7 +1759,12 @@ function buildUiEffectsApplyLabel(
 ) {
     const activeLabels = groupOptions
         .filter((option) => {
-            if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
+            if (
+                option === "timeline" ||
+                option === "layer_panel" ||
+                option === "zoom_panel" ||
+                option === "wiki"
+            ) {
                 return true;
             }
             return draft.selected[option];
@@ -1743,6 +1773,9 @@ function buildUiEffectsApplyLabel(
             const label = uiOptionChoices.find((choice) => choice.value === option)?.label || option;
             if (option === "timeline" || option === "layer_panel" || option === "zoom_panel") {
                 return draft.selected[option] ? `Show ${label}` : `Hide ${label}`;
+            }
+            if (option === "wiki") {
+                return draft.wiki_id ? `Open ${label}: ${draft.wiki_id}` : `Close ${label}`;
             }
             return label;
         });

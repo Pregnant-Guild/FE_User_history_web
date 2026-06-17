@@ -36,6 +36,7 @@ export interface ReplayControllers {
     hideGeometries: (ids: string[]) => void;
     showOnlyGeometries: (ids: string[]) => void;
     showAllGeometries: () => void;
+    hideAllGeometries: () => void;
     setAsBackgroundGeometries: (ids: string[]) => void;
     removeFromBackgroundGeometries: (ids: string[]) => void;
 
@@ -97,6 +98,12 @@ export const dispatchReplayAction = (
                 return;
             case "hide_others_geometries":
                 controllers.showOnlyGeometries(toStringValues(params[0]));
+                return;
+            case "hide_all_geometries":
+                controllers.hideAllGeometries();
+                return;
+            case "show_all_geometries":
+                controllers.showAllGeometries();
                 return;
             case "pulse_geometry":
                 controllers.effects.pulseGeometry(
@@ -247,8 +254,10 @@ function normalizeSingleAction(action: unknown): ReplayAction<ReplayFunctionName
         case "reset_camera_north":
             return { function_name: "set_camera_view", params: [{ bearing: 0 }] };
         case "set_time_filter":
-        case "show_all_geometries":
             return null;
+        case "hide_all_geometries":
+        case "show_all_geometries":
+            return { function_name, params: [] };
 
         // Geo Functions
         case "fly_to_geometries":

@@ -113,7 +113,9 @@ export type GeoFunctionName =
     | "set_geometry_style"       // Đổi style trực tiếp của geometry
     | "orbit_camera_around_geometry" // Quay camera quanh một geometry
     | "set_as_background_geometries" // Đặt các geometry làm background (luôn hiện)
-    | "remove_from_background_geometries"; // Loại các geometry khỏi background
+    | "remove_from_background_geometries" // Loại các geometry khỏi background
+    | "hide_all_geometries"      // Ẩn toàn bộ geometry (ngoại trừ background)
+    | "show_all_geometries";     // Hiện toàn bộ geometry
 
 export type NarrativeFunctionName =
     | "set_dialog";              // Đặt kịch bản đối thoại/hình ảnh dẫn chuyện mới (hoặc null để xóa)

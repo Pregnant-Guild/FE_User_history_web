@@ -338,7 +338,7 @@ export function buildPolygonLabelFeatureCollection(
             continue;
         }
 
-        const labelPoint = getPolygonLabelPoint(feature.geometry);
+        const labelPoint = getPolygonLabelPoint(feature.geometry, feature.properties.id);
         if (!labelPoint) continue;
 
         const labelFeature: Feature = {
@@ -485,6 +485,32 @@ export function getGeometryRepresentativePoint(geometry: Geometry): Coordinate |
 }
 
 const pathArrowGeometriesCache = new WeakMap<Geometry, Geometry[]>();
+const pathArrowGeometriesL2Cache = new Map<string, Geometry[]>();
+const polygonLabelPointL2Cache = new Map<string, Coordinate | null>();
+const MAX_L2_CACHE_SIZE = 1000;
+
+export function clearGeometryCaches() {
+    pathArrowGeometriesL2Cache.clear();
+    polygonLabelPointL2Cache.clear();
+}
+
+function getGeometryFingerprint(geometry: Geometry): string {
+    const coords = geometry.coordinates;
+    if (!Array.isArray(coords)) return geometry.type;
+
+    if (typeof coords[0] === "number") {
+        return `${geometry.type}:${coords[0]},${coords[1]}`;
+    }
+
+    const flat = coords.flat(4) as number[];
+    if (flat.length === 0) return geometry.type;
+
+    const len = flat.length;
+    const first = flat[0];
+    const last = flat[len - 1];
+    const mid = flat[Math.floor(len / 2)];
+    return `${geometry.type}:${len}:${first}:${mid}:${last}`;
+}
 
 export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureCollection {
     const features: Feature[] = [];
@@ -494,15 +520,30 @@ export function buildPathArrowFeatureCollection(fc: FeatureCollection): FeatureC
 
         let arrowGeometries = pathArrowGeometriesCache.get(feature.geometry);
         if (!arrowGeometries) {
-            arrowGeometries = [];
-            const coordinateGroups = getLineCoordinateGroups(feature.geometry);
-            const featureType = getFeatureSemanticType(feature);
-            const isRetreat = featureType === "retreat_route";
-            for (const coordinates of coordinateGroups) {
-                const geometry = buildPathArrowGeometry(coordinates, isRetreat);
-                if (geometry) arrowGeometries.push(geometry);
+            const featureId = feature.properties?.id;
+            const fingerprint = getGeometryFingerprint(feature.geometry);
+            const cacheKey = featureId ? `${featureId}:${fingerprint}` : null;
+
+            if (cacheKey && pathArrowGeometriesL2Cache.has(cacheKey)) {
+                arrowGeometries = pathArrowGeometriesL2Cache.get(cacheKey)!;
+                pathArrowGeometriesCache.set(feature.geometry, arrowGeometries);
+            } else {
+                arrowGeometries = [];
+                const coordinateGroups = getLineCoordinateGroups(feature.geometry);
+                const featureType = getFeatureSemanticType(feature);
+                const isRetreat = featureType === "retreat_route";
+                for (const coordinates of coordinateGroups) {
+                    const geometry = buildPathArrowGeometry(coordinates, isRetreat);
+                    if (geometry) arrowGeometries.push(geometry);
+                }
+                pathArrowGeometriesCache.set(feature.geometry, arrowGeometries);
+                if (cacheKey) {
+                    if (pathArrowGeometriesL2Cache.size >= MAX_L2_CACHE_SIZE) {
+                        pathArrowGeometriesL2Cache.clear();
+                    }
+                    pathArrowGeometriesL2Cache.set(cacheKey, arrowGeometries);
+                }
             }
-            pathArrowGeometriesCache.set(feature.geometry, arrowGeometries);
         }
 
         for (const geometry of arrowGeometries) {
@@ -1163,10 +1204,20 @@ function getLineCoordinateGroups(geometry: Geometry): Coordinate[][] {
 
 const polygonLabelPointCache = new WeakMap<Geometry, Coordinate | null>();
 
-function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
+function getPolygonLabelPoint(geometry: Geometry, featureId?: string | number): Coordinate | null {
     if (polygonLabelPointCache.has(geometry)) {
         return polygonLabelPointCache.get(geometry)!;
     }
+
+    const fingerprint = getGeometryFingerprint(geometry);
+    const cacheKey = featureId ? `${featureId}:${fingerprint}` : null;
+
+    if (cacheKey && polygonLabelPointL2Cache.has(cacheKey)) {
+        const result = polygonLabelPointL2Cache.get(cacheKey)!;
+        polygonLabelPointCache.set(geometry, result);
+        return result;
+    }
+
     let result: Coordinate | null = null;
     if (geometry.type === "Polygon") {
         result = getPolygonLabelCandidate(geometry.coordinates)?.point || null;
@@ -1181,7 +1232,14 @@ function getPolygonLabelPoint(geometry: Geometry): Coordinate | null {
         }
         result = best?.point || null;
     }
+
     polygonLabelPointCache.set(geometry, result);
+    if (cacheKey) {
+        if (polygonLabelPointL2Cache.size >= MAX_L2_CACHE_SIZE) {
+            polygonLabelPointL2Cache.clear();
+        }
+        polygonLabelPointL2Cache.set(cacheKey, result);
+    }
     return result;
 }
 

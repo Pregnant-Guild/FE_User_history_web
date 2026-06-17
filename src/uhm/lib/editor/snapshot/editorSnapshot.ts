@@ -1193,6 +1193,18 @@ function normalizeReplayMapAndGeoActions(
                     params,
                 });
                 break;
+            case "hide_all_geometries":
+                normalizedGeoActions.push({
+                    function_name: "hide_all_geometries",
+                    params: [],
+                });
+                break;
+            case "show_all_geometries":
+                normalizedGeoActions.push({
+                    function_name: "show_all_geometries",
+                    params: [],
+                });
+                break;
             default:
                 break;
         }

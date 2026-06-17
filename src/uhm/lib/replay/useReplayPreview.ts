@@ -6,6 +6,7 @@ import type { BattleReplay, ReplayStage, ReplayStep, DialogState } from "@/uhm/t
 import { dispatchReplayAction } from "./replayDispatcher";
 import { mapActions } from "./mapActions";
 import { createReplayMapEffects } from "./replayMapEffects";
+import { clearGeometryCaches } from "@/uhm/components/map/mapUtils";
 
 export type ReplayPreviewToast = {
     id: number;
@@ -205,11 +206,13 @@ export function useReplayPreview({
                 });
             }
         }
+        clearGeometryCaches();
     }, [getMapInstance, resetPresentation, setMapProjection]);
 
     const resetPreview = useCallback(() => {
         runIdRef.current += 1;
         restorePreviewState();
+        clearGeometryCaches();
     }, [restorePreviewState]);
 
     const stopPreview = useCallback(() => {
@@ -217,6 +220,7 @@ export function useReplayPreview({
         isPlayingRef.current = false;
         setIsPlaying(false);
         getMapInstance()?.stop();
+        clearGeometryCaches();
     }, [getMapInstance]);
 
     useEffect(() => {
@@ -224,7 +228,10 @@ export function useReplayPreview({
         const timeoutId = window.setTimeout(() => {
             restorePreviewState();
         }, 0);
-        return () => window.clearTimeout(timeoutId);
+        return () => {
+            window.clearTimeout(timeoutId);
+            clearGeometryCaches();
+        };
     }, [replay?.id, restorePreviewState]);
 
     const controllers = useMemo<Parameters<typeof dispatchReplayAction>[0]>(() => ({
@@ -290,6 +297,13 @@ export function useReplayPreview({
         showAllGeometries: () => {
             setHiddenGeometryIds([]);
         },
+        hideAllGeometries: () => {
+            setHiddenGeometryIds(
+                draft.features
+                    .map((feature) => String(feature.properties.id))
+                    .filter((id) => !backgroundIdsRef.current.has(id))
+            );
+        },
         setDialog: setDialogWithRef,
         getDialog: () => dialogRef.current,
     }), [
@@ -301,13 +315,12 @@ export function useReplayPreview({
     ]);
 
     const controllersRef = useRef<Parameters<typeof dispatchReplayAction>[0] | null>(null);
-    useEffect(() => {
-        controllersRef.current = controllers;
-    }, [controllers]);
+    controllersRef.current = controllers;
 
     const playFromIndex = useCallback(async (startIndex: number) => {
         if (!flatSteps.length) return;
 
+        clearGeometryCaches();
         const map = getMapInstance();
         if (map) {
             map.stop(); // Stop ongoing camera animations/transitions immediately

@@ -169,7 +169,9 @@ export type GeoFunctionName =
     | "set_geometry_style"
     | "orbit_camera_around_geometry"
     | "set_as_background_geometries"
-    | "remove_from_background_geometries";
+    | "remove_from_background_geometries"
+    | "hide_all_geometries"
+    | "show_all_geometries";
 
 export type NarrativeFunctionName =
     | "set_dialog";
@@ -283,6 +285,8 @@ export type ReplayGeoFunctionParamTupleDocs = {
     remove_from_background_geometries: [
         geometry_ids: string[],
     ];
+    hide_all_geometries: [];
+    show_all_geometries: [];
 };
 
 export type ReplayNarrativeParamTupleDocs = {

@@ -240,17 +240,12 @@ function getBackgroundGeometryIdsFromReplay(replay: BattleReplay | null): Set<st
                 ? Math.max(...stages.map((stage) => stage.id)) + 1
                 : 0;
 
-        const bgIds = getBackgroundGeometryIdsFromReplay(replay);
-        const geometriesToHide = (replay.target_geometry_ids || []).filter(
-            (id: string) => !bgIds.has(String(id))
-        );
-        const initialGeoFunctions = [];
-        if (geometriesToHide.length > 0) {
-            initialGeoFunctions.push({
-                function_name: "set_geometry_visibility" as const,
-                params: [geometriesToHide, false],
-            });
-        }
+        const initialGeoFunctions = [
+            {
+                function_name: "hide_all_geometries" as const,
+                params: [],
+            },
+        ];
 
         const nextStage: ReplayStage = {
             id: nextId,
@@ -583,22 +578,13 @@ function getBackgroundGeometryIdsFromReplay(replay: BattleReplay | null): Set<st
                             <button
                                 type="button"
                                 onClick={onPlayPreviewFromSelection}
-                                disabled={!replay || selectedStage == null || selectedStepIndex == null}
+                                disabled={true /* Tạm thời khóa nút này */}
                                 style={{
                                     ...buttonStyle,
-                                    background:
-                                        !replay || selectedStage == null || selectedStepIndex == null
-                                            ? "#1e293b"
-                                            : "#0f766e",
+                                    background: "#1e293b",
                                     border: "none",
-                                    cursor:
-                                        !replay || selectedStage == null || selectedStepIndex == null
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    opacity:
-                                        !replay || selectedStage == null || selectedStepIndex == null
-                                            ? 0.7
-                                            : 1,
+                                    cursor: "not-allowed",
+                                    opacity: 0.7,
                                 }}
                             >
                                 Play từ step
@@ -1435,6 +1421,8 @@ const geoFunctionLabels: Record<GeoFunctionName, string> = {
     orbit_camera_around_geometry: "Orbit quanh geo",
     set_as_background_geometries: "Đặt làm background",
     remove_from_background_geometries: "Loại khỏi background",
+    hide_all_geometries: "Ẩn toàn bộ geo",
+    show_all_geometries: "Hiện toàn bộ geo",
 };
 
 function buildStepActionEntries(step: ReplayStep): StepActionEntry[] {
@@ -1590,6 +1578,12 @@ function buildGeoActionEntry(
             break;
         case "remove_from_background_geometries":
             summary = `geometry=${summarizeGeometryIdsValue(params[0])}`;
+            break;
+        case "hide_all_geometries":
+            summary = "Ẩn toàn bộ geo ngoại trừ background";
+            break;
+        case "show_all_geometries":
+            summary = "Hiện toàn bộ geo";
             break;
     }
 
