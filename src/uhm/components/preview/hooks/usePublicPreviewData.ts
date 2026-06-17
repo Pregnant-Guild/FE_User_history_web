@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { fetchGeometriesByBBox, fetchGeometriesByBoundWith } from "@/uhm/api/geometries";
+import { fetchGeometriesByBBox, fetchGeometriesByBoundWith, fetchGeometryById } from "@/uhm/api/geometries";
 import { ApiError } from "@/uhm/api/http";
 import {
     fetchEntitiesByGeometryIds,
@@ -19,7 +19,7 @@ import {
     type PreviewRelationIndex,
 } from "@/uhm/lib/preview/types";
 import type { Entity } from "@/uhm/types/entities";
-import type { FeatureCollection, FeatureEntityPreview, FeatureWikiPreview } from "@/uhm/types/geo";
+import type { Feature, FeatureCollection, FeatureEntityPreview, FeatureWikiPreview } from "@/uhm/types/geo";
 import type { BattleReplay } from "@/uhm/types/projects";
 import { fetchBattleReplaysByGeometryIds } from "@/uhm/api/battleReplays";
 
@@ -30,6 +30,7 @@ export function usePublicPreviewData(options: {
 }) {
     const { timelineYear, timeRange, enabled = true } = options;
     const [data, setData] = useState<FeatureCollection>(EMPTY_FEATURE_COLLECTION);
+    const [preloadedGeometries, setPreloadedGeometries] = useState<FeatureCollection>(EMPTY_FEATURE_COLLECTION);
     const [relations, setRelations] = useState<PreviewRelationIndex>(EMPTY_PREVIEW_RELATIONS);
     const [replays, setReplays] = useState<BattleReplay[]>([]);
     const [isTimelineLoading, setIsTimelineLoading] = useState(false);
@@ -38,10 +39,23 @@ export function usePublicPreviewData(options: {
     const [relationsStatus, setRelationsStatus] = useState<string | null>(null);
     const timelineFetchRequestRef = useRef(0);
     const loadedChildGeometryParentIdsRef = useRef<Set<string>>(new Set());
+    const loadedReplayIdsRef = useRef<Set<string>>(new Set());
+
+    const mergedData = useMemo(() => {
+        if (!preloadedGeometries.features.length) return data;
+        return mergeFeatureCollections(data, preloadedGeometries);
+    }, [data, preloadedGeometries]);
+
+    const dataRef = useRef(mergedData);
+
+    useEffect(() => {
+        dataRef.current = mergedData;
+    }, [mergedData]);
 
     useEffect(() => {
         if (!enabled) {
             setData(EMPTY_FEATURE_COLLECTION);
+            setPreloadedGeometries(EMPTY_FEATURE_COLLECTION);
             setRelations(EMPTY_PREVIEW_RELATIONS);
             setReplays([]);
             setIsTimelineLoading(false);
@@ -49,6 +63,7 @@ export function usePublicPreviewData(options: {
             setTimelineStatus(null);
             setRelationsStatus(null);
             loadedChildGeometryParentIdsRef.current.clear();
+            loadedReplayIdsRef.current.clear();
             return;
         }
 
@@ -61,6 +76,8 @@ export function usePublicPreviewData(options: {
             setTimelineStatus(null);
             setRelationsStatus(null);
             loadedChildGeometryParentIdsRef.current.clear();
+            loadedReplayIdsRef.current.clear();
+            setPreloadedGeometries(EMPTY_FEATURE_COLLECTION);
             let next: FeatureCollection;
 
             try {
@@ -183,8 +200,8 @@ export function usePublicPreviewData(options: {
     }, [timelineYear, timeRange, enabled]);
 
     const labelContextDraft = useMemo(
-        () => buildEntityLabelContextDraft(data, relations),
-        [data, relations]
+        () => buildEntityLabelContextDraft(mergedData, relations),
+        [mergedData, relations]
     );
 
     const ensureChildrenForGeometry = useCallback(async (parentGeometryId: string | number | null | undefined) => {
@@ -240,8 +257,79 @@ export function usePublicPreviewData(options: {
         }
     }, []);
 
+    const ensureReplayGeometries = useCallback(async (replay: BattleReplay | null | undefined) => {
+        if (!replay) {
+            setPreloadedGeometries(EMPTY_FEATURE_COLLECTION);
+            loadedReplayIdsRef.current.clear();
+            return;
+        }
+
+        if (replay.id && loadedReplayIdsRef.current.has(replay.id)) return;
+
+        setPreloadedGeometries(EMPTY_FEATURE_COLLECTION);
+        loadedReplayIdsRef.current.clear();
+        if (replay.id) {
+            loadedReplayIdsRef.current.add(replay.id);
+        }
+
+        const targetIds = Array.isArray(replay.target_geometry_ids) ? replay.target_geometry_ids : [];
+        if (!targetIds.length) return;
+
+        const existingIds = new Set(dataRef.current.features.map((f) => String(f.properties.id)));
+        const missingIds = targetIds
+            .map((id) => String(id).trim())
+            .filter((id) => id && !existingIds.has(id));
+
+        if (!missingIds.length) return;
+
+        let fetchedFeatures: Feature[] = [];
+        try {
+            const results = await Promise.all(
+                missingIds.map((id) => fetchGeometryById(id))
+            );
+            fetchedFeatures = results.filter((f): f is Feature => f !== null);
+        } catch (err) {
+            console.error("Load missing replay geometries failed", err);
+            if (replay.id) {
+                loadedReplayIdsRef.current.delete(replay.id);
+            }
+            return;
+        }
+
+        if (!fetchedFeatures.length) return;
+
+        const loadedFc: FeatureCollection = {
+            type: "FeatureCollection",
+            features: fetchedFeatures,
+        };
+
+        setPreloadedGeometries((prev) => mergeFeatureCollections(prev, loadedFc));
+
+        const loadedGeometryIds = fetchedFeatures.map((f) => String(f.properties.id));
+        let entitiesByGeometryId: Record<string, Entity[]> = {};
+        let wikisByEntityId: Record<string, Wiki[]> = {};
+        try {
+            entitiesByGeometryId = await fetchEntitiesByGeometryIds(loadedGeometryIds);
+            const entityIds = uniqueStrings(
+                Object.values(entitiesByGeometryId)
+                    .flat()
+                    .map((entity) => entity.id)
+            );
+            if (entityIds.length) {
+                wikisByEntityId = await fetchWikisByEntityIdsWithPreviews(entityIds);
+            }
+        } catch (err) {
+            console.error("Load replay geometry relations failed", err);
+        }
+
+        const newRelations = buildPublicPreviewRelationIndex(
+            buildRelationInputFromGeometryRelations(loadedFc, entitiesByGeometryId, wikisByEntityId)
+        );
+        setRelations((prev) => mergePreviewRelationIndexes(prev, newRelations));
+    }, []);
+
     return {
-        data,
+        data: mergedData,
         renderDraft: labelContextDraft,
         labelContextDraft,
         relations,
@@ -252,6 +340,7 @@ export function usePublicPreviewData(options: {
         relationsStatus,
         replays,
         ensureChildrenForGeometry,
+        ensureReplayGeometries,
     };
 }
 

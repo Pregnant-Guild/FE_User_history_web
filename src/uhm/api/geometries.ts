@@ -315,3 +315,22 @@ function normalizeEntityGeometryItems(items: EntityGeometriesSearchItemRow[] | u
         })),
     }));
 }
+
+export async function fetchGeometryById(id: string): Promise<Feature | null> {
+    const nextId = String(id || "").trim();
+    if (!nextId) return null;
+
+    try {
+        const row = await requestJson<GeometryRow>(
+            `${API_ENDPOINTS.geometries}/${encodeURIComponent(nextId)}`
+        );
+        if (!row) return null;
+
+        const fc = geometriesToFeatureCollection([row]);
+        return fc.features[0] || null;
+    } catch (err) {
+        console.error(`Failed to fetch geometry ${nextId}:`, err);
+        return null;
+    }
+}
+

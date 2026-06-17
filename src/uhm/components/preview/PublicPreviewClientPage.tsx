@@ -178,6 +178,7 @@ export default function PublicPreviewClientPage({
         relationsStatus,
         replays,
         ensureChildrenForGeometry,
+        ensureReplayGeometries,
     } = usePublicPreviewData({ timelineYear: searchTimelineYear, timeRange, enabled: loadInteractiveMap });
 
     const activeReplay = useMemo(() => {
@@ -207,6 +208,14 @@ export default function PublicPreviewClientPage({
         }
         return null;
     }, [replays, selectedFeatureIds]);
+
+    useEffect(() => {
+        if (activeReplay?.replay) {
+            void ensureReplayGeometries(activeReplay.replay);
+        } else {
+            void ensureReplayGeometries(null);
+        }
+    }, [activeReplay, ensureReplayGeometries]);
 
     const getMapInstance = useCallback(() => mapHandleRef.current?.getMap() || null, []);
     const handleSelectReplayStep = useCallback((stageId: number | null, stepIndex: number | null) => {
