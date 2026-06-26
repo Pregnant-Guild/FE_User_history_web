@@ -31,7 +31,41 @@ type RelationType =
     | "entity-geometry-child"
     | "entity-geometry-alone";
 
-const entitiesPromiseCache: Record<string, Promise<Entity[]>> = {};
+class BoundedPromiseCache<T> {
+    private cache = new Map<string, Promise<T>>();
+    constructor(private maxSize: number = 1000) {}
+
+    has(key: string): boolean {
+        return this.cache.has(key);
+    }
+
+    get(key: string): Promise<T> | undefined {
+        if (!this.cache.has(key)) return undefined;
+        const value = this.cache.get(key)!;
+        // Move key to the end to maintain LRU access order
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    set(key: string, value: Promise<T>): void {
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        } else if (this.cache.size >= this.maxSize) {
+            const oldestKey = this.cache.keys().next().value;
+            if (oldestKey !== undefined) {
+                this.cache.delete(oldestKey);
+            }
+        }
+        this.cache.set(key, value);
+    }
+
+    delete(key: string): boolean {
+        return this.cache.delete(key);
+    }
+}
+
+const entitiesPromiseCache = new BoundedPromiseCache<Entity[]>();
 
 export async function fetchRelationMap<T>(type: RelationType, ids: string[]): Promise<Record<string, T[]>> {
     const uniqueIds = uniqueStrings(ids);
@@ -51,7 +85,7 @@ export async function fetchGeometriesByEntityIds(ids: string[]): Promise<Record<
 
 export async function fetchEntitiesByGeometryIds(ids: string[]): Promise<Record<string, Entity[]>> {
     const uniqueIds = uniqueStrings(ids);
-    const missingIds = uniqueIds.filter(id => !entitiesPromiseCache[id]);
+    const missingIds = uniqueIds.filter(id => !entitiesPromiseCache.has(id));
 
     if (missingIds.length > 0) {
         const batchPromise = (async () => {
@@ -71,20 +105,21 @@ export async function fetchEntitiesByGeometryIds(ids: string[]): Promise<Record<
         batchPromise.catch(() => {});
 
         for (const id of missingIds) {
-            entitiesPromiseCache[id] = batchPromise
+            const subPromise = batchPromise
                 .then(res => res[id] || [])
                 .catch(err => {
-                    // Xóa khỏi cache để lần sau thử lại
-                    delete entitiesPromiseCache[id];
-                    // Trả về [] để không làm sập Promise.all của UI
-                    return [];
+                    // Xóa khỏi cache lập tức để lần sau thử lại
+                    entitiesPromiseCache.delete(id);
+                    throw err; // Propagate lỗi lên UI/Caller
                 });
+            entitiesPromiseCache.set(id, subPromise);
         }
     }
 
     const result: Record<string, Entity[]> = {};
     await Promise.all(uniqueIds.map(async id => {
-        result[id] = await entitiesPromiseCache[id];
+        const cached = entitiesPromiseCache.get(id);
+        result[id] = cached ? await cached : [];
     }));
     return result;
 }
@@ -125,11 +160,11 @@ export async function fetchWikiContentPreviewsByIds(ids: string[]): Promise<Wiki
     return result;
 }
 
-const wikisWithPreviewPromiseCache: Record<string, Promise<Wiki[]>> = {};
+const wikisWithPreviewPromiseCache = new BoundedPromiseCache<Wiki[]>();
 
 export async function fetchWikisByEntityIdsWithPreviews(ids: string[]): Promise<Record<string, Wiki[]>> {
     const uniqueIds = uniqueStrings(ids);
-    const missingIds = uniqueIds.filter(id => !wikisWithPreviewPromiseCache[id]);
+    const missingIds = uniqueIds.filter(id => !wikisWithPreviewPromiseCache.has(id));
 
     if (missingIds.length > 0) {
         const batchPromise = (async () => {
@@ -159,20 +194,21 @@ export async function fetchWikisByEntityIdsWithPreviews(ids: string[]): Promise<
         batchPromise.catch(() => {});
 
         for (const id of missingIds) {
-            wikisWithPreviewPromiseCache[id] = batchPromise
+            const subPromise = batchPromise
                 .then(res => res[id] || [])
                 .catch(err => {
-                    // Xóa khỏi cache để lần sau thử lại
-                    delete wikisWithPreviewPromiseCache[id];
-                    // Trả về [] để không làm sập Promise.all của UI
-                    return [];
+                    // Xóa khỏi cache lập tức để lần sau thử lại
+                    wikisWithPreviewPromiseCache.delete(id);
+                    throw err; // Propagate lỗi lên UI/Caller
                 });
+            wikisWithPreviewPromiseCache.set(id, subPromise);
         }
     }
 
     const result: Record<string, Wiki[]> = {};
     await Promise.all(uniqueIds.map(async id => {
-        result[id] = await wikisWithPreviewPromiseCache[id];
+        const cached = wikisWithPreviewPromiseCache.get(id);
+        result[id] = cached ? await cached : [];
     }));
     return result;
 }
